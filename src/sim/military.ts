@@ -1,3 +1,4 @@
+import { MAX_ARMIES } from './military-limits'
 import { markOccupation } from './geopolitics'
 import { knownMap } from './intelligence'
 import { clamp, population, relation, type Army, type World } from './types'
@@ -249,7 +250,7 @@ export function advanceArmies(w: World) {
         Math.floor(next.population.adults * 0.035 * localLoyalty),
         Math.floor(next.stocks.arms / 0.002),
       )
-      if (levy >= 50 && w.armies.length < 500) {
+      if (levy >= 50 && w.armies.length < MAX_ARMIES) {
         const militia: Army = {
           id: w.nextArmy++,
           nation: former.id,

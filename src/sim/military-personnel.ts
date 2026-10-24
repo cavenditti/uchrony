@@ -1,3 +1,4 @@
+import { MAX_ARMIES } from './military-limits'
 import { addCommunity, takeCivilianAdults, coalesceCommunities } from './population'
 import { clamp, population, type Army, type World } from './types'
 import { ensureWarfare, warEvent } from './navy'
@@ -12,7 +13,7 @@ export function reinforceArmies(world: World) {
   for (const nation of world.nations) {
     const own = world.regions.filter((r) => r.nation === nation.id)
     if (!own.length || nation.policies.military <= 0 || nation.policies.conscription <= 0) continue
-    if (world.armies.length < 500 && !world.armies.some((a) => a.nation === nation.id)) {
+    if (world.armies.length < MAX_ARMIES && !world.armies.some((a) => a.nation === nation.id)) {
       const source = own
         .filter(
           (r) =>

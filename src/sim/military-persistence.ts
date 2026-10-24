@@ -1,3 +1,4 @@
+import { MAX_ARMIES } from './military-limits'
 import { neighbors } from './hex'
 import type { World, RouteLeg } from './types'
 
@@ -56,7 +57,7 @@ export function validateWarfare(
       !Array.isArray(f.course) ||
       f.course.length > w.cells.length ||
       !Array.isArray(f.embarked) ||
-      f.embarked.length > 500 ||
+      f.embarked.length > MAX_ARMIES ||
       new Set(f.embarked).size !== f.embarked.length
     )
       fail(`fleet ${f.id} profile (crew=${f.soldiers}, food=${f.food}, arms=${f.arms}, hull=${f.hull})`)

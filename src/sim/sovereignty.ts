@@ -1,3 +1,4 @@
+import { MAX_ARMIES } from './military-limits'
 import { MAX_STATE_IDENTITIES } from './types'
 import { ensureStatecraft } from './statecraft'
 import { clamp, population, relation, type Army, type Nation, type World } from './types'
@@ -161,7 +162,7 @@ function transferAuthority(world: World, report: ProvincialAuthority) {
     former.legitimacy = 45
   }
   // Muster only actual organized supporters, using existing arms or a limited supply of improvised tools.
-  if (!armedForeign && world.armies.length < 500) {
+  if (!armedForeign && world.armies.length < MAX_ARMIES) {
     const recruits = Math.min(report.mobilizable, Math.floor(r.population.adults * 0.04), 1500),
       regular = Math.min(recruits, Math.floor(r.stocks.arms / 0.012)),
       improvised = recruits - regular,

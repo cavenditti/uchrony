@@ -4,9 +4,15 @@ import { generateWorld } from '../src/sim/generate'
 import { applyCommand } from '../src/sim/engine'
 import { ensureWarfare, commissionFleet, advanceNavy, embarkArmy } from '../src/sim/navy'
 import { restoreWorld, validateWorld } from '../src/sim/persistence'
-import { releaseSoldiers } from '../src/sim/population'
+import { releaseSoldiers, takeCivilianAdults } from '../src/sim/population'
 import { transportNetwork } from '../src/sim/transport'
-import { relation } from '../src/sim/types'
+import { relation, population, type World } from '../src/sim/types'
+import { initialArmyOperations } from '../src/sim/navy'
+import { MAX_ARMIES } from '../src/sim/military-limits'
+import { reinforceArmies } from '../src/sim/military-personnel'
+import { allForces } from '../src/sim/forces'
+import { persistSave, restoreSave } from '../src/storage/autosave'
+import type { WorldSave } from '../src/storage/save-types'
 
 test('manual recruitment is immediately saveable, before the next simulation month', () => {
   const w = generateWorld('manual-recruit-save')
@@ -97,4 +103,104 @@ test('an unaffordable allied-port purchase cannot give a fleet negative ammuniti
   advanceNavy(w)
   assert.equal(f.arms, 0)
   assert(f.food >= 0 && f.supply >= 0 && f.supply <= 1)
+})
+
+function fillCadres(w: World, count: number) {
+  const template = w.armies[0],
+    province = w.regions[template.region]
+  while (w.armies.length < count) {
+    w.armies.push({
+      ...template,
+      id: w.nextArmy++,
+      name: `Territorial cadre ${w.armies.length}`,
+      soldiers: 1,
+      establishment: 1,
+      communities: takeCivilianAdults(w, province, 1),
+      operations: initialArmyOperations(),
+    })
+  }
+}
+const people = (w: World) =>
+  w.regions.reduce((sum, r) => sum + population(r), 0) + allForces(w).reduce((sum, a) => sum + a.soldiers, 0)
+
+test('recruiting the 501st formation remains saveable and preserves people and military identities', async () => {
+  const w = generateWorld('army-capacity-regression'),
+    r = w.regions[w.nations[0].capital]
+  fillCadres(w, 500)
+  validateWorld(w)
+  const before = people(w),
+    ids = w.armies.map((a) => a.id)
+  w.nations[0].treasury = 100000
+  r.stocks.arms = 10000
+  assert.match(applyCommand(w, { type: 'recruit', nation: 0, region: r.id }), /Recruited/)
+  assert.equal(w.armies.length, 501)
+  assert.equal(people(w), before)
+  assert.deepEqual(
+    w.armies.slice(0, 500).map((a) => a.id),
+    ids,
+  )
+  validateWorld(w)
+  let stored: WorldSave | null = null
+  const backend = {
+    name: 'disk' as const,
+    read: async () => stored,
+    write: async (value: WorldSave) => {
+      stored = JSON.parse(JSON.stringify(value))
+    },
+  }
+  await persistSave([backend], { version: 1, savedAt: 1, world: w })
+  const restored = (await restoreSave([backend], null)).world!
+  assert.deepEqual(restored.armies, w.armies)
+  assert.equal(people(restored), before)
+  const original = JSON.stringify(w)
+  assert.equal(restoreWorld(w).armies.length, 501)
+  assert.equal(JSON.stringify(w), original, 'loading does not delete, merge or rewrite the source formations')
+})
+
+test('a state can rebuild its funded standing cadre after the world passes 500 formations', () => {
+  const w = generateWorld('army-capacity-cadre')
+  for (const a of w.armies.filter((a) => a.nation === 1))
+    releaseSoldiers(w, a, w.regions[a.region], a.soldiers)
+  w.armies = w.armies.filter((a) => a.soldiers > 0)
+  fillCadres(w, 500)
+  const n = w.nations[1],
+    source = w.regions[n.capital],
+    before = people(w)
+  n.treasury = 100000
+  n.budget.military = 1000
+  n.policies.military = 20
+  n.policies.conscription = 1
+  source.foodCoverage = 1
+  source.unrest = 0
+  source.stocks.arms = 10000
+  source.stocks.food = 100000
+  reinforceArmies(w)
+  assert(w.armies.some((a) => a.nation === 1 && a.soldiers >= 100))
+  assert.equal(w.armies.length, 501)
+  assert.equal(people(w), before)
+  validateWorld(w)
+})
+
+test('the shared safety boundary rejects oversized saves and blocks recruitment before spending or taking civilians', () => {
+  const w = generateWorld('army-capacity-boundary'),
+    r = w.regions[w.nations[0].capital]
+  w.armies = Array(MAX_ARMIES).fill(w.armies[0])
+  const before = {
+    treasury: w.nations[0].treasury,
+    stocks: structuredClone(r.stocks),
+    adults: r.population.adults,
+    nextArmy: w.nextArmy,
+  }
+  assert.match(
+    applyCommand(w, { type: 'recruit', nation: 0, region: r.id }),
+    /supported number of army formations/,
+  )
+  assert.deepEqual(
+    { treasury: w.nations[0].treasury, stocks: r.stocks, adults: r.population.adults, nextArmy: w.nextArmy },
+    before,
+  )
+  w.armies.push(w.armies[0])
+  assert.throws(() => validateWorld(w), /army formation capacity exceeded \(16385; supported 16384\)/)
+  w.armies = {} as never
+  assert.throws(() => validateWorld(w), /armies must be a list/)
 })

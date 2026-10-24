@@ -1,3 +1,4 @@
+import { MAX_ARMIES } from './military-limits'
 import {
   allocateProvincialTaxes,
   advanceInstitutions,
@@ -444,6 +445,7 @@ function diplomacy(w: World) {
 
 function recruit(w: World, n: Nation, r: Region): string {
   if (r.nation !== n.id) return 'Recruitment requires a province controlled by this state.'
+  if (w.armies.length >= MAX_ARMIES) return 'This world has reached its supported number of army formations.'
   const soldiers = Math.min(3000, Math.floor(r.population.adults * (0.025 + n.policies.conscription * 0.012)))
   const cost = soldiers * 0.2
   if (soldiers < 500) return 'Not enough adult recruits in this province.'

@@ -1,3 +1,4 @@
+import { MAX_ARMIES } from './military-limits'
 import { MAX_MAP_CELLS, MAX_PROVINCES } from './scale'
 import { validateInstitutions } from './institutions'
 import { validateIntelligence } from './intelligence-persistence'
@@ -243,7 +244,9 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     if (seenRelations.has(key)) fail('duplicate diplomatic relationship')
     seenRelations.add(key)
   }
-  if (!Array.isArray(w.armies) || w.armies.length > 500) fail('invalid armies')
+  if (!Array.isArray(w.armies)) fail('armies must be a list')
+  if (w.armies.length > MAX_ARMIES)
+    fail(`army formation capacity exceeded (${w.armies.length}; supported ${MAX_ARMIES})`)
   const armyIds = new Set<number>()
   for (const a of w.armies) {
     if (

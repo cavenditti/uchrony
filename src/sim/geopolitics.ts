@@ -1,3 +1,4 @@
+import { MAX_ARMIES } from './military-limits'
 import {
   intelligenceService,
   perceivedPower,
@@ -88,7 +89,7 @@ function mobilize(world: World, n: Nation, province: number, limit: number) {
         Math.max(0, r.stocks.food - population(r) * 0.02) / 0.06,
       ),
     )
-  if (amount < 100 || world.armies.length >= 500) return
+  if (amount < 100 || world.armies.length >= MAX_ARMIES) return
   const communities = takeCivilianAdults(world, r, amount)
   n.treasury -= amount * 0.2
   r.stocks.arms -= amount * 0.012
