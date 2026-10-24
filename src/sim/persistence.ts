@@ -278,6 +278,34 @@ export function validateWorld(value: unknown): World {
         fail('freight endpoints do not match shipment')
     }
   }
+  if (w.tradeLanes !== undefined) {
+    if (!Array.isArray(w.tradeLanes) || w.tradeLanes.length > w.regions.length * (w.regions.length - 1))
+      fail('invalid trade memory')
+    const seen = new Set<string>()
+    for (const lane of w.tradeLanes) {
+      if (
+        !object(lane) ||
+        !regionId(lane.from) ||
+        !regionId(lane.to) ||
+        lane.from === lane.to ||
+        !Array.isArray(lane.path) ||
+        lane.path.length < 2 ||
+        lane.path.length > w.regions.length ||
+        lane.path.some((id) => !regionId(id)) ||
+        new Set(lane.path).size !== lane.path.length ||
+        lane.path[0] !== lane.from ||
+        lane.path.at(-1) !== lane.to ||
+        !object(lane.flow) ||
+        GOODS.some((good) => !number(lane.flow[good])) ||
+        !number(lane.lastActive, 0, w.month) ||
+        !Number.isInteger(lane.lastActive)
+      )
+        fail('invalid remembered trade lane')
+      const key = `${lane.from}-${lane.to}`
+      if (seen.has(key)) fail('duplicate remembered trade lane')
+      seen.add(key)
+    }
+  }
   if (!Array.isArray(w.events) || w.events.length > 240) fail('invalid chronicle')
   for (const e of w.events)
     if (

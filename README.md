@@ -23,6 +23,7 @@ npm run preview       # Serve the production build locally
 npm test              # Simulation and persistence regression suite
 npm run test:soak     # Three 200-year simulations with invariant checks
 npm run format:check  # Check source formatting
+npm run test:trade-stability # Measure supplier continuity across three 20-year runs
 ```
 
 ## Explore a world
@@ -94,7 +95,7 @@ The atlas traces shared province boundaries, smooths shorelines, blends terrain 
 
 Existing saved worlds retain their geography and load normally. Use **New world** to see the revised generator. New worlds with an old seed now differ from the original generator; exports retain their complete map and generator version.
 
-The trade layer shows actual monthly freight on shared roads and shipping lanes. Roads use low-cost terrain paths; ships follow connected water between reachable coastal harbors. The selected state's or province's imports and exports are emphasized. Width represents summed tonnage in both directions, and moving dots indicate direction. The economy panel lists cargo, distance, and harbors. Old saved shipments without physical paths become visible again after advancing one month.
+The trade layer shows actual monthly freight on shared roads and shipping lanes. Roads use low-cost terrain paths; ships follow connected water between reachable coastal harbors. The selected state's or province's imports and exports are emphasized. Width represents summed tonnage in both directions, and moving dots indicate direction. The economy panel lists cargo, distance, and harbors. Trade relationships persist through minor cost changes: established paths require a 20% cost improvement to switch, while better suppliers gain traffic gradually. War and urgent shortages override supplier inertia; the memory survives save/load. Old saved shipments without physical paths become visible again after advancing one month.
 
 ## Scope and next extensions
 

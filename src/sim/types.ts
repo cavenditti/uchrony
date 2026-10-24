@@ -142,6 +142,14 @@ export interface Route {
   capacity: number
   international: boolean
 }
+export interface TradeLane {
+  from: number
+  to: number
+  path: number[]
+  /** Recent monthly cargo volumes, decayed during inactive months. Not stock or freight in transit. */
+  flow: Inventory
+  lastActive: number
+}
 export interface SimEvent {
   id: number
   month: number
@@ -175,6 +183,7 @@ export interface World {
   relations: Relation[]
   armies: Army[]
   routes: Route[]
+  tradeLanes?: TradeLane[]
   events: SimEvent[]
   history: HistoryPoint[]
   nextEvent: number

@@ -2,6 +2,28 @@
 
 Verified locally on 24 October 2026 using Node 26.11.1 and Chrome for Testing 151.0.7922.47. Results are grouped by implementation revision below; no production deployment is implied.
 
+## Trade inertia revision
+
+`npm run build`, `npm run format:check`, and **30 tests** pass. Six new regressions cover gradual supplier replacement, stability under small cost changes, small repeat orders, inactive memory decay and expiry, immediate war/supply/food overrides, physical route hysteresis, freight/treasury conservation and capacity, exact save continuation, legacy initialization, and malformed memory rejection.
+
+`npm run test:trade-stability` runs three 20-year scenarios and measures months 61–240. A recurring supplier is the same origin, destination, and good as in the preceding month, weighted by current freight tonnage. Monthly reallocation is `sum(abs(current - previous)) / sum(current + previous)` across those relationships; it includes changes in total volume. Baseline is commit `45bf3da`, using the same seeds and measurement script. These are evolving synthetic scenarios, not calibrated economic observations.
+
+| Seed | Recurring supplier, before | Recurring supplier, after | Reallocation, before | Reallocation, after |
+| --- | ---: | ---: | ---: | ---: |
+| A world unwritten | 25.22% | 96.56% | 77.29% | 5.04% |
+| Long winter | 22.35% | 82.66% | 80.42% | 21.46% |
+| Maritime republics | 27.49% | 82.97% | 76.40% | 22.80% |
+
+Three 200-year runs also pass monthly population accounting and periodic save validation:
+
+| Seed | Final population | Surviving states | Active routes | Event IDs |
+| --- | ---: | ---: | ---: | ---: |
+| A world unwritten | 20,747,827 | 8 | 384 | 272 |
+| Long winter | 20,186,560 | 6 | 437 | 525 |
+| Maritime republics | 20,723,378 | 7 | 358 | 579 |
+
+The compiled browser build imports the prior 20-year save without trade memory and initializes 473 remembered relationships on the next monthly tick. Reloading restores the same month and an identical SHA-256 digest of the serialized trade memory. The updated economy explanation and eight shipment rows render successfully, with no browser runtime errors.
+
 ## Geographic freight revision
 
 The trade network and renderer pass `npm run build`, `npm run format:check`, and **24 tests**. Five new regressions exercise water-only navigation around headlands, disconnected seas, low mountain passes, road and harbor continuity across three generated worlds, symmetric civilian costs and directional military access, exact shipment geometry, malformed/legacy save handling, and aggregation of opposing flows. Existing tests still verify conservation of goods and treasury, shared connection capacity, deterministic continuation, and population accounting.

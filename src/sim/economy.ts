@@ -13,6 +13,14 @@ import {
 } from './types'
 
 import { transportNetwork, reverseLegs } from './transport'
+import {
+  rememberedTrade,
+  rememberShipments,
+  establishedPath,
+  pathCost,
+  laneKey,
+  TRADE_INERTIA,
+} from './trade-memory'
 
 export const BASE_PRICE: Inventory = {
   food: 14,
@@ -195,14 +203,21 @@ export function pathTo(previous: Int32Array, from: number, to: number): number[]
 export function trade(world: World) {
   const graph = transportGraph(world),
     capacity = new Map<string, number>(),
-    routes = new Map<string, Route>()
+    routes = new Map<string, Route>(),
+    memory = rememberedTrade(world)
   const key = (a: number, b: number) => `${Math.min(a, b)}-${Math.max(a, b)}`
   for (let a = 0; a < graph.length; a++) for (const e of graph[a]) capacity.set(key(a, e.to), e.capacity)
-  const pathCache = new Map<number, ReturnType<typeof shortestPaths>>()
+  const pathCache = new Map<number, ReturnType<typeof shortestPaths>>(),
+    plans = new Map<string, { path: number[]; cost: number }>()
   world.routes = []
   for (const g of GOODS) {
+    const establishedBuyers = new Set(
+      [...memory.values()].filter((lane) => lane.flow[g] >= 0.1).map((lane) => lane.to),
+    )
+    // Established buyers replenish small shortfalls instead of cycling between
+    // a large order and a silent month at the 90% reorder threshold.
     const buyers = world.regions
-      .filter((r) => r.stocks[g] < reserveTarget(r, g) * 0.9)
+      .filter((r) => r.stocks[g] < reserveTarget(r, g) * (establishedBuyers.has(r.id) ? 1 : 0.9))
       .sort(
         (a, b) =>
           a.stocks[g] / Math.max(1, reserveTarget(a, g)) - b.stocks[g] / Math.max(1, reserveTarget(b, g)) ||
@@ -212,23 +227,36 @@ export function trade(world: World) {
       let needed = reserveTarget(buyer, g) - buyer.stocks[g]
       if (!pathCache.has(buyer.id)) pathCache.set(buyer.id, shortestPaths(graph, buyer.id))
       const paths = pathCache.get(buyer.id)!
-      const sellers = world.regions
+      const candidates = world.regions
         .filter(
           (s) =>
             s.id !== buyer.id &&
-            s.stocks[g] > reserveTarget(s, g) * 1.1 &&
-            Number.isFinite(paths.distance[s.id]),
+            Number.isFinite(paths.distance[s.id]) &&
+            s.stocks[g] >
+              reserveTarget(s, g) * ((memory.get(laneKey(s.id, buyer.id))?.flow[g] ?? 0) >= 0.1 ? 1 : 1.1),
         )
         .filter((s) => s.nation === buyer.nation || relation(world, s.nation, buyer.nation)?.treaty !== 'war')
-        .sort(
-          (a, b) =>
-            paths.distance[a.id] * (a.nation === buyer.nation ? 0.6 : 1) -
-            paths.distance[b.id] * (b.nation === buyer.nation ? 0.6 : 1),
-        )
-      for (const seller of sellers.slice(0, 5)) {
-        if (needed < 0.1) break
-        const path = pathTo(paths.previous, buyer.id, seller.id).reverse()
-        if (path.length < 2) continue
+        .map((seller) => {
+          const id = laneKey(seller.id, buyer.id),
+            prior = memory.get(id)
+          if (!plans.has(id)) {
+            const best = pathTo(paths.previous, buyer.id, seller.id).reverse(),
+              path = establishedPath(graph, prior?.path, best)
+            plans.set(id, { path, cost: pathCost(graph, path) })
+          }
+          const plan = plans.get(id)!
+          return {
+            seller,
+            path: plan.path,
+            score: plan.cost * (seller.nation === buyer.nation ? 0.6 : 1),
+            prior: prior?.flow[g] ?? 0,
+          }
+        })
+        .sort((a, b) => a.score - b.score || a.seller.id - b.seller.id)
+      if (!candidates.length) continue
+      const transfer = (candidate: (typeof candidates)[number], requested: number) => {
+        const { seller, path } = candidate
+        if (needed < 0.1 || requested < 0.1 || path.length < 2) return
         const edgeKeys = path.slice(1).map((id, i) => key(path[i], id))
         const available = Math.min(...edgeKeys.map((k) => capacity.get(k) ?? 0))
         const international = seller.nation !== buyer.nation
@@ -246,9 +274,12 @@ export function trade(world: World) {
         // Tariffs are border friction in this public-inventory abstraction;
         // a trade treaty removes the reduction in cross-border throughput.
         const amount =
-          Math.max(0, Math.min(needed, seller.stocks[g] - reserveTarget(seller, g), available, affordable)) /
+          Math.max(
+            0,
+            Math.min(requested, needed, seller.stocks[g] - reserveTarget(seller, g), available, affordable),
+          ) /
           (1 + tariff)
-        if (amount < 0.1) continue
+        if (amount < 0.1) return
         seller.stocks[g] -= amount
         buyer.stocks[g] += amount
         needed -= amount
@@ -283,9 +314,29 @@ export function trade(world: World) {
           })
         }
       }
+      const established = candidates.filter((candidate) => candidate.prior >= 0.1),
+        previousTotal = established.reduce((sum, candidate) => sum + candidate.prior, 0),
+        initialNeed = needed,
+        urgentFood = g === 'food' && buyer.stocks.food < population(buyer) * MONTHLY_NEED.food
+      if (!urgentFood && previousTotal > 0) {
+        for (const candidate of established) {
+          // Preserve normal supplier shares. When a meaningfully better option
+          // appears, release 25% per month instead of replacing the relationship.
+          const competitive = candidate.score * (1 - TRADE_INERTIA.improvement) <= candidates[0].score,
+            retention = competitive ? 1 : 1 - TRADE_INERTIA.adjustment
+          transfer(candidate, ((initialNeed * candidate.prior) / previousTotal) * retention)
+        }
+      }
+      // Unavailable goods, closed borders, exhausted capacity and urgent food
+      // needs bypass reservations. Only real, affordable freight is recorded.
+      for (const candidate of candidates) {
+        if (needed < 0.1) break
+        transfer(candidate, needed)
+      }
     }
   }
   world.routes = [...routes.values()]
+  rememberShipments(world, memory)
 }
 
 export function consume(world: World) {

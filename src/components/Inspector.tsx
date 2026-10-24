@@ -590,9 +590,9 @@ export function Inspector({
               </p>
             )}
             <p className="panel-note">
-              Shipments move surplus goods to shortages along the lowest-cost open route. Roads follow
-              terrain; shipping uses coastal harbors and connected water. Corridors share limited capacity,
-              and hostile borders close to trade. Select a province on the map to highlight its imports and
+              Established suppliers and routes persist through small cost changes. Better suppliers gain
+              traffic gradually; war, unavailable supply, and urgent food needs override that inertia. Roads
+              follow terrain and ships use connected water. Select a province to highlight its imports and
               exports.
             </p>
           </>
