@@ -64,11 +64,11 @@ export function completedFreight(
   }
 }
 
-export function parallelHarbors() {
-  const rows = Array.from({ length: 7 }, () => Array<string>(40).fill('.'))
+export function parallelHarbors({ gap = 2, width = 40 } = {}) {
+  const rows = Array.from({ length: gap + 5 }, () => Array<string>(width).fill('.'))
   rows[2][1] = 'A'
-  rows[2][38] = 'B'
-  rows[4][1] = 'C'
-  rows[4][38] = 'D'
+  rows[2][width - 2] = 'B'
+  rows[2 + gap][1] = 'C'
+  rows[2 + gap][width - 2] = 'D'
   return corridorWorld(rows.map((row) => row.join('')))
 }

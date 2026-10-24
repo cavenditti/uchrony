@@ -1,4 +1,5 @@
 import { MinHeap } from './heap'
+import { bundleCorridors } from './corridor-bundling'
 import type { Cell, CorridorPlan, RouteLeg, World } from './types'
 import {
   CORRIDOR_LEARNING,
@@ -116,7 +117,7 @@ function physicalLink(world: World, link: { from: number; to: number; legs: Rout
   return { ...link, landCost, seaCost }
 }
 
-/** Reconsider tile paths quarterly; retain the old path unless savings exceed 5%. */
+/** Quarterly cost replanning and nearby trunk consolidation, with annual path inertia. */
 export function refreshTransport(world: World, profile: CorridorProfile) {
   const previous = world.corridorPlan
   if (
@@ -151,7 +152,28 @@ export function refreshTransport(world: World, profile: CorridorProfile) {
       changedAt: keep ? changedAt : world.month,
     }
   })
-  world.corridorPlan = { month: world.month, links }
+  const bundled = bundleCorridors(
+    world,
+    profile,
+    links,
+    (link) =>
+      world.month - (ages.get(`${link.from}-${link.to}`) ?? world.month) >=
+      CORRIDOR_LEARNING.minimumPathMonths,
+  )
+  for (const link of bundled) {
+    const prior = oldLinks.get(`${link.from}-${link.to}`),
+      unchanged =
+        prior &&
+        prior.legs.length === link.legs.length &&
+        prior.legs.every(
+          (leg, i) =>
+            leg.mode === link.legs[i].mode &&
+            leg.cells.length === link.legs[i].cells.length &&
+            leg.cells.every((cell, j) => cell === link.legs[i].cells[j]),
+        )
+    link.changedAt = unchanged ? (ages.get(`${link.from}-${link.to}`) ?? world.month) : world.month
+  }
+  world.corridorPlan = { month: world.month, links: bundled }
 }
 
 function buildNetwork(world: World, profile?: CorridorProfile, base?: TransportNetwork): TransportNetwork {
