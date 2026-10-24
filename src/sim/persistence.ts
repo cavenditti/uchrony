@@ -1,4 +1,5 @@
 import { GOODS, FIELDS, type World } from './types'
+import { neighbors } from './hex'
 
 /** Validates untrusted save files before they enter the simulation worker. */
 export function validateWorld(value: unknown): World {
@@ -19,6 +20,8 @@ export function validateWorld(value: unknown): World {
   const w = value as unknown as World
   walk(w)
   if (w.version !== 1) fail('unsupported version; this app supports version 1')
+  if (w.generatorVersion !== undefined && ![1, 2].includes(w.generatorVersion))
+    fail('unsupported geography generator')
   if (
     typeof w.seed !== 'string' ||
     w.seed.length > 100 ||
@@ -58,6 +61,14 @@ export function validateWorld(value: unknown): World {
     )
       fail(`invalid map cell ${i}`)
     if (c.terrain !== 'water' && !regionId(c.region)) fail('land cell without a province')
+    if (c.riverFlow !== undefined && !number(c.riverFlow, 0, w.cells.length * 2)) fail('invalid river runoff')
+    if (c.downstream !== undefined) {
+      if (!cellId(c.downstream) || !neighbors(c.id, w.width, w.height).includes(c.downstream))
+        fail('invalid downstream connection')
+      const next = w.cells[c.downstream]
+      if (!object(next) || !number(next.elevation, -5, 5) || next.elevation >= c.elevation)
+        fail('river drainage must descend without cycles')
+    }
   }
   const seenCells = new Set<number>()
   for (const [i, r] of w.regions.entries()) {

@@ -9,9 +9,12 @@ import {
   population,
   clamp,
 } from './types'
-import { hashSeed, random, fractal } from './random'
+import { hashSeed, random } from './random'
+import { neighbors } from './hex'
+import { generateGeography } from './geography'
+import { MinHeap } from './heap'
+export { HEX, neighbors } from './hex'
 
-export const HEX = 7
 export const GRID_W = 112
 export const GRID_H = 72
 export const NAMES = [
@@ -73,22 +76,6 @@ const ends = [
   'fell',
 ]
 
-export function neighbors(id: number, width: number, height: number): number[] {
-  const q = id % width,
-    r = Math.floor(id / width),
-    s = r % 2
-  return [
-    [q - 1, r],
-    [q + 1, r],
-    [q - 1 + s, r - 1],
-    [q + s, r - 1],
-    [q - 1 + s, r + 1],
-    [q + s, r + 1],
-  ]
-    .filter(([x, y]) => x >= 0 && x < width && y >= 0 && y < height)
-    .map(([x, y]) => y * width + x)
-}
-
 export function makeNation(id: number, capital: number): Nation {
   const [name, shortName, color, government, personality] = NAMES[id % NAMES.length]
   return {
@@ -142,57 +129,8 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
   const rng = { rng: hashSeed(seed) },
     rand = () => random(rng)
   const width = GRID_W,
-    height = GRID_H,
-    noiseSeed = rng.rng
-  const masses = Array.from({ length: continents + 2 }, (_, i) => ({
-    x: (i < continents ? 0.18 + ((i + rand() * 0.4) / continents) * 0.66 : 0.15 + rand() * 0.7) * width,
-    y: (0.28 + rand() * 0.42) * height,
-    rx: width * (i < continents ? 0.23 + rand() * 0.06 : 0.1),
-    ry: height * (i < continents ? 0.33 + rand() * 0.12 : 0.13),
-  }))
-  const cells: Cell[] = []
-  for (let r = 0; r < height; r++)
-    for (let q = 0; q < width; q++) {
-      const warpX = (fractal(q / 22, r / 22, noiseSeed + 9) - 0.5) * 18
-      const warpY = (fractal(q / 22, r / 22, noiseSeed + 66) - 0.5) * 15
-      const continental = Math.max(
-        ...masses.map((m) => 1 - Math.hypot((q + warpX - m.x) / m.rx, (r + warpY - m.y) / m.ry)),
-      )
-      const rugged = fractal(q / 10, r / 10, noiseSeed)
-      const elevation = continental * 0.64 + (rugged - 0.4) * 0.7
-      const moisture = fractal(q / 14, r / 14, noiseSeed + 98)
-      const latitude = Math.abs(r / height - 0.5) * 2
-      const terrain =
-        elevation < 0.095
-          ? 'water'
-          : elevation > 0.49
-            ? 'mountains'
-            : elevation > 0.36
-              ? 'hills'
-              : latitude > 0.68
-                ? 'tundra'
-                : moisture < 0.34
-                  ? 'desert'
-                  : moisture > 0.54
-                    ? 'forest'
-                    : 'plains'
-      cells.push({
-        id: r * width + q,
-        q,
-        r,
-        x: Math.sqrt(3) * HEX * (q + (r % 2) / 2),
-        y: HEX * 1.5 * r,
-        elevation,
-        moisture,
-        terrain,
-        region: -1,
-        river: false,
-      })
-    }
-  // Remove isolated single cells; the smallest islands still get an administrable province.
-  for (const c of cells)
-    if (c.terrain !== 'water' && neighbors(c.id, width, height).every((id) => cells[id].terrain === 'water'))
-      c.terrain = 'water'
+    height = GRID_H
+  const cells = generateGeography(seed, continents, width, height)
   const land = cells.filter((c) => c.terrain !== 'water')
   const seeds: Cell[] = [land[Math.floor(rand() * land.length)]]
   const minDistances = new Float64Array(cells.length).fill(Infinity)
@@ -211,18 +149,28 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
     }
     seeds.push(best)
   }
-  const queue: number[] = []
+  // Cost-based growth keeps provinces connected and makes ridges meaningful boundaries.
+  const frontier = new MinHeap(),
+    costs = new Float64Array(cells.length).fill(Infinity)
   seeds.forEach((c, i) => {
     c.region = i
-    queue.push(c.id)
+    costs[c.id] = 0
+    frontier.push(c.id, 0)
   })
-  for (let i = 0; i < queue.length; i++) {
-    const c = cells[queue[i]]
-    for (const n of neighbors(c.id, width, height))
-      if (cells[n].terrain !== 'water' && cells[n].region < 0) {
-        cells[n].region = c.region
-        queue.push(n)
+  while (frontier.size) {
+    const { id, cost } = frontier.pop(),
+      c = cells[id]
+    if (cost !== costs[id]) continue
+    for (const next of neighbors(id, width, height)) {
+      const n = cells[next]
+      if (n.terrain === 'water') continue
+      const step = 1 + Math.abs(n.elevation - c.elevation) * 12 + (n.terrain === 'mountains' ? 1.8 : 0)
+      if (cost + step < costs[next]) {
+        costs[next] = cost + step
+        n.region = c.region
+        frontier.push(next, cost + step)
       }
+    }
   }
   // Seed any disconnected island not reached by the main flood fill.
   for (const c of land)
@@ -240,6 +188,12 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
     }
   const regions: Region[] = seeds.map((c, id) => {
     const regionCells = land.filter((x) => x.region === id)
+    const cx = regionCells.reduce((s, x) => s + x.x, 0) / regionCells.length
+    const cy = regionCells.reduce((s, x) => s + x.y, 0) / regionCells.length
+    const score = (x: Cell) =>
+      Math.hypot(x.x - cx, x.y - cy) + Math.max(0, x.elevation - 0.2) * 45 - (x.river ? 4 : 0)
+    c = regionCells.reduce((best, x) => (score(x) < score(best) ? x : best))
+
     const fertility = clamp(
       regionCells.reduce(
         (s, x) =>
@@ -250,7 +204,8 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
               ? 0.64
               : x.terrain === 'hills'
                 ? 0.48
-                : 0.22),
+                : 0.22) +
+          (x.river ? 0.12 : 0),
         0,
       ) / regionCells.length,
     )
@@ -315,26 +270,27 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
       }
     r.neighbors = [...adjacent]
   }
-  // Rivers follow downhill paths from high ground; they are geographic features, not decoration.
-  const springs = land.filter((c) => c.elevation > 0.38 && c.moisture > 0.48).sort(() => 0)
-  for (let i = 0; i < 30 && springs.length; i++) {
-    let c = springs[Math.floor(rand() * springs.length)]
-    const visited = new Set<number>()
-    for (let step = 0; step < 70; step++) {
-      if (c.terrain === 'water' || visited.has(c.id)) break
-      visited.add(c.id)
-      c.river = true
-      const next = neighbors(c.id, width, height)
-        .map((id) => cells[id])
-        .filter((x) => !visited.has(x.id))
-        .sort((a, b) => a.elevation - b.elevation)[0]
-      if (!next || next.elevation > c.elevation + 0.018) break
-      c = next
+  const landmassSize = new Uint32Array(cells.length)
+  for (const c of land)
+    if (!landmassSize[c.id]) {
+      const group = [c.id]
+      landmassSize[c.id] = 1
+      for (let i = 0; i < group.length; i++)
+        for (const n of neighbors(group[i], width, height)) {
+          if (cells[n].terrain !== 'water' && !landmassSize[n]) {
+            landmassSize[n] = 1
+            group.push(n)
+          }
+        }
+      group.forEach((id) => {
+        landmassSize[id] = group.length
+      })
     }
-  }
   const capitals: Region[] = [regions.reduce((a, b) => (a.cells.length > b.cells.length ? a : b))]
   while (capitals.length < nationCount) {
-    const candidates = regions.filter((r) => !capitals.includes(r) && r.cells.length > 4)
+    const candidates = regions.filter(
+      (r) => !capitals.includes(r) && r.cells.length > 4 && landmassSize[r.center] >= 200,
+    )
     let best = candidates[0],
       max = -1
     for (const r of candidates) {
@@ -350,13 +306,39 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
     capitals.push(best)
   }
   const nations = capitals.map((r, i) => makeNation(i, r.id))
+  const stateFrontier = new MinHeap(),
+    stateCosts = new Float64Array(regions.length).fill(Infinity)
+  capitals.forEach((r, i) => {
+    r.nation = i
+    stateCosts[r.id] = 0
+    stateFrontier.push(r.id, 0)
+  })
+  while (stateFrontier.size) {
+    const { id, cost } = stateFrontier.pop(),
+      r = regions[id]
+    if (cost !== stateCosts[id]) continue
+    for (const next of r.neighbors) {
+      const n = regions[next],
+        a = cells[r.center],
+        b = cells[n.center]
+      const step = Math.hypot(a.x - b.x, a.y - b.y) * (1 + Math.abs(a.elevation - b.elevation) * 3)
+      if (cost + step < stateCosts[next]) {
+        n.nation = r.nation
+        stateCosts[next] = cost + step
+        stateFrontier.push(next, cost + step)
+      }
+    }
+  }
   for (const r of regions) {
-    const c = cells[r.center]
-    r.nation = capitals.reduce((best, cap, i) => {
-      const a = cells[cap.center],
-        b = cells[capitals[best].center]
-      return Math.hypot(a.x - c.x, a.y - c.y) < Math.hypot(b.x - c.x, b.y - c.y) ? i : best
-    }, 0)
+    // Unsettled islands join the closest capital across water.
+    if (r.nation < 0) {
+      const c = cells[r.center]
+      r.nation = capitals.reduce((best, cap, i) => {
+        const a = cells[cap.center],
+          b = cells[capitals[best].center]
+        return Math.hypot(a.x - c.x, a.y - c.y) < Math.hypot(b.x - c.x, b.y - c.y) ? i : best
+      }, 0)
+    }
     r.culture = r.nation
   }
   capitals.forEach((r, i) => {
@@ -382,6 +364,7 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
   })
   const world: World = {
     version: 1,
+    generatorVersion: 2,
     seed,
     rng: rng.rng,
     month: 0,

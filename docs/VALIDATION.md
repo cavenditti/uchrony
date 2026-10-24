@@ -1,8 +1,24 @@
 # Validation record
 
-Verified locally on 24 October 2026 using Node 26.11.1 and Chrome for Testing 151.0.7922.47. These results apply to the implementation in this checkout, not to a deployed service.
+Verified locally on 24 October 2026 using Node 26.11.1 and Chrome for Testing 151.0.7922.47. Results are grouped by implementation revision below; no production deployment is implied.
 
-## Automated checks
+## Map generation and rendering revision
+
+The revised generator and renderer pass `npm run build`, `npm run format:check`, and **19 tests**. Six geography-specific regressions cover major-landmass counts over three seeds and four settings, the ocean boundary, downstream reachability and runoff, connected provinces and polygon hit testing, static-geometry cache invalidation, pointer-anchored zoom, and legacy-save compatibility/rejection of malformed drainage. The existing simulation suite still passes, including the 100-year validity check and deterministic save continuation.
+
+The three 200-year / 2,400-month soak runs completed on the revised geography, with monthly population accounting and periodic full save validation:
+
+| Seed | Final population | Surviving states | Active routes | Event IDs |
+| --- | ---: | ---: | ---: | ---: |
+| A world unwritten | 20,334,747 | 8 | 133 | 292 |
+| Long winter | 19,839,054 | 6 | 127 | 623 |
+| Maritime republics | 20,491,661 | 7 | 130 | 434 |
+
+Browser verification uses the compiled build on local port 4174. The political atlas, terrain, zoomed detail, mobile layout, and legend views were inspected. Clicking Aurel's rendered center selected the correct province. The geometry controls generated a different five-continent, twelve-state world. The 390px phone layout has no horizontal overflow. A real JSON export from the initial build was imported and advanced from January 1722 to January 1723 successfully; no browser runtime errors were reported. Captures are under `.impeccable/review/map-final-*.png` (local, ignored by Git).
+
+The following initial-build record is retained as historical evidence. Its **1,080-year run belongs to the original generator**; the revised generator has the three 200-year runs above, not a new 1,080-year qualification.
+
+## Initial-build automated checks
 
 - `npm run build`: TypeScript and Vite production build passed.
 - `npm run format:check`: passed.

@@ -669,7 +669,7 @@ export default function App() {
           >
             <Globe2 className="dialog-symbol" size={34} strokeWidth={1} />
             <h2 id="dialog-title">A different beginning.</h2>
-            <p>Give geography a seed. Let history find its own way.</p>
+            <p>Shape continents, islands, mountain ranges, and river basins from a seed.</p>
             <label className="select-label">
               World seed
               <input

@@ -618,6 +618,10 @@ button:hover:not(:disabled) {
 }
 .map-title {
   position: absolute;
+  background: #243f49f2;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: -8px -10px;
   top: 23px;
   left: 25px;
   pointer-events: none;

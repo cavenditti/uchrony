@@ -203,6 +203,8 @@ State selectors pair a heraldic mark with a name, supporting data, and status. S
 
 The layer picker, stacked zoom controls, and tooltip use compact dark floating surfaces. Switching themes preserves geography and selection. Quantitative themes include a color ramp, descriptive label, and numeric ticks; terrain uses labeled swatches; trade and military use their rendered line and marker vocabulary. The scale shifts clear of the thematic legend. Icons are SVG components, including the selected layer check.
 
+The atlas renders shared province polygons over interpolated terrain, with slope lighting and a deep-water field (`#243f49`) that blends into the map surround. Shorelines use the shared smoothed land silhouette. Political fills are grouped by state; detailed province divisions appear on closer inspection. Labels reserve screen space to avoid overlaps, and the title retains an opaque slate backing while panning over bright land. Pointer-anchored wheel zoom and double-click zoom preserve geographic orientation. These are map-specific devices, not decorative treatments for other panels.
+
 ### Meters and Chronicle
 
 Meters pair a left label and right value with a narrow tonal track. Research emphasis reuses brass. Chronicle entries pair a timestamp and event marker with an Alegreya title and explanatory text, separated by rules. Use actual event categories and available state values rather than decorative indicators.

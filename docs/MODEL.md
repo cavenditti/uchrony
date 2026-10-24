@@ -11,6 +11,18 @@ Uchrony's model is deliberately inspectable. These are implemented rules, not cl
 - The map scale assumes four kilometers per internal map coordinate unit. It is a fictional spatial convention and updates with zoom.
 - Generating the same seed with the same settings on the same model version produces the same world. The PRNG state is part of every save.
 
+## Geography and cartography
+
+Generator 2 uses separated continental nuclei with seeded domain warping and angular coastline variation, plus smaller offshore islands. An ocean frame keeps land away from the map boundary. Curved ridge fields create mountain belts. Latitude, elevation, moisture noise, and a simple dry-latitude/rain-shadow term choose biomes. This is synthetic terrain generation, not plate tectonics or an atmospheric simulation.
+
+A priority flood removes drainage sinks by minimally raising their elevations. Each land cell stores a lower, adjacent downstream cell. Runoff accumulates in reverse drainage order; visible rivers begin at 12 runoff units and continue to the sea. Rivers increase local moisture and add a small contribution to provincial fertility. These runoff units are relative catchment weights, not measured cubic meters per second. River flow is geographic and does not yet change with monthly rainfall.
+
+Provinces grow with positive terrain costs, preserving connected land ownership. Centers prefer positions near each province's centroid, with a preference for lower ground and rivers. Starting capitals are spread over substantial landmasses rather than tiny offshore rocks. State expansion follows the province graph; unclaimed offshore provinces join the closest capital. None of these rules constrain later military conquests.
+
+Rendering extracts shared polygon topology from the hex grid, applies bounded shared-vertex offsets, and smooths the land silhouette. Interpolated terrain and slope lighting are cached independently of economic updates. Borders and quantitative fills read current simulation state. City and state labels use screen-space collision checks; ocean labels use open-water clearance. Hit testing follows province polygons, and wheel zoom preserves the geographic location under the pointer. The smoothed shore is a small visual approximation of the underlying boundary; it does not change simulation adjacency.
+
+The version-1 save envelope remains supported. New saves carry `generatorVersion: 2` and optional per-cell drainage fields; older exports without those fields remain valid and keep their saved terrain. New generation is reproducible within this generator version. Changed neighbor traversal and geography may produce different future histories than an older application build; same-build save continuation remains deterministic.
+
 ## Monthly order
 
 1. Increment the month; reset population-flow counters.

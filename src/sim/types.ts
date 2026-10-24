@@ -24,6 +24,8 @@ export interface Cell {
   terrain: Terrain
   region: number
   river: boolean
+  downstream?: number
+  riverFlow?: number
 }
 export interface Region {
   id: number
@@ -154,6 +156,7 @@ export interface HistoryPoint {
 }
 export interface World {
   version: 1
+  generatorVersion?: number
   seed: string
   rng: number
   month: number

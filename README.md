@@ -28,7 +28,7 @@ npm run format:check  # Check source formatting
 ## Explore a world
 
 1. **Play** advances time in monthly ticks. Choose 1×, 4×, 12×, or 60×; pause to advance one month or one year precisely.
-2. **Select a state** from the left rail, or a **province** on the map. Drag to pan and scroll to zoom. Map buttons also support zoom and reset.
+2. **Select a state** from the left rail, or a **province** on the map. Drag to pan and scroll to zoom. Wheel zoom stays anchored under the cursor; double-click zooms into a location. Map buttons also support zoom and reset.
 3. **Change the map layer** between politics, terrain, population, contentment, food coverage, trade, and military activity.
 4. Use the **Population, Economy, Diplomacy, Military, Research, and Government** views to inspect or intervene. The chronicle records important events.
 5. **Export** before trying a different history. Importing a save restores the exact random state and pauses the simulation.
@@ -41,7 +41,7 @@ Keyboard shortcuts: **Space** play/pause, **1–4** speed, **L** cycle layers, *
 
 | System | Mechanisms and consequences |
 | --- | --- |
-| Geography | Reproducible seeded continent generation; 8,064 hex cells; about 180 provinces plus isolated islands; coasts, elevation, moisture, terrain, rivers, and resource richness. Start with 4–12 fictional states. |
+| Geography | Reproducible seeded continent generation; 8,064 hex cells; about 180 provinces plus isolated islands; separated continents and offshore islands; irregular coasts, mountain belts, latitude/moisture biomes, connected river basins, and resource richness. Start with 4–12 fictional states. |
 | Demography | Children, adults, and elders; births, aging, health-dependent mortality, food-shortage mortality, literacy, employment, urbanization, migration, local culture, contentment, and unrest. Military recruitment removes adults from civilian work. |
 | Resources and production | Eight goods: food, timber, stone, iron, coal, tools, textiles, arms. Terrain, labor, land capacity, infrastructure, damage, policy, and technology affect output. Manufacturing consumes actual inputs. |
 | Distribution | Local reserves, scarcity-sensitive prices, domestic and international shipments, shortest accessible paths, road and port capacity shared by shipments, tariff friction, wartime border closures, spoilage and storage limits. |
@@ -68,7 +68,9 @@ The tested workflows, regression coverage, and 1,080-year run are recorded in [d
 ```text
 src/sim/types.ts        Shared state, commands, and worker messages
 src/sim/random.ts       Seed hashing, PRNG, geographic noise
-src/sim/generate.ts     Geography, provinces, initial states and armies
+src/sim/geography.ts    Continental relief, climate, and drainage
+src/sim/generate.ts     Terrain-aware provinces, states, and initial armies
+src/map/               Shared polygon geometry, relief rendering, and label placement
 src/sim/economy.ts      Production, route graph, trade, consumption
 src/sim/engine.ts       Fiscal policy, demographics, research, diplomacy, warfare
 src/sim/persistence.ts  Untrusted-save validation
@@ -81,6 +83,14 @@ tests/                 Behavioral and long-horizon invariant tests
 The simulation engine is independent of React and the DOM. A dedicated Web Worker advances the world while the main thread renders the interface. Model randomness comes from a saved pseudorandom state; rendering animation never changes simulation results.
 
 The UI uses React, TypeScript, Vite, Canvas, Lucide icons, and self-hosted Alegreya fonts. No map imagery or remote fonts are fetched at runtime. Third-party packages retain their own licenses.
+
+## Map generation and rendering
+
+The geography setting selects one, two, three, or five major landmasses, with smaller offshore islands. Province and initial state expansion account for terrain costs. Mountain belts, moisture, latitude, and drainage influence the map; rivers collect runoff and reach the sea, with a small fertility benefit along their course.
+
+The atlas traces shared province boundaries, smooths shorelines, blends terrain shading, and places labels with collision checks. Province divisions and smaller place names become visible as you zoom. The underlying simulation remains a 112 × 72 hex grid; this is a cartographic rendering improvement, not an increase in simulation resolution.
+
+Existing saved worlds retain their geography and load normally. Use **New world** to see the revised generator. New worlds with an old seed now differ from the original generator; exports retain their complete map and generator version.
 
 ## Scope and next extensions
 
