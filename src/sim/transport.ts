@@ -33,9 +33,10 @@ function search(
   adjacent: number[][],
   cost: (a: number, b: number) => number,
   targets?: Set<number>,
+  buffers?: { distance: Float64Array; previous: Int32Array },
 ) {
-  const distance = new Float64Array(adjacent.length).fill(Infinity),
-    previous = new Int32Array(adjacent.length).fill(-1),
+  const distance = buffers?.distance ?? new Float64Array(adjacent.length).fill(Infinity),
+    previous = buffers?.previous ?? new Int32Array(adjacent.length).fill(-1),
     queue = new MinHeap()
   distance[start] = 0
   queue.push(start, 0)
@@ -162,9 +163,19 @@ function buildNetwork(world: World, profile?: CorridorProfile, base?: TransportN
 
   // Each province has one road tree rooted at its settlement. Roads to borders
   // and harbors therefore share trunks instead of drawing a separate line per shipment.
+  // Province trees are disjoint. One pair of arrays serves the entire map,
+  // rather than retaining a map-sized allocation for every province.
+  const roadBuffers = {
+    distance: new Float64Array(cells.length).fill(Infinity),
+    previous: new Int32Array(cells.length).fill(-1),
+  }
   const roads = regions.map((r) =>
-    search(r.center, adjacent, (a, b) =>
-      cells[b].region === r.id && !isWater(b) ? landEffort(a, b) : Infinity,
+    search(
+      r.center,
+      adjacent,
+      (a, b) => (cells[b].region === r.id && !isWater(b) ? landEffort(a, b) : Infinity),
+      undefined,
+      roadBuffers,
     ),
   )
   const borders = new Map<string, { from: number; to: number; a: number; b: number; cost: number }>()
@@ -248,7 +259,12 @@ function buildNetwork(world: World, profile?: CorridorProfile, base?: TransportN
     seaPairs = base
       ? new Set(base.links.filter((link) => link.seaCost > 0).map((link) => `${link.from}-${link.to}`))
       : undefined
-  for (let i = 0; i < harbors.length; i++) {
+  if (!base && regions.length > 300) {
+    // A sea Voronoi network connects neighboring port catchments. It spans
+    // each navigable basin without materializing every possible port pair.
+    candidates.push(...seaBackbone(world, harbors, adjacent, shore, borders))
+  }
+  for (let i = 0; i < harbors.length && (base || regions.length <= 300); i++) {
     const a = harbors[i]
     if (seaPairs && !harbors.slice(i + 1).some((b) => seaPairs.has(`${a.region}-${b.region}`))) continue
     // A replan needs only the existing destination ports, not distances to every sea tile.
@@ -319,4 +335,77 @@ function buildNetwork(world: World, profile?: CorridorProfile, base?: TransportN
   }
   links.push(...chosen)
   return { links, harbors }
+}
+
+/** Multi-source sailing distances produce a sparse, physically navigable port graph. */
+function seaBackbone(
+  world: World,
+  ports: Harbor[],
+  adjacent: number[][],
+  shore: boolean[],
+  borders: Map<string, unknown>,
+): TransportLink[] {
+  const distance = new Float64Array(world.cells.length).fill(Infinity),
+    previous = new Int32Array(world.cells.length).fill(-1),
+    owner = new Int32Array(world.cells.length).fill(-1),
+    queue = new MinHeap(),
+    crossings = new Map<string, { from: number; to: number; a: number; b: number; cost: number }>()
+  ports.forEach((port, i) => {
+    if (distance[port.water] === 0) {
+      // Two settlements can share a shore tile, and both still need a sea connection.
+      const other = owner[port.water],
+        a = ports[other]
+      crossings.set(`${a.region}-${port.region}`, {
+        from: other,
+        to: i,
+        a: port.water,
+        b: port.water,
+        cost: 0,
+      })
+    } else {
+      distance[port.water] = 0
+      owner[port.water] = i
+      queue.push(port.water, 0)
+    }
+  })
+  while (queue.size) {
+    const at = queue.pop()
+    if (at.cost !== distance[at.id]) continue
+    for (const next of adjacent[at.id]) {
+      if (world.cells[next].terrain !== 'water') continue
+      const step = 1 + (+shore[at.id] + +shore[next]) * 0.15,
+        candidate = at.cost + step
+      if (candidate < distance[next]) {
+        distance[next] = candidate
+        previous[next] = at.id
+        owner[next] = owner[at.id]
+        queue.push(next, candidate)
+      }
+    }
+  }
+  for (let a = 0; a < adjacent.length; a++) {
+    if (owner[a] < 0) continue
+    for (const b of adjacent[a]) {
+      if (owner[b] < 0 || owner[a] >= owner[b]) continue
+      const from = owner[a],
+        to = owner[b],
+        key = `${ports[from].region}-${ports[to].region}`,
+        cost = distance[a] + distance[b] + 1 + (+shore[a] + +shore[b]) * 0.15
+      if (cost < (crossings.get(key)?.cost ?? Infinity)) crossings.set(key, { from, to, a, b, cost })
+    }
+  }
+  return [...crossings.values()].flatMap((crossing) => {
+    const a = ports[crossing.from],
+      b = ports[crossing.to]
+    if (borders.has(`${a.region}-${b.region}`)) return []
+    const left = trace(previous, a.water, crossing.a),
+      right = trace(previous, b.water, crossing.b).reverse()
+    if (!left.length || !right.length) return []
+    if (left.at(-1) === right[0]) right.shift()
+    const legs: RouteLeg[] = []
+    if (a.access.length > 1) legs.push({ mode: 'land', cells: a.access })
+    legs.push({ mode: 'sea', cells: [a.land, ...left, ...right, b.land] })
+    if (b.access.length > 1) legs.push({ mode: 'land', cells: [...b.access].reverse() })
+    return [{ from: a.region, to: b.region, landCost: a.cost + b.cost, seaCost: crossing.cost + 2, legs }]
+  })
 }

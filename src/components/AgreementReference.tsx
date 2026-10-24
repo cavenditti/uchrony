@@ -1,3 +1,4 @@
+import { inWorldText } from '../sim/narrative'
 import { agreementTitle, splitAgreementReferences, visibleAgreement } from '../sim/agreement-references'
 import { dateLabel, type World } from '../sim/types'
 
@@ -25,20 +26,20 @@ export function AgreementReference({
     <a
       className="agreement-link"
       href={`#agreement-${offer.id}`}
-      title={`${agreementTitle(offer)} · ${dateLabel({ month: offer.month, startYear: world.startYear })} · ${offer.status}`}
+      title={`${inWorldText(agreementTitle(offer))} · ${dateLabel({ month: offer.month, startYear: world.startYear })} · ${offer.status}`}
       onClick={(event) => {
         event.preventDefault()
         onOpen(offer.id)
       }}
     >
-      {agreementTitle(offer)}
+      {inWorldText(agreementTitle(offer))}
     </a>
   )
 }
 export function AgreementText({ text, ...props }: AgreementReferenceProps & { text: string }) {
   return (
     <>
-      {splitAgreementReferences(text).map((part, index) =>
+      {splitAgreementReferences(inWorldText(text)).map((part, index) =>
         part.agreement === undefined ? (
           part.text
         ) : (

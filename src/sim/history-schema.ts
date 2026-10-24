@@ -1,3 +1,5 @@
+import { MAX_PROVINCES } from './scale'
+import { MAX_STATE_IDENTITIES } from './types'
 import { parseHistoryPatterns } from './history-repertoire'
 import {
   CHANGE_STATS,
@@ -24,8 +26,8 @@ const object = (properties: Record<string, unknown>) => ({
 const array = (items: unknown, maxItems: number) => ({ type: 'array', items, maxItems })
 const effectProperties = {
   scope: enumeration(['world', 'nation', 'region', 'relation']),
-  target: integer(-1, 599),
-  other: integer(-1, 63),
+  target: integer(-1, MAX_PROVINCES - 1),
+  other: integer(-1, -1),
   delay: integer(0, 120),
   field: enumeration(['', ...FIELDS]),
   text: { type: 'string', maxLength: 180 },
@@ -46,10 +48,24 @@ export const HISTORICAL_EFFECT_SCHEMA = {
     object({
       ...effectProperties,
       kind: enumeration(['change']),
-      stat: enumeration(CHANGE_STATS),
+      scope: enumeration(['world', 'nation', 'region']),
+      stat: enumeration(CHANGE_STATS.filter((stat) => stat !== 'opinion')),
       amount: { type: 'number', minimum: -100, maximum: 100 },
       duration: integer(0, 0),
       curve: enumeration(['steady']),
+      text: enumeration(['']),
+    }),
+    object({
+      ...effectProperties,
+      kind: enumeration(['change']),
+      scope: enumeration(['relation']),
+      target: integer(-1, MAX_STATE_IDENTITIES - 1),
+      other: integer(-1, MAX_STATE_IDENTITIES - 1),
+      stat: enumeration(['opinion']),
+      amount: { type: 'number', minimum: -20, maximum: 20 },
+      duration: integer(0, 0),
+      curve: enumeration(['steady']),
+      field: enumeration(['']),
       text: enumeration(['']),
     }),
     object({
@@ -105,8 +121,8 @@ export const HISTORICAL_EVENT_SCHEMA = object({
   category: enumeration(HISTORY_CATEGORIES),
   title: string(140),
   description: string(500),
-  nation: integer(0, 63),
-  region: integer(0, 599),
+  nation: integer(0, MAX_STATE_IDENTITIES - 1),
+  region: integer(0, MAX_PROVINCES - 1),
   causeEvent: integer(0, 1e9),
   conditions: array(conditionSchema, 4),
   effects: array(effectSchema, 12),
@@ -168,7 +184,7 @@ export function validateHistoricalEffect(world: World, value: unknown): Historic
   )
     fail('unknown effect target')
   if (e.scope === 'relation' ? !world.nations[e.other] || e.other === e.target : e.other !== -1)
-    fail('invalid relation target')
+    fail(`invalid relation target (scope=${e.scope}, target=${e.target}, other=${e.other})`)
   if (e.kind === 'modifier') {
     if (
       !has(MODIFIER_STATS, e.stat) ||
@@ -302,8 +318,16 @@ export function validateHistoricalProposal(world: World, value: unknown): Histor
       ? candidate.followUps.flatMap((followUp) => (Array.isArray(followUp.effects) ? followUp.effects : []))
       : []),
   ]) {
-    if (isObject(effect) && effect.scope === 'nation' && effect.target === -1)
-      effect.target = candidate.nation
+    if (!isObject(effect)) continue
+    if (effect.scope === 'relation') {
+      // The actor is unambiguous; a foreign counterpart must still be supplied explicitly.
+      if (effect.target === -1) effect.target = candidate.nation
+      if (effect.other === -1) effect.other = candidate.nation
+    } else if (['world', 'nation', 'region'].includes(String(effect.scope))) {
+      if (effect.scope === 'nation' && effect.target === -1) effect.target = candidate.nation
+      // This slot has no meaning outside a bilateral effect, even if a model echoed an ID into it.
+      effect.other = -1
+    }
   }
   const p = value as unknown as HistoricalProposal
   if (

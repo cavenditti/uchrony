@@ -7,7 +7,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 test('pending external requests never gate months, local events or worker playback; speed does not flood requests', async (t) => {
   let configured = true
   const requests: string[] = [],
-    snapshots: { month: number; local: number }[] = [],
+    snapshots: { month: number; local: number; terrain: boolean; mapKey: string }[] = [],
     errors: string[] = []
   const worker = {
     onmessage: (_message: { data: WorkerRequest }) => {},
@@ -15,6 +15,8 @@ test('pending external requests never gate months, local events or worker playba
       if (message.type === 'world')
         snapshots.push({
           month: message.world.month,
+          terrain: !!message.world.cells,
+          mapKey: message.mapKey,
           local: message.world.events.filter((event) => event.historical?.source === 'procedural').length,
         })
       if (message.type === 'error') errors.push(message.message)
@@ -40,6 +42,12 @@ test('pending external requests never gate months, local events or worker playba
     send({ type: 'step', count: 12 })
     send({ type: 'step', count: 12 })
     assert.equal(snapshots.at(-1)?.month, 27)
+    assert(snapshots[0].terrain, 'initial world includes its terrain')
+    assert(
+      snapshots.slice(1).every((snapshot) => !snapshot.terrain),
+      'monthly updates reuse immutable geography',
+    )
+    assert(snapshots.every((snapshot) => snapshot.mapKey === snapshots[0].mapKey))
     assert(snapshots.at(-1)!.local > 0)
     assert.equal(requests.length, 1, 'fast months cannot bypass the wall-time request budget')
     send({ type: 'playback', running: true, speed: 60 })
@@ -56,6 +64,8 @@ test('pending external requests never gate months, local events or worker playba
     configured = false
     send({ type: 'load', world: generateWorld('cleanup') })
     await wait(0)
+    assert(snapshots.at(-1)?.terrain, 'restoring another world sends its geography again')
+    assert.notEqual(snapshots.at(-1)?.mapKey, snapshots[0].mapKey)
     if (originalSelf) Object.defineProperty(globalThis, 'self', originalSelf)
     else Reflect.deleteProperty(globalThis, 'self')
   }

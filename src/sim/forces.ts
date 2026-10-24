@@ -1,4 +1,4 @@
-import type { Army, World } from './types'
+import { clamp, type Army, type World } from './types'
 export const allForces = (world: World): Army[] => [...world.armies, ...(world.warfare?.fleets ?? [])]
 export const militaryPeople = (world: World, nation: number) =>
   allForces(world)
@@ -14,5 +14,8 @@ export function unitLoyalty(world: World, force: Army) {
     loyalty += size * g.loyalty
     fluency += size * (g.language === language ? 1 : g.knownLanguage === language ? g.fluency : 0)
   }
-  return { loyalty: loyalty / total, cohesion: 0.55 + (loyalty / total) * 0.3 + (fluency / total) * 0.15 }
+  return {
+    loyalty: clamp(loyalty / total),
+    cohesion: clamp(0.55 + (loyalty / total) * 0.3 + (fluency / total) * 0.15),
+  }
 }

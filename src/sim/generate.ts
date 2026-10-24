@@ -1,6 +1,8 @@
 import { noise } from './random'
+import { WORLD_SCALES, worldScale, type WorldScale } from './scale'
 import { DEFAULT_SETTINGS, validateSettings, type SimulationSettings } from './settings'
 import { ensureWarfare, commissionFleet, portAt } from './navy'
+import { ensureIntelligence } from './intelligence'
 import { militaryPeople } from './forces'
 import { ensurePopulation } from './population'
 import { ensureCharacters, characterPolicyTargets, characterResearch } from './character'
@@ -82,8 +84,32 @@ const ends = [
   'fell',
 ]
 
+function provinceName(id: number) {
+  const base = roots[id % roots.length] + ends[Math.floor(id / roots.length) % ends.length]
+  const district = Math.floor(id / (roots.length * ends.length))
+  return district ? `${roots[(district - 1) % roots.length]} ${base}` : base
+}
+
 export function makeNation(id: number, capital: number): Nation {
-  const [name, shortName, color, government, personality] = NAMES[id % NAMES.length]
+  let [name, shortName, color] = NAMES[id % NAMES.length] as readonly string[]
+  const [, , , government, personality] = NAMES[id % NAMES.length]
+  if (id >= NAMES.length) {
+    shortName = provinceName(id * 7)
+    name = `${government === 'Monarchy' ? 'Kingdom' : government} of ${shortName}`
+    // Separate hues as well as names when many independent states share the map.
+    const hue = (id * 137.508) % 360,
+      chroma = 0.3,
+      light = 0.6
+    const channel = (n: number) => {
+      const k = (n + hue / 30) % 12
+      return Math.round(
+        255 * (light - chroma * Math.min(light, 1 - light) * Math.max(-1, Math.min(k - 3, 9 - k, 1))),
+      )
+        .toString(16)
+        .padStart(2, '0')
+    }
+    color = `#${channel(0)}${channel(8)}${channel(4)}`
+  }
   return {
     id,
     name,
@@ -134,19 +160,20 @@ export function generateWorld(
   continents = 3,
   nationCount = 8,
   settings: SimulationSettings = DEFAULT_SETTINGS,
+  scale: WorldScale = 'regional',
 ): World {
+  const extent = WORLD_SCALES[worldScale(scale)]
   settings = validateSettings(settings)
   continents = Math.round(clamp(continents, 1, 5))
-  nationCount = Math.round(clamp(nationCount, 4, 12))
+  nationCount = Math.round(clamp(nationCount, 4, 48))
   const rng = { rng: hashSeed(seed) },
     rand = () => random(rng)
-  const width = GRID_W,
-    height = GRID_H
+  const { width, height } = extent
   const cells = generateGeography(seed, continents, width, height)
   const land = cells.filter((c) => c.terrain !== 'water')
   const seeds: Cell[] = [land[Math.floor(rand() * land.length)]]
   const minDistances = new Float64Array(cells.length).fill(Infinity)
-  const targetRegions = Math.min(180, Math.floor(land.length / 13))
+  const targetRegions = Math.min(extent.provinces, Math.floor(land.length / 13))
   for (let i = 1; i < targetRegions; i++) {
     const last = seeds[seeds.length - 1]
     let best = land[0],
@@ -198,8 +225,10 @@ export function generateWorld(
           }
         }
     }
+  const provinceCells: Cell[][] = seeds.map(() => [])
+  for (const c of land) provinceCells[c.region].push(c)
   const regions: Region[] = seeds.map((c, id) => {
-    const regionCells = land.filter((x) => x.region === id)
+    const regionCells = provinceCells[id]
     const cx = regionCells.reduce((s, x) => s + x.x, 0) / regionCells.length
     const cy = regionCells.reduce((s, x) => s + x.y, 0) / regionCells.length
     const score = (x: Cell) =>
@@ -221,7 +250,9 @@ export function generateWorld(
         0,
       ) / regionCells.length,
     )
-    const size = (28000 + rand() * 60000) * Math.sqrt(regionCells.length / 18)
+    const size =
+      (28000 + rand() * 60000) *
+      (scale === 'regional' ? Math.sqrt(regionCells.length / 18) : regionCells.length / 18)
     const stocks = inventory()
     stocks.food = size * 0.026 * (2 + rand() * 2)
     stocks.timber = size * 0.02
@@ -233,7 +264,7 @@ export function generateWorld(
     stocks.arms = size * 0.001
     return {
       id,
-      name: roots[id % roots.length] + ends[Math.floor(id / roots.length) % ends.length],
+      name: provinceName(id),
       nation: -1,
       culture: -1,
       center: c.id,
@@ -309,6 +340,7 @@ export function generateWorld(
     const candidates = regions.filter(
       (r) => !capitals.includes(r) && r.cells.length > 4 && landmassSize[r.center] >= 200,
     )
+    if (!candidates.length) candidates.push(...regions.filter((r) => !capitals.includes(r)))
     let best = candidates[0],
       max = -1
     for (const r of candidates) {
@@ -362,20 +394,21 @@ export function generateWorld(
   capitals.forEach((r, i) => {
     r.nation = i
     r.culture = i
-    r.name = [
-      'Aurel',
-      'Veyrholm',
-      'Serrana',
-      'Greenhaven',
-      'Thalassos',
-      'Ord',
-      'Illyria',
-      'Nordvik',
-      'Cael',
-      'Rhennburg',
-      'Meridia',
-      'Ashara',
-    ][i]
+    r.name =
+      [
+        'Aurel',
+        'Veyrholm',
+        'Serrana',
+        'Greenhaven',
+        'Thalassos',
+        'Ord',
+        'Illyria',
+        'Nordvik',
+        'Cael',
+        'Rhennburg',
+        'Meridia',
+        'Ashara',
+      ][i] ?? `${nations[i].shortName} City`
     r.urban = 0.72
     r.infrastructure = 0.85
     r.industry = 0.8
@@ -416,9 +449,27 @@ export function generateWorld(
       })
     }
   for (const n of nations) {
-    const r = regions[n.capital],
-      soldiers = Math.min(3000, Math.floor(r.population.adults * 0.08))
-    r.population.adults -= soldiers
+    const r = regions[n.capital]
+    let soldiers = Math.min(3000, Math.floor(r.population.adults * 0.08))
+    if (scale === 'regional') r.population.adults -= soldiers
+    else {
+      // A larger country begins with a standing establishment proportional to
+      // its people. All initial personnel come from its civilian population.
+      let needed = Math.max(
+        3000,
+        Math.floor(
+          regions.filter((p) => p.nation === n.id).reduce((sum, p) => sum + population(p), 0) * 0.002,
+        ),
+      )
+      soldiers = 0
+      for (const province of [r, ...regions.filter((p) => p.nation === n.id && p.id !== r.id)]) {
+        const recruited = Math.min(needed, Math.floor(province.population.adults * 0.08))
+        province.population.adults -= recruited
+        soldiers += recruited
+        needed -= recruited
+        if (!needed) break
+      }
+    }
     world.armies.push({
       id: world.nextArmy++,
       nation: n.id,
@@ -426,6 +477,7 @@ export function generateWorld(
       region: n.capital,
       target: null,
       soldiers,
+      establishment: soldiers,
       morale: 0.85,
       supply: 1,
       experience: 0.15,
@@ -464,5 +516,6 @@ export function generateWorld(
       militaryPeople(world, n.id)
   }
   world.totals.population = world.nations.reduce((sum, n) => sum + n.population, 0)
+  ensureIntelligence(world)
   return world
 }

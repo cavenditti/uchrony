@@ -1,8 +1,10 @@
+import { inWorldText } from '../sim/narrative'
 import { useEffect, useRef, useState } from 'react'
 import { dateLabel, type World } from '../sim/types'
 import type { DiplomaticClause, AgentServiceStatus } from '../sim/statecraft-types'
 import { visibleAgreement } from '../sim/agreement-references'
 import { AgreementReference, AgreementText } from './AgreementReference'
+import { foreignOfficeContext } from '../sim/diplomatic-friction'
 
 function describe(world: World, term: DiplomaticClause) {
   const from = world.nations[term.from]?.shortName ?? 'New state',
@@ -90,10 +92,24 @@ export function DiplomaticChancery({
     })
   }
   const referenceProps = { world, nation, confidential, onOpen }
+  const office = foreignOfficeContext(world, nation)
   const text = (value: string) => <AgreementText {...referenceProps} text={value} />
   return (
     <section className="diplomatic-chancery">
       <h3>State agency</h3>
+      <div className="data-row">
+        <span>Diplomatic attention committed</span>
+        <b>{Math.round((office.committed / office.capacity) * 100)}%</b>
+      </div>
+      <div className="data-row">
+        <span>Foreign office spending this month</span>
+        <b>{Math.round(office.spent * 1000).toLocaleString()} crowns</b>
+      </div>
+      <p className="panel-note">
+        Negotiations occupy envoys and require dispatches, review and public funds. Existing arrangements
+        remain in force without repeated agreements.
+      </p>
+      {office.notice && <p className="panel-note">{office.notice}</p>}
       <p className="panel-note">
         {working
           ? `${working.role === 'strategy' ? 'Strategic deliberation' : 'Routine assessment'} in progress.`
@@ -135,8 +151,7 @@ export function DiplomaticChancery({
           </ul>
           <p>{text(agent.memory)}</p>
           <small>
-            Institutional compliance: {agent.integrity}/100 ·{' '}
-            {agent.lastModel || 'Awaiting first deliberation'}
+            Government credibility: {agent.integrity}/100 · {agent.lastModel || 'Awaiting first deliberation'}
           </small>
           {state?.audit
             .filter((entry) => entry.nation === nation)
@@ -193,13 +208,19 @@ export function DiplomaticChancery({
           </div>
           <h5>{text(offer.title)}</h5>
           <p>{offer.parties.map((id) => world.nations[id].shortName).join(' · ')}</p>
+          {offer.status === 'proposed' && offer.notBefore !== undefined && offer.notBefore > world.month && (
+            <p className="panel-note">
+              Diplomatic preparation · earliest implementation{' '}
+              {dateLabel({ month: offer.notBefore, startYear: world.startYear })}, subject to consent.
+            </p>
+          )}
           {!!offer.supersedes && (
             <p className="agreement-relationship">
               Revises <AgreementReference {...referenceProps} id={offer.supersedes} />
             </p>
           )}
           <details open={selected?.id === offer.id ? true : undefined}>
-            <summary>Terms and adjudication</summary>
+            <summary>Terms and developments</summary>
             <ul>
               {offer.terms.map((term, index) => (
                 <li key={index}>
@@ -214,7 +235,7 @@ export function DiplomaticChancery({
               Accepted by{' '}
               {offer.signatures.map((signature) => world.nations[signature.nation].shortName).join(', ')}.
             </p>
-            {offer.ruling && <p className="referee-explanation">Referee: {text(offer.ruling)}</p>}
+            {offer.ruling && <p className="agreement-development">Development: {text(offer.ruling)}</p>}
             {offer.breaches > 0 && <small>Recorded obligation shortfalls: {offer.breaches}</small>}
           </details>
         </article>
@@ -242,7 +263,7 @@ export function DiplomaticChancery({
       ))}
       {!!status.error && (
         <p className="panel-note">
-          Model service: {status.error} Existing instructions and local events continue.
+          Model service: {inWorldText(status.error)} Existing instructions and local events continue.
         </p>
       )}
     </section>

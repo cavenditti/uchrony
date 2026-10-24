@@ -1,6 +1,6 @@
 import { simulationSettings } from './settings'
 import { MinHeap } from './heap'
-import { seaPassageFactor } from './naval-control'
+import { seaPassageView } from './naval-control'
 import {
   GOODS,
   inventory,
@@ -192,23 +192,37 @@ export function transportGraph(
         )
         .flatMap(({ term }) => (term.kind === 'access' ? [term.from] : [term.from, term.to])),
     )
+  if (militaryNation !== undefined)
+    for (const body of world.institutions?.organizations ?? [])
+      if (
+        body.status === 'active' &&
+        body.members.includes(militaryNation) &&
+        body.charter.powers.includes('defense')
+      )
+        for (const member of body.members) hosts.add(member)
   let metrics = linkMetrics.get(profile)
   if (!metrics) {
     metrics = new Map()
     linkMetrics.set(profile, metrics)
   }
-  const allowed = (a: Region, b: Region) => {
-    if (militaryNation !== undefined) {
-      const rel = relation(world, militaryNation, b.nation)
-      return (
-        b.nation === militaryNation ||
-        rel?.treaty === 'war' ||
-        rel?.treaty === 'alliance' ||
-        hosts.has(b.nation)
-      )
+  const passage = seaPassageView(world),
+    wars = world.nations.map(() => new Set<number>())
+  for (const rel of world.relations)
+    if (rel.treaty === 'war') {
+      wars[rel.a].add(rel.b)
+      wars[rel.b].add(rel.a)
     }
-    return a.nation === b.nation || relation(world, a.nation, b.nation)?.treaty !== 'war'
-  }
+  const militaryAccess =
+    militaryNation === undefined
+      ? null
+      : world.nations.map((n) => {
+          const rel = relation(world, militaryNation, n.id)
+          return (
+            n.id === militaryNation || rel?.treaty === 'war' || rel?.treaty === 'alliance' || hosts.has(n.id)
+          )
+        })
+  const allowed = (a: Region, b: Region) =>
+    militaryAccess ? militaryAccess[b.nation] : !wars[a.nation].has(b.nation)
   for (const link of transportNetwork(world).links) {
     const a = world.regions[link.from],
       b = world.regions[link.to]
@@ -222,7 +236,7 @@ export function transportGraph(
     }
     const capacity =
         physical.capacity *
-        Math.min(seaPassageFactor(world, a.nation, link.legs), seaPassageFactor(world, b.nation, link.legs)),
+        (link.seaCost > 0 ? Math.min(passage(a.nation, link.legs), passage(b.nation, link.legs)) : 1),
       cost = physical.cost,
       sea = link.seaCost > 0
     if (capacity > 0.001 && allowed(a, b))
@@ -263,11 +277,25 @@ export function pathTo(previous: Int32Array, from: number, to: number): number[]
 }
 
 export function trade(world: World) {
+  // Demand targets do not change while goods change hands this month.
+  const targets = Object.fromEntries(
+    GOODS.map((good) => [good, world.regions.map((r) => reserveTarget(r, good))]),
+  ) as Record<Good, number[]>
+  const target = (region: Region, good: Good) => targets[good][region.id]
   const preferences = new Set(
     agreementTerms(world)
       .filter(({ term }) => ['trade', 'alliance'].includes(term.kind))
       .flatMap(({ term }) => [`${term.from}:${term.to}`, `${term.to}:${term.from}`]),
   )
+  for (const body of world.institutions?.organizations ?? [])
+    if (body.status === 'active' && body.charter.powers.includes('trade'))
+      for (const a of body.members) for (const b of body.members) if (a !== b) preferences.add(`${a}:${b}`)
+  const treaties = world.nations.map(() => new Map<number, string>())
+  for (const rel of world.relations) {
+    treaties[rel.a].set(rel.b, rel.treaty)
+    treaties[rel.b].set(rel.a, rel.treaty)
+  }
+  const treaty = (a: number, b: number) => treaties[a].get(b)
   const profile = corridorProfile(world)
   refreshTransport(world, profile)
   const graph = transportGraph(world, undefined, profile),
@@ -283,9 +311,11 @@ export function trade(world: World) {
       {
         path: number[]
         cost: number
+        blocked?: boolean
         physical?: { legs: RouteLeg[]; usage: ReadonlyMap<number, number> }
       }
     >()
+  const markets = new Map<number, { seller: Region; id: string; score: number; flow?: Inventory }[]>()
   world.routes = []
   for (const { offer, term } of agreementTerms(world, 'goods')) {
     const buyers = world.regions
@@ -304,7 +334,7 @@ export function trade(world: World) {
         .filter(
           (region) =>
             region.nation === term.from &&
-            region.stocks[good] > reserveTarget(region, good) &&
+            region.stocks[good] > target(region, good) &&
             Number.isFinite(paths.distance[region.id]),
         )
         .sort((a, b) => paths.distance[a.id] - paths.distance[b.id])
@@ -316,8 +346,8 @@ export function trade(world: World) {
           edgeKeys = path.slice(1).map((to, i) => key(path[i], to))
         let amount = Math.min(
           owed,
-          seller.stocks[good] - reserveTarget(seller, good),
-          Math.max(0, reserveTarget(buyer, good) * 4 - buyer.stocks[good]),
+          seller.stocks[good] - target(seller, good),
+          Math.max(0, target(buyer, good) * 4 - buyer.stocks[good]),
           ...edgeKeys.map((edge) => capacity.get(edge) ?? 0),
         )
         for (const [index, count] of usage) amount = Math.min(amount, physicalCapacity[index] / count)
@@ -358,61 +388,98 @@ export function trade(world: World) {
     // Established buyers replenish small shortfalls instead of cycling between
     // a large order and a silent month at the 90% reorder threshold.
     const buyers = world.regions
-      .filter((r) => r.stocks[g] < reserveTarget(r, g) * (establishedBuyers.has(r.id) ? 1 : 0.9))
+      .filter((r) => r.stocks[g] < target(r, g) * (establishedBuyers.has(r.id) ? 1 : 0.9))
       .sort(
         (a, b) =>
           a.stocks[g] / Math.max(1, reserveTarget(a, g)) - b.stocks[g] / Math.max(1, reserveTarget(b, g)) ||
           a.id - b.id,
       )
     for (const buyer of buyers) {
-      let needed = reserveTarget(buyer, g) - buyer.stocks[g]
+      let needed = target(buyer, g) - buyer.stocks[g]
       if (!pathCache.has(buyer.id)) pathCache.set(buyer.id, shortestPaths(graph, buyer.id))
       const paths = pathCache.get(buyer.id)!
-      const candidates = world.regions
-        .filter(
-          (s) =>
-            s.id !== buyer.id &&
-            Number.isFinite(paths.distance[s.id]) &&
-            s.stocks[g] >
-              reserveTarget(s, g) * ((memory.get(laneKey(s.id, buyer.id))?.flow[g] ?? 0) >= 0.1 ? 1 : 1.1),
+      if (!markets.has(buyer.id)) {
+        const suppliers = world.regions
+          .filter(
+            (s) =>
+              s.id !== buyer.id &&
+              Number.isFinite(paths.distance[s.id]) &&
+              (s.nation === buyer.nation || treaty(s.nation, buyer.nation) !== 'war'),
+          )
+          .map((seller) => {
+            const id = laneKey(seller.id, buyer.id),
+              prior = memory.get(id)
+            if (prior && !plans.has(id)) {
+              const best = pathTo(paths.previous, buyer.id, seller.id).reverse(),
+                path = routes.get(id)?.path ?? establishedPath(graph, prior.path, best)
+              plans.set(id, { path, cost: pathCost(graph, path) })
+            }
+            return {
+              seller,
+              id,
+              score:
+                (plans.get(id)?.cost ?? paths.distance[seller.id]) *
+                (seller.nation === buyer.nation ? 0.6 : 1),
+              flow: prior?.flow,
+            }
+          })
+          .sort((a, b) => a.score - b.score || a.seller.id - b.seller.id)
+        markets.set(buyer.id, suppliers)
+      }
+      // Provincial merchants have finite search capacity. At continental/world
+      // scale they canvass nearby competitive suppliers each month, alongside
+      // every established partner, rather than querying the entire planet for
+      // each order. Logistics and commercial infrastructure broaden that reach.
+      const contacts =
+        world.regions.length <= 300
+          ? Infinity
+          : Math.round(
+              16 + buyer.infrastructure * 16 + world.nations[buyer.nation].technologies.logistics * 8,
+            )
+      let newcomers = 0
+      const candidates = markets.get(buyer.id)!.filter((candidate) => {
+        const prior = candidate.flow?.[g] ?? 0
+        if (
+          plans.get(candidate.id)?.blocked ||
+          candidate.seller.stocks[g] <= target(candidate.seller, g) * (prior >= 0.1 ? 1 : 1.1)
         )
-        .filter((s) => s.nation === buyer.nation || relation(world, s.nation, buyer.nation)?.treaty !== 'war')
-        .map((seller) => {
-          const id = laneKey(seller.id, buyer.id),
-            prior = memory.get(id)
-          if (!plans.has(id)) {
-            const best = pathTo(paths.previous, buyer.id, seller.id).reverse(),
-              path = routes.get(id)?.path ?? establishedPath(graph, prior?.path, best)
-            plans.set(id, { path, cost: pathCost(graph, path) })
-          }
-          const plan = plans.get(id)!
-          return {
-            seller,
-            path: plan.path,
-            plan,
-            score: plan.cost * (seller.nation === buyer.nation ? 0.6 : 1),
-            prior: prior?.flow[g] ?? 0,
-          }
-        })
-        .sort((a, b) => a.score - b.score || a.seller.id - b.seller.id)
+          return false
+        if (prior >= 0.1) return true
+        return newcomers++ < contacts
+      })
       if (!candidates.length) continue
       const transfer = (candidate: (typeof candidates)[number], requested: number) => {
-        const { seller, path, plan } = candidate
-        if (needed < 0.1 || requested < 0.1 || path.length < 2) return
+        const { seller } = candidate
+        if (needed < 0.1 || requested < 0.1) return
+        const planId = laneKey(seller.id, buyer.id)
+        if (!plans.has(planId)) {
+          const path = pathTo(paths.previous, buyer.id, seller.id).reverse()
+          plans.set(planId, { path, cost: paths.distance[seller.id] })
+        }
+        const plan = plans.get(planId)!,
+          path = plan.path
+        if (path.length < 2 || !Number.isFinite(plan.cost)) return
         const edgeKeys = path.slice(1).map((id, i) => key(path[i], id))
         let available = Math.min(...edgeKeys.map((k) => capacity.get(k) ?? 0))
-        if (available < 0.1) return
+        if (available < 0.1) {
+          plan.blocked = true
+          return
+        }
         if (!plan.physical) {
           const legs = path.slice(1).flatMap((to, i) => graph[path[i]].find((edge) => edge.to === to)!.legs)
           plan.physical = { legs, usage: corridorUsage(profile, legs) }
         }
         const { legs, usage } = plan.physical
         for (const [index, count] of usage) available = Math.min(available, physicalCapacity[index] / count)
+        if (available < 0.1) {
+          plan.blocked = true
+          return
+        }
         const international = seller.nation !== buyer.nation
         const nBuyer = world.nations[buyer.nation],
           nSeller = world.nations[seller.nation]
         const unitPrice = (buyer.prices[g] + seller.prices[g]) / 2 / 1000
-        const agreement = relation(world, buyer.nation, seller.nation)?.treaty
+        const agreement = treaty(buyer.nation, seller.nation)
         const tariff =
           international &&
           agreement !== 'trade' &&
@@ -428,7 +495,7 @@ export function trade(world: World) {
         const amount =
           Math.max(
             0,
-            Math.min(requested, needed, seller.stocks[g] - reserveTarget(seller, g), available, affordable),
+            Math.min(requested, needed, seller.stocks[g] - target(seller, g), available, affordable),
           ) /
           (1 + tariff)
         if (amount < 0.1) return
@@ -467,8 +534,8 @@ export function trade(world: World) {
           })
         }
       }
-      const established = candidates.filter((candidate) => candidate.prior >= 0.1),
-        previousTotal = established.reduce((sum, candidate) => sum + candidate.prior, 0),
+      const established = candidates.filter((candidate) => (candidate.flow?.[g] ?? 0) >= 0.1),
+        previousTotal = established.reduce((sum, candidate) => sum + (candidate.flow?.[g] ?? 0), 0),
         initialNeed = needed,
         urgentFood = g === 'food' && buyer.stocks.food < population(buyer) * MONTHLY_NEED.food
       if (!urgentFood && previousTotal > 0) {
@@ -477,7 +544,7 @@ export function trade(world: World) {
           // appears, release a small monthly share instead of replacing the relationship.
           const competitive = candidate.score * (1 - TRADE_INERTIA.improvement) <= candidates[0].score,
             retention = competitive ? 1 : 1 - TRADE_INERTIA.adjustment
-          transfer(candidate, ((initialNeed * candidate.prior) / previousTotal) * retention)
+          transfer(candidate, ((initialNeed * (candidate.flow?.[g] ?? 0)) / previousTotal) * retention)
         }
       }
       // Unavailable goods, closed borders, exhausted capacity and urgent food

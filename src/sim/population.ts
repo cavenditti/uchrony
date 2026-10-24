@@ -123,8 +123,7 @@ export function identityDistribution(groups: PopulationCommunity[], axis: Identi
   return [...counts].map(([id, count]) => ({ id, count })).sort((a, b) => b.count - a.count || a.id - b.id)
 }
 export function rollupPopulation(region: Region) {
-  const groups = region.communities!
-  region.communities = groups.filter((group) => communitySize(group) > 0)
+  region.communities = coalesceCommunities(region.communities!)
   for (const age of AGES)
     region.population[age] = region.communities.reduce((sum, group) => sum + group.population[age], 0)
   const total = population(region)
@@ -148,6 +147,25 @@ export function addCommunity(groups: PopulationCommunity[], incoming: Population
   for (const field of SOCIAL)
     existing[field] = (existing[field] * size + incoming[field] * count) / (size + count)
   for (const age of AGES) existing.population[age] += incoming.population[age]
+}
+/** Equal identities may converge after allegiance changes; combine their actual people and weighted conditions. */
+export function coalesceCommunities(groups: PopulationCommunity[]) {
+  const indexed = new Map<string, PopulationCommunity>()
+  for (const group of groups) {
+    const count = communitySize(group)
+    if (!count) continue
+    const key = communityKey(group),
+      existing = indexed.get(key)
+    if (!existing) {
+      indexed.set(key, group)
+      continue
+    }
+    const size = communitySize(existing)
+    for (const field of SOCIAL)
+      existing[field] = (existing[field] * size + group[field] * count) / (size + count)
+    for (const age of AGES) existing.population[age] += group.population[age]
+  }
+  return [...indexed.values()]
 }
 function copyPopulation(group: PopulationCommunity, counts: Cohorts): PopulationCommunity {
   return { ...group, population: { ...counts } }
@@ -232,7 +250,7 @@ export function ensurePopulation(world: World) {
           orientation as IdentityDefinition['orientation'],
         ),
       )
-    const span = Math.max(...world.cells.map((cell) => cell.x), 1)
+    const span = world.cells.reduce((max, cell) => Math.max(max, cell.x), 1)
     for (const region of world.regions) {
       const at = world.cells[region.center],
         nearest = seeds
@@ -497,13 +515,18 @@ export function updateCommunityDemography(world: World, region: Region) {
   rollupPopulation(region)
 }
 
-export function takeCivilianAdults(world: World, region: Region, amount: number) {
+export function takeCivilianAdults(
+  world: World,
+  region: Region,
+  amount: number,
+  eligible: (group: PopulationCommunity) => boolean = () => true,
+) {
   ensurePopulation(world)
   const groups = region.communities!,
     counts = apportion(
       amount,
-      groups.map((group) => group.population.adults * (0.5 + group.loyalty)),
-      groups.map((group) => group.population.adults),
+      groups.map((group) => (eligible(group) ? group.population.adults * (0.5 + group.loyalty) : 0)),
+      groups.map((group) => (eligible(group) ? group.population.adults : 0)),
     ),
     taken: PopulationCommunity[] = []
   groups.forEach((group, index) => {
@@ -587,6 +610,7 @@ export function releaseSoldiers(world: World, army: Army, region: Region, amount
 }
 export function ageMilitaryPopulation(world: World) {
   for (const army of allForces(world)) {
+    army.communities = coalesceCommunities(army.communities!)
     const home = world.regions[world.nations[army.nation].capital]
     for (const group of army.communities!) {
       const nation = world.nations[army.nation],

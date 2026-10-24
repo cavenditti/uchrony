@@ -1,5 +1,34 @@
+import { advisorContext, validateAdviceReplies, deliverAdvice } from './advisors'
+import {
+  validateInstitutionTerm,
+  applyInstitutionTerm,
+  institutionalFunds,
+  transferInstitutionMembership,
+  foreignPolicyMandate,
+  collectiveDefense,
+} from './institutions'
+import { sovereigntyAssessment } from './strategic-assessment'
+import {
+  openDiplomaticProposal,
+  rememberProposal,
+  admitDiplomaticConsent,
+  admitDiplomaticMessage,
+  DiplomaticFriction,
+  foreignOfficeContext,
+  hasActiveReplacement,
+} from './diplomatic-friction'
+import {
+  intelligenceService,
+  intelligenceContext,
+  foreignIntelligence,
+  knownMap,
+  visibleInstitutions,
+  INTELLIGENCE_PRIORITIES,
+  type IntelligencePriority,
+} from './intelligence'
+import { MAX_STATE_IDENTITIES } from './types'
+import { inWorldText, narrativeProjection } from './narrative'
 import { strategicPressures } from './ambitions'
-import { simulationSettings } from './settings'
 import { ensurePopulation, returnArmyPeople, identityDistribution } from './population'
 import { populationIdentitySummary } from './identities'
 import { characterContext } from './character'
@@ -11,7 +40,7 @@ import { applyCommand, summarize } from './engine'
 import { ensureHistory, applyRefereeEffects } from './history'
 import { validateHistoricalEffect } from './history-schema'
 import { parseReferee, parseStatePlan } from './statecraft-schema'
-import { agreementTerms, currentAgreements } from './agreements'
+import { agreementTerms, currentAgreements, diplomaticAccess } from './agreements'
 import {
   agreementReference,
   agreementReferenceIndex,
@@ -78,13 +107,13 @@ function sanction(world: World, nation: number, message: string, severity = 1) {
   severity = clamp(Math.round(severity), 1, 3)
   agent.integrity = Math.max(0, agent.integrity - severity * 5)
   world.nations[nation].legitimacy = Math.max(0, world.nations[nation].legitimacy - severity)
-  agent.escalation = `Authority violation: ${message}. The referee has applied institutional consequences. Never repeat this attempt.`
+  agent.escalation = `Diplomatic credibility damaged: ${inWorldText(message)}. Domestic institutions and counterparts have lost confidence in these commitments.`
   state.audit.unshift({
     id: state.nextId++,
     month: world.month,
     nation,
     visibility: 'secret',
-    message,
+    message: inWorldText(message),
     severity,
   })
   state.audit = state.audit.slice(0, 240)
@@ -110,6 +139,25 @@ function validateTerms(world: World, terms: DiplomaticClause[], parties: number[
   }
   for (const term of terms) {
     requireParty(term.from)
+    if (term.kind === 'institution' || term.kind === 'devolution') {
+      validateInstitutionTerm(world, term, parties)
+      continue
+    }
+    if (
+      term.kind === 'war' &&
+      !collectiveDefense(world, term.from, term.to) &&
+      !world.relations.some(
+        (rel) =>
+          rel.treaty === 'war' &&
+          rel.aggressor === term.to &&
+          [rel.a, rel.b].includes(term.from) &&
+          [rel.a, rel.b].includes(term.to),
+      ) &&
+      !foreignPolicyMandate(world, term.from, parties)
+    )
+      throw new Error(
+        'Foreign policy is delegated; the charter requires member authorization for an offensive war.',
+      )
     if (term.to !== -1) {
       if (!world.nations[term.to]) throw new Error('Unknown diplomatic counterpart.')
       if (!['war', 'custom', 'guarantee'].includes(term.kind)) requireParty(term.to)
@@ -145,7 +193,17 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
   const n = world.nations[nation]
   if (!n.ai) return // Human policy interventions remain authoritative.
   let command: Command
-  if (order.kind === 'commission') {
+  if (order.kind === 'intelligence') {
+    if (!INTELLIGENCE_PRIORITIES.includes(order.key as IntelligencePriority))
+      throw new Error('Unknown intelligence collection priority.')
+    command = {
+      type: 'intelligence',
+      nation,
+      budgetShare: order.value / 100,
+      priority: order.key as IntelligencePriority,
+      focus: order.target === -1 ? null : order.target,
+    }
+  } else if (order.kind === 'commission') {
     if (world.regions[order.target]?.nation !== nation || !['warship', 'transport'].includes(order.key))
       throw new Error('Commission ships at an owned port, specifying warship or transport.')
     command = {
@@ -258,6 +316,7 @@ export function acceptStatePlan(
     seenMessage?: number
     offers?: number[]
     leaderGeneration?: number
+    advice?: number[]
   },
 ) {
   const plan: StateAgentPlan = parseStatePlan(input, strategic),
@@ -273,6 +332,10 @@ export function acceptStatePlan(
     agent.nextDecision = world.month
     return
   }
+  const advice = knowledge?.advice ?? [],
+    replies = plan.adviceResponses ?? []
+  validateAdviceReplies(advice, replies)
+  deliverAdvice(world, agent, advice, replies)
   agent.assessment = plan.assessment
   agent.memory = plan.memory
   agent.goals = plan.goals
@@ -334,6 +397,7 @@ export function acceptStatePlan(
       )
       continue
     }
+    if (!admitDiplomaticMessage(world, nation, message)) continue
     state.messages.push({ id: state.nextId++, month: world.month, from: nation, ...message })
     for (const recipient of message.to) {
       const target = state.agents.find((entry) => entry.nation === recipient)!
@@ -360,12 +424,14 @@ export function acceptStatePlan(
         )
       )
         throw new Error('A counteroffer must reference a known proposal.')
-      const id = state.nextId++,
+      const admission = openDiplomaticProposal(world, nation, draft),
+        id = state.nextId++,
         digest = fingerprint(draft, id),
         offer: DiplomaticOffer = {
           id,
           author: nation,
           month: world.month,
+          notBefore: admission.notBefore,
           title: draft.title,
           visibility: draft.visibility,
           parties: draft.parties,
@@ -383,8 +449,10 @@ export function acceptStatePlan(
           delivered: 0,
         }
       state.offers.push(offer)
+      rememberProposal(world, nation, draft, id, admission)
       notifyParties(world, offer, `New diplomatic proposal: ${offer.title}`)
     } catch (error) {
+      if (error instanceof DiplomaticFriction) continue
       const stale =
         knowledge &&
         draft.terms.some((term) =>
@@ -410,8 +478,7 @@ export function acceptStatePlan(
       continue
     }
     if (answer.answer === 'accept') {
-      if (!offer.signatures.some((signature) => signature.nation === nation))
-        offer.signatures.push({ nation, digest: offer.digest, month: world.month })
+      admitDiplomaticConsent(world, nation, offer)
     } else if (answer.answer === 'withdraw' && offer.author !== nation)
       sanction(world, nation, 'Only the author can withdraw its proposal.')
     else {
@@ -443,10 +510,101 @@ export function acceptStatePlan(
   summarize(world, false)
 }
 
+export function submitStandingOffer(
+  world: World,
+  nation: number,
+  proposal: StateAgentPlan['offers'][number],
+  manual = false,
+) {
+  const state = ensureStatecraft(world)
+  if (!alive(world, nation) || (!manual && !world.nations[nation].ai) || !proposal.parties.includes(nation))
+    throw new Error('A standing cabinet can commit only its own government.')
+  if (
+    proposal.parties.length > 32 ||
+    new Set(proposal.parties).size !== proposal.parties.length ||
+    proposal.parties.some((id) => !Number.isInteger(id) || !alive(world, id))
+  )
+    throw new Error('A proposal needs distinct, active participating governments.')
+  validateTerms(world, proposal.terms, proposal.parties)
+  const admission = openDiplomaticProposal(world, nation, proposal)
+  const offer: DiplomaticOffer = {
+    ...structuredClone(proposal),
+    id: state.nextId++,
+    author: nation,
+    month: world.month,
+    notBefore: admission.notBefore,
+    digest: '',
+    signatures: [],
+    status: 'proposed',
+    expires: world.month + proposal.duration,
+    activated: 0,
+    ends: 0,
+    ruling: '',
+    resolved: [],
+    breaches: 0,
+    delivered: 0,
+  }
+  offer.digest = fingerprint(offer, offer.id)
+  offer.signatures = [{ nation, digest: offer.digest, month: world.month }]
+  state.offers.push(offer)
+  rememberProposal(world, nation, proposal, offer.id, admission)
+  state.revision++
+  notifyParties(world, offer, `New diplomatic proposal: ${offer.title}`)
+  return offer
+}
+export function tryStandingOffer(...args: Parameters<typeof submitStandingOffer>) {
+  try {
+    return submitStandingOffer(...args)
+  } catch (error) {
+    if (error instanceof DiplomaticFriction) return null
+    throw error
+  }
+}
+export { admitDiplomaticConsent } from './diplomatic-friction'
+export function settleConventionalOffers(world: World) {
+  const routine = new Set([
+    'war',
+    'trade',
+    'alliance',
+    'peace',
+    'access',
+    'nonaggression',
+    'guarantee',
+    'payment',
+    'tribute',
+    'goods',
+    'research',
+    'devolution',
+    'institution',
+  ])
+  const offers = readyOffers(world)
+    .filter((offer) => offer.terms.length && offer.terms.every((term) => routine.has(term.kind)))
+    .slice(0, 6)
+  if (!offers.length) return
+  acceptRefereeDecision(
+    world,
+    {
+      rulings: offers.map((offer) => ({
+        offer: offer.id,
+        digest: offer.digest,
+        verdict: 'approve',
+        reasoning:
+          'The participating governments implement their recorded commitments, subject to available resources and practical obligations.',
+        resolved: [],
+        effects: [],
+        misconduct: [],
+      })),
+    },
+    offers.map((offer) => ({ id: offer.id, digest: offer.digest })),
+    'standing-institutions',
+  )
+}
+
 export function readyOffers(world: World) {
   return ensureStatecraft(world).offers.filter(
     (offer) =>
       offer.status === 'proposed' &&
+      (offer.notBefore ?? 0) <= world.month &&
       (offer.reviewAfter ?? 0) <= world.month &&
       offer.parties.every((id) =>
         offer.signatures.some((signature) => signature.nation === id && signature.digest === offer.digest),
@@ -458,6 +616,7 @@ function transferProvince(world: World, id: number, from: number, to: number) {
   if (!province || province.nation !== from)
     throw new Error('The territorial situation changed during negotiations.')
   province.nation = to
+  delete province.occupation
   province.unrest = clamp(province.unrest + 8, 0, 100)
 }
 function normalizeStates(world: World) {
@@ -474,6 +633,8 @@ function normalizeStates(world: World) {
     const at = world.regions[army.region]
     if (
       at.nation !== army.nation &&
+      army.operations?.embarkedOn == null &&
+      !diplomaticAccess(world, army.nation, at.nation) &&
       relation(world, at.nation, army.nation)?.treaty !== 'war' &&
       relation(world, at.nation, army.nation)?.treaty !== 'alliance'
     ) {
@@ -484,6 +645,24 @@ function normalizeStates(world: World) {
   world.armies = world.armies.filter((army) => army.soldiers > 0)
   if (world.warfare) {
     world.warfare.fleets = world.warfare.fleets.filter((f) => f.soldiers > 0)
+    for (const army of world.armies)
+      if (
+        army.operations?.embarkedOn != null &&
+        !world.warfare.fleets.some(
+          (fleet) =>
+            fleet.id === army.operations!.embarkedOn &&
+            fleet.nation === army.nation &&
+            fleet.embarked.includes(army.id),
+        )
+      )
+        army.operations!.embarkedOn = null
+    for (const fleet of world.warfare.fleets)
+      fleet.embarked = fleet.embarked.filter((id) =>
+        world.armies.some(
+          (army) =>
+            army.id === id && army.nation === fleet.nation && army.operations?.embarkedOn === fleet.id,
+        ),
+      )
     world.warfare.revision++
   }
   ensurePopulation(world)
@@ -493,11 +672,17 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
   let created = -1
   const resolve = (id: number) => (id === -1 ? created : id)
   for (const term of terms) {
+    if (term.kind === 'institution' || term.kind === 'devolution') {
+      applyInstitutionTerm(world, term, offer)
+      continue
+    }
     const from = resolve(term.from)
     let to = resolve(term.to)
     if (term.kind === 'create') {
-      if (world.nations.length >= 64)
-        throw new Error('The simulation currently supports at most 64 historical state identities.')
+      if (world.nations.length >= MAX_STATE_IDENTITIES)
+        throw new Error(
+          `The simulation currently supports at most ${MAX_STATE_IDENTITIES} historical state identities.`,
+        )
       const founder = world.nations[from],
         nation = makeNation(world.nations.length, term.regions[0])
       nation.name = term.text
@@ -528,6 +713,7 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
     } else if (term.kind === 'cede') {
       for (const id of term.regions) transferProvince(world, id, from, to)
     } else if (term.kind === 'merge') {
+      transferInstitutionMembership(world, from, to)
       if (!world.nations[to] || from === to) throw new Error('Invalid successor state.')
       for (const region of world.regions.filter((entry) => entry.nation === from))
         transferProvince(world, region.id, from, to)
@@ -550,6 +736,7 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
       if (!rel) throw new Error('A diplomatic counterpart no longer exists.')
       if (term.kind === 'war') {
         rel.treaty = 'war'
+        rel.aggressor = from
         rel.opinion = Math.min(-50, rel.opinion)
         rel.warExhaustion = 0
       } else if (term.kind === 'peace') {
@@ -563,7 +750,8 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
     term.from = from
     term.to = to
   }
-  normalizeStates(world)
+  if (terms.some((term) => ['cede', 'create', 'merge', 'institution', 'devolution'].includes(term.kind)))
+    normalizeStates(world)
 }
 
 export function acceptRefereeDecision(
@@ -585,6 +773,7 @@ export function acceptRefereeDecision(
       offer.status !== 'proposed'
     )
       continue
+    if ((offer.notBefore ?? 0) > world.month) continue
     seen.add(ruling.offer)
     if (
       !offer.parties.every((id) =>
@@ -593,7 +782,7 @@ export function acceptRefereeDecision(
     )
       continue
     let verdict = ruling.verdict,
-      reasoning = ruling.reasoning
+      reasoning = inWorldText(ruling.reasoning)
     let appliedEffects: typeof ruling.effects = []
     try {
       // Re-check live ownership, consent and funds, independent of model approval.
@@ -602,7 +791,7 @@ export function acceptRefereeDecision(
         .filter((term) => term.kind !== 'custom')
         .map((term) => structuredClone(term))
       if (ruling.resolved.length && !offer.terms.some((term) => term.kind === 'custom'))
-        throw new Error('The referee cannot rewrite signed standard terms.')
+        throw new Error('Signed standard terms cannot be rewritten after consent.')
       validateTerms(world, ruling.resolved, offer.parties, true)
       resolved.push(...ruling.resolved.map((term) => structuredClone(term)))
       const effects = ruling.effects.map((effect) => validateHistoricalEffect(world, effect))
@@ -613,14 +802,23 @@ export function acceptRefereeDecision(
       if (effects.some((effect) => effect.scope === 'nation' && !offer.parties.includes(effect.target)))
         throw new Error('National authority changes require a participating government.')
       if (verdict === 'approve') {
+        if (offer.supersedes && hasActiveReplacement(world, offer.supersedes, offer.id))
+          throw new Error(
+            'The negotiated source terms cannot support this replacement. Seek updated terms from the participating governments.',
+          )
+        const territorial = resolved.some((term) =>
+          ['cede', 'create', 'merge', 'institution', 'devolution'].includes(term.kind),
+        )
         const trial: World = {
           ...world,
+          intelligence: territorial ? structuredClone(world.intelligence) : world.intelligence,
+          institutions: structuredClone(world.institutions),
           nations: structuredClone(world.nations),
-          regions: structuredClone(world.regions),
+          regions: territorial ? structuredClone(world.regions) : world.regions,
           relations: structuredClone(world.relations),
-          armies: structuredClone(world.armies),
-          warfare: structuredClone(world.warfare),
-          historical: structuredClone(world.historical),
+          armies: territorial ? structuredClone(world.armies) : world.armies.map((army) => ({ ...army })),
+          warfare: territorial ? structuredClone(world.warfare) : world.warfare,
+          historical: territorial ? structuredClone(world.historical) : world.historical,
           events: [...world.events],
         }
         applyTerms(trial, offer, resolved)
@@ -631,10 +829,14 @@ export function acceptRefereeDecision(
             trial.regions.reduce((sum, region) => sum + population(region), 0) +
             allForces(trial).reduce((sum, army) => sum + army.soldiers, 0)
         if (before !== after) throw new Error('Settlement would violate population accounting.')
-        const fundsBefore = world.nations.reduce((sum, nation) => sum + nation.treasury, 0),
-          fundsAfter = trial.nations.reduce((sum, nation) => sum + nation.treasury, 0)
+        const fundsBefore =
+            world.nations.reduce((sum, nation) => sum + nation.treasury, 0) + institutionalFunds(world),
+          fundsAfter =
+            trial.nations.reduce((sum, nation) => sum + nation.treasury, 0) + institutionalFunds(trial)
         if (Math.abs(fundsAfter - fundsBefore) > 1e-6)
           throw new Error('Settlement would create or destroy treasury funds.')
+        world.institutions = trial.institutions
+        world.intelligence = trial.intelligence
         world.nations = trial.nations
         world.regions = trial.regions
         world.relations = trial.relations
@@ -644,6 +846,17 @@ export function acceptRefereeDecision(
         offer.status = 'ratified'
         offer.activated = world.month
         offer.resolved = resolved
+        if (offer.supersedes) {
+          const previous = state.offers.find((p) => p.id === offer.supersedes)
+          if (
+            previous &&
+            previous.parties.every((id) => offer.parties.includes(id)) &&
+            ['proposed', 'ratified'].includes(previous.status)
+          ) {
+            previous.status = 'expired'
+            previous.ends = world.month
+          }
+        }
         const ongoing = resolved.filter((term) =>
           [
             'tribute',
@@ -663,6 +876,7 @@ export function acceptRefereeDecision(
             : ongoing.some((term) => term.duration === 0)
               ? 0
               : world.month + Math.max(...ongoing.map((term) => term.duration))
+        reconcileTreatyRelations(world)
         appliedEffects = effects
         applyRefereeEffects(
           world,
@@ -680,7 +894,7 @@ export function acceptRefereeDecision(
           sanction(world, violation.nation, violation.reason, violation.severity)
     } catch (error) {
       verdict = 'defer'
-      reasoning = `Live-state verification: ${error instanceof Error ? error.message : 'The proposal must be renegotiated.'}`
+      reasoning = `Changed circumstances: ${error instanceof Error ? inWorldText(error.message) : 'The proposal must be renegotiated.'}`
       notifyParties(world, offer, reasoning)
     }
     offer.ruling = reasoning
@@ -697,11 +911,37 @@ export function acceptRefereeDecision(
     })
     if (verdict !== 'approve')
       log(world, `${offer.title}: ${verdict}`, reasoning, offer.author, offer.visibility)
-    notifyParties(world, offer, `Referee ${verdict}: ${offer.title}`)
+    notifyParties(
+      world,
+      offer,
+      `${verdict === 'approve' ? 'Agreement took effect' : verdict === 'reject' ? 'Proposal did not proceed' : 'Implementation delayed'}: ${offer.title}`,
+    )
   }
   state.rulings = state.rulings.slice(0, 180)
   state.revision++
   summarize(world, false)
+}
+
+function reconcileTreatyRelations(world: World) {
+  for (const offer of world.statecraft?.offers ?? [])
+    for (const term of offer.resolved)
+      if (
+        offer.visibility === 'public' &&
+        ['trade', 'alliance'].includes(term.kind) &&
+        (offer.status !== 'ratified' || (term.duration > 0 && offer.activated + term.duration <= world.month))
+      ) {
+        const rel = relation(world, term.from, term.to)
+        if (
+          rel?.treaty === term.kind &&
+          !agreementTerms(world, term.kind).some(
+            ({ offer: other, term: active }) =>
+              other.id !== offer.id &&
+              [active.from, active.to].includes(term.from) &&
+              [active.from, active.to].includes(term.to),
+          )
+        )
+          rel.treaty = 'neutral'
+      }
 }
 
 export function advanceStatecraft(world: World) {
@@ -731,25 +971,7 @@ export function advanceStatecraft(world: World) {
       notifyParties(world, offer, `Agreement expired: ${offer.title}`)
     }
   }
-  for (const offer of state.offers)
-    for (const term of offer.resolved)
-      if (
-        offer.visibility === 'public' &&
-        ['trade', 'alliance'].includes(term.kind) &&
-        (offer.status !== 'ratified' || (term.duration > 0 && offer.activated + term.duration <= world.month))
-      ) {
-        const rel = relation(world, term.from, term.to)
-        if (
-          rel?.treaty === term.kind &&
-          !agreementTerms(world, term.kind).some(
-            ({ offer: other, term: active }) =>
-              other.id !== offer.id &&
-              [active.from, active.to].includes(term.from) &&
-              [active.from, active.to].includes(term.to),
-          )
-        )
-          rel.treaty = 'neutral'
-      }
+  reconcileTreatyRelations(world)
   for (const { offer, term } of agreementTerms(world)) {
     if (!alive(world, term.from) || !alive(world, term.to)) continue
     if (term.kind === 'tribute') {
@@ -767,19 +989,26 @@ export function advanceStatecraft(world: World) {
       )
   }
   if (state.offers.length > 240) {
-    state.offers = retainAgreementReferences(state)
+    state.offers = retainAgreementReferences(
+      state,
+      world.institutions?.organizations.map((o) => o.sourceOffer),
+    )
   }
 }
 
 export function stateAgentContext(world: World, nation: number, strategic: boolean) {
   const state = ensureStatecraft(world),
+    knowledge = intelligenceService(world, nation),
     n = world.nations[nation],
     agent = state.agents.find((entry) => entry.nation === nation)!,
-    visible = state.offers.filter((offer) => offer.visibility === 'public' || offer.parties.includes(nation)),
+    visible = [
+      ...state.offers.filter((offer) => offer.parties.includes(nation)),
+      ...knowledge.agreements.map((report) => report.offer),
+    ],
     inbox = state.messages
       .filter(
         (message) =>
-          message.visibility === 'public' || message.to.includes(nation) || message.from === nation,
+          message.to.includes(nation) || message.from === nation || knowledge.broadcasts.includes(message.id),
       )
       .slice(-(strategic ? 24 : 6))
   const { character: _profile, personality: _legacyPersonality, ...government } = n
@@ -799,11 +1028,14 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
       ...offer.terms.map((term) => term.text),
     ]),
   ]
-  return {
+  return narrativeProjection({
     month: world.month,
     nation,
     strategic,
-    simulationConditions: simulationSettings(world),
+    adviser: advisorContext(agent, strategic),
+    intelligence: intelligenceContext(world, nation),
+    foreignOffice: foreignOfficeContext(world, nation),
+    institutions: visibleInstitutions(world, nation),
     strategicLandscape: strategicPressures(world, n),
     government,
     character: characterContext(n),
@@ -811,7 +1043,7 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
       strategy: agent.strategy,
       memory: agent.memory,
       goals: agent.goals,
-      integrity: agent.integrity,
+      credibility: agent.integrity,
       escalation: agent.escalation,
     },
     populationIdentity: populationIdentitySummary(world, nation),
@@ -824,11 +1056,14 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
         people: population(region),
         food: region.foodCoverage,
         materialCoverage: region.materialCoverage ?? 1,
+        security:
+          world.sovereignty?.provinces.find((report) => report.region === region.id)?.stage ?? 'unreported',
         production: region.production,
         consumption: region.consumption,
         deposits: region.deposits,
         unrest: region.unrest,
         infrastructure: region.infrastructure,
+        delegation: region.delegation,
         industry: region.industry,
         stocks: region.stocks,
         port: !!portAt(world, region.id),
@@ -841,50 +1076,75 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
       world.warfare?.fleets
         .filter((f) => f.nation === nation)
         .map(({ communities: _crew, ...fleet }) => fleet) ?? [],
-    foreignStates: world.nations
-      .filter((entry) => entry.id !== nation && alive(world, entry.id))
-      .map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        government: entry.government,
-        character: characterContext(entry, true),
-        population: entry.population,
-        stability: entry.stability,
-        armySize: world.armies
-          .filter((army) => army.nation === entry.id)
-          .reduce((sum, army) => sum + army.soldiers, 0),
-        navy:
-          world.warfare?.fleets
-            .filter((f) => f.nation === entry.id)
-            .map((f) => ({
-              id: f.id,
-              cell: f.cell,
-              warships: f.warships,
-              transports: f.transports,
-              hull: f.hull,
-            })) ?? [],
-        relation: relation(world, nation, entry.id),
-      })),
-    map: strategic
-      ? world.regions.map((region) => ({
-          id: region.id,
-          name: region.name,
-          nation: region.nation,
-          neighbors: region.neighbors,
-          coastal: region.coastal,
-        }))
-      : [],
+    foreignStates: foreignIntelligence(world, nation),
+    map: strategic ? knownMap(world, nation) : [],
     inbox,
-    offers: currentOffers.map((offer) => ({ ...offer, reference: agreementReference(offer.id) })),
+    offers: currentOffers.map(({ ruling, ...offer }) => ({
+      reported: offer.parties.includes(nation)
+        ? null
+        : {
+            month: knowledge.agreements.find((r) => r.offer.id === offer.id)?.month,
+            warning: 'Third-party report; status and fulfillment may have changed since collection.',
+          },
+      sovereigntyAssessment: sovereigntyAssessment(world, nation, { ...offer, ruling }),
+      ...offer,
+      development:
+        offer.status === 'ratified'
+          ? 'Recorded commitments entered into force.'
+          : offer.status === 'proposed'
+            ? 'Negotiation or practical implementation remains pending.'
+            : 'The undertaking did not proceed or is no longer in force.',
+      reference: agreementReference(offer.id),
+    })),
     agreementReferences: agreementReferenceIndex(visible, referenceTexts),
     recentPublicHistory: world.events
-      .filter((event) => event.nation === nation || event.type === 'war' || event.type === 'peace')
-      .slice(0, 8),
-    rulings: state.rulings
-      .filter((ruling) => ruling.visibility === 'public' || ruling.parties.includes(nation))
-      .slice(0, 8),
+      .filter((event) => event.nation === nation || knowledge.news.includes(event.id))
+      .slice(0, 8)
+      .map((event) =>
+        event.nation === nation
+          ? {
+              id: event.id,
+              month: event.month,
+              type: event.type,
+              title: event.title,
+              detail: event.detail,
+              region: event.region,
+            }
+          : {
+              id: event.id,
+              month: event.month,
+              title: event.title,
+              type: event.type,
+              source: 'Reported foreign news; details and consequences are unverified.',
+            },
+      ),
+    developments: state.rulings
+      .filter(
+        (entry) =>
+          entry.parties.includes(nation) ||
+          (entry.visibility === 'public' &&
+            knowledge.agreements.some((r) => r.offer.id === entry.offer) &&
+            entry.month <= world.month - 6),
+      )
+      .slice(0, 8)
+      .map((entry) => ({
+        month: entry.month,
+        agreement: agreementReference(entry.offer),
+        situation:
+          entry.verdict === 'approve'
+            ? 'Recorded commitments entered into force.'
+            : entry.verdict === 'reject'
+              ? 'The undertaking did not proceed.'
+              : 'Practical implementation remains unresolved.',
+        outcome:
+          entry.verdict === 'approve'
+            ? 'in force'
+            : entry.verdict === 'reject'
+              ? 'did not proceed'
+              : 'delayed',
+      })),
     warnings: state.audit.filter((entry) => entry.nation === nation).slice(0, 4),
-  }
+  })
 }
 export function refereeContext(world: World, offers: DiplomaticOffer[]) {
   return {
@@ -900,6 +1160,7 @@ export function refereeContext(world: World, offers: DiplomaticOffer[]) {
       ]),
     ),
     groundTruth: {
+      institutions: world.institutions?.organizations,
       nations: world.nations.map((nation) => ({ ...nation, character: characterContext(nation) })),
       identities: world.nations
         .filter((nation) => alive(world, nation.id))
@@ -916,6 +1177,7 @@ export function refereeContext(world: World, offers: DiplomaticOffer[]) {
         neighbors: region.neighbors,
         unrest: region.unrest,
         infrastructure: region.infrastructure,
+        delegation: region.delegation,
         stocks: region.stocks,
       })),
       armies: world.armies.map(({ communities: _census, ...army }) => army),

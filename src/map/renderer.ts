@@ -39,14 +39,19 @@ export interface AtlasCache {
   ocean: HTMLCanvasElement
   terrain: HTMLCanvasElement
   relief: HTMLCanvasElement
+  worldWidth: number
+  worldHeight: number
   seaLabels: { x: number; y: number; name: string }[]
 }
 
 export function buildAtlas(world: World): AtlasCache {
   const { cells, width, height } = world
   const geometry = buildGeometry(cells, width, height, world.regions.length)
-  const w = Math.ceil(width * Math.sqrt(3) * HEX),
-    h = Math.ceil(height * HEX * 1.5)
+  const worldWidth = Math.ceil(width * Math.sqrt(3) * HEX),
+    worldHeight = Math.ceil(height * HEX * 1.5),
+    resolution = Math.min(1, 2400 / Math.max(worldWidth, worldHeight)),
+    w = Math.ceil(worldWidth * resolution),
+    h = Math.ceil(worldHeight * resolution)
   const makeCanvas = () => {
     const c = document.createElement('canvas')
     c.width = w
@@ -75,13 +80,13 @@ export function buildAtlas(world: World): AtlasCache {
   })
   // Interpolate the simulation field, so relief is continuous instead of a mosaic of flat hexes.
   for (let y = 0; y < h; y++) {
-    const row = Math.min(height - 1, y / (HEX * 1.5)),
+    const row = Math.min(height - 1, y / resolution / (HEX * 1.5)),
       r0 = Math.floor(row),
       r1 = Math.min(height - 1, r0 + 1),
       fy = row - r0
     for (let x = 0; x < w; x++) {
       const samples = [r0, r1].map((r) => {
-        const col = clamp(x / (Math.sqrt(3) * HEX) - (r % 2) / 2, 0, width - 1)
+        const col = clamp(x / resolution / (Math.sqrt(3) * HEX) - (r % 2) / 2, 0, width - 1)
         const q = Math.floor(col),
           f = col - q,
           a = colors[r * width + q],
@@ -127,16 +132,16 @@ export function buildAtlas(world: World): AtlasCache {
     .sort((a, b) => distance[b.id] - distance[a.id])
   const seaLabels: AtlasCache['seaLabels'] = []
   for (const c of candidates) {
-    if (seaLabels.some((p) => Math.hypot(p.x - c.x, p.y - c.y) < w * 0.3)) continue
+    if (seaLabels.some((p) => Math.hypot(p.x - c.x, p.y - c.y) < worldWidth * 0.3)) continue
     seaLabels.push({
       x: c.x,
       y: c.y,
       name:
-        c.x < w * 0.35
+        c.x < worldWidth * 0.35
           ? 'Western Ocean'
-          : c.x > w * 0.65
+          : c.x > worldWidth * 0.65
             ? 'Eastern Ocean'
-            : c.y > h * 0.6
+            : c.y > worldHeight * 0.6
               ? 'Southern Sea'
               : 'Northern Sea',
     })
@@ -150,6 +155,8 @@ export function buildAtlas(world: World): AtlasCache {
     terrain,
     relief,
     seaLabels,
+    worldWidth,
+    worldHeight,
   }
 }
 
@@ -160,10 +167,10 @@ export function drawAtlas(
   layer: Layer,
   scale: number,
 ) {
-  ctx.drawImage(cache.ocean, 0, 0)
+  ctx.drawImage(cache.ocean, 0, 0, cache.worldWidth, cache.worldHeight)
   ctx.save()
   ctx.clip(cache.land, 'evenodd')
-  ctx.drawImage(cache.terrain, 0, 0)
+  ctx.drawImage(cache.terrain, 0, 0, cache.worldWidth, cache.worldHeight)
   // The raster supplies water and smoothly blended biomes; ownership remains exact province geometry.
   const maxPop = Math.max(1, ...world.regions.map((r) => population(r) / r.cells.length))
   if (['political', 'trade', 'military'].includes(layer)) {
@@ -198,13 +205,17 @@ export function drawAtlas(
   ctx.globalAlpha = ['population', 'food', 'prosperity', 'culture', 'language', 'belief'].includes(layer)
     ? 0.28
     : 0.85
-  ctx.drawImage(cache.relief, 0, 0)
+  ctx.drawImage(cache.relief, 0, 0, cache.worldWidth, cache.worldHeight)
   ctx.globalAlpha = 1
   // Actual drainage edges: adjacent wet cells never create spurious cross-connections.
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   for (const c of world.cells)
-    if (c.river && c.terrain !== 'water') {
+    if (
+      c.river &&
+      c.terrain !== 'water' &&
+      (scale >= 0.7 || (c.riverFlow ?? 0) >= 12 / Math.max(0.08, scale))
+    ) {
       const targets =
         c.downstream === undefined
           ? neighbors(c.id, world.width, world.height).filter(

@@ -1,3 +1,21 @@
+import {
+  allocateProvincialTaxes,
+  advanceInstitutions,
+  foreignPolicyMandate,
+  collectiveDefense,
+  provincialServiceBudget,
+} from './institutions'
+import {
+  submitStandingOffer,
+  tryStandingOffer,
+  settleConventionalOffers,
+  admitDiplomaticConsent,
+} from './statecraft'
+import { advanceGeopolitics } from './geopolitics'
+import { advanceIntelligence, configureIntelligence } from './intelligence'
+import { advanceDiplomaticOffices, foreignOfficeContext } from './diplomatic-friction'
+import { advanceSovereignty } from './sovereignty'
+import { reinforceArmies } from './military-personnel'
 import { advancePressures } from './pressures'
 import { validateSettings } from './settings'
 import { allForces, militaryPeople } from './forces'
@@ -27,13 +45,11 @@ import {
   takeCivilianAdults,
   ageMilitaryPopulation,
   migrateCommunities,
-  addCommunity,
 } from './population'
 import { beginPopulationMonth, evolveIdentities } from './identities'
 import { advanceCharacters, characterPolicyTargets, characterResearch } from './character'
 import { advanceHistory } from './history'
 import { effectMultiplier, effectValue } from './effects'
-import { makeNation } from './generate'
 
 export const TECH_NAMES: Record<Research, string[]> = {
   agriculture: [
@@ -115,10 +131,12 @@ function fiscalPolicy(w: World) {
       (0.6 + n.technologies.governance * 0.045) *
       (n.stability / 200 + 0.5) *
       effectMultiplier(w, 'taxIncome', n.id)
+    const grossIncome = n.income
+    n.income -= allocateProvincialTaxes(w, n.id, n.income)
     const revenue = n.income
     // A service floor can create a deficit at low tax rates; healthy states
     // otherwise retain a reserve instead of structurally overspending forever.
-    const desiredServices = Math.max(n.gdp * 0.09, revenue * 0.85)
+    const desiredServices = Math.max(n.gdp * 0.09 * (revenue / Math.max(0.001, grossIncome)), revenue * 0.85)
     const available = Math.min(desiredServices, revenue + Math.max(0, n.treasury) * 0.01)
     const weights = {
       welfare: n.policies.welfare,
@@ -186,6 +204,7 @@ function demographics(w: World) {
     const services =
       (n.budget.welfare / Math.max(1, n.population / 10000)) * effectMultiplier(w, 'healthcare', n.id, r.id)
     const school =
+      provincialServiceBudget(r, 'education') / Math.max(1, pop / 10000) +
       (n.budget.education / Math.max(1, n.population / 10000)) * effectMultiplier(w, 'education', n.id, r.id)
     const healthTarget = clamp(
       0.44 +
@@ -224,7 +243,9 @@ function demographics(w: World) {
       100,
     )
     updateCommunityDemography(w, r)
-    const investment = n.budget.infrastructure / Math.max(1, n.population / 10000)
+    const investment =
+      n.budget.infrastructure / Math.max(1, n.population / 10000) +
+      provincialServiceBudget(r, 'infrastructure') / Math.max(1, pop / 10000)
     r.infrastructure = clamp(
       r.infrastructure + investment * 0.00012 - 0.0007 - r.devastation * 0.0007,
       0.08,
@@ -295,8 +316,9 @@ export function bordering(w: World, a: number, b: number) {
 }
 
 function diplomacy(w: World) {
+  const alive = new Set(w.regions.map((region) => region.nation))
   for (const rel of w.relations) {
-    if (!isAlive(w, rel.a) || !isAlive(w, rel.b)) continue
+    if (!alive.has(rel.a) || !alive.has(rel.b)) continue
     const a = w.nations[rel.a],
       b = w.nations[rel.b]
     const exchange = w.routes.some(
@@ -365,12 +387,14 @@ function diplomacy(w: World) {
       .sort((a, b) => b.character!.effective.assertiveness - a.character!.effective.assertiveness)[0]
     if (
       aggressor?.ai &&
+      foreignPolicyMandate(w, aggressor.id, [aggressor.id]) &&
       rel.treaty === 'neutral' &&
       bordering(w, a.id, b.id) &&
       random(w) < (rel.opinion < 0 ? 0.09 : 0.02) * aggressor.character!.effective.assertiveness &&
       aggressor.stability > 50
     ) {
       rel.treaty = 'war'
+      rel.aggressor = aggressor.id
       rel.since = w.month
       rel.opinion = -75
       rel.warExhaustion = 0
@@ -436,11 +460,13 @@ function recruit(w: World, n: Nation, r: Region): string {
     region: r.id,
     target: null,
     soldiers,
+    establishment: soldiers,
     morale: 0.75,
     supply: 1,
     experience: 0.05,
     casualties: 0,
   })
+  ensureWarfare(w)
   event(
     w,
     'war',
@@ -469,55 +495,6 @@ function worldEvents(w: World) {
         'Favorable growing conditions',
         'A wetter growing season improves harvests and replenishes food reserves.',
       )
-  }
-  if (w.month % 6 === 0 && w.nations.length < 64) {
-    const r = w.regions.find(
-      (r) => r.unrest > 82 && population(r) > 25000 && nationRegions(w, r.nation).length > 2,
-    )
-    if (r && random(w) < 0.25) {
-      const former = r.nation,
-        n = makeNation(w.nations.length, r.id)
-      n.name = `Free State of ${r.name}`
-      n.shortName = r.name
-      n.treasury = 1000
-      n.technologies = { ...w.nations[former].technologies }
-      w.nations.push(n)
-      r.nation = n.id
-      r.culture = n.id
-      ensurePopulation(w)
-      const communities = r.communities ?? []
-      r.communities = []
-      for (const group of communities) {
-        if (group.allegiance === -1 || group.grievance > 0.3) {
-          group.allegiance = n.id
-          group.host = n.id
-          group.loyalty = Math.max(0.65, group.loyalty)
-          group.grievance *= 0.6
-        }
-        addCommunity(r.communities, group)
-      }
-      r.unrest = 35
-      n.population = population(r)
-      for (const other of w.nations.slice(0, -1))
-        w.relations.push({
-          a: other.id,
-          b: n.id,
-          opinion: other.id === former ? -65 : 0,
-          treaty: other.id === former ? 'war' : 'neutral',
-          since: w.month,
-          warExhaustion: 0,
-          grievance: 0,
-        })
-      if (w.nations[former].capital === r.id) w.nations[former].capital = nationRegions(w, former)[0].id
-      event(
-        w,
-        'world',
-        `${r.name} declares independence`,
-        'Sustained unrest breaks a province away from its former government.',
-        n.id,
-        r.id,
-      )
-    }
   }
 }
 
@@ -574,15 +551,119 @@ export function tick(w: World): World {
   trade(w)
   consume(w)
   fiscalPolicy(w)
+  advanceDiplomaticOffices(w)
+  advanceInstitutions(w)
+  advanceIntelligence(w)
+  advanceGeopolitics(w)
   demographics(w)
   science(w)
   diplomacy(w)
   advanceArmies(w)
+  reinforceArmies(w)
+  advanceSovereignty(w)
   summarize(w)
   return w
 }
 
+function proposeTreaty(w: World, from: number, to: number, kind: 'trade' | 'alliance' | 'peace') {
+  const offer = tryStandingOffer(
+    w,
+    from,
+    {
+      title: `${w.nations[from].shortName}–${w.nations[to].shortName} ${kind} accord`,
+      parties: [from, to],
+      visibility: 'public',
+      duration: 24,
+      supersedes: 0,
+      terms: [
+        {
+          kind,
+          from,
+          to,
+          amount: 0,
+          good: '',
+          field: '',
+          regions: [],
+          duration: kind === 'peace' ? 60 : 0,
+          text:
+            kind === 'peace'
+              ? 'A negotiated armistice.'
+              : 'A standing arrangement, continuing until revoked or replaced.',
+        },
+      ],
+    },
+    true,
+  )
+  if (!offer) return foreignOfficeContext(w, from).notice
+  if (w.nations[to].ai) admitDiplomaticConsent(w, to, offer)
+  return 'The proposal is dispatched. Consent, diplomatic preparation and review are required before it takes effect.'
+}
 export function applyCommand(w: World, command: Command): string {
+  if (command.type === 'intelligence') {
+    configureIntelligence(w, command.nation, command.budgetShare, command.priority, command.focus)
+    return 'Intelligence priorities updated. Reports improve through funded collection over time.'
+  }
+  if (command.type === 'charter-proposal') {
+    const offer = tryStandingOffer(
+      w,
+      command.nation,
+      {
+        title: command.name,
+        parties: command.members,
+        terms: [
+          {
+            kind: 'institution',
+            from: command.nation,
+            to: -1,
+            amount: 0,
+            good: '',
+            field: '',
+            regions: [],
+            duration: 0,
+            text: command.name,
+            charter: command.charter,
+          },
+        ],
+        visibility: 'public',
+        supersedes: 0,
+        duration: 24,
+      },
+      true,
+    )
+    return offer
+      ? 'The charter has been proposed. Other governments must consent before it takes effect.'
+      : foreignOfficeContext(w, command.nation).notice
+  }
+  if (command.type === 'devolution') {
+    submitStandingOffer(
+      w,
+      command.nation,
+      {
+        title: `Provincial charter of ${w.nations[command.nation].shortName}`,
+        parties: [command.nation],
+        terms: [
+          {
+            kind: 'devolution',
+            from: command.nation,
+            to: command.nation,
+            amount: command.autonomy,
+            good: '',
+            field: '',
+            regions: command.regions,
+            duration: 0,
+            text: 'Delegated provincial responsibilities',
+            delegation: { powers: command.powers },
+          },
+        ],
+        visibility: 'public',
+        supersedes: 0,
+        duration: 12,
+      },
+      true,
+    )
+    settleConventionalOffers(w)
+    return 'Provincial responsibilities have been delegated under the recorded charter.'
+  }
   if (command.type === 'conditions') {
     w.simulation = validateSettings(command.settings)
     return 'Simulation conditions updated. Existing people, stocks and commitments are preserved.'
@@ -761,17 +842,20 @@ export function applyCommand(w: World, command: Command): string {
         return `${other.shortName} declines. A trade agreement requires relations of at least +10 and peace.`
       if (rel.treaty === 'alliance' || rel.treaty === 'trade')
         return 'Tariff-free trade is already in effect.'
-      rel.treaty = 'trade'
+      return proposeTreaty(w, n.id, other.id, 'trade')
     } else if (command.action === 'alliance') {
       if (rel.opinion < 45 || rel.treaty === 'war')
         return `${other.shortName} declines. An alliance requires relations of at least +45 and peace.`
       if (rel.treaty === 'alliance') return 'An alliance is already in effect.'
-      rel.treaty = 'alliance'
+      return proposeTreaty(w, n.id, other.id, 'alliance')
     } else if (command.action === 'war') {
+      if (!foreignPolicyMandate(w, n.id, [n.id]) && !collectiveDefense(w, n.id, command.target))
+        return 'Foreign policy is delegated. Obtain the member authorization required by the charter.'
       if (rel.treaty === 'war') return 'These states are already at war.'
       if (rel.treaty === 'truce' && w.month - rel.since < 60)
         return 'The armistice prevents another declaration of war for five years.'
       rel.treaty = 'war'
+      rel.aggressor = n.id
       rel.opinion = -85
       rel.warExhaustion = 0
       n.legitimacy = clamp(n.legitimacy - 5, 0, 100)
@@ -779,9 +863,7 @@ export function applyCommand(w: World, command: Command): string {
       if (rel.treaty !== 'war') return 'These states are not at war.'
       if (rel.warExhaustion < 5 && rel.opinion < -50)
         return `${other.shortName} rejects an early armistice. War exhaustion must reach 5.`
-      rel.treaty = 'truce'
-      rel.warExhaustion = 0
-      rel.opinion = -10
+      return proposeTreaty(w, n.id, other.id, 'peace')
     } else if (command.action === 'embargo') {
       if (rel.treaty === 'war') return 'Wartime borders are already closed.'
       rel.treaty = 'neutral'
@@ -790,7 +872,7 @@ export function applyCommand(w: World, command: Command): string {
     rel.since = w.month
     event(
       w,
-      command.action === 'war' ? 'war' : command.action === 'peace' ? 'peace' : 'diplomacy',
+      command.action === 'war' ? 'war' : 'diplomacy',
       `${n.shortName} → ${other.shortName}: ${rel.treaty}`,
       command.action === 'embargo'
         ? 'Preferential access is revoked. Standard tariffs apply.'

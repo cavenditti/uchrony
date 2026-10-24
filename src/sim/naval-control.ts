@@ -1,5 +1,5 @@
 import { neighbors } from './hex'
-import { relation, clamp, type World, type RouteLeg } from './types'
+import { clamp, type World, type RouteLeg } from './types'
 
 const cache = new WeakMap<World, { month: number; revision: number; pressure: Map<number, Float64Array> }>()
 export function navalPressure(world: World) {
@@ -32,28 +32,49 @@ export function navalPressure(world: World) {
   cache.set(world, { month: world.month, revision, pressure })
   return pressure
 }
+/** One immutable naval/diplomatic view for a transport phase. */
+export function seaPassageView(world: World) {
+  const opponents = world.nations.map(() => [] as number[]),
+    allies = world.nations.map((n) => [n.id]),
+    fields = new Map<number, { friendly: Float64Array[]; hostile: Float64Array[] }>()
+  for (const rel of world.relations) {
+    const groups = rel.treaty === 'war' ? opponents : rel.treaty === 'alliance' ? allies : null
+    if (groups) {
+      groups[rel.a].push(rel.b)
+      groups[rel.b].push(rel.a)
+    }
+  }
+  return (nation: number, legs: RouteLeg[]) => {
+    if (!world.warfare?.fleets.length || !opponents[nation].length || !legs.some((leg) => leg.mode === 'sea'))
+      return 1
+    let view = fields.get(nation)
+    if (!view) {
+      const pressure = navalPressure(world)
+      const select = (ids: number[]) =>
+        ids.flatMap((id) => {
+          const values = pressure.get(id)
+          return values ? [values] : []
+        })
+      view = { friendly: select(allies[nation]), hostile: select(opponents[nation]) }
+      fields.set(nation, view)
+    }
+    if (!view.hostile.length) return 1
+    let factor = 1
+    for (const leg of legs)
+      if (leg.mode === 'sea')
+        for (const cell of leg.cells) {
+          if (world.cells[cell].terrain !== 'water') continue
+          let friendly = 0,
+            hostile = 0
+          for (const values of view.friendly) friendly += values[cell]
+          for (const values of view.hostile) hostile += values[cell]
+          const excess = Math.max(0, hostile - friendly)
+          factor = Math.min(factor, excess > 2.5 ? 0 : clamp(1 - excess * 0.32, 0.05, 1))
+        }
+    return factor
+  }
+}
+
 export function seaPassageFactor(world: World, nation: number, legs: RouteLeg[]) {
-  if (
-    !world.warfare?.fleets.length ||
-    !world.relations.some((rel) => rel.treaty === 'war' && (rel.a === nation || rel.b === nation))
-  )
-    return 1
-  const pressure = navalPressure(world)
-  let factor = 1
-  for (const leg of legs)
-    if (leg.mode === 'sea')
-      for (const cell of leg.cells) {
-        if (world.cells[cell].terrain !== 'water') continue
-        let friendly = pressure.get(nation)?.[cell] ?? 0,
-          hostile = 0
-        for (const [other, values] of pressure)
-          if (other !== nation) {
-            const treaty = relation(world, nation, other)?.treaty
-            if (treaty === 'war') hostile += values[cell]
-            else if (treaty === 'alliance') friendly += values[cell]
-          }
-        const excess = Math.max(0, hostile - friendly)
-        factor = Math.min(factor, excess > 2.5 ? 0 : clamp(1 - excess * 0.32, 0.05, 1))
-      }
-  return factor
+  return seaPassageView(world)(nation, legs)
 }

@@ -2,90 +2,90 @@
 name: Uchrony
 description: A living atlas with inspectable state dossiers and historical consequences.
 colors:
-  bg: "#19252b"
-  ink: "#e6e7dd"
-  muted: "#a8b6b7"
-  line: "#354449"
-  accent: "#d7b77a"
-  green: "#a9c5a1"
-  red: "#d6a098"
-  ocean: "#304e54"
-  inspector: "#202e34"
-  button-ink: "#253034"
-  button-hover: "#e7c994"
-  selected-state: "#31403f"
-  field: "#1c2e34"
+  bg: '#19252b'
+  ink: '#e6e7dd'
+  muted: '#a8b6b7'
+  line: '#354449'
+  accent: '#d7b77a'
+  green: '#a9c5a1'
+  red: '#d6a098'
+  ocean: '#304e54'
+  inspector: '#202e34'
+  button-ink: '#253034'
+  button-hover: '#e7c994'
+  selected-state: '#31403f'
+  field: '#1c2e34'
 typography:
   display:
-    fontFamily: "Alegreya, Georgia, serif"
-    fontSize: "29px"
+    fontFamily: 'Alegreya, Georgia, serif'
+    fontSize: '29px'
     fontWeight: 400
     lineHeight: 1.2
-    letterSpacing: "0.005em"
+    letterSpacing: '0.005em'
   headline:
-    fontFamily: "Alegreya, Georgia, serif"
-    fontSize: "23px"
+    fontFamily: 'Alegreya, Georgia, serif'
+    fontSize: '23px'
     fontWeight: 500
     lineHeight: 1.1
   narrative:
-    fontFamily: "Alegreya, Georgia, serif"
-    fontSize: "19px"
+    fontFamily: 'Alegreya, Georgia, serif'
+    fontSize: '19px'
     fontWeight: 500
     lineHeight: 1.2
   metric:
-    fontFamily: "Alegreya, Georgia, serif"
-    fontSize: "27px"
+    fontFamily: 'Alegreya, Georgia, serif'
+    fontSize: '27px'
     fontWeight: 400
     lineHeight: 1.3
   body:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "13px"
+    fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+    fontSize: '13px'
     lineHeight: 1.5
   title:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "11px"
+    fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+    fontSize: '11px'
     fontWeight: 500
   button:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "12px"
+    fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+    fontSize: '12px'
     fontWeight: 500
 rounded:
-  control: "4px"
-  floating: "5px"
-  dialog: "12px"
+  control: '4px'
+  floating: '5px'
+  dialog: '12px'
 spacing:
-  compact: "8px"
-  related: "12px"
-  panel: "20px"
-  section: "24px"
+  compact: '8px'
+  related: '12px'
+  panel: '20px'
+  section: '24px'
 components:
   button-primary:
-    backgroundColor: "{colors.accent}"
-    textColor: "{colors.button-ink}"
-    rounded: "{rounded.control}"
-    padding: "7px 12px"
+    backgroundColor: '{colors.accent}'
+    textColor: '{colors.button-ink}'
+    rounded: '{rounded.control}'
+    padding: '7px 12px'
   button-primary-hover:
-    backgroundColor: "{colors.button-hover}"
+    backgroundColor: '{colors.button-hover}'
   button-secondary:
-    backgroundColor: "transparent"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.control}"
-    padding: "7px 12px"
+    backgroundColor: 'transparent'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.control}'
+    padding: '7px 12px'
   button-text:
-    textColor: "{colors.accent}"
-    padding: "7px 0"
+    textColor: '{colors.accent}'
+    padding: '7px 0'
   field:
-    backgroundColor: "{colors.field}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.control}"
-    padding: "7px 9px"
+    backgroundColor: '{colors.field}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.control}'
+    padding: '7px 9px'
   state-row-selected:
-    backgroundColor: "{colors.selected-state}"
-    rounded: "{rounded.control}"
-    padding: "9px 8px"
+    backgroundColor: '{colors.selected-state}'
+    rounded: '{rounded.control}'
+    padding: '9px 8px'
   inspector:
-    backgroundColor: "{colors.inspector}"
-    padding: "20px"
+    backgroundColor: '{colors.inspector}'
+    padding: '20px'
 ---
 
 # Design System: Uchrony
@@ -152,14 +152,13 @@ Numeric tables, data rows, metrics, and simulation statistics use tabular figure
 
 ## Layout
 
-The desktop application fills the dynamic viewport, with independently scrolling side panels and a flexible map. Persistent toolbars and separators establish a continuous workspace. The default columns are (208px / minmax(0, 1fr) / 328px); the topbar is (66px), the facts strip (40px), and primary navigation (47px). These describe the implemented atlas surface, not mandatory dimensions for every future screen.
+The atlas fills the dynamic viewport beneath a single (54px) header, reduced to (50px) on mobile. Global statistics, view navigation, background generation, map overlays and saving no longer occupy stacked full-width bars. The palette, heraldry, serif/sans roles and dossier data styling remain the incumbent visual system.
 
-The recurring rhythm uses compact gaps, related-item spacing, panel padding, and section separation from the frontmatter. Inspector metrics form two columns; data and goods rows align their values to the right. Most dossier sections remain open against their parent surface and are separated by horizontal rules.
+Temporary controls sit over the geography: States and Explore at the upper left, map layers at the upper right, a floating clock at bottom center, zoom controls at lower right, and scale/map key at lower left. States opens a (286px) searchable drawer and collapses after selection. A province click opens a compact contextual action panel; full dossiers appear only when requested. State selection frames its territory in the map area left visible by the dossier.
 
-- At (1600px) and above, columns expand to (230px / flexible / 360px), with larger panel padding and lettering.
-- At (1250px) and below, columns contract to (182px / flexible / 302px).
-- At (1050px) and below, the state list becomes a temporary drawer and the main layout becomes a flexible map plus (310px) dossier. Navigation scrolls horizontally.
-- At (760px) and below, the map and dossier stack in document flow. The map workspace uses (57dvh), bounded by (380px) and (630px). The state drawer remains accessible; action labels in the header become icon controls with accessible names. Dossier text and targets increase in size.
+Dossiers occupy an independently scrolling right panel (366px), expanding to (400px) on wide screens. The expand control permits up to (740px) for detailed work. A local section selector replaces global view tabs, and stability is part of the country subtitle instead of another section bar. World comparisons use a separate nonmodal panel up to (1040px). Import, export, generation, conditions and help live in the world menu; generation and saving status live in Activity. A saving failure retains a visible warning and a notification.
+
+At (760px) and below, the map remains full-height while dossiers become sheets below the map controls and above the clock. States remains a collapsible drawer. Header actions use icons with accessible labels, and long layer names truncate within the available width. The underlying camera size stays stable when panels open or close. Menus dismiss outside or with Escape; the map supports keyboard pan/zoom and two-pointer pinch zoom. Reduced motion retains the existing project behavior.
 
 ## Elevation & Depth
 
@@ -167,17 +166,19 @@ Depth comes mainly from adjacent slate tones, fine borders, and selected surface
 
 ### Shadow Vocabulary
 
-- **Layer menu:** `0 7px 25px #10202355`.
+- **Layer menu / contextual popover:** `0 10px 34px #081a2270`.
 - **Map tooltip:** `0 7px 20px #14282f55`.
 - **Toast:** `0 8px 30px #08181f66`.
 - **Dialog:** `0 18px 70px #06151f80`, paired with a dark translucent backdrop.
-- **State drawer:** `8px 0 30px #0b1c2666`.
+- **State drawer:** `0 10px 34px #0b1b2266`.
+- **Dossier / comparison panel:** `0 12px 38px #081a2270`.
+- **Floating clock:** `0 8px 28px #081a2266`.
 
 **The Cabinet Plane Rule.** Keep persistent workspace panels flat and ruled. Reserve diffuse shadows for floating menus, tooltips, dialogs, and temporary messages.
 
 ## Shapes
 
-Controls have small, practical corners; menus and tooltips are only slightly softer. Dialogs use the larger corner token to distinguish temporary tasks. Persistent panels retain straight edges. Fine borders delineate controls and rows; meters use nearly square ends. Dots are reserved for compact status and event markers. Heraldic SVG silhouettes identify states and echo the map’s territorial color.
+Controls have small, practical corners; menus and tooltips are only slightly softer. Dialogs use the larger corner token to distinguish temporary tasks. Persistent panels retain straight edges. Context panels use (8px) corners, while fine borders delineate controls and rows; meters use nearly square ends. Dots are reserved for compact status and event markers. Heraldic SVG silhouettes identify states and echo the map’s territorial color.
 
 ## Components
 
@@ -193,17 +194,17 @@ Fields use a recessed slate background, a fine green-gray border, and control co
 
 ### Navigation
 
-Primary navigation is a ruled horizontal strip. The active item combines warmer text, a faint brass wash, and a bottom underline (2px). It remains a horizontal scroller at narrow widths. Compact segmented controls for speed and chronicle scope use a selected tonal surface.
+Explore offers domain views in a lightweight menu; the active dossier section is selected locally in its header. World comparisons keep their own horizontal tabs. The compact clock exposes play, monthly stepping and a native speed selector, with annual stepping in its menu. The existing chronicle scope controls retain their tonal selected state.
 
 ### State Rows and Dossiers
 
-State selectors pair a heraldic mark with a name, supporting data, and status. Selection changes the row surface and name color, and reveals a chevron. The inspector is a continuous panel with a serif state heading, numeric summary, ruled sections, and persistent status footer. It is not a standalone card repeated around the canvas.
+State selectors pair a heraldic mark with a name, supporting data, and status. Selection changes the row surface and name color, and reveals a chevron. The inspector is a contextual panel with a serif state heading, numeric summary and ruled sections. Its duplicate section heading and persistent status footer are removed; the section selector and country subtitle carry orientation and stability. It can expand or dismiss without resizing the map.
 
 ### Cartographic Controls and Legends
 
-The layer picker, stacked zoom controls, and tooltip use compact dark floating surfaces. Switching themes preserves geography and selection. Quantitative themes include a color ramp, descriptive label, and numeric ticks; terrain uses labeled swatches; trade and military use their rendered line and marker vocabulary. The scale shifts clear of the thematic legend. Icons are SVG components, including the selected layer check.
+The layer picker, stacked zoom controls, and tooltip use compact dark floating surfaces. Switching themes preserves geography and selection. Quantitative themes include a color ramp, descriptive label, and numeric ticks; terrain uses labeled swatches; trade and military use their rendered line and marker vocabulary. The map key opens its legend above the scale instead of keeping all symbols visible. Icons are SVG components, including the selected layer check.
 
-The atlas renders shared province polygons over interpolated terrain, with slope lighting and a deep-water field (`#243f49`) that blends into the map surround. Shorelines use the shared smoothed land silhouette. Political fills are grouped by state; detailed province divisions appear on closer inspection. Labels reserve screen space to avoid overlaps, and the title retains an opaque slate backing while panning over bright land. Pointer-anchored wheel zoom and double-click zoom preserve geographic orientation. These are map-specific devices, not decorative treatments for other panels.
+The atlas renders shared province polygons over interpolated terrain, with slope lighting and a deep-water field (`#243f49`) that blends into the map surround. Shorelines use the shared smoothed land silhouette. Political fills are grouped by state; detailed province divisions appear on closer inspection. Labels reserve screen space to avoid overlaps, and map controls retain opaque slate backing while panning over bright land. The large decorative map heading is replaced with an accessible, visually hidden heading. Pointer-anchored wheel zoom and double-click zoom preserve geographic orientation. These are map-specific devices, not decorative treatments for other panels.
 
 Freight is a physical network overlay: muted solid roads, warm dashed shipping lanes, and hollow harbor markers. Each shared segment is drawn once, with width based on total monthly tonnage. The trade layer dims unrelated shipments while emphasizing the selected state's or province's imports and exports. Cargo dots follow actual travel direction at a constant screen speed and stop when paused or reduced motion is requested. The dossier explains cargo, distance, and harbor transfers without requiring map hover.
 

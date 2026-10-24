@@ -1,4 +1,4 @@
-import { parseSave, validateWorld } from '../sim/persistence'
+import { parseSave, restoreWorld } from '../sim/persistence'
 import type { World } from '../sim/types'
 import type { SaveBackend } from './backends'
 import type { WorldSave } from './save-types'
@@ -11,8 +11,7 @@ export interface RestoredSave {
 function checked(record: WorldSave) {
   if (!record || record.version !== 1 || !Number.isSafeInteger(record.savedAt) || record.savedAt < 0)
     throw new Error('The autosave envelope is invalid.')
-  validateWorld(record.world)
-  return record
+  return { ...record, world: restoreWorld(record.world) }
 }
 export async function restoreSave(backends: SaveBackend[], legacy: string | null): Promise<RestoredSave> {
   const reads = await Promise.allSettled(
@@ -37,7 +36,7 @@ export async function restoreSave(backends: SaveBackend[], legacy: string | null
   return { world: null, source: 'none' }
 }
 export async function persistSave(backends: SaveBackend[], record: WorldSave) {
-  checked(record)
+  record = checked(record)
   const writes = await Promise.allSettled(backends.map((backend) => backend.write(record)))
   const success = writes.findIndex((result) => result.status === 'fulfilled')
   if (success >= 0) return backends[success].name

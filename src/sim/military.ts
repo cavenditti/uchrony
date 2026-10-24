@@ -1,3 +1,5 @@
+import { markOccupation } from './geopolitics'
+import { knownMap } from './intelligence'
 import { clamp, population, relation, type Army, type World } from './types'
 import { transportGraph, shortestPaths, pathTo } from './economy'
 import { corridorProfile, corridorUsage } from './corridors'
@@ -65,9 +67,13 @@ export function advanceArmies(w: World) {
     const cache = land ? landGraphs : supplyGraphs
     let graph = cache.get(nation)
     if (!graph) {
-      const access = w.regions.map((region) => accessible(w, nation, region.id))
+      const access = w.regions.map((region) => accessible(w, nation, region.id)),
+        chart = land && w.nations[nation].ai ? new Set(knownMap(w, nation).map((r) => r.id)) : null
       graph = land
-        ? landGraph(w, nation, profile)
+        ? landGraph(w, nation, profile).map((edges, from) => {
+            if (!chart) return edges
+            return chart.has(from) ? edges.filter((e) => chart.has(e.to)) : []
+          })
         : transportGraph(w, nation, profile).map((edges, from) =>
             edges.filter((edge) => access[from] && access[edge.to]),
           )
@@ -224,15 +230,23 @@ export function advanceArmies(w: World) {
         a.soldiers > 0 &&
         a.operations!.embarkedOn === null,
     )
-    if (!defenders.length) {
-      const localLoyalty =
-        next.communities!.reduce(
-          (sum, g) => sum + (g.population.adults + g.population.elders) * g.loyalty,
-          0,
-        ) / Math.max(1, next.population.adults + next.population.elders)
+    if (defenders.reduce((sum, force) => sum + force.soldiers, 0) < Math.min(1800, army.soldiers * 0.8)) {
+      const willingAdults = next
+          .communities!.filter((g) => g.allegiance !== army.nation)
+          .reduce((sum, g) => sum + g.population.adults, 0),
+        localLoyalty =
+          next.communities!.reduce(
+            (sum, g) =>
+              sum +
+              (g.population.adults + g.population.elders) *
+                g.loyalty *
+                (g.allegiance === former.id ? 1 : g.allegiance === army.nation ? 0 : 0.45),
+            0,
+          ) / Math.max(1, next.population.adults + next.population.elders)
       const levy = Math.min(
-        1200,
-        Math.floor(next.population.adults * 0.008 * localLoyalty),
+        2500,
+        willingAdults,
+        Math.floor(next.population.adults * 0.035 * localLoyalty),
         Math.floor(next.stocks.arms / 0.002),
       )
       if (levy >= 50 && w.armies.length < 500) {
@@ -243,7 +257,8 @@ export function advanceArmies(w: World) {
           region: destination,
           target: null,
           soldiers: levy,
-          communities: takeCivilianAdults(w, next, levy),
+          establishment: levy,
+          communities: takeCivilianAdults(w, next, levy, (g) => g.allegiance !== army.nation),
           morale: 0.45,
           supply: 0.6,
           experience: 0.05,
@@ -255,7 +270,7 @@ export function advanceArmies(w: World) {
         ensureWarfare(w)
         militia.operations!.stance = 'entrench'
         militia.operations!.entrenchment = 0.15
-        defenders = [militia]
+        defenders.push(militia)
       }
     }
     const power = (a: Army) =>
@@ -309,6 +324,7 @@ export function advanceArmies(w: World) {
     army.experience = clamp(army.experience + 0.02)
     if (attack > defense * 1.2 && army.soldiers > 200 && army.morale > 0.2) {
       next.nation = army.nation
+      markOccupation(w, next.id, former.id)
       next.unrest = clamp(next.unrest + 15, 0, 100)
       army.region = next.id
       army.operations!.entrenchment = 0
@@ -336,8 +352,8 @@ export function advanceArmies(w: World) {
       }
       warEvent(
         w,
-        `${n.shortName} takes ${next.name}`,
-        `Terrain, supply and troop cohesion shape the battle. ${attackerLoss + defenseLoss} troops and ${civilianLoss} civilians die; surviving defenders retreat or surrender.`,
+        `${n.shortName} occupies ${next.name}`,
+        `Terrain, supply and troop cohesion shape the battle. ${attackerLoss + defenseLoss} troops and ${civilianLoss} civilians die; surviving defenders retreat or surrender. Occupation requires sustained forces and administration; local allegiance does not change with the battlefield result.`,
         n.id,
         next.id,
       )
@@ -392,7 +408,8 @@ export function advanceArmies(w: World) {
     const graph = graphFor(a.nation, true),
       paths = shortestPaths(graph, a.region)
     if (n.ai && a.target === null) {
-      const targets = w.regions
+      const chart = knownMap(w, n.id)
+      const targets = chart
         .filter(
           (r) => relation(w, a.nation, r.nation)?.treaty === 'war' && Number.isFinite(paths.distance[r.id]),
         )
@@ -407,7 +424,7 @@ export function advanceArmies(w: World) {
             f.transports >= 4,
         )
         const enemy = fleet
-          ? w.regions.find(
+          ? chart.find(
               (r) =>
                 relation(w, a.nation, r.nation)?.treaty === 'war' &&
                 portAt(w, r.id) &&

@@ -1,9 +1,13 @@
+import { pendingAdvice, submitAdvice, withdrawAdvice } from './advisors'
+import { geographyKey } from '../map/geometry'
+import { DEFAULT_WORLD_SCALE, WORLD_SCALES } from './scale'
 import { Playback } from './playback'
 import { ensurePopulation } from './population'
+import { ensureIntelligence } from './intelligence'
 import { ensureWarfare } from './navy'
 import { generateWorld } from './generate'
 import { tick, applyCommand, summarize } from './engine'
-import { validateWorld } from './persistence'
+import { restoreWorld } from './persistence'
 import { receiveHistoricalEvent, ensureHistory, historicalContext } from './history'
 import {
   ensureStatecraft,
@@ -44,25 +48,48 @@ let nextBackgroundAt = 0,
   lastHistoryMonth = -Infinity,
   backgroundPublish: ReturnType<typeof setTimeout> | undefined
 let agentError = ''
+let mapKey = ''
+let geographyPublished = false
 const send = (message: WorkerResponse) => self.postMessage(message)
 const status = (state: StorytellerStatus['state'], message: string) =>
   send({ type: 'storyteller', status: { state, message, model: models.model } })
 function agentStatus() {
   const active: AgentServiceStatus['active'] = [...jobs.values()]
-    .filter((job) => ['decision', 'strategy', 'referee'].includes(job.role))
+    .filter((job) => ['decision', 'strategy'].includes(job.role))
     .map((job) => ({
       nation: job.nation,
-      role: job.role as 'decision' | 'strategy' | 'referee',
+      role: job.role as 'decision' | 'strategy',
       since: job.since,
     }))
-  send({ type: 'agents', status: { pending: jobs.size, active, ...models, error: agentError } })
+  send({
+    type: 'agents',
+    status: {
+      pending: active.length,
+      active,
+      decisionModel: models.decisionModel,
+      strategyModel: models.strategyModel,
+      error: agentError,
+    },
+  })
 }
 function publish(message?: string, acknowledgement = false) {
   if (acknowledgement) {
     clearTimeout(backgroundPublish)
     backgroundPublish = undefined
   }
-  if (world) send({ type: 'world', world, message, acknowledgement })
+  if (world) {
+    // The immutable terrain travels once per generated/restored world. Dynamic
+    // snapshots reuse it in the UI and still form complete exports/autosaves.
+    const { cells, ...dynamic } = world
+    send({
+      type: 'world',
+      world: geographyPublished ? dynamic : { ...dynamic, cells },
+      mapKey,
+      message,
+      acknowledgement,
+    })
+    geographyPublished = true
+  }
 }
 async function connection() {
   try {
@@ -97,6 +124,7 @@ const playback = new Playback(
   (error) => send({ type: 'error', message: error instanceof Error ? error.message : 'Simulation stopped.' }),
 )
 function reset() {
+  geographyPublished = false
   playback.stop()
   for (const job of jobs.values()) job.controller.abort()
   jobs.clear()
@@ -178,7 +206,10 @@ async function launch(
     else if (role === 'details')
       send({ type: 'event-detail', event: Number(key.split(':')[1]), state: 'error', message })
     else {
-      agentError = message
+      agentError =
+        role === 'referee'
+          ? 'Diplomatic developments are delayed. Existing commitments remain in force.'
+          : message
       const agent = world?.statecraft?.agents.find((entry) => entry.nation === nation)
       if (agent && role === 'decision')
         agent.escalation = `The lightweight pass needs strategic review: ${message}`
@@ -247,6 +278,7 @@ function schedule() {
   }
   for (const agent of [...ensureStatecraft(current).agents].sort(
     (a, b) =>
+      Number(pendingAdvice(b).length > 0) - Number(pendingAdvice(a).length > 0) ||
       (lastLaunch.get(`state:${a.nation}`) ?? -Infinity) - (lastLaunch.get(`state:${b.nation}`) ?? -Infinity),
   )) {
     if (jobs.size >= 4) break
@@ -255,22 +287,30 @@ function schedule() {
       jobs.has(`state:${agent.nation}`)
     )
       continue
-    if (current.month < agent.nextDecision && agent.lastDecision === 0) continue
+    const adviceWaiting = pendingAdvice(agent).length > 0
+    if (!adviceWaiting && current.month < agent.nextDecision && agent.lastDecision === 0) continue
     const key = `state:${agent.nation}`
     // Check budgets BEFORE building census, map, agreements and prompts. Clock speed never raises request rate.
     if (!eligible(key, 30000)) continue
     const requestedByObserver = agent.escalation === 'Strategic review requested by the observer.',
-      newCrisis = current.pressures?.incidents.some(
-        (incident) =>
-          incident.nations.includes(agent.nation) &&
-          incident.month > agent.lastStrategy &&
-          incident.expires > current.month,
-      ),
+      newCrisis =
+        current.pressures?.incidents.some(
+          (incident) =>
+            incident.nations.includes(agent.nation) &&
+            incident.month > agent.lastStrategy &&
+            incident.expires > current.month,
+        ) ||
+        current.sovereignty?.provinces.some(
+          (report) =>
+            report.nation === agent.nation &&
+            report.stage === 'contested' &&
+            report.warned > agent.lastStrategy,
+        ),
       full =
         requestedByObserver ||
         ((!!agent.escalation || current.month >= agent.nextStrategy) &&
           now - (lastStrategy.get(agent.nation) ?? -Infinity) >= (newCrisis ? 60000 : 120000))
-    if (!full && current.month < agent.nextDecision) continue
+    if (!full && !adviceWaiting && current.month < agent.nextDecision) continue
     const nation = current.nations[agent.nation],
       signal = JSON.stringify([
         Math.floor(nation.foodCoverage * 5),
@@ -287,6 +327,10 @@ function schedule() {
           )
           .map((offer) => offer.id),
         agent.escalation,
+        pendingAdvice(agent).map((note) => note.id),
+        current.intelligence?.services
+          .find((s) => s.nation === agent.nation)
+          ?.dossiers.map((d) => [d.nation, d.military?.month, d.economy?.month, d.politics?.month]),
       ])
     if (!full && decisionSignals.get(agent.nation) === signal && current.month < agent.lastDecision + 24)
       continue
@@ -309,6 +353,7 @@ function schedule() {
           seenMessage: Math.max(0, ...context.inbox.map((message) => message.id)),
           offers: context.offers.map((offer) => offer.id),
           leaderGeneration: context.character?.leader.generation,
+          advice: context.adviser.pending.map((note) => note.id),
         }),
     )
   }
@@ -326,20 +371,30 @@ self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
     let message: string | undefined
     if (data.type === 'generate') {
       reset()
-      world = generateWorld(data.seed, data.continents, data.nations, data.settings)
+      const scale = data.scale ?? DEFAULT_WORLD_SCALE
+      world = generateWorld(
+        data.seed,
+        data.continents,
+        data.nations ?? WORLD_SCALES[scale].states,
+        data.settings,
+        scale,
+      )
+      mapKey = geographyKey(world.cells)
       ensurePopulation(world)
       ensureHistory(world)
       ensureStatecraft(world)
       summarize(world)
       void connection().then(schedule)
     } else if (data.type === 'load') {
-      const restored = validateWorld(data.world)
+      const restored = restoreWorld(data.world)
       reset()
       world = restored
+      mapKey = geographyKey(world.cells)
       ensureWarfare(world)
       ensurePopulation(world)
       ensureHistory(world)
       ensureStatecraft(world)
+      ensureIntelligence(world)
       message = 'World restored. Simulation is paused.'
       void connection().then(schedule)
     } else if (data.type === 'step') {
@@ -355,6 +410,18 @@ self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
       nextBackgroundAt = 0
       agentError = ''
       void connection().then(schedule)
+    } else if (data.type === 'advise' || data.type === 'withdraw-advice') {
+      if (!world) throw new Error('No government is available yet.')
+      const agent = ensureStatecraft(world).agents.find((entry) => entry.nation === data.nation)
+      if (!agent) throw new Error('That government could not be found.')
+      if (data.type === 'advise') {
+        submitAdvice(world, agent, data.text)
+        decisionSignals.delete(data.nation)
+        message = 'Suggestion sent privately. The government will weigh it at its next assessment.'
+      } else {
+        withdrawAdvice(world, agent, data.advice)
+        message = 'Undelivered suggestion withdrawn.'
+      }
     } else if (data.type === 'agent-strategy') {
       const agent = world?.statecraft?.agents.find((entry) => entry.nation === data.nation)
       if (agent) {
@@ -388,6 +455,7 @@ self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
     send({
       type: 'error',
       message: error instanceof Error ? error.message : 'The action could not complete.',
+      recoverable: data.type === 'advise' || data.type === 'withdraw-advice',
     })
   }
 }

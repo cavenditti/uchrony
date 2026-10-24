@@ -1,9 +1,14 @@
+import type { Charter, ProvincialDelegation } from './institutions'
 import type { HistoricalEffect } from './history-types'
 import type { Good, Research } from './types'
 
 export type Visibility = 'public' | 'secret'
 export interface DiplomaticClause {
+  charter?: Charter
+  delegation?: Pick<ProvincialDelegation, 'powers'>
   kind:
+    | 'institution'
+    | 'devolution'
     | 'payment'
     | 'tribute'
     | 'goods'
@@ -29,6 +34,7 @@ export interface DiplomaticClause {
   text: string
 }
 export interface DiplomaticOffer {
+  notBefore?: number
   id: number
   author: number
   month: number
@@ -61,6 +67,7 @@ export interface DiplomaticMessage {
 }
 export interface DomesticOrder {
   kind:
+    | 'intelligence'
     | 'policy'
     | 'identity'
     | 'research'
@@ -76,7 +83,16 @@ export interface DomesticOrder {
   value: number
   text: string
 }
+export interface AdvisorNote {
+  id: number
+  month: number
+  text: string
+  status: 'pending' | 'delivered' | 'answered' | 'withdrawn'
+  handledMonth?: number
+  response?: string
+}
 export interface StateAgentPlan {
+  adviceResponses?: { advice: number; response: string }[]
   assessment: string
   strategy: string
   memory: string
@@ -96,6 +112,7 @@ export interface StateAgentPlan {
   answers: { offer: number; digest: string; answer: 'accept' | 'reject' | 'withdraw'; reason: string }[]
 }
 export interface StateAgent {
+  advisor?: { nextId: number; notes: AdvisorNote[] }
   nation: number
   assessment: string
   strategy: string
@@ -151,9 +168,8 @@ export interface Statecraft {
 }
 export interface AgentServiceStatus {
   pending: number
-  active: { nation: number; role: 'decision' | 'strategy' | 'referee'; since: number }[]
+  active: { nation: number; role: 'decision' | 'strategy'; since: number }[]
   decisionModel: string
   strategyModel: string
-  refereeModel: string
   error: string
 }

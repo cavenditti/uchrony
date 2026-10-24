@@ -35,6 +35,16 @@ export function ArmyLogistics({
         </p>
       )}
       <div className="data-row">
+        <span>Standing establishment</span>
+        <b>
+          {count(a.soldiers)} / {count(a.establishment ?? a.soldiers)}
+        </b>
+      </div>
+      <div className="data-row">
+        <span>Replacements this month</span>
+        <b>{count(a.replacements ?? 0)}</b>
+      </div>
+      <div className="data-row">
         <span>Carried provisions</span>
         <b>{Math.round((o.food / Math.max(0.001, a.soldiers * 0.034)) * 30)} days</b>
       </div>

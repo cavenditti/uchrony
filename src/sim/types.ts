@@ -1,3 +1,9 @@
+import type { WorldScale } from './scale'
+import type { InstitutionalState, ProvincialDelegation, Charter } from './institutions'
+import type { IntelligenceState, IntelligencePriority } from './intelligence'
+import type { ForeignOffices } from './diplomatic-friction'
+import type { Geopolitics, Occupation } from './geopolitics'
+import type { SovereigntyState } from './sovereignty'
 import type { SimulationSettings } from './settings'
 import type { PressureState } from './pressures'
 import type { HistoricalRecord, HistoricalState, StorytellerStatus } from './history-types'
@@ -11,6 +17,7 @@ import type {
   NationalIdentity,
 } from './population-types'
 
+export const MAX_STATE_IDENTITIES = 256
 export const GOODS = ['food', 'timber', 'stone', 'iron', 'coal', 'tools', 'textiles', 'arms'] as const
 export type Good = (typeof GOODS)[number]
 export type Inventory = Record<Good, number>
@@ -51,6 +58,8 @@ export interface Cell {
   riverFlow?: number
 }
 export interface Region {
+  delegation?: ProvincialDelegation
+  occupation?: Occupation
   id: number
   name: string
   nation: number
@@ -135,6 +144,7 @@ export interface Nation {
   ai: boolean
 }
 export interface Relation {
+  aggressor?: number
   a: number
   b: number
   opinion: number
@@ -144,6 +154,8 @@ export interface Relation {
   grievance: number
 }
 export interface Army {
+  establishment?: number
+  replacements?: number
   operations?: ArmyOperations
   id: number
   nation: number
@@ -218,6 +230,11 @@ export interface HistoryPoint {
 export interface World {
   version: 1
   simulation?: SimulationSettings
+  institutions?: InstitutionalState
+  intelligence?: IntelligenceState
+  foreignOffices?: ForeignOffices
+  geopolitics?: Geopolitics
+  sovereignty?: SovereigntyState
   pressures?: PressureState
   generatorVersion?: number
   seed: string
@@ -255,6 +272,21 @@ export interface World {
   }
 }
 export type Command =
+  | {
+      type: 'intelligence'
+      nation: number
+      budgetShare: number
+      priority: IntelligencePriority
+      focus: number | null
+    }
+  | { type: 'charter-proposal'; nation: number; members: number[]; name: string; charter: Charter }
+  | {
+      type: 'devolution'
+      nation: number
+      regions: number[]
+      autonomy: number
+      powers: ProvincialDelegation['powers']
+    }
   | { type: 'conditions'; settings: SimulationSettings }
   | { type: 'policy'; nation: number; key: keyof Policies; value: Policies[keyof Policies] }
   | { type: 'identity-policy'; nation: number; key: 'culture' | 'language' | 'belief'; identity: number }
@@ -285,17 +317,32 @@ export type Command =
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }
 export type WorkerRequest =
-  | { type: 'generate'; seed: string; continents?: number; nations?: number; settings?: SimulationSettings }
+  | {
+      type: 'generate'
+      seed: string
+      continents?: number
+      nations?: number
+      settings?: SimulationSettings
+      scale?: WorldScale
+    }
   | { type: 'step'; count: number }
   | { type: 'playback'; running: boolean; speed: number }
   | { type: 'command'; command: Command }
   | { type: 'load'; world: unknown }
   | { type: 'retry-history' }
+  | { type: 'advise'; nation: number; text: string }
+  | { type: 'withdraw-advice'; nation: number; advice: number }
   | { type: 'agent-strategy'; nation: number }
   | { type: 'event-details'; event: number }
 export type WorkerResponse =
-  | { type: 'world'; world: World; message?: string; acknowledgement?: boolean }
-  | { type: 'error'; message: string }
+  | {
+      type: 'world'
+      world: Omit<World, 'cells'> & { cells?: Cell[] }
+      mapKey: string
+      message?: string
+      acknowledgement?: boolean
+    }
+  | { type: 'error'; message: string; recoverable?: boolean }
   | { type: 'storyteller'; status: StorytellerStatus }
   | { type: 'agents'; status: AgentServiceStatus }
   | { type: 'event-detail'; event: number; state: 'loading' | 'done' | 'error'; message?: string }

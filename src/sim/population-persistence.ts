@@ -3,7 +3,7 @@ import type { IdentityAxis, PopulationCommunity } from './population-types'
 import { AGES, communityKey } from './population'
 import { allForces } from './forces'
 
-export function validatePopulation(world: World) {
+export function validatePopulation(world: World, allowDuplicateCommunities = false) {
   const state = world.demography,
     fail = (message: string): never => {
       throw new Error(`Invalid population save: ${message}`)
@@ -91,7 +91,7 @@ export function validatePopulation(world: World) {
       )
         fail('invalid community profile')
       const key = communityKey(group)
-      if (keys.has(key)) fail('duplicate census community')
+      if (keys.has(key) && !allowDuplicateCommunities) fail('duplicate census community')
       keys.add(key)
       for (const age of AGES) totals[age] += group.population[age]
     }

@@ -1,3 +1,6 @@
+import { MAX_PROVINCES } from './scale'
+import { INSTITUTION_POWERS, PROVINCIAL_POWERS } from './institutions'
+import { MAX_STATE_IDENTITIES } from './types'
 import { FIELDS, GOODS } from './types'
 import { HISTORICAL_EFFECT_SCHEMA } from './history-schema'
 import type { StateAgentPlan, RefereeDecision } from './statecraft-types'
@@ -36,9 +39,9 @@ const arr = (items: Schema, maxItems: number, minItems = 0): Schema => ({
   maxItems,
   minItems,
 })
-const nation = num(0, 63, true),
+const nation = num(0, MAX_STATE_IDENTITIES - 1, true),
   id = num(0, 1e12, true)
-export const CLAUSE_SCHEMA = obj({
+const clauseProperties = {
   kind: en([
     'payment',
     'tribute',
@@ -57,16 +60,48 @@ export const CLAUSE_SCHEMA = obj({
     'war',
   ]),
   from: nation,
-  to: num(-1, 63, true),
+  to: num(-1, MAX_STATE_IDENTITIES - 1, true),
   amount: num(0, 1e8),
   good: en(['', ...GOODS]),
   field: en(['', ...FIELDS]),
-  regions: arr(num(0, 599, true), 600),
+  regions: arr(num(0, MAX_PROVINCES - 1, true), MAX_PROVINCES),
   duration: num(0, 240, true),
   text: text(1000),
-})
+}
+export const CLAUSE_SCHEMA: Schema = {
+  anyOf: [
+    obj(clauseProperties),
+    obj({
+      ...clauseProperties,
+      kind: en(['institution']),
+      charter: obj({
+        operation: en(['found', 'join', 'withdraw', 'amend']),
+        id,
+        powers: arr(en(INSTITUTION_POWERS), 5),
+        form: en([
+          'defense-league',
+          'customs-union',
+          'research-community',
+          'confederation',
+          'federation',
+          'bespoke',
+        ]),
+        rule: en(['unanimity', 'majority', 'weighted']),
+        contribution: num(0, 0.15),
+        exit: en(['free', 'notice']),
+      }),
+    }),
+    obj({
+      ...clauseProperties,
+      kind: en(['devolution']),
+      delegation: obj({ powers: arr(en(PROVINCIAL_POWERS), 4) }),
+    }),
+  ],
+}
+
 export function stateAgentSchema(strategic: boolean): Schema {
   return obj({
+    adviceResponses: arr(obj({ advice: num(1, 1e12, true), response: text(400) }), 4),
     assessment: text(strategic ? 1000 : 400),
     strategy: text(strategic ? 1800 : 600),
     memory: text(strategic ? 2000 : 800),
@@ -76,6 +111,7 @@ export function stateAgentSchema(strategic: boolean): Schema {
     orders: arr(
       obj({
         kind: en([
+          'intelligence',
           'policy',
           'identity',
           'research',
@@ -108,7 +144,7 @@ export function stateAgentSchema(strategic: boolean): Schema {
       obj({
         title: text(140),
         visibility: en(['public', 'secret']),
-        parties: arr(nation, 12, 1),
+        parties: arr(nation, 32, 1),
         terms: arr(CLAUSE_SCHEMA, 12, 1),
         supersedes: id,
         duration: num(1, 120, true),
@@ -187,8 +223,11 @@ export function checkSchema(schema: Schema, value: unknown, path = 'response', d
   } else if (schema.type === 'boolean' && typeof value !== 'boolean') fail('must be boolean')
 }
 export function parseStatePlan(value: unknown, strategic: boolean): StateAgentPlan {
-  checkSchema(stateAgentSchema(strategic), value)
-  return structuredClone(value) as StateAgentPlan
+  // Older saved/in-flight plans predate advisory feedback.
+  const plan =
+    value && typeof value === 'object' && !Array.isArray(value) ? { adviceResponses: [], ...value } : value
+  checkSchema(stateAgentSchema(strategic), plan)
+  return structuredClone(plan) as StateAgentPlan
 }
 export function parseReferee(value: unknown): RefereeDecision {
   checkSchema(REFEREE_SCHEMA, value)

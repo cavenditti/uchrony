@@ -16,6 +16,7 @@ import { hashSeed } from '../src/sim/random'
 import { generateWorld } from '../src/sim/generate'
 import { ensureStatecraft, stateAgentContext } from '../src/sim/statecraft'
 import { validateWorld } from '../src/sim/persistence'
+import { intelligenceService } from '../src/sim/intelligence'
 
 function offer(
   id: number,
@@ -139,6 +140,8 @@ test('agent citation catalogs include older visible sources and preserve valid s
   state.nextId = 30
   state.agents.find((a) => a.nation === 2)!.memory = 'Review [[agreement:8]] and [[agreement:21]].'
   const before = JSON.stringify(state.offers)
+  assert(!stateAgentContext(w, 2, true).agreementReferences.some((entry) => entry.id === 8))
+  intelligenceService(w, 2).agreements.push({ offer: structuredClone(state.offers[0]), month: 0 })
   const context = stateAgentContext(w, 2, true)
   assert(context.agreementReferences.some((entry) => entry.id === 8 && entry.reference === '[[agreement:8]]'))
   assert(!context.agreementReferences.some((entry) => entry.id === 21))

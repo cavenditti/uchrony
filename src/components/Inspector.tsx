@@ -1,3 +1,6 @@
+import { StateAdvisor } from './StateAdvisor'
+import { StateSecurity } from './StateSecurity'
+import { IntelligenceOffice } from './IntelligenceOffice'
 import { useState } from 'react'
 import {
   ArrowUpRight,
@@ -264,6 +267,8 @@ function PolicySlider({
 }
 
 interface InspectorProps {
+  onAdvise?: (nation: number, text: string) => void
+  onWithdrawAdvice?: (nation: number, id: number) => void
   agentStatus: AgentServiceStatus
   onStrategy: (nation: number) => void
   onEventDetails: (event: number) => void
@@ -282,6 +287,8 @@ interface InspectorProps {
 }
 
 export function Inspector({
+  onAdvise,
+  onWithdrawAdvice,
   agentStatus,
   onStrategy,
   onEventDetails,
@@ -337,6 +344,10 @@ export function Inspector({
             {n.government}
             <span>·</span>
             {n.ai ? 'Autonomous' : 'Player governed'}
+            <span>·</span>
+            <span className={n.stability < 45 ? 'negative' : ''}>
+              {n.stability > 65 ? 'Stable' : n.stability > 45 ? 'Uneasy' : 'Unrest'}
+            </span>
           </p>
         </div>
         <button
@@ -349,16 +360,11 @@ export function Inspector({
         </button>
       </div>
       <StateCharacter world={w} nation={n} compact />
-      <div className="inspector-heading">
-        <span>
-          {TAB_INFO.find((t) => t.id === tab)?.name === 'Atlas'
-            ? 'State overview'
-            : TAB_INFO.find((t) => t.id === tab)?.name}
-        </span>
-        <span className={`status-dot ${n.stability < 45 ? 'warning' : ''}`} />
-        <small>{n.stability > 65 ? 'Stable' : n.stability > 45 ? 'Uneasy' : 'Unrest'}</small>
-      </div>
       <div className="inspector-body" key={`${tab}-${n.id}`}>
+        {onAdvise && onWithdrawAdvice && (
+          <StateAdvisor key={n.id} world={w} nation={n.id} onSend={onAdvise} onWithdraw={onWithdrawAdvice} />
+        )}
+
         {tab === 'atlas' && (
           <>
             {r ? (
@@ -637,6 +643,7 @@ export function Inspector({
               <ArrowUpRight size={14} />
             </button>
             <StateCharacter world={w} nation={n} />
+            <StateSecurity world={w} nation={n.id} onFocus={onFocus} />
             <SectionTitle>Taxation & borders</SectionTitle>
             <PolicySlider
               name="Tax rate"
@@ -784,6 +791,7 @@ export function Inspector({
         )}
         {tab === 'diplomacy' && (
           <>
+            <IntelligenceOffice key={n.id} world={w} nation={n.id} onCommand={command} />
             <DiplomaticChancery world={w} nation={n.id} status={agentStatus} onReview={onStrategy} />
             <p className="panel-note">
               Commerce builds trust. Expansionist governments weigh border opportunities; prolonged wars
@@ -842,7 +850,7 @@ export function Inspector({
                       command({ type: 'diplomacy', nation: n.id, target: target.id, action: 'trade' })
                     }
                   >
-                    Trade accord
+                    Propose trade
                   </button>
                   <button
                     className="button"
@@ -850,7 +858,7 @@ export function Inspector({
                       command({ type: 'diplomacy', nation: n.id, target: target.id, action: 'alliance' })
                     }
                   >
-                    Alliance
+                    Propose alliance
                   </button>
                 </div>
                 <button
@@ -913,6 +921,7 @@ export function Inspector({
                 </button>
               </div>
             )}
+            <StateSecurity world={w} nation={n.id} onFocus={onFocus} />
             <SectionTitle>Field armies</SectionTitle>
             {armies.map((a) => (
               <div className="army-row" key={a.id}>

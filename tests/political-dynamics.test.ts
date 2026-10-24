@@ -62,7 +62,7 @@ test('private motives enter strategy without exposing foreign private profiles a
   const context = stateAgentContext(w, n.id, true)
   assert(context.strategicLandscape.doctrine?.ambition)
   assert(context.strategicLandscape.rivals.length > 0)
-  assert(context.foreignStates.every((other) => !('politics' in other.character!.leader)))
+  assert(context.foreignStates.every((other) => !('character' in other)))
   assert(strategicPressures(w, n).constraints.suppliedLandPower >= 0)
 })
 

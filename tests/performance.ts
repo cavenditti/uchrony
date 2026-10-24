@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
+import { WORLD_SCALES, worldScale } from '../src/sim/scale'
 import { validateWorld } from '../src/sim/persistence'
 import { population, type World } from '../src/sim/types'
 const argument = (name: string) => {
@@ -13,7 +14,10 @@ const argument = (name: string) => {
 const root = resolve(argument('--engine-root') ?? '.'),
   { tick } = await import(pathToFileURL(resolve(root, 'src/sim/engine.ts')).href),
   save = argument('--save'),
-  original = save ? JSON.parse(readFileSync(resolve(save), 'utf8')) : generateWorld('performance-ledger'),
+  scale = worldScale(argument('--scale') ?? 'regional'),
+  original = save
+    ? JSON.parse(readFileSync(resolve(save), 'utf8'))
+    : generateWorld('performance-ledger', 3, WORLD_SCALES[scale].states, undefined, scale),
   initial: World = original.world ?? original,
   months = Number(argument('--months') ?? 24),
   repeats = Number(argument('--repeats') ?? 2),

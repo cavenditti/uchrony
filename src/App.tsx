@@ -1,3 +1,6 @@
+import { DEFAULT_WORLD_SCALE, WORLD_SCALES, type WorldScale } from './sim/scale'
+import { WorldOverview } from './components/WorldOverview'
+import { inWorldText, narrativeProjection, presentWorld } from './sim/narrative'
 import { DEFAULT_SETTINGS, simulationSettings, type SimulationSettings } from './sim/settings'
 import { SimulationConditions } from './components/SimulationConditions'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -16,7 +19,6 @@ import {
   Wheat,
   Swords,
   Route,
-  Eye,
   CircleHelp,
   ArrowUpRight,
   Check,
@@ -24,8 +26,16 @@ import {
   PanelLeft,
   Clock3,
   Settings2,
+  Network,
   Info,
   CalendarDays,
+  ChevronDown,
+  Ellipsis,
+  Activity,
+  BookOpen,
+  Compass,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import {
   type World,
@@ -69,12 +79,17 @@ export default function App() {
   const [modal, setModal] = useState<'new' | 'help' | 'conditions' | null>(null),
     [stateSearch, setStateSearch] = useState(''),
     [showStates, setShowStates] = useState(false)
+  const [inspectorOpen, setInspectorOpen] = useState(false),
+    [expandedDossier, setExpandedDossier] = useState(false),
+    [overviewOpen, setOverviewOpen] = useState(false)
   const [seed, setSeed] = useState('A world unwritten'),
     [continents, setContinents] = useState(3),
-    [nationCount, setNationCount] = useState(8)
+    [nationCount, setNationCount] = useState(32)
+  const [scale, setScale] = useState<WorldScale>(DEFAULT_WORLD_SCALE)
+  const [mapKey, setMapKey] = useState('')
   const [conditions, setConditions] = useState<SimulationSettings>({ ...DEFAULT_SETTINGS }),
     [newConditions, setNewConditions] = useState<SimulationSettings>({ ...DEFAULT_SETTINGS })
-  const [focus, setFocus] = useState<{ region: number; key: number } | null>(null),
+  const [focus, setFocus] = useState<{ region: number; key: number; nation?: number } | null>(null),
     [orderedArmy, setOrderedArmy] = useState<number | null>(null)
   const [savedAt, setSavedAt] = useState('Not saved yet'),
     [restoreWarning, setRestoreWarning] = useState<string | null>(null)
@@ -88,13 +103,13 @@ export default function App() {
     active: [],
     decisionModel: '',
     strategyModel: '',
-    refereeModel: '',
     error: '',
   })
   const [pendingDetails, setPendingDetails] = useState<number[]>([])
   const worker = useRef<Worker | null>(null),
     pending = useRef(false),
     currentWorld = useRef<World | null>(null)
+  const receivedGeography = useRef<{ key: string; cells: World['cells'] } | null>(null)
   const saveQueue = useRef<LatestSaveQueue | null>(null),
     lastSavedWorld = useRef<World | null>(null),
     retryDiskAt = useRef(Infinity),
@@ -102,11 +117,19 @@ export default function App() {
   const [startupError, setStartupError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null),
     searchInput = useRef<HTMLInputElement>(null),
+    stateToggle = useRef<HTMLButtonElement>(null),
     dialogRef = useRef<HTMLDialogElement>(null)
-  const notify = useCallback((text: string, error = false) => setToast({ text, error }), [])
+  const notify = useCallback(
+    (text: string, error = false) => setToast({ text: inWorldText(text), error }),
+    [],
+  )
   const send = useCallback((data: WorkerRequest) => {
     if (data.type === 'generate' || data.type === 'load') {
       setPendingDetails([])
+      setShowStates(false)
+      setInspectorOpen(false)
+      setOverviewOpen(false)
+      setOrderedArmy(null)
       saveQueue.current?.reset()
       currentWorld.current = null
       lastSavedWorld.current = null
@@ -122,11 +145,11 @@ export default function App() {
     worker.current = instance
     instance.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
       if (data.type === 'storyteller') {
-        setStoryteller(data.status)
+        setStoryteller(narrativeProjection(data.status))
         return
       }
       if (data.type === 'agents') {
-        setAgents(data.status)
+        setAgents(narrativeProjection(data.status))
         return
       }
       if (data.type === 'event-detail') {
@@ -144,11 +167,21 @@ export default function App() {
       }
       if (data.type === 'error') {
         notify(data.message, true)
-        setRunning(false)
+        if (!data.recoverable) setRunning(false)
         return
       }
-      setWorld(data.world)
-      currentWorld.current = data.world
+      if (data.world.cells) receivedGeography.current = { key: data.mapKey, cells: data.world.cells }
+      const cells =
+        data.world.cells ??
+        (receivedGeography.current?.key === data.mapKey ? receivedGeography.current.cells : undefined)
+      if (!cells) {
+        notify('The atlas has not arrived yet. Reload to restore your world.', true)
+        return
+      }
+      const snapshot: World = { ...data.world, cells }
+      setMapKey(data.mapKey)
+      setWorld(presentWorld(snapshot))
+      currentWorld.current = snapshot
       if (data.message) notify(data.message)
     }
     instance.onerror = () => {
@@ -244,6 +277,10 @@ export default function App() {
     }
   }, [])
   useEffect(() => {
+    if (restoreWarning)
+      notify('Autosave needs attention. Open activity for details or export a backup.', true)
+  }, [restoreWarning, notify])
+  useEffect(() => {
     if (!toast) return
     const timer = setTimeout(() => setToast(null), toast.error ? 10000 : 6000)
     return () => clearTimeout(timer)
@@ -254,12 +291,27 @@ export default function App() {
   }, [modal])
   useEffect(() => {
     const keydown = (e: KeyboardEvent) => {
+      if (modal) return
+      if (e.key === 'Escape') {
+        if (closeMenus()) return
+        if (orderedArmy !== null) setOrderedArmy(null)
+        else if (showStates) {
+          setShowStates(false)
+          stateToggle.current?.focus()
+        } else if (overviewOpen) {
+          setOverviewOpen(false)
+          document.querySelector<HTMLCanvasElement>('.world-canvas')?.focus()
+        } else if (inspectorOpen) {
+          setInspectorOpen(false)
+          document.querySelector<HTMLCanvasElement>('.world-canvas')?.focus()
+        } else setRegion(null)
+        return
+      }
       if (
         e.target instanceof HTMLElement &&
-        ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(e.target.tagName)
+        ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'SUMMARY'].includes(e.target.tagName)
       )
         return
-      if (modal) return
       if (e.code === 'Space') {
         e.preventDefault()
         setRunning((v) => !v)
@@ -281,21 +333,33 @@ export default function App() {
           ]
           return list[(list.indexOf(v) + 1) % list.length]
         })
-      if (e.key === 'Escape') {
-        setOrderedArmy(null)
-        setRegion(null)
-        setShowStates(false)
-      }
       if (e.key === '/') {
         e.preventDefault()
+        closeMenus()
+        setOverviewOpen(false)
         setShowStates(true)
         searchInput.current?.focus()
       }
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [modal])
+  }, [modal, orderedArmy, showStates, overviewOpen, inspectorOpen])
+  useEffect(() => {
+    if (showStates) searchInput.current?.focus()
+  }, [showStates])
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      for (const menu of document.querySelectorAll<HTMLDetailsElement>('details[data-menu][open]'))
+        if (!menu.contains(event.target as Node)) menu.open = false
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [])
   const chooseTab = (next: Tab) => {
+    closeMenus()
+    setInspectorOpen(true)
+    setOverviewOpen(false)
+    setShowStates(false)
     setTab(next)
     if (tabLayer[next]) setLayer(tabLayer[next]!)
     if (next === 'military') setShowArmies(true)
@@ -305,6 +369,8 @@ export default function App() {
     setRegion(null)
     setShowStates(false)
     setOrderedArmy(null)
+    setInspectorOpen(true)
+    setOverviewOpen(false)
   }
   const command = (c: Command) => send({ type: 'command', command: c })
   const selectRegion = (id: number) => {
@@ -316,15 +382,16 @@ export default function App() {
     }
     setRegion(id)
     setNation(world.regions[id].nation)
-    setTab('atlas')
+    setOverviewOpen(false)
   }
   const focusRegion = (id: number) => setFocus({ region: id, key: Date.now() })
   const exportWorld = () => {
-    if (!world) return
-    const url = URL.createObjectURL(new Blob([JSON.stringify(world)], { type: 'application/json' })),
+    const snapshot = currentWorld.current
+    if (!snapshot) return
+    const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot)], { type: 'application/json' })),
       a = document.createElement('a')
     a.href = url
-    a.download = `uchrony-${world.seed.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 50)}-${world.startYear + Math.floor(world.month / 12)}.json`
+    a.download = `uchrony-${snapshot.seed.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 50)}-${snapshot.startYear + Math.floor(snapshot.month / 12)}.json`
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
     notify('World exported, including history and the random state for exact continuation.')
@@ -352,7 +419,7 @@ export default function App() {
         {!startupError && <p>Raising continents. Settling provinces. Setting history in motion.</p>}
         {startupError && (
           <>
-            <p role="alert">{startupError}</p>
+            <p role="alert">{inWorldText(startupError)}</p>
             <button className="button primary" onClick={() => retryRestore.current?.()}>
               Retry restoring saved world
             </button>
@@ -392,173 +459,250 @@ export default function App() {
   const controlled = nations.filter((n) => !n.ai)
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
+    <div className="app-shell atlas-shell">
+      <header className="topbar atlas-header">
         <Brand />
-        <div className="world-identity">
-          <span className="world-divider" />
-          <Globe2 size={15} />
-          <span>{world.seed}</span>
-          <span className="world-type">Generated world</span>
-        </div>
-        <div className="header-actions">
+        <span className="atlas-world-name" title={world.seed}>
+          {world.seed}
+        </span>
+        <div className="atlas-header-actions">
           <button
-            className="icon-button"
-            title="Simulation conditions"
-            aria-label="Simulation conditions"
+            className={`header-link ${overviewOpen ? 'active' : ''}`}
+            aria-label="World overview"
+            aria-expanded={overviewOpen}
             onClick={() => {
-              setRunning(false)
-              setConditions({ ...simulationSettings(world) })
-              setModal('conditions')
+              setOverviewOpen((v) => !v)
+              setInspectorOpen(false)
+              setShowStates(false)
             }}
           >
-            <Settings2 size={18} />
+            <Network size={16} />
+            <span>World</span>
           </button>
           <button
-            className="icon-button"
-            aria-label="How the simulation works"
-            title="How it works"
-            onClick={() => {
-              setRunning(false)
-              setModal('help')
-            }}
+            className={`header-link ${inspectorOpen && tab === 'chronicle' ? 'active' : ''}`}
+            onClick={() => chooseTab('chronicle')}
+            aria-label="Open world chronicle"
           >
-            <CircleHelp size={18} />
+            <BookOpen size={16} />
+            <span>Chronicle</span>
           </button>
-          <button className="button header-secondary" onClick={() => fileInput.current?.click()}>
-            <Upload size={14} />
-            <span>Import</span>
-          </button>
-          <button className="button header-secondary" onClick={exportWorld}>
-            <Download size={14} />
-            <span>Export world</span>
-          </button>
-          <button
-            className="button new-world-button"
-            onClick={() => {
-              setRunning(false)
-              setModal('new')
-            }}
-          >
-            <Plus size={15} />
-            <span>New world</span>
-          </button>
+          <details className="header-popover" data-menu>
+            <summary
+              className={`header-link activity-trigger ${restoreWarning || storyteller.state === 'error' || agents.error ? 'has-warning' : ''}`}
+              aria-label={
+                restoreWarning ? 'Autosave problem: open saving status' : 'Simulation activity and saving'
+              }
+              title={restoreWarning ? 'Autosave needs attention' : 'Activity and saving'}
+            >
+              {restoreWarning || storyteller.state === 'error' || agents.error ? (
+                <Info size={17} />
+              ) : (
+                <Activity size={17} />
+              )}
+              <span className="visually-hidden">Activity and saving</span>
+              {restoreWarning && <span className="save-problem-label">Save issue</span>}
+            </summary>
+            <div className="chrome-popover activity-popover">
+              <h2>Simulation activity</h2>
+              <p className="activity-save">
+                <Check size={14} />
+                {savedAt}
+              </p>
+              <p>
+                {controlled.length
+                  ? `Governing ${controlled.length} ${controlled.length === 1 ? 'state' : 'states'}`
+                  : 'Observer mode · States govern themselves.'}
+              </p>
+              {restoreWarning && (
+                <div className="activity-warning" role="alert">
+                  <p>{inWorldText(restoreWarning)}</p>
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      if (currentWorld.current) void saveQueue.current?.enqueue(currentWorld.current)
+                    }}
+                  >
+                    Retry save
+                  </button>
+                  <button className="text-button" onClick={exportWorld}>
+                    Export a backup
+                  </button>
+                </div>
+              )}
+              <div className="activity-history">
+                <strong>Historical accounts</strong>
+                <p>
+                  {storyteller.state === 'generating'
+                    ? 'An account is developing in the background. Local events continue.'
+                    : storyteller.message}
+                </p>
+                {storyteller.state === 'error' && (
+                  <button className="text-button" onClick={() => send({ type: 'retry-history' })}>
+                    Retry connection
+                  </button>
+                )}
+              </div>
+              <p>
+                {agents.pending
+                  ? `${agents.pending} background deliberations. The simulation continues independently.`
+                  : 'Governments deliberate in the background.'}
+              </p>
+              {agents.error && <p className="negative">{agents.error}</p>}
+            </div>
+          </details>
+          <details className="header-popover" data-menu>
+            <summary className="header-link" aria-label="World menu" title="World menu">
+              <Ellipsis size={20} />
+              <span className="visually-hidden">World menu</span>
+            </summary>
+            <div className="chrome-popover world-menu">
+              <h2>{world.seed}</h2>
+              <button
+                onClick={() => {
+                  closeMenus()
+                  exportWorld()
+                }}
+              >
+                <Download size={16} />
+                Export world
+              </button>
+              <button
+                onClick={() => {
+                  closeMenus()
+                  fileInput.current?.click()
+                }}
+              >
+                <Upload size={16} />
+                Import world
+              </button>
+              <button
+                onClick={() => {
+                  closeMenus()
+                  setRunning(false)
+                  setModal('new')
+                }}
+              >
+                <Plus size={16} />
+                Generate world
+              </button>
+              <hr />
+              <button
+                onClick={() => {
+                  closeMenus()
+                  setRunning(false)
+                  setConditions({ ...simulationSettings(world) })
+                  setModal('conditions')
+                }}
+              >
+                <Settings2 size={16} />
+                Simulation conditions
+              </button>
+              <button
+                onClick={() => {
+                  closeMenus()
+                  setRunning(false)
+                  setModal('help')
+                }}
+              >
+                <CircleHelp size={16} />
+                Model & controls
+              </button>
+              <p>Fictional world · Experimental simulation</p>
+            </div>
+          </details>
         </div>
       </header>
-      <div className="world-stats">
-        <div className="world-status">
-          <span className={`status-dot ${running ? 'pulse' : ''}`} />
-          {running ? 'World in motion' : 'World paused'}
-        </div>
-        <div>
-          <Users size={14} />
-          <strong>{compact(world.totals.population)}</strong>
-          <span>people</span>
-        </div>
-        <div>
-          <Globe2 size={14} />
-          <strong>{nations.length}</strong>
-          <span>states</span>
-        </div>
-        <div>
-          <Route size={14} />
-          <strong>{compact(world.totals.trade)}</strong>
-          <span>t traded / mo</span>
-        </div>
-        <div>
-          <Wheat size={14} />
-          <strong>{Math.round(food * 100)}%</strong>
-          <span>food needs met</span>
-        </div>
-        <div className={wars > 0 ? 'war-stat' : ''}>
-          <Swords size={14} />
-          <strong>{wars}</strong>
-          <span>{wars === 1 ? 'active war' : 'active wars'}</span>
-        </div>
-        <div className="mode-indicator">
-          <Eye size={14} />
-          <span>
-            {controlled.length
-              ? `Governing ${controlled.length} ${controlled.length === 1 ? 'state' : 'states'}`
-              : 'Observer mode'}
-          </span>
-        </div>
-      </div>
-      <nav className="main-nav" aria-label="Simulation views">
-        <button
-          className="mobile-states-button"
-          onClick={() => setShowStates((v) => !v)}
-          aria-label="Toggle state list"
-        >
-          <PanelLeft size={17} />
-        </button>
-        {TAB_INFO.map(({ id, name, icon: Icon }) => (
-          <button
-            key={id}
-            aria-current={tab === id ? 'page' : undefined}
-            className={tab === id ? 'active' : ''}
-            onClick={() => chooseTab(id)}
-          >
-            <Icon size={15} />
-            <span>{name}</span>
-            {id === 'chronicle' && <small>{Math.min(world.events.length, 99)}</small>}
-          </button>
-        ))}
-      </nav>
-      {(storyteller.state === 'error' || storyteller.state === 'generating') && (
-        <div className={`history-service-banner ${storyteller.state}`} role="status">
-          {storyteller.state === 'generating' ? (
-            <LoaderCircle size={15} className="spin" />
-          ) : (
-            <Info size={15} />
+      <main className="workspace atlas-stage">
+        <section className="atlas-workspace" aria-label="World atlas">
+          <WorldMap
+            world={world}
+            mapKey={mapKey}
+            layer={layer}
+            nation={selected.id}
+            region={region}
+            showRoutes={showRoutes}
+            showArmies={showArmies}
+            running={running}
+            focus={focus}
+            orderMode={orderedArmy !== null}
+            showContext={!inspectorOpen && !overviewOpen}
+            onSelect={selectRegion}
+            onLayer={setLayer}
+            onInspect={(id, section) => {
+              selectRegion(id)
+              chooseTab(section)
+            }}
+            onClear={() => setRegion(null)}
+            onToggleRoutes={() => setShowRoutes((v) => !v)}
+            onToggleArmies={() => setShowArmies((v) => !v)}
+          />
+          {orderedArmy !== null && (
+            <div className="map-order-banner" role="status">
+              <Swords size={16} />
+              <span>Select a province as the army’s destination</span>
+              <button onClick={() => setOrderedArmy(null)} aria-label="Cancel destination selection">
+                <X size={15} />
+              </button>
+            </div>
           )}
-          <span>
-            {storyteller.message}
-            {storyteller.state === 'generating' && ' Local events continue while the draft develops.'}
-          </span>
-          {storyteller.state === 'error' && (
-            <button className="text-button" onClick={() => send({ type: 'retry-history' })}>
-              Retry connection
-            </button>
-          )}
-          <button className="text-button" onClick={() => chooseTab('chronicle')}>
-            Chronicle
-          </button>
-        </div>
-      )}
-      {restoreWarning && (
-        <div className="warning-banner" role="alert">
-          <Info size={15} />
-          <span>{restoreWarning}</span>
+        </section>
+        <div className="atlas-navigation">
           <button
-            className="text-button"
+            ref={stateToggle}
+            className={`map-button state-switcher ${showStates ? 'active' : ''}`}
+            aria-expanded={showStates}
+            aria-controls="faction-drawer"
             onClick={() => {
-              if (currentWorld.current) void saveQueue.current?.enqueue(currentWorld.current)
+              setShowStates((v) => !v)
+              setOverviewOpen(false)
             }}
           >
-            Retry save
+            <PanelLeft size={17} />
+            <span>States</span>
+            <small>{nations.length}</small>
+            <ChevronDown size={13} />
           </button>
-          <button aria-label="Dismiss storage warning" onClick={() => setRestoreWarning(null)}>
-            <X size={14} />
-          </button>
+          <details className="explore-picker" data-menu>
+            <summary className="map-button" aria-label="Explore simulation views">
+              <Compass size={17} />
+              <span>Explore</span>
+              <ChevronDown size={13} />
+            </summary>
+            <nav className="chrome-popover explore-menu" aria-label="Simulation views">
+              {TAB_INFO.map(({ id, name, icon: Icon }) => (
+                <button
+                  key={id}
+                  aria-current={inspectorOpen && tab === id ? 'page' : undefined}
+                  onClick={() => chooseTab(id)}
+                >
+                  <Icon size={16} />
+                  <span>{id === 'atlas' ? 'State & province' : name}</span>
+                  {tab === id && inspectorOpen && <Check size={13} />}
+                </button>
+              ))}
+            </nav>
+          </details>
         </div>
-      )}
-      <main className="workspace">
-        <aside className={`world-sidebar ${showStates ? 'open' : ''}`} aria-label="States and recent events">
-          <div className="sidebar-section">
-            <div className="sidebar-heading">
-              <h2>Sovereign states</h2>
-              <span>{nations.length}</span>
+        {showStates && (
+          <aside id="faction-drawer" className="faction-drawer" aria-label="Sovereign states">
+            <div className="drawer-heading">
+              <h2>
+                Sovereign states <small>{nations.length}</small>
+              </h2>
               <button
-                className="mobile-close icon-button"
-                aria-label="Close state list"
-                onClick={() => setShowStates(false)}
+                className="icon-button"
+                aria-label="Collapse state list"
+                onClick={() => {
+                  setShowStates(false)
+                  stateToggle.current?.focus()
+                }}
               >
-                <X size={14} />
+                <X size={17} />
               </button>
             </div>
             <label className="state-search">
-              <Search size={14} />
+              <Search size={15} />
               <input
                 ref={searchInput}
                 aria-label="Find a state"
@@ -577,21 +721,19 @@ export default function App() {
                     key={n.id}
                     className={`state-row ${selected.id === n.id ? 'selected' : ''}`}
                     aria-pressed={selected.id === n.id}
-                    onClick={() => chooseNation(n.id)}
+                    onClick={() => {
+                      chooseNation(n.id)
+                      setFocus({ region: n.capital, nation: n.id, key: Date.now() })
+                    }}
                   >
                     <FlagMark nation={n} small />
                     <span>
                       <strong>{n.shortName}</strong>
                       <small>{compact(n.population)} people</small>
                     </span>
-                    <span
-                      className={`state-peace ${world.relations.some((r) => (r.a === n.id || r.b === n.id) && r.treaty === 'war') ? 'at-war' : ''}`}
-                      title={
-                        world.relations.some((r) => (r.a === n.id || r.b === n.id) && r.treaty === 'war')
-                          ? 'At war'
-                          : 'At peace'
-                      }
-                    />
+                    {world.relations.some((r) => (r.a === n.id || r.b === n.id) && r.treaty === 'war') && (
+                      <Swords size={13} className="negative" aria-label="At war" />
+                    )}
                     <ChevronRight size={13} />
                   </button>
                 ))}
@@ -599,180 +741,180 @@ export default function App() {
                 <p className="empty-state">No state matches “{stateSearch}”.</p>
               )}
             </div>
-          </div>
-          <div className="sidebar-events">
-            <div className="sidebar-heading">
-              <h2>Recent history</h2>
+            <p className="drawer-note">
+              Choose a state to open its dossier. You can also select any province on the map.
+            </p>
+          </aside>
+        )}
+        {inspectorOpen && !overviewOpen && (
+          <section
+            className={`dossier-panel ${expandedDossier ? 'expanded' : ''}`}
+            aria-label="Selected place dossier"
+          >
+            <div className="dossier-tools">
+              <label>
+                <span className="visually-hidden">Dossier section</span>
+                <select
+                  aria-label="Dossier section"
+                  value={tab}
+                  onChange={(event) => chooseTab(event.target.value as Tab)}
+                >
+                  {TAB_INFO.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.id === 'atlas' ? 'State & province' : item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
-                aria-label="Open world chronicle"
-                className="icon-button"
-                onClick={() => chooseTab('chronicle')}
+                className="icon-button expand-dossier"
+                aria-label={expandedDossier ? 'Compact dossier' : 'Expand dossier'}
+                title={expandedDossier ? 'Compact dossier' : 'Expand dossier'}
+                onClick={() => setExpandedDossier((v) => !v)}
               >
-                <ArrowUpRight size={15} />
+                {expandedDossier ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
-            </div>
-            {world.events.slice(0, 3).map((e) => (
               <button
-                className={`sidebar-event ${e.type}`}
-                key={e.id}
+                className="icon-button"
+                aria-label="Close dossier"
                 onClick={() => {
-                  chooseTab('chronicle')
-                  if (e.nation !== undefined) chooseNation(e.nation)
+                  setInspectorOpen(false)
+                  document.querySelector<HTMLCanvasElement>('.world-canvas')?.focus()
                 }}
               >
-                <time>{dateLabel({ month: e.month, startYear: world.startYear })}</time>
-                <strong>{e.title}</strong>
-                <span>
-                  {e.type === 'world' ? 'The world takes shape' : e.type[0].toUpperCase() + e.type.slice(1)}
-                </span>
-              </button>
-            ))}
-            <button className="text-button" onClick={() => chooseTab('chronicle')}>
-              Read the chronicle
-              <ArrowRightIcon />
-            </button>
-          </div>
-          <div className="sidebar-bottom">
-            <span>Every border has a history.</span>
-            <small>Every decision writes the next.</small>
-          </div>
-        </aside>
-        <section className="atlas-workspace" aria-label="World atlas">
-          <WorldMap
-            world={world}
-            layer={layer}
-            nation={selected.id}
-            region={region}
-            showRoutes={showRoutes}
-            showArmies={showArmies}
-            running={running}
-            focus={focus}
-            onSelect={selectRegion}
-            onLayer={setLayer}
-          />
-          {orderedArmy !== null && (
-            <div className="map-order-banner">
-              <FlagIcon />
-              <span>Choose a destination for your army</span>
-              <button onClick={() => setOrderedArmy(null)} aria-label="Cancel destination selection">
-                <X size={15} />
+                <X size={18} />
               </button>
             </div>
-          )}
-          <div className="map-tools">
-            <div className="overlay-toggles">
-              <button
-                className={showRoutes ? 'active' : ''}
-                aria-pressed={showRoutes}
-                onClick={() => setShowRoutes((v) => !v)}
-              >
-                <Route size={13} />
-                Trade routes
-              </button>
-              <button
-                className={showArmies ? 'active' : ''}
-                aria-pressed={showArmies}
-                onClick={() => setShowArmies((v) => !v)}
-              >
-                <Swords size={13} />
-                Armies
-              </button>
-            </div>
-            <span>Drag to explore · Scroll to zoom</span>
-          </div>
-          <footer className="time-control">
-            <div className="date-display">
-              <CalendarDays size={18} />
-              <div>
-                <strong>{dateLabel(world)}</strong>
-                <span>{world.month} months of history</span>
-              </div>
-            </div>
-            <div className="playback">
-              <button
-                className={`play-button ${running ? 'running' : ''}`}
-                aria-label={running ? 'Pause simulation' : 'Play simulation'}
-                title="Play / pause (Space)"
-                onClick={() => setRunning((v) => !v)}
-              >
-                {running ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-              </button>
-              <button
-                className="step-button"
-                aria-label="Advance one month"
-                title="Advance one month"
-                disabled={busy || running}
-                onClick={() => send({ type: 'step', count: 1 })}
-              >
-                <SkipForward size={17} />
-              </button>
-              <div className="speed-controls">
-                {speedOptions.map((v) => (
-                  <button
-                    key={v}
-                    aria-pressed={speed === v}
-                    className={speed === v ? 'active' : ''}
-                    onClick={() => setSpeed(v)}
-                  >
-                    {v}×
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button
-              className="advance-year"
-              disabled={busy || running}
-              onClick={() => send({ type: 'step', count: 12 })}
-            >
-              +1 year
-              <ChevronRight size={13} />
-            </button>
-            <span className="save-status" title={savedAt}>
-              {busy ? <LoaderCircle className="spin" size={12} /> : <Check size={12} />}
+            <Inspector
+              onAdvise={(nation, text) => send({ type: 'advise', nation, text })}
+              onWithdrawAdvice={(nation, advice) => send({ type: 'withdraw-advice', nation, advice })}
+              world={world}
+              agentStatus={agents}
+              onStrategy={(nation) => worker.current?.postMessage({ type: 'agent-strategy', nation })}
+              onEventDetails={(event) => worker.current?.postMessage({ type: 'event-details', event })}
+              pendingDetails={pendingDetails}
+              nationId={selected.id}
+              regionId={region}
+              tab={tab}
+              onTab={chooseTab}
+              onCommand={command}
+              onFocus={focusRegion}
+              onRegion={setRegion}
+              onNation={chooseNation}
+              onArmy={(id) => {
+                setOrderedArmy(id)
+                setInspectorOpen(false)
+              }}
+              orderedArmy={orderedArmy}
+            />
+          </section>
+        )}
+        {overviewOpen && (
+          <section
+            className="world-comparison-panel"
+            aria-label="World comparisons"
+            aria-labelledby="world-overview-title"
+          >
+            <div className="comparison-toolbar">
               <span>
-                {busy
-                  ? 'Simulating'
-                  : agents.pending
-                    ? `${agents.pending} background deliberations`
-                    : savedAt}
+                <Network size={16} />
+                World overview
               </span>
-            </span>
-          </footer>
-        </section>
-        <Inspector
-          world={world}
-          agentStatus={agents}
-          onStrategy={(nation) => worker.current?.postMessage({ type: 'agent-strategy', nation })}
-          onEventDetails={(event) => worker.current?.postMessage({ type: 'event-details', event })}
-          pendingDetails={pendingDetails}
-          nationId={selected.id}
-          regionId={region}
-          tab={tab}
-          onTab={chooseTab}
-          onCommand={command}
-          onFocus={focusRegion}
-          onRegion={setRegion}
-          onNation={chooseNation}
-          onArmy={setOrderedArmy}
-          orderedArmy={orderedArmy}
-        />
+              <button
+                className="icon-button"
+                aria-label="Close world overview"
+                onClick={() => setOverviewOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="comparison-scroll">
+              <div className="world-digest">
+                <span>
+                  <Users size={14} />
+                  <strong>{compact(world.totals.population)}</strong> people
+                </span>
+                <span>
+                  <Wheat size={14} />
+                  {Math.round(food * 100)}% food needs met
+                </span>
+                <span>
+                  <Route size={14} />
+                  {compact(world.totals.trade)} t traded / month
+                </span>
+                <span className={wars ? 'negative' : ''}>
+                  <Swords size={14} />
+                  {wars} active {wars === 1 ? 'war' : 'wars'}
+                </span>
+              </div>
+              <WorldOverview
+                world={world}
+                nation={nation}
+                onNation={(id) => {
+                  chooseNation(id)
+                  chooseTab('diplomacy')
+                }}
+                onCommand={command}
+              />
+            </div>
+          </section>
+        )}
+        <div className="atlas-clock" aria-label="Simulation time controls">
+          <div className="clock-date">
+            <strong>{dateLabel(world)}</strong>
+            <span>{busy ? 'Advancing…' : running ? 'In motion' : 'Paused'}</span>
+          </div>
+          <button
+            className={`play-button ${running ? 'running' : ''}`}
+            aria-label={running ? 'Pause simulation' : 'Play simulation'}
+            title="Play / pause (Space)"
+            onClick={() => setRunning((v) => !v)}
+          >
+            {running ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
+          </button>
+          <button
+            className="icon-button clock-step"
+            aria-label="Advance one month"
+            title="Advance one month"
+            disabled={busy || running}
+            onClick={() => send({ type: 'step', count: 1 })}
+          >
+            <SkipForward size={17} />
+          </button>
+          <select
+            aria-label="Simulation speed"
+            title="Simulation speed"
+            value={speed}
+            onChange={(e) => setSpeed(Number(e.target.value))}
+          >
+            {speedOptions.map((value) => (
+              <option key={value} value={value}>
+                {value}×
+              </option>
+            ))}
+          </select>
+          <details className="clock-options" data-menu>
+            <summary className="icon-button" aria-label="Time controls">
+              <Ellipsis size={19} />
+              <span className="visually-hidden">Time controls</span>
+            </summary>
+            <div className="chrome-popover">
+              <p>{world.month} months of history</p>
+              <button
+                disabled={busy || running}
+                onClick={() => {
+                  closeMenus()
+                  send({ type: 'step', count: 12 })
+                }}
+              >
+                <CalendarDays size={16} />
+                Advance one year
+              </button>
+              <p>{busy ? 'Calculating the next month…' : 'Space to play or pause · 1–4 for speed'}</p>
+            </div>
+          </details>
+        </div>
       </main>
-      <div className="app-status">
-        <span>
-          <Globe2 size={11} />
-          UCHRONY <b>0.1</b>
-        </span>
-        <span>Fictional world · Experimental simulation</span>
-        <button
-          onClick={() => {
-            setRunning(false)
-            setModal('help')
-          }}
-        >
-          Model & controls
-          <ArrowUpRight size={11} />
-        </button>
-      </div>
       {toast && (
         <div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'}>
           {toast.error ? <Info size={17} /> : <Check size={17} />}
@@ -828,6 +970,7 @@ export default function App() {
                 type: 'generate',
                 seed: seed.trim() || 'A world unwritten',
                 continents,
+                scale,
                 nations: nationCount,
                 settings: newConditions,
               })
@@ -848,6 +991,27 @@ export default function App() {
                 required
               />
             </label>
+            <label className="select-label">
+              World size
+              <select
+                value={scale}
+                onChange={(e) => {
+                  const next = e.target.value as WorldScale
+                  setScale(next)
+                  setNationCount(WORLD_SCALES[next].states)
+                }}
+              >
+                {Object.entries(WORLD_SCALES).map(([key, extent]) => (
+                  <option key={key} value={key}>
+                    {extent.label} · {(extent.width * extent.height).toLocaleString()} hexes
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="panel-note">
+              Around {WORLD_SCALES[scale].provinces.toLocaleString()} provinces. Larger worlds add real
+              distance: longer supply lines, regional markets, and more room for independent states.
+            </p>
             <div className="form-columns">
               <label className="select-label">
                 Geography
@@ -861,7 +1025,7 @@ export default function App() {
               <label className="select-label">
                 Starting states
                 <select value={nationCount} onChange={(e) => setNationCount(Number(e.target.value))}>
-                  {[4, 6, 8, 10, 12].map((v) => (
+                  {[4, 6, 8, 10, 12, 16, 24, 32, 48].map((v) => (
                     <option key={v} value={v}>
                       {v} sovereign states
                     </option>
@@ -1020,15 +1184,15 @@ function Brand() {
     </a>
   )
 }
-function ArrowRightIcon() {
-  return <ChevronRight size={12} />
-}
-function FlagIcon() {
-  return <MapFlag />
-}
-function MapFlag() {
-  return <Swords size={16} />
-}
 function CompassIcon() {
   return <Clock3 className="dialog-symbol" size={34} strokeWidth={1} />
+}
+
+function closeMenus() {
+  const menus = document.querySelectorAll<HTMLDetailsElement>('details[data-menu][open]')
+  for (const menu of menus) {
+    if (menu.contains(document.activeElement)) menu.querySelector<HTMLElement>('summary')?.focus()
+    menu.open = false
+  }
+  return menus.length > 0
 }

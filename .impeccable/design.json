@@ -260,11 +260,7 @@
         "value": "1250px"
       },
       {
-        "name": "drawer-max",
-        "value": "1050px"
-      },
-      {
-        "name": "stacked-max",
+        "name": "sheet-max",
         "value": "760px"
       }
     ]
@@ -343,10 +339,10 @@
     "northStar": "The cabinet map table",
     "overview": "Uchrony frames a living atlas with compact, inspectable state dossiers. Blue-green slate, warm pale lettering, restrained brass controls, and muted territorial colors create the character of a working map cabinet. Alegreya gives places and historical records a distinct voice while a quiet sans-serif carries operations and comparable data.\n\nThis records the implemented, provisional code-led direction, seed ec4fabee; it is not a claim of user approval. The source is authoritative for the current build. Product mechanisms belong in PRODUCT.md, and the first-surface composition remains in .impeccable/surfaces/src-app-tsx.md.",
     "keyCharacteristics": [
-      "Geography remains the dominant visual field.",
-      "Ruled, dense dossiers make quantities and costs comparable.",
-      "Brass identifies actions, focus, and selection.",
-      "Alegreya distinguishes places, narrative, and prominent figures from operational labels."
+      "A full-height atlas beneath one compact header.",
+      "Contextual, expandable dossiers and collapsible faction selection.",
+      "Brass identifies actions, focus and selection; territorial colors carry map data.",
+      "Alegreya carries places and history while operational data uses the platform sans-serif."
     ],
     "rules": [
       {

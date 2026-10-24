@@ -6,8 +6,8 @@ export function validateWarfare(
   validateLegs: (from: number, to: number, legs: RouteLeg[]) => void,
 ) {
   const s = w.warfare,
-    fail = (): never => {
-      throw new Error('Invalid military, fleet, or supply-line state in this save.')
+    fail = (detail = 'unrecognized military record'): never => {
+      throw new Error(`Invalid military, fleet, or supply-line state in this save: ${detail}.`)
     }
   const object = (v: unknown) => !!v && typeof v === 'object' && !Array.isArray(v)
   const number = (v: unknown, max = 1e10) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max
@@ -15,7 +15,7 @@ export function validateWarfare(
   const region = (id: number) => integer(id, w.regions.length - 1)
   const water = (id: number) => integer(id, w.cells.length - 1) && w.cells[id].terrain === 'water'
   if (!s) {
-    if (w.armies.some((a) => a.operations !== undefined)) fail()
+    if (w.armies.some((a) => a.operations !== undefined)) fail('missing warfare ledger')
     return
   }
   if (
@@ -59,26 +59,33 @@ export function validateWarfare(
       f.embarked.length > 500 ||
       new Set(f.embarked).size !== f.embarked.length
     )
-      fail()
+      fail(`fleet ${f.id} profile (crew=${f.soldiers}, food=${f.food}, arms=${f.arms}, hull=${f.hull})`)
     ids.add(f.id)
     let at = f.cell
     for (const next of f.course) {
-      if (!water(next) || !neighbors(at, w.width, w.height).includes(next)) fail()
+      if (!water(next) || !neighbors(at, w.width, w.height).includes(next))
+        fail(`fleet ${f.id} has a noncontiguous course at ${at}→${next}`)
       at = next
     }
     for (const id of f.embarked)
       if (!w.armies.some((a) => a.id === id && a.nation === f.nation && a.operations?.embarkedOn === f.id))
-        fail()
+        fail(`fleet ${f.id} passenger ${id} disagrees with its embarkation record`)
   }
   for (const a of w.armies) {
+    if (
+      (a.establishment !== undefined && (!integer(a.establishment, 1e7) || a.establishment < 1)) ||
+      (a.replacements !== undefined && !integer(a.replacements, 1e7))
+    )
+      fail(`army ${a.id} establishment or replacement count`)
     const o = a.operations
+    if (!object(o)) fail(`army ${a.id} is missing its operations record`)
     if (
       o?.march !== undefined &&
       (!Array.isArray(o.march) ||
         o.march.length > w.cells.length * 3 ||
         o.march.some((id) => !integer(id, w.cells.length - 1) || w.cells[id].terrain === 'water'))
     )
-      fail()
+      fail(`army ${a.id} march geometry`)
     if (
       !object(o) ||
       !o ||
@@ -99,7 +106,9 @@ export function validateWarfare(
         s.fleets.some((f) => f.id === o.embarkedOn && f.nation === a.nation && f.embarked.includes(a.id))
       )
     )
-      fail()
+      fail(
+        `army ${a.id} operations (food=${o?.food}, arms=${o?.arms}, progress=${o?.progress}, fatigue=${o?.fatigue}, cohesion=${o?.cohesion}, loyalty=${o?.loyalty}, entrenchment=${o?.entrenchment}, embarked=${o?.embarkedOn}, source=${o?.source}, line=${o?.line?.length})`,
+      )
   }
   for (const d of s.deliveries) {
     if (
@@ -116,7 +125,7 @@ export function validateWarfare(
       d.path[0] !== d.from ||
       !Array.isArray(d.legs)
     )
-      fail()
+      fail(`delivery to army ${d.army} from ${d.from}: food=${d.food}, arms=${d.arms}, path=${d.path}`)
     if (d.path.length === 1) {
       if (d.legs.length) fail()
     } else validateLegs(d.from, d.path.at(-1)!, d.legs)

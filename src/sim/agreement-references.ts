@@ -67,7 +67,7 @@ export function offerReferenceIds(offer: DiplomaticOffer) {
   ]
 }
 /** Keep cited ancestors when trimming the working ledger; cycles are harmless. */
-export function retainAgreementReferences(state: Statecraft) {
+export function retainAgreementReferences(state: Statecraft, roots: number[] = []) {
   const byId = new Map(state.offers.map((offer) => [offer.id, offer]))
   const ordered = [...state.offers].sort((a, b) => a.month - b.month || a.id - b.id)
   const keep = new Set(
@@ -85,6 +85,7 @@ export function retainAgreementReferences(state: Statecraft) {
     ...state.audit.map((a) => a.message),
   ]
   const queue = [
+    ...roots,
     ...keep,
     ...state.messages.map((m) => m.offer),
     ...state.rulings.map((r) => r.offer),

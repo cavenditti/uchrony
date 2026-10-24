@@ -1,3 +1,4 @@
+import { sharedInstitution } from './institutions'
 import type { World } from './types'
 import type { DiplomaticClause } from './statecraft-types'
 
@@ -19,6 +20,7 @@ export function agreementTerms(world: World, kind?: DiplomaticClause['kind']) {
   )
 }
 export function diplomaticAccess(world: World, traveler: number, host: number) {
+  if (sharedInstitution(world, traveler, host, 'defense')) return true
   return agreementTerms(world).some(
     ({ term }) =>
       (term.kind === 'alliance' &&
@@ -28,6 +30,7 @@ export function diplomaticAccess(world: World, traveler: number, host: number) {
   )
 }
 export function preferentialTrade(world: World, a: number, b: number) {
+  if (sharedInstitution(world, a, b, 'trade')) return true
   return agreementTerms(world).some(
     ({ term }) =>
       ['trade', 'alliance'].includes(term.kind) &&

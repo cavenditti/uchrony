@@ -1,3 +1,12 @@
+import { MAX_MAP_CELLS, MAX_PROVINCES } from './scale'
+import { validateInstitutions } from './institutions'
+import { validateIntelligence } from './intelligence-persistence'
+import { validateForeignOffices } from './diplomatic-persistence'
+import { validateGeopolitics } from './geopolitics-persistence'
+import { coalesceCommunities, communityKey } from './population'
+import type { PopulationCommunity } from './population-types'
+import { MAX_STATE_IDENTITIES } from './types'
+import { validateSovereignty } from './sovereignty-persistence'
 import { validatePressures } from './pressure-persistence'
 import { GOODS, FIELDS, type World, type RouteLeg } from './types'
 import { neighbors } from './hex'
@@ -6,10 +15,11 @@ import { validateStatecraft } from './statecraft-persistence'
 import { validatePopulation } from './population-persistence'
 import { validateCharacters } from './character-persistence'
 import { validateWarfare } from './military-persistence'
+import { initialArmyOperations } from './navy'
 import { MAX_SAVE_BYTES } from '../storage/save-types'
 
 /** Validates untrusted save files before they enter the simulation worker. */
-export function validateWorld(value: unknown): World {
+export function validateWorld(value: unknown, allowDuplicateCommunities = false): World {
   const fail = (message: string): never => {
     throw new Error(`Invalid world save: ${message}`)
   }
@@ -44,10 +54,20 @@ export function validateWorld(value: unknown): World {
     !number(w.climate, 0.1, 3)
   )
     fail('missing simulation counters')
-  if (w.width !== 112 || w.height !== 72 || !Array.isArray(w.cells) || w.cells.length !== w.width * w.height)
+  if (
+    !number(w.width, 16, 448) ||
+    !Number.isInteger(w.width) ||
+    !number(w.height, 16, 288) ||
+    !Number.isInteger(w.height) ||
+    w.width * w.height > MAX_MAP_CELLS ||
+    !Array.isArray(w.cells) ||
+    w.cells.length !== w.width * w.height
+  )
     fail('unsupported map dimensions')
-  if (!Array.isArray(w.regions) || w.regions.length < 4 || w.regions.length > 600) fail('invalid provinces')
-  if (!Array.isArray(w.nations) || w.nations.length < 4 || w.nations.length > 64) fail('invalid states')
+  if (!Array.isArray(w.regions) || w.regions.length < 4 || w.regions.length > MAX_PROVINCES)
+    fail('invalid provinces')
+  if (!Array.isArray(w.nations) || w.nations.length < 4 || w.nations.length > MAX_STATE_IDENTITIES)
+    fail('invalid states')
   const regionId = (id: unknown) => number(id, 0, w.regions.length - 1) && Number.isInteger(id)
   const nationId = (id: unknown) => number(id, 0, w.nations.length - 1) && Number.isInteger(id)
   const cellId = (id: unknown) => number(id, 0, w.cells.length - 1) && Number.isInteger(id)
@@ -59,8 +79,8 @@ export function validateWorld(value: unknown): World {
       c.id !== i ||
       !number(c.x) ||
       !number(c.y) ||
-      !number(c.q, 0, 111) ||
-      !number(c.r, 0, 71) ||
+      c.q !== i % w.width ||
+      c.r !== Math.floor(i / w.width) ||
       !terrain(c.terrain) ||
       !number(c.elevation, -5, 5) ||
       !number(c.moisture, 0, 1) ||
@@ -215,7 +235,8 @@ export function validateWorld(value: unknown): World {
       !number(r.opinion, -100, 100) ||
       !number(r.warExhaustion) ||
       !number(r.since) ||
-      !number(r.grievance)
+      !number(r.grievance) ||
+      (r.aggressor !== undefined && r.aggressor !== r.a && r.aggressor !== r.b)
     )
       fail('invalid diplomatic relationship')
     const key = `${r.a}-${r.b}`
@@ -402,11 +423,16 @@ export function validateWorld(value: unknown): World {
       if (e.historical.causeEvent >= e.id) fail('historical cause must precede its consequence')
     }
   }
+  validateInstitutions(w)
+  validateIntelligence(w)
+  validateForeignOffices(w)
+  validateGeopolitics(w)
+  validateSovereignty(w)
   validatePressures(w)
   if (w.historical !== undefined) validateHistoryState(w, w.historical)
   validateWarfare(w, validateLegs)
   validateStatecraft(w)
-  validatePopulation(w)
+  validatePopulation(w, allowDuplicateCommunities)
   validateCharacters(w)
   if (!Array.isArray(w.history) || w.history.length > 15000) fail('invalid history')
   for (const h of w.history) {
@@ -436,6 +462,88 @@ export function validateWorld(value: unknown): World {
   return w
 }
 
+/** Recover only duplicate representation, after validating every profile and all declared age/troop totals. */
+export function restoreWorld(value: unknown): World {
+  // Recover only machine-roundoff at natural bounds; real negatives and broken transport links still fail.
+  const source = value as World
+  let adjusted: World | undefined
+  if (source && Array.isArray(source.armies) && source.warfare && Array.isArray(source.warfare.fleets)) {
+    const clean = <T extends object>(record: T, unit: string[], nonnegative: string[]): T => {
+      if (!record || typeof record !== 'object') return record
+      let copy: Record<string, unknown> | undefined
+      for (const key of [...unit, ...nonnegative]) {
+        const number = (record as Record<string, unknown>)[key]
+        if (typeof number !== 'number' || !Number.isFinite(number)) continue
+        const replacement =
+          number < 0 && number >= -1e-12
+            ? 0
+            : unit.includes(key) && number > 1 && number <= 1 + 1e-12
+              ? 1
+              : number
+        if (number !== replacement) {
+          copy ??= { ...record } as Record<string, unknown>
+          copy[key] = replacement
+        }
+      }
+      return (copy ?? record) as T
+    }
+    const armies = source.armies.map((army) => {
+        const operations =
+          army?.operations === undefined && army && typeof army === 'object'
+            ? initialArmyOperations()
+            : army?.operations
+              ? clean(
+                  army.operations,
+                  ['fatigue', 'cohesion', 'loyalty', 'entrenchment'],
+                  ['food', 'arms', 'progress'],
+                )
+              : army?.operations
+        return operations === army?.operations ? army : { ...army, operations }
+      }),
+      fleets = source.warfare.fleets.map((fleet) =>
+        clean(fleet, ['morale', 'supply', 'experience', 'hull'], ['food', 'arms']),
+      )
+    if (
+      armies.some((a, i) => a !== source.armies[i]) ||
+      fleets.some((f, i) => f !== source.warfare!.fleets[i])
+    )
+      adjusted = { ...source, armies, warfare: { ...source.warfare, fleets } }
+  }
+  const world = validateWorld(adjusted ?? value, true)
+  let changed = false
+  const census = (groups: PopulationCommunity[] | undefined) => {
+    if (!groups) return groups
+    const keys = new Set<string>()
+    for (const group of groups) {
+      const key = communityKey(group)
+      if (keys.has(key)) {
+        changed = true
+        return coalesceCommunities(structuredClone(groups))
+      }
+      keys.add(key)
+    }
+    return groups
+  }
+  const regions = world.regions.map((region) => {
+      const communities = census(region.communities)
+      return communities === region.communities ? region : { ...region, communities }
+    }),
+    armies = world.armies.map((army) => {
+      const communities = census(army.communities)
+      return communities === army.communities ? army : { ...army, communities }
+    }),
+    warfare = world.warfare
+      ? {
+          ...world.warfare,
+          fleets: world.warfare.fleets.map((fleet) => {
+            const communities = census(fleet.communities)
+            return communities === fleet.communities ? fleet : { ...fleet, communities }
+          }),
+        }
+      : undefined
+  return changed ? validateWorld({ ...world, regions, armies, ...(warfare ? { warfare } : {}) }) : world
+}
+
 export function parseSave(text: string): World {
   if (text.length > MAX_SAVE_BYTES)
     throw new Error('This save is too large. Choose an Uchrony save smaller than 128 MiB.')
@@ -445,5 +553,5 @@ export function parseSave(text: string): World {
   } catch {
     throw new Error('This file is not valid JSON. Choose an exported Uchrony world.')
   }
-  return validateWorld(value)
+  return restoreWorld(value)
 }

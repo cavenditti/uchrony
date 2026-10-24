@@ -143,7 +143,7 @@ export function zoomAt(
   point: Point,
   size: { w: number; h: number },
 ) {
-  const zoom = Math.max(0.65, Math.min(7, view.zoom * factor)),
+  const zoom = Math.max(0.65, Math.min(32, view.zoom * factor)),
     ratio = zoom / view.zoom
   return {
     zoom,

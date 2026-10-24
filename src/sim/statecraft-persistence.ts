@@ -1,3 +1,4 @@
+import { validateAdvisor } from './advisors'
 import type { World } from './types'
 import { CLAUSE_SCHEMA, checkSchema } from './statecraft-schema'
 import { validateHistoricalEffect } from './history-schema'
@@ -68,6 +69,7 @@ export function validateStatecraft(world: World) {
         agent.seenOffers.some((id) => !integer(id, 1)))
     )
       fail('invalid diplomatic review memory')
+    validateAdvisor(world, agent)
     agents.add(agent.nation)
   }
   for (const message of state.messages) {
@@ -105,6 +107,7 @@ export function validateStatecraft(world: World) {
       !Array.isArray(offer.signatures) ||
       !['proposed', 'ratified', 'rejected', 'withdrawn', 'expired', 'breached'].includes(offer.status) ||
       !integer(offer.expires) ||
+      (offer.notBefore !== undefined && !integer(offer.notBefore, offer.month, offer.month + 240)) ||
       !integer(offer.activated, 0, world.month) ||
       !integer(offer.ends) ||
       !integer(offer.supersedes) ||

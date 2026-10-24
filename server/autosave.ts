@@ -3,7 +3,7 @@ import { copyFile, mkdir, open, readFile, rename, stat, unlink } from 'node:fs/p
 import { join, resolve } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
-import { validateWorld } from '../src/sim/persistence'
+import { restoreWorld } from '../src/sim/persistence'
 import { MAX_SAVE_BYTES, type WorldSave } from '../src/storage/save-types'
 import { LEGACY_SAVE_KEY } from '../src/storage/autosave'
 
@@ -25,8 +25,7 @@ export function validateSaveRecord(value: unknown): WorldSave {
     record.savedAt > Date.now() + 60000
   )
     throw new Error('Invalid autosave envelope.')
-  validateWorld(record.world)
-  return record
+  return { ...record, world: restoreWorld(record.world) }
 }
 export class DiskAutosaves {
   private queues = new Map<string, Promise<void>>()
@@ -40,8 +39,8 @@ export class DiskAutosaves {
       if ((await stat(path)).size > MAX_SAVE_BYTES + 1024)
         throw new Error('Autosave exceeds the supported size.')
       const parsed = JSON.parse(await readFile(path, 'utf8'))
+      if (parsed.checksum !== checksum(parsed)) throw new Error('Autosave checksum does not match.')
       const save = validateSaveRecord(parsed)
-      if (parsed.checksum !== checksum(save)) throw new Error('Autosave checksum does not match.')
       return { version: save.version, savedAt: save.savedAt, world: save.world } as WorldSave
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null

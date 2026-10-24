@@ -14,6 +14,7 @@ import {
 import { unitLoyalty } from './forces'
 import { random } from './random'
 import { effectMultiplier } from './effects'
+import type { ArmyOperations } from './military-types'
 
 export const crewNeeded = (f: Pick<Fleet, 'warships' | 'transports'>) => f.warships * 90 + f.transports * 30
 export const transportSeats = (f: Fleet) => Math.floor((f.transports * 800 + f.warships * 40) * f.hull)
@@ -31,26 +32,30 @@ export function warEvent(w: World, title: string, detail: string, nation: number
   })
   w.events = w.events.slice(0, 240)
 }
+/** New formations start without supplies or an embarkation; their people are accounted separately. */
+export function initialArmyOperations(): ArmyOperations {
+  return {
+    food: 0,
+    arms: 0,
+    fatigue: 0,
+    cohesion: 0.8,
+    loyalty: 0.65,
+    entrenchment: 0,
+    progress: 0,
+    stance: 'march',
+    conduct: 'restrained',
+    isolated: 0,
+    disorder: 0,
+    embarkedOn: null,
+    source: null,
+    line: [],
+    march: [],
+  }
+}
 export function ensureWarfare(w: World) {
   w.warfare ??= { version: 1, revision: 0, fleets: [], deliveries: [] }
   for (const a of w.armies) {
-    a.operations ??= {
-      food: 0,
-      arms: 0,
-      fatigue: 0,
-      cohesion: 0.8,
-      loyalty: 0.65,
-      entrenchment: 0,
-      progress: 0,
-      stance: 'march',
-      conduct: 'restrained',
-      isolated: 0,
-      disorder: 0,
-      embarkedOn: null,
-      source: null,
-      line: [],
-      march: [],
-    }
+    a.operations ??= initialArmyOperations()
     a.operations.march ??= []
   }
   return w.warfare
@@ -263,7 +268,7 @@ export function advanceNavy(w: World) {
       const load = Math.min(
         Math.max(0, r.stocks.food - population(r) * 0.025),
         Math.max(0, f.soldiers * 0.034 * 4 - f.food),
-        foreign ? n.treasury / Math.max(0.001, foodPrice) : Infinity,
+        foreign ? Math.max(0, n.treasury) / Math.max(0.001, foodPrice) : Infinity,
       )
       if (foreign) {
         n.treasury -= load * foodPrice
@@ -272,7 +277,7 @@ export function advanceNavy(w: World) {
       const ammunition = Math.min(
         r.stocks.arms,
         Math.max(0, (f.warships + 1) * 0.8 * 3 - f.arms),
-        foreign ? n.treasury / Math.max(0.001, armsPrice) : Infinity,
+        foreign ? Math.max(0, n.treasury) / Math.max(0.001, armsPrice) : Infinity,
       )
       if (foreign) {
         n.treasury -= ammunition * armsPrice
@@ -306,7 +311,7 @@ export function advanceNavy(w: World) {
         const loaded = Math.min(
           Math.max(0, r.stocks.food - population(r) * 0.025),
           Math.max(0, a.soldiers * 0.034 * 3 - a.operations!.food),
-          foreign ? n.treasury / Math.max(0.001, foodPrice) : Infinity,
+          foreign ? Math.max(0, n.treasury) / Math.max(0.001, foodPrice) : Infinity,
         )
         if (foreign) {
           n.treasury -= loaded * foodPrice
@@ -441,5 +446,15 @@ export function advanceNavy(w: World) {
     }
   }
   state.fleets = state.fleets.filter((f) => f.soldiers > 0 && f.warships + f.transports > 0)
+  for (const fleet of state.fleets)
+    fleet.embarked = fleet.embarked.filter((id) =>
+      w.armies.some(
+        (army) =>
+          army.id === id &&
+          army.soldiers > 0 &&
+          army.operations?.embarkedOn === fleet.id &&
+          army.nation === fleet.nation,
+      ),
+    )
   state.revision++
 }

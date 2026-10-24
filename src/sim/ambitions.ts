@@ -1,3 +1,4 @@
+import { foreignIntelligence, perceivedPower, knownMap, domesticAuthority } from './intelligence'
 import { hashSeed, random } from './random'
 import { clamp, type Nation, type World } from './types'
 import { simulationSettings } from './settings'
@@ -129,12 +130,16 @@ export function ensureAmbition(world: World, nation: Nation, align = false) {
 }
 
 export function strategicPressures(world: World, nation: Nation) {
-  const own = world.regions.filter((region) => region.nation === nation.id),
-    forces = world.armies.filter((army) => army.nation === nation.id),
-    power = forces.reduce((sum, army) => sum + army.soldiers * army.supply * army.morale, 0),
-    neighbors = new Set(own.flatMap((region) => region.neighbors.map((id) => world.regions[id].nation))),
+  const own = world.regions.filter((r) => r.nation === nation.id),
+    power = perceivedPower(world, nation.id, nation.id),
+    neighbors = new Set(
+      knownMap(world, nation.id)
+        .filter((r) => r.nation === nation.id)
+        .flatMap((r) => r.neighbors),
+    ),
     drives = nation.character?.leader.politics?.drives
   return {
+    authority: domesticAuthority(world, nation.id),
     doctrine: nation.character?.leader.politics,
     constraints: {
       food: nation.foodCoverage,
@@ -142,46 +147,33 @@ export function strategicPressures(world: World, nation: Nation) {
       treasury: nation.treasury,
       suppliedLandPower: Math.round(power),
     },
-    rivals: world.nations
-      .filter((other) => other.id !== nation.id && other.population > 0)
-      .map((other) => {
-        const rival = world.regions.filter((region) => region.nation === other.id),
-          force = world.armies
-            .filter((army) => army.nation === other.id)
-            .reduce((sum, army) => sum + army.soldiers * army.supply * army.morale, 0),
-          border = neighbors.has(other.id),
-          resources = (['iron', 'coal', 'timber'] as const).map((good) => ({
-            good,
-            ownSupply: own.reduce((sum, region) => sum + region.production[good], 0),
-            rivalSupply: rival.reduce((sum, region) => sum + region.production[good], 0),
-          })),
-          rel = world.relations.find(
-            (entry) =>
-              (entry.a === nation.id && entry.b === other.id) ||
-              (entry.b === nation.id && entry.a === other.id),
-          )
-        return {
-          nation: other.id,
-          bordering: border,
-          treaty: rel?.treaty,
-          opinion: rel?.opinion,
-          suppliedLandPower: Math.round(force),
-          ownRelativePower: +(power / Math.max(500, force)).toFixed(2),
-          resourceLeverage: resources.filter(
-            (entry) => entry.rivalSupply > Math.max(1, entry.ownSupply) * 1.8,
-          ),
-          possibleAim: !border
-            ? 'Commercial influence, access, alliance or overseas ambitions require real naval reach.'
-            : power > force * 1.35 && nation.foodCoverage > 0.88 && (drives?.dominance ?? 0) > 0.65
-              ? 'A coercive bargain may be attractive; assess alliances, terrain, supply and domestic resistance before threats or force.'
-              : other.foodCoverage < 0.9 && (drives?.opportunism ?? 0) > 0.65
-                ? 'Supply dependence may support a profitable unequal bargain, with resentment and retaliation risks.'
-                : 'Assess mutual interests and competing claims.',
-        }
-      }),
+    rivals: foreignIntelligence(world, nation.id).map((other) => {
+      const force = perceivedPower(world, nation.id, other.id),
+        border = knownMap(world, nation.id).some((r) => r.nation === other.id && neighbors.has(r.id)),
+        resources = (['iron', 'coal', 'timber'] as const).flatMap((good) => {
+          const estimated = other.economy?.values[good],
+            ownSupply = own.reduce((s, r) => s + r.production[good], 0)
+          return estimated && estimated.estimate > Math.max(1, ownSupply) * 1.8
+            ? [{ good, ownSupply, reportedForeignSupply: estimated }]
+            : []
+        })
+      return {
+        nation: other.id,
+        bordering: border,
+        treaty: other.relation?.treaty,
+        opinion: other.relation?.opinion,
+        reportedLandPower: other.military?.values.effectivePower ?? null,
+        ownRelativePowerEstimate: +(power / Math.max(500, force)).toFixed(2),
+        resourceLeverage: resources,
+        possibleAim: !border
+          ? 'Overseas and commercial initiatives need contacts, charts and real naval reach.'
+          : power > force * 1.35 && nation.foodCoverage > 0.88 && (drives?.dominance ?? 0) > 0.65
+            ? 'Reports suggest a coercive opportunity. Their age, uncertainty, unobserved reserves and unknown alliances could make this assessment wrong.'
+            : 'Compare negotiation, reconnaissance and action using available reports; uncertainty is not proof of weakness.',
+      }
+    }),
     disputes:
-      world.pressures?.incidents.filter(
-        (incident) => incident.nations.includes(nation.id) && incident.expires > world.month,
-      ) ?? [],
+      world.pressures?.incidents.filter((i) => i.nations.includes(nation.id) && i.expires > world.month) ??
+      [],
   }
 }
