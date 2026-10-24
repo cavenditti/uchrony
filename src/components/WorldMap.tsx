@@ -5,6 +5,9 @@ import { geographyKey, contains, zoomAt } from '../map/geometry'
 import { buildAtlas, drawAtlas, drawPlaceLabels, terrainColors } from '../map/renderer'
 import { freightOverlay, drawFreight } from '../map/trade'
 import { population, type World, type Layer } from '../sim/types'
+import { dominantIdentity, identityAxis, identityColor } from '../map/identity'
+import { identityDistribution } from '../sim/population'
+import { drawWarfare } from '../map/warfare'
 
 interface Props {
   world: World
@@ -22,6 +25,9 @@ const layers: { id: Layer; name: string }[] = [
   { id: 'political', name: 'Political' },
   { id: 'terrain', name: 'Terrain' },
   { id: 'population', name: 'Population' },
+  { id: 'culture', name: 'Cultural communities' },
+  { id: 'language', name: 'Languages' },
+  { id: 'belief', name: 'Beliefs' },
   { id: 'prosperity', name: 'Contentment' },
   { id: 'food', name: 'Food security' },
   { id: 'trade', name: 'Trade' },
@@ -48,6 +54,16 @@ export function WorldMap({
   const [hover, setHover] = useState<{ id: number; x: number; y: number } | null>(null)
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null)
   const [layerMenu, setLayerMenu] = useState(false)
+  const axis = identityAxis(layer)
+  const dominant = axis ? new Set(world.regions.map((r) => dominantIdentity(r, axis))) : new Set<number>()
+  const identityLegend = axis
+    ? identityDistribution(
+        world.regions.flatMap((r) => r.communities ?? []),
+        axis,
+      )
+        .filter((entry) => dominant.has(entry.id))
+        .slice(0, 6)
+    : []
   const maxPopulationDensity = Math.max(...world.regions.map((r) => population(r) / r.cells.length))
   const quantitativeLegend =
     layer === 'population'
@@ -175,8 +191,9 @@ export function WorldMap({
         { x: offsetX, y: offsetY, w: size.w, h: size.h },
         nation,
       )
+      if (showArmies || layer === 'military') drawWarfare(ctx, world, nation)
       if (showArmies || layer === 'military')
-        for (const a of world.armies) {
+        for (const a of world.armies.filter((a) => a.operations?.embarkedOn == null)) {
           const c = world.cells[world.regions[a.region].center]
           const x = c.x - 12,
             y = c.y + 14
@@ -190,13 +207,12 @@ export function WorldMap({
           ctx.fillStyle = '#f0e9d8'
           ctx.fillText(`${(a.soldiers / 1000).toFixed(1)}k`, x + 5, y + 3)
           if (a.target !== null) {
-            const t = world.cells[world.regions[a.target].center]
             ctx.strokeStyle = '#a2463bbb'
             ctx.lineWidth = 1.3
             ctx.setLineDash([4, 4])
             ctx.beginPath()
             ctx.moveTo(c.x, c.y)
-            ctx.lineTo(t.x, t.y)
+            for (const id of a.operations?.march ?? []) ctx.lineTo(world.cells[id].x, world.cells[id].y)
             ctx.stroke()
             ctx.setLineDash([])
           }
@@ -344,6 +360,18 @@ export function WorldMap({
               ))}
             </div>
           </div>
+        ) : axis ? (
+          <div className="identity-map-legend">
+            <span>Largest community in each province · populations are mixed</span>
+            <div>
+              {identityLegend.map((entry) => (
+                <span key={entry.id}>
+                  <i style={{ background: identityColor(entry.id) }} />
+                  {world.demography?.identities[entry.id]?.name}
+                </span>
+              ))}
+            </div>
+          </div>
         ) : layer === 'terrain' ? (
           <div className="terrain-legend">
             {Object.entries(terrainColors)
@@ -376,7 +404,8 @@ export function WorldMap({
               <i className="legend-army">1.0k</i>Troops <i className="legend-order" />
               March order
             </span>
-            <span>Army border and land color identify the state</span>
+            <span>Army border and hull color identify the state</span>
+            <span>Mint dashes: last supply deliveries · ships show fleet size</span>
           </div>
         ) : (
           <>

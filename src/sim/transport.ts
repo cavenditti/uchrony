@@ -1,6 +1,12 @@
-import { neighbors } from './hex'
 import { MinHeap } from './heap'
-import type { Cell, RouteLeg, Terrain, World } from './types'
+import type { Cell, CorridorPlan, RouteLeg, World } from './types'
+import {
+  CORRIDOR_LEARNING,
+  corridorCost,
+  corridorGeography,
+  roadCost,
+  type CorridorProfile,
+} from './corridors'
 
 export interface TransportLink {
   from: number
@@ -21,24 +27,6 @@ export interface TransportNetwork {
   harbors: Harbor[]
 }
 const cache = new WeakMap<Cell[], TransportNetwork>()
-const difficulty: Record<Terrain, number> = {
-  water: Infinity,
-  plains: 1,
-  forest: 1.5,
-  hills: 2,
-  mountains: 5,
-  desert: 1.8,
-  tundra: 2,
-}
-
-/** Symmetric travel effort, including slope and a modest river-crossing cost. */
-export function roadCost(a: Cell, b: Cell) {
-  return (
-    (difficulty[a.terrain] + difficulty[b.terrain]) / 2 +
-    Math.abs(a.elevation - b.elevation) * 12 +
-    (a.river || b.river ? 0.35 : 0)
-  )
-}
 
 function search(start: number, adjacent: number[][], cost: (a: number, b: number) => number) {
   const distance = new Float64Array(adjacent.length).fill(Infinity),
@@ -81,19 +69,88 @@ export function reverseLegs(legs: RouteLeg[]): RouteLeg[] {
   return result
 }
 
-/** Geography is immutable during a simulation; politics, damage and investment are applied separately. */
+/** Static harbor locations and connection pairs are determined by geography. */
+function baseNetwork(world: World): TransportNetwork {
+  let network = cache.get(world.cells)
+  if (!network) {
+    network = buildNetwork(world)
+    cache.set(world.cells, network)
+  }
+  return network
+}
+
+const planned = new WeakMap<CorridorPlan, TransportNetwork>()
 export function transportNetwork(world: World): TransportNetwork {
-  const existing = cache.get(world.cells)
-  if (existing) return existing
-  const { cells, regions, width, height } = world,
-    adjacent = cells.map((c) => neighbors(c.id, width, height)),
-    isWater = (id: number) => cells[id].terrain === 'water'
+  if (!world.corridorPlan) return baseNetwork(world)
+  let network = planned.get(world.corridorPlan)
+  if (!network) {
+    network = {
+      links: world.corridorPlan.links.map((link) => physicalLink(world, link)),
+      harbors: baseNetwork(world).harbors,
+    }
+    planned.set(world.corridorPlan, network)
+  }
+  return network
+}
+
+function physicalLink(world: World, link: { from: number; to: number; legs: RouteLeg[] }): TransportLink {
+  const geo = corridorGeography(world)
+  let landCost = 0,
+    seaCost = 0
+  for (const leg of link.legs)
+    for (let i = 1; i < leg.cells.length; i++) {
+      const segment = geo.segments[geo.index(leg.cells[i - 1], leg.cells[i])]
+      if (segment.mode === 'land') landCost += segment.effort
+      else seaCost += segment.effort
+    }
+  return { ...link, landCost, seaCost }
+}
+
+/** Reconsider tile paths quarterly; retain the old path unless savings exceed 5%. */
+export function refreshTransport(world: World, profile: CorridorProfile) {
+  const previous = world.corridorPlan
+  if (
+    previous &&
+    Math.floor(previous.month / CORRIDOR_LEARNING.replanMonths) ===
+      Math.floor(world.month / CORRIDOR_LEARNING.replanMonths)
+  )
+    return
+  const base = baseNetwork(world),
+    old = transportNetwork(world),
+    proposed = world.corridors?.length ? buildNetwork(world, profile, base) : base,
+    oldLinks = new Map(old.links.map((link) => [`${link.from}-${link.to}`, link])),
+    ages = new Map(previous?.links.map((link) => [`${link.from}-${link.to}`, link.changedAt]))
+  const links = proposed.links.map((link) => {
+    const prior = oldLinks.get(`${link.from}-${link.to}`),
+      changedAt = ages.get(`${link.from}-${link.to}`) ?? world.month,
+      keep =
+        prior &&
+        (world.month - changedAt < CORRIDOR_LEARNING.minimumPathMonths ||
+          corridorCost(profile, prior.legs) * (1 - CORRIDOR_LEARNING.improvement) <=
+            corridorCost(profile, link.legs)),
+      selected = keep ? prior : link
+    return {
+      from: selected.from,
+      to: selected.to,
+      legs: selected.legs,
+      changedAt: keep ? changedAt : world.month,
+    }
+  })
+  world.corridorPlan = { month: world.month, links }
+}
+
+function buildNetwork(world: World, profile?: CorridorProfile, base?: TransportNetwork): TransportNetwork {
+  const { cells, regions } = world,
+    { adjacent } = corridorGeography(world),
+    isWater = (id: number) => cells[id].terrain === 'water',
+    landEffort = (a: number, b: number) =>
+      profile ? profile.cost[profile.index(a, b)] : roadCost(cells[a], cells[b])
 
   // Each province has one road tree rooted at its settlement. Roads to borders
   // and harbors therefore share trunks instead of drawing a separate line per shipment.
   const roads = regions.map((r) =>
     search(r.center, adjacent, (a, b) =>
-      cells[b].region === r.id && !isWater(b) ? roadCost(cells[a], cells[b]) : Infinity,
+      cells[b].region === r.id && !isWater(b) ? landEffort(a, b) : Infinity,
     ),
   )
   const borders = new Map<string, { from: number; to: number; a: number; b: number; cost: number }>()
@@ -102,7 +159,7 @@ export function transportNetwork(world: World): TransportNetwork {
     for (const id of adjacent[a.id]) {
       const b = cells[id]
       if (isWater(id) || a.region >= b.region) continue
-      const cost = roads[a.region].distance[a.id] + roadCost(a, b) + roads[b.region].distance[b.id],
+      const cost = roads[a.region].distance[a.id] + landEffort(a.id, b.id) + roads[b.region].distance[b.id],
         key = `${a.region}-${b.region}`
       if (Number.isFinite(cost) && cost < (borders.get(key)?.cost ?? Infinity))
         borders.set(key, { from: a.region, to: b.region, a: a.id, b: b.id, cost })
@@ -124,55 +181,74 @@ export function transportNetwork(world: World): TransportNetwork {
     ],
   }))
 
-  // A province facing a lake and the ocean uses the larger connected water body.
-  // The selected shore must be reachable by road from its settlement.
-  const basin = new Int32Array(cells.length).fill(-1),
-    sizes: number[] = []
-  for (const c of cells) {
-    if (!isWater(c.id) || basin[c.id] >= 0) continue
-    const id = sizes.length,
-      group = [c.id]
-    basin[c.id] = id
-    for (let i = 0; i < group.length; i++)
-      for (const next of adjacent[group[i]])
-        if (isWater(next) && basin[next] < 0) {
-          basin[next] = id
-          group.push(next)
-        }
-    sizes.push(group.length)
-  }
   const harbors: Harbor[] = []
-  for (const r of regions) {
-    let best: Harbor | undefined
-    for (const id of r.cells) {
-      const cost = roads[r.id].distance[id]
-      if (!Number.isFinite(cost)) continue
-      for (const water of adjacent[id]) {
-        if (!isWater(water)) continue
-        if (
-          !best ||
-          sizes[basin[water]] > sizes[basin[best.water]] ||
-          (basin[water] === basin[best.water] && cost < best.cost)
-        )
-          best = { region: r.id, land: id, water, cost, access: [] }
-      }
+  if (base) {
+    // Ports do not jump along the coast when shipping lanes improve.
+    for (const port of base.harbors)
+      harbors.push({
+        ...port,
+        access: trace(roads[port.region].previous, regions[port.region].center, port.land),
+        cost: roads[port.region].distance[port.land],
+      })
+  } else {
+    // A province facing a lake and the ocean uses the larger connected water body.
+    // The selected shore must be reachable by road from its settlement.
+    const basin = new Int32Array(cells.length).fill(-1),
+      sizes: number[] = []
+    for (const c of cells) {
+      if (!isWater(c.id) || basin[c.id] >= 0) continue
+      const id = sizes.length,
+        group = [c.id]
+      basin[c.id] = id
+      for (let i = 0; i < group.length; i++)
+        for (const next of adjacent[group[i]])
+          if (isWater(next) && basin[next] < 0) {
+            basin[next] = id
+            group.push(next)
+          }
+      sizes.push(group.length)
     }
-    if (best) {
-      best.access = trace(roads[r.id].previous, r.center, best.land)
-      harbors.push(best)
+    for (const r of regions) {
+      let best: Harbor | undefined
+      for (const id of r.cells) {
+        const cost = roads[r.id].distance[id]
+        if (!Number.isFinite(cost)) continue
+        for (const water of adjacent[id]) {
+          if (!isWater(water)) continue
+          if (
+            !best ||
+            sizes[basin[water]] > sizes[basin[best.water]] ||
+            (basin[water] === basin[best.water] && cost < best.cost)
+          )
+            best = { region: r.id, land: id, water, cost, access: [] }
+        }
+      }
+      if (best) {
+        best.access = trace(roads[r.id].previous, r.center, best.land)
+        harbors.push(best)
+      }
     }
   }
   const shore = cells.map((c) => isWater(c.id) && adjacent[c.id].some((n) => !isWater(n))),
-    candidates: TransportLink[] = []
+    candidates: TransportLink[] = [],
+    seaPairs = base
+      ? new Set(base.links.filter((link) => link.seaCost > 0).map((link) => `${link.from}-${link.to}`))
+      : undefined
   for (let i = 0; i < harbors.length; i++) {
-    const a = harbors[i],
-      paths = search(a.water, adjacent, (from, to) =>
-        isWater(to) ? 1 + (Number(shore[from]) + Number(shore[to])) * 0.15 : Infinity,
-      )
+    const a = harbors[i]
+    if (seaPairs && !harbors.slice(i + 1).some((b) => seaPairs.has(`${a.region}-${b.region}`))) continue
+    const paths = search(a.water, adjacent, (from, to) =>
+      isWater(to)
+        ? profile
+          ? profile.cost[profile.index(from, to)]
+          : 1 + (Number(shore[from]) + Number(shore[to])) * 0.15
+        : Infinity,
+    )
     for (let j = i + 1; j < harbors.length; j++) {
       const b = harbors[j],
         seaCost = paths.distance[b.water]
       if (
+        (seaPairs && !seaPairs.has(`${a.region}-${b.region}`)) ||
         !Number.isFinite(seaCost) ||
         borders.has(`${Math.min(a.region, b.region)}-${Math.max(a.region, b.region)}`)
       )
@@ -184,6 +260,7 @@ export function transportNetwork(world: World): TransportNetwork {
       candidates.push({ from: a.region, to: b.region, landCost: a.cost + b.cost, seaCost: seaCost + 2, legs })
     }
   }
+  if (base) return { links: [...links, ...candidates].map((link) => physicalLink(world, link)), harbors }
   const effort = (link: TransportLink) => link.landCost / 6 + link.seaCost / 18 + 2
   candidates.sort((a, b) => effort(a) - effort(b) || a.from - b.from || a.to - b.to)
   const chosen = new Set<TransportLink>(),
@@ -214,7 +291,5 @@ export function transportNetwork(world: World): TransportNetwork {
     }
   }
   links.push(...chosen)
-  const network = { links, harbors }
-  cache.set(cells, network)
-  return network
+  return { links, harbors }
 }

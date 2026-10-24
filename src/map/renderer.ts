@@ -1,6 +1,7 @@
 import { HEX, neighbors } from '../sim/hex'
 import { clamp, population, type World, type Layer } from '../sim/types'
 import { buildGeometry, type MapGeometry, type Ring } from './geometry'
+import { dominantIdentity, identityAxis, identityColor } from './identity'
 
 export const terrainColors = {
   plains: '#b8bd91',
@@ -176,6 +177,8 @@ export function drawAtlas(
   } else if (layer !== 'terrain')
     for (const r of world.regions) {
       let fill = world.nations[r.nation].color
+      const axis = identityAxis(layer)
+      if (axis) fill = identityColor(dominantIdentity(r, axis))
       if (layer === 'population') {
         const t = Math.sqrt(population(r) / r.cells.length / maxPop)
         fill = `rgb(${199 - t * 141},${209 - t * 91},${164 - t * 67})`
@@ -192,7 +195,9 @@ export function drawAtlas(
       ctx.fillStyle = fill
       ctx.fill(cache.provinces[r.id], 'evenodd')
     }
-  ctx.globalAlpha = ['population', 'food', 'prosperity'].includes(layer) ? 0.28 : 0.85
+  ctx.globalAlpha = ['population', 'food', 'prosperity', 'culture', 'language', 'belief'].includes(layer)
+    ? 0.28
+    : 0.85
   ctx.drawImage(cache.relief, 0, 0)
   ctx.globalAlpha = 1
   // Actual drainage edges: adjacent wet cells never create spurious cross-connections.

@@ -4,6 +4,9 @@ dist/
 .impeccable/review/
 .impeccable/mocks/
 .DS_Store
+.env
+.env.*
+!.env.example
 
 .impeccable/hook.cache.json
 .impeccable/questions/

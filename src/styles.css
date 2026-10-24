@@ -2661,3 +2661,552 @@ select {
     scroll-behavior: auto !important;
   }
 }
+
+.history-service-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: #343f3b;
+  border-bottom: 1px solid #53604e;
+  color: #ded8ba;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+.history-service-banner > span {
+  flex: 1;
+  min-width: 180px;
+}
+.history-service-banner.error {
+  background: #493d33;
+  border-color: #7c6246;
+}
+.historical-forces {
+  border-bottom: 1px solid #52604f;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+}
+.historical-forces h3 {
+  font:
+    500 23px/1.2 'Alegreya',
+    Georgia,
+    serif;
+  margin: 0 0 14px;
+  color: #e1e3c9;
+}
+.historical-society > strong {
+  display: block;
+  font-size: 12px;
+  color: #dcdcc4;
+}
+.historical-society > span {
+  display: block;
+  font-size: 10px;
+  color: #a4b9a9;
+  margin-top: 5px;
+}
+.historical-society > p {
+  font:
+    italic 16px/1.4 'Alegreya',
+    Georgia,
+    serif;
+  color: #c6cbb0;
+  margin: 12px 0;
+}
+.historical-society > div {
+  display: flex;
+  gap: 14px;
+  font-size: 10px;
+  color: #aebfae;
+}
+.historical-society > div b {
+  display: block;
+  color: #d6d7b9;
+  font-weight: 500;
+  margin-top: 4px;
+}
+.historical-effects {
+  margin-top: 18px;
+}
+.historical-effects article {
+  padding: 12px 0;
+  border-top: 1px solid #46574c;
+}
+.historical-effects article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: #d9d8bd;
+}
+.historical-effects article b {
+  white-space: nowrap;
+  font-weight: 500;
+  color: #d9bc7f;
+}
+.historical-effects article strong {
+  font-weight: 500;
+}
+.historical-effects article p {
+  margin: 5px 0;
+  font-size: 11px;
+  color: #b9c7b3;
+  line-height: 1.5;
+}
+.historical-effects article small {
+  font-size: 9px;
+  color: #9fb09f;
+  line-height: 1.5;
+}
+.historical-legacies h4 {
+  margin: 18px 0 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #c8ccb0;
+}
+.historical-legacies p {
+  font:
+    16px/1.3 'Alegreya',
+    Georgia,
+    serif;
+  color: #d4d5ba;
+  margin: 8px 0;
+}
+.historical-legacies p span {
+  display: block;
+  font: 9px/1.5 var(--font-ui, sans-serif);
+  color: #a5b8a4;
+}
+.chronicle-entry > .historical-consequences {
+  display: block;
+  font-size: 11px;
+}
+.historical-response {
+  border-left: 2px solid #927b4c;
+  padding: 2px 0 2px 10px;
+  margin: 14px 0;
+}
+.historical-response strong {
+  font-size: 11px;
+  font-weight: 500;
+  color: #d6ccaa;
+}
+.historical-response p {
+  margin: 5px 0 0;
+}
+.historical-cause {
+  display: block;
+  font-size: 10px;
+  color: #d3bd8e;
+  margin-bottom: 12px;
+  text-decoration: underline;
+}
+.historical-consequences summary {
+  cursor: pointer;
+  color: #d0c6a2;
+  font-size: 10px;
+  padding: 5px 0;
+}
+.historical-consequences ul {
+  list-style: none;
+  padding: 0;
+  margin: 7px 0;
+}
+.historical-consequences li {
+  border-top: 1px solid #46564c;
+  padding: 8px 0;
+  line-height: 1.5;
+  color: #c1cbb6;
+  font-size: 10px;
+}
+.historical-consequences li small {
+  display: block;
+  color: #9cae9b;
+  font-size: 9px;
+}
+.chronicle-entry .historical-provenance {
+  font-size: 9px;
+  color: #98aa98;
+  overflow-wrap: anywhere;
+}
+.chronicle-entry[id] {
+  scroll-margin-top: 18px;
+}
+
+.diplomatic-chancery {
+  padding-bottom: 22px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.diplomatic-chancery h3 {
+  font:
+    500 24px/1.2 'Alegreya',
+    Georgia,
+    serif;
+  margin-bottom: 10px;
+}
+.diplomatic-chancery > h4 {
+  margin: 24px 0 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+}
+.agent-assessment {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #c4cabc;
+  margin: 14px 0;
+}
+.confidential-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.confidential-toggle input {
+  accent-color: var(--accent);
+}
+.diplomatic-document {
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line);
+}
+.diplomatic-document > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.diplomatic-document h5 {
+  font:
+    500 19px/1.3 'Alegreya',
+    Georgia,
+    serif;
+  margin: 7px 0;
+}
+.diplomatic-document p,
+.agent-private-plan p {
+  font-size: 11px;
+  line-height: 1.65;
+  color: #c3cbbd;
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+}
+.diplomatic-document details,
+.agent-private-plan {
+  margin-top: 10px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.diplomatic-document summary,
+.agent-private-plan summary {
+  cursor: pointer;
+  color: #d6c59f;
+}
+.diplomatic-document ul,
+.agent-private-plan ul {
+  padding-left: 16px;
+  margin: 8px 0;
+}
+.diplomatic-document li,
+.agent-private-plan li {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+.diplomatic-document .referee-explanation {
+  border-left: 2px solid #8c794f;
+  padding-left: 9px;
+}
+.historical-consequences .expanded-history p {
+  font-size: 12px;
+  white-space: pre-line;
+  line-height: 1.7;
+  margin: 10px 0;
+}
+.population-identities > h4 {
+  margin: 24px 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+}
+.identity-census {
+  margin: 12px 0 18px;
+}
+.identity-census-row {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.identity-census-row > span:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+.identity-swatch {
+  width: 9px;
+  height: 9px;
+}
+.identity-census-row b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.identity-census-row small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.community-records {
+  margin: 18px 0;
+  font-size: 12px;
+}
+.community-records summary {
+  color: var(--accent);
+  cursor: pointer;
+  padding: 5px 0;
+}
+.community-record {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.community-record > strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.community-record p {
+  margin: 6px 0 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.community-record dl {
+  margin: 0;
+  font-size: 11px;
+}
+.community-record dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 7px 0;
+}
+.community-record dt {
+  color: var(--muted);
+}
+.community-record dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.identity-map-legend {
+  max-width: 390px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.identity-map-legend > span {
+  color: var(--muted);
+}
+.identity-map-legend > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 5px;
+}
+.identity-map-legend > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.identity-map-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+.state-character-summary {
+  display: grid;
+  gap: 4px;
+  padding: 0 20px 16px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.state-character-summary strong {
+  color: var(--accent);
+  font-weight: 500;
+}
+.state-character-summary span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.state-character {
+  margin: 24px 0 28px;
+}
+.state-character > h3 {
+  font:
+    500 23px/1.2 'Alegreya',
+    Georgia,
+    serif;
+  margin: 0 0 12px;
+}
+.state-character h4 {
+  margin: 22px 0 10px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+.character-account {
+  font-size: 12px;
+  line-height: 1.65;
+  margin: 10px 0;
+}
+.character-priorities {
+  margin: 12px 0 20px;
+  padding-left: 17px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.character-priorities li {
+  margin: 5px 0;
+}
+.character-influence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 12px;
+}
+.character-influence span {
+  color: var(--muted);
+}
+.character-influence b {
+  color: var(--ink);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.character-leader {
+  display: grid;
+  gap: 5px;
+}
+.character-leader strong {
+  font:
+    500 19px/1.3 'Alegreya',
+    Georgia,
+    serif;
+  overflow-wrap: anywhere;
+}
+.character-leader > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.leader-qualities > div {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.leader-qualities > div > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+.leader-qualities strong {
+  font-weight: 500;
+}
+.leader-qualities span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.leader-qualities p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 7px 0 0;
+}
+.character-details {
+  margin-top: 18px;
+  font-size: 12px;
+}
+.character-details summary {
+  color: var(--accent);
+  cursor: pointer;
+  padding: 5px 0;
+}
+.character-table-wrap {
+  overflow-x: auto;
+}
+.character-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.character-table caption {
+  text-align: left;
+  color: var(--muted);
+  padding: 8px 0;
+}
+.character-table th,
+.character-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 9px 4px;
+  text-align: right;
+  font-weight: 400;
+}
+.character-table th:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+.character-table thead th {
+  color: var(--muted);
+}
+.character-table th small {
+  display: block;
+  margin-top: 4px;
+  max-width: 110px;
+  color: var(--muted);
+  line-height: 1.4;
+  font-size: 10px;
+}
+.character-table tbody td:last-child {
+  color: var(--accent);
+  font-weight: 500;
+}
+.army-logistics {
+  margin: 12px 0 16px;
+}
+.naval-forces {
+  margin: 28px 0 20px;
+}
+.naval-forces > h3 {
+  font:
+    500 23px/1.2 'Alegreya',
+    Georgia,
+    serif;
+  margin: 0 0 12px;
+}
+.naval-forces h4 {
+  font-weight: 500;
+  font-size: 13px;
+  margin: 20px 0 12px;
+}
+.fleet-record {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0 22px;
+}
+.fleet-record h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.fleet-record > p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.naval-forces .button {
+  white-space: normal;
+}

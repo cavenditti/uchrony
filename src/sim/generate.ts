@@ -1,3 +1,7 @@
+import { ensureWarfare, commissionFleet, portAt } from './navy'
+import { militaryPeople } from './forces'
+import { ensurePopulation } from './population'
+import { ensureCharacters, characterPolicyTargets, characterResearch } from './character'
 import {
   type World,
   type Cell,
@@ -422,5 +426,28 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
     title: 'A world unwritten',
     detail: `${nations.length} sovereign states. ${regions.length} provinces. Every future begins here.`,
   })
+  ensurePopulation(world)
+  ensureCharacters(world)
+  for (const nation of world.nations) {
+    nation.policies = characterPolicyTargets(nation)
+    nation.researchFocus = characterResearch(nation)
+  }
+  ensureWarfare(world)
+  for (const n of world.nations) {
+    const port = world.regions
+      .filter((r) => r.nation === n.id && portAt(world, r.id))
+      .sort((a, b) => b.stocks.timber - a.stocks.timber)[0]
+    if (port) {
+      try {
+        commissionFleet(world, n.id, port.id, 1, 4)
+      } catch {
+        /* A state without materials begins without a fleet. */
+      }
+    }
+    n.population =
+      world.regions.filter((r) => r.nation === n.id).reduce((sum, r) => sum + population(r), 0) +
+      militaryPeople(world, n.id)
+  }
+  world.totals.population = world.nations.reduce((sum, n) => sum + n.population, 0)
   return world
 }

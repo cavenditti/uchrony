@@ -44,13 +44,13 @@ test('a better supplier gains traffic gradually while small cost differences pre
   f.remember()
   f.reset()
   f.step()
-  assert(Math.abs(f.shipped(f.far.id) - 75) < 1e-6)
-  assert(Math.abs(f.shipped(f.near.id) - 25) < 1e-6)
+  assert(Math.abs(f.shipped(f.far.id) - 88) < 1e-6)
+  assert(Math.abs(f.shipped(f.near.id) - 12) < 1e-6)
   f.reset()
   f.step()
-  assert(Math.abs(f.shipped(f.far.id) - 56.25) < 1e-6)
-  assert(Math.abs(f.shipped(f.near.id) - 43.75) < 1e-6)
-  for (let i = 0; i < 12; i++) {
+  assert(Math.abs(f.shipped(f.far.id) - 77.44) < 1e-6)
+  assert(Math.abs(f.shipped(f.near.id) - 22.56) < 1e-6)
+  for (let i = 0; i < 28; i++) {
     f.reset()
     f.step()
   }
@@ -85,7 +85,7 @@ test('small repeat orders and short idle periods preserve trade without fictitio
   f.reset('coal', 0, [])
   f.step()
   assert.equal(f.world.routes.length, 0)
-  assert.equal(f.world.tradeLanes![0].flow.coal, recent * 0.75)
+  assert.equal(f.world.tradeLanes![0].flow.coal, recent * 0.88)
   f.reset('coal', small, [f.near.id])
   f.step()
   assert(Math.abs(f.shipped(f.near.id) - small) < 1e-6)

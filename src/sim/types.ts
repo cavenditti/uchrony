@@ -1,3 +1,14 @@
+import type { HistoricalRecord, HistoricalState, StorytellerStatus } from './history-types'
+import type { Statecraft, AgentServiceStatus } from './statecraft-types'
+import type { StateCharacter } from './character-types'
+import type { ArmyOperations, Warfare } from './military-types'
+import type {
+  PopulationCommunity,
+  PopulationDynamics,
+  PopulationSystem,
+  NationalIdentity,
+} from './population-types'
+
 export const GOODS = ['food', 'timber', 'stone', 'iron', 'coal', 'tools', 'textiles', 'arms'] as const
 export type Good = (typeof GOODS)[number]
 export type Inventory = Record<Good, number>
@@ -11,7 +22,17 @@ export const FIELDS: Research[] = [
   'military',
   'governance',
 ]
-export type Layer = 'political' | 'terrain' | 'population' | 'prosperity' | 'food' | 'trade' | 'military'
+export type Layer =
+  | 'political'
+  | 'terrain'
+  | 'population'
+  | 'culture'
+  | 'language'
+  | 'belief'
+  | 'prosperity'
+  | 'food'
+  | 'trade'
+  | 'military'
 
 export interface Cell {
   id: number
@@ -32,6 +53,8 @@ export interface Region {
   name: string
   nation: number
   culture: number
+  communities?: PopulationCommunity[]
+  populationDynamics?: PopulationDynamics
   center: number
   cells: number[]
   neighbors: number[]
@@ -69,6 +92,9 @@ export interface Policies {
   conscription: number
   migration: 'open' | 'controlled' | 'closed'
   priority: 'balanced' | 'agriculture' | 'industry' | 'military'
+  citizenship?: 'civic' | 'pluralist' | 'heritage'
+  languagePolicy?: 'local' | 'common' | 'multilingual'
+  beliefPolicy?: 'protected' | 'favored' | 'restricted'
 }
 export interface Nation {
   id: number
@@ -77,6 +103,8 @@ export interface Nation {
   color: string
   capital: number
   government: string
+  identity?: NationalIdentity
+  character?: StateCharacter
   personality: 'mercantile' | 'expansionist' | 'scholarly' | 'agrarian'
   treasury: number
   debt: number
@@ -113,6 +141,7 @@ export interface Relation {
   grievance: number
 }
 export interface Army {
+  operations?: ArmyOperations
   id: number
   nation: number
   name: string
@@ -123,6 +152,7 @@ export interface Army {
   supply: number
   experience: number
   casualties: number
+  communities?: PopulationCommunity[]
 }
 export interface RouteLeg {
   mode: 'land' | 'sea'
@@ -150,6 +180,18 @@ export interface TradeLane {
   flow: Inventory
   lastActive: number
 }
+export interface CorridorTrace {
+  /** An undirected, adjacent tile pair, stored with a < b. */
+  a: number
+  b: number
+  familiarity: number
+  traffic: number
+}
+export interface CorridorPlan {
+  month: number
+  /** Persist physical paths so loading a save cannot trigger an early replan. */
+  links: { from: number; to: number; legs: RouteLeg[]; changedAt: number }[]
+}
 export interface SimEvent {
   id: number
   month: number
@@ -158,6 +200,8 @@ export interface SimEvent {
   detail: string
   nation?: number
   region?: number
+  expandedAccount?: string
+  historical?: HistoricalRecord
 }
 export interface HistoryPoint {
   month: number
@@ -184,6 +228,12 @@ export interface World {
   armies: Army[]
   routes: Route[]
   tradeLanes?: TradeLane[]
+  corridors?: CorridorTrace[]
+  corridorPlan?: CorridorPlan
+  historical?: HistoricalState
+  statecraft?: Statecraft
+  demography?: PopulationSystem
+  warfare?: Warfare
   events: SimEvent[]
   history: HistoryPoint[]
   nextEvent: number
@@ -201,6 +251,7 @@ export interface World {
 }
 export type Command =
   | { type: 'policy'; nation: number; key: keyof Policies; value: Policies[keyof Policies] }
+  | { type: 'identity-policy'; nation: number; key: 'culture' | 'language' | 'belief'; identity: number }
   | { type: 'research'; nation: number; field: Research }
   | {
       type: 'diplomacy'
@@ -210,6 +261,20 @@ export type Command =
     }
   | { type: 'recruit'; nation: number; region: number }
   | { type: 'move'; army: number; target: number }
+  | {
+      type: 'army-orders'
+      army: number
+      stance: 'march' | 'hold' | 'entrench'
+      conduct: 'restrained' | 'requisition'
+    }
+  | { type: 'commission'; nation: number; region: number; warships: number; transports: number }
+  | {
+      type: 'fleet-order'
+      fleet: number
+      target: number
+      mission: 'patrol' | 'escort' | 'blockade' | 'transport' | 'return'
+    }
+  | { type: 'embark'; army: number; fleet: number }
   | { type: 'build'; region: number; building: 'farm' | 'industry' | 'road' | 'school' }
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }
@@ -218,8 +283,15 @@ export type WorkerRequest =
   | { type: 'step'; count: number }
   | { type: 'command'; command: Command }
   | { type: 'load'; world: unknown }
+  | { type: 'retry-history' }
+  | { type: 'agent-strategy'; nation: number }
+  | { type: 'event-details'; event: number }
 export type WorkerResponse =
-  { type: 'world'; world: World; message?: string } | { type: 'error'; message: string }
+  | { type: 'world'; world: World; message?: string; acknowledgement?: boolean }
+  | { type: 'error'; message: string }
+  | { type: 'storyteller'; status: StorytellerStatus }
+  | { type: 'agents'; status: AgentServiceStatus }
+  | { type: 'event-detail'; event: number; state: 'loading' | 'done' | 'error'; message?: string }
 
 export const inventory = (value = 0): Inventory =>
   Object.fromEntries(GOODS.map((g) => [g, value])) as Inventory

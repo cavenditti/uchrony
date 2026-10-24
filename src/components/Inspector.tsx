@@ -48,6 +48,13 @@ import {
 } from '../sim/types'
 import { routeDistance } from '../map/trade'
 import { TECH_NAMES, researchCost } from '../sim/engine'
+import { DiplomaticChancery } from './DiplomaticChancery'
+import type { AgentServiceStatus } from '../sim/statecraft-types'
+import { HistoricalForces, HistoricalConsequences } from './HistoricalForces'
+import { PopulationIdentities } from './PopulationIdentities'
+import { StateCharacter } from './StateCharacter'
+import { ArmyLogistics, NavalForces } from './MilitaryOperations'
+import { militaryPeople } from '../sim/forces'
 
 export type Tab =
   'atlas' | 'population' | 'economy' | 'diplomacy' | 'military' | 'research' | 'government' | 'chronicle'
@@ -257,6 +264,10 @@ function PolicySlider({
 }
 
 interface InspectorProps {
+  agentStatus: AgentServiceStatus
+  onStrategy: (nation: number) => void
+  onEventDetails: (event: number) => void
+  pendingDetails: number[]
   world: World
   nationId: number
   regionId: number | null
@@ -271,6 +282,10 @@ interface InspectorProps {
 }
 
 export function Inspector({
+  agentStatus,
+  onStrategy,
+  onEventDetails,
+  pendingDetails,
   world: w,
   nationId,
   regionId,
@@ -296,7 +311,7 @@ export function Inspector({
     )
   const people = {
     children: regions.reduce((s, r) => s + r.population.children, 0),
-    adults: regions.reduce((s, r) => s + r.population.adults, 0),
+    adults: regions.reduce((s, r) => s + r.population.adults, 0) + militaryPeople(w, n.id),
     elders: regions.reduce((s, r) => s + r.population.elders, 0),
   }
   const armies = w.armies.filter((a) => a.nation === n.id),
@@ -331,6 +346,7 @@ export function Inspector({
           <MapPin size={17} />
         </button>
       </div>
+      <StateCharacter world={w} nation={n} compact />
       <div className="inspector-heading">
         <span>
           {TAB_INFO.find((t) => t.id === tab)?.name === 'Atlas'
@@ -453,6 +469,7 @@ export function Inspector({
             <Meter label="Health" value={avg('health')} />
             <Meter label="Literacy" value={avg('literacy')} />
             <Meter label="Food needs met" value={avg('foodCoverage')} />
+            <PopulationIdentities world={w} nation={n.id} />
             <SectionTitle>Population history</SectionTitle>
             <Chart world={w} nation={n.id} />
             <SectionTitle>Largest provinces</SectionTitle>
@@ -476,8 +493,8 @@ export function Inspector({
                 </button>
               ))}
             <p className="panel-note">
-              Age cohorts change through births, aging, and deaths. Migrants move to healthier, better
-              supplied neighboring provinces. Soldiers are counted in total population.
+              Births, aging, and mortality respond to each community's living conditions. Migration follows
+              opportunity, safety, diaspora networks, and shipping links. Soldiers remain in the census.
             </p>
           </>
         )}
@@ -590,10 +607,10 @@ export function Inspector({
               </p>
             )}
             <p className="panel-note">
-              Established suppliers and routes persist through small cost changes. Better suppliers gain
-              traffic gradually; war, unavailable supply, and urgent food needs override that inertia. Roads
-              follow terrain and ships use connected water. Select a province to highlight its imports and
-              exports.
+              Successful deliveries draw trade into shared corridors. Terrain and congestion limit their
+              advantage; unused paths gradually fade. Adopted tile paths hold for at least a year, and better
+              suppliers gain traffic slowly. War, unavailable supply, and urgent food needs override supplier
+              inertia. Select a province to highlight its imports and exports.
             </p>
           </>
         )}
@@ -615,6 +632,7 @@ export function Inspector({
               {n.ai ? 'Take control of this state' : 'Return all states to autonomy'}
               <ArrowUpRight size={14} />
             </button>
+            <StateCharacter world={w} nation={n} />
             <SectionTitle>Taxation & borders</SectionTitle>
             <PolicySlider
               name="Tax rate"
@@ -642,6 +660,67 @@ export function Inspector({
                 <option value="closed">Closed borders</option>
               </select>
             </label>
+            <SectionTitle>Citizenship, language &amp; belief</SectionTitle>
+            <label className="select-label">
+              Citizenship
+              <select
+                value={n.policies.citizenship ?? 'civic'}
+                onChange={(e) => policy('citizenship', e.target.value as Policies['citizenship'])}
+              >
+                <option value="civic">Shared civic citizenship</option>
+                <option value="pluralist">Protected cultural pluralism</option>
+                <option value="heritage">Heritage privileges</option>
+              </select>
+            </label>
+            <label className="select-label">
+              Language in public education
+              <select
+                value={n.policies.languagePolicy ?? 'multilingual'}
+                onChange={(e) => policy('languagePolicy', e.target.value as Policies['languagePolicy'])}
+              >
+                <option value="multilingual">Multilingual education</option>
+                <option value="local">Local language continuity</option>
+                <option value="common">Common state language</option>
+              </select>
+            </label>
+            <label className="select-label">
+              Freedom of belief
+              <select
+                value={n.policies.beliefPolicy ?? 'protected'}
+                onChange={(e) => policy('beliefPolicy', e.target.value as Policies['beliefPolicy'])}
+              >
+                <option value="protected">Protect all traditions</option>
+                <option value="favored">Favor the state tradition</option>
+                <option value="restricted">Restrict other traditions</option>
+              </select>
+            </label>
+            {(['culture', 'language', 'belief'] as const).map((key) => (
+              <label className="select-label" key={key}>
+                {key === 'culture'
+                  ? 'Recognized cultural tradition'
+                  : key === 'language'
+                    ? 'Shared state language'
+                    : 'Recognized belief tradition'}
+                <select
+                  value={n.identity?.[key] ?? ''}
+                  onChange={(e) =>
+                    command({ type: 'identity-policy', nation: n.id, key, identity: Number(e.target.value) })
+                  }
+                >
+                  {(w.demography?.identities ?? [])
+                    .filter((identity) => identity.kind === key)
+                    .map((identity) => (
+                      <option key={identity.id} value={identity.id}>
+                        {identity.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            ))}
+            <p className="panel-note">
+              Recognition changes institutions. Adoption takes time. Exclusion affects access to services,
+              loyalty, and migration; a shared language can spread without replacing people's mother tongue.
+            </p>
             <SectionTitle>Allocate the public budget</SectionTitle>
             <p className="panel-note">
               Weights divide the available budget. Administration and infrastructure retain fixed weights of
@@ -701,6 +780,7 @@ export function Inspector({
         )}
         {tab === 'diplomacy' && (
           <>
+            <DiplomaticChancery world={w} nation={n.id} status={agentStatus} onReview={onStrategy} />
             <p className="panel-note">
               Commerce builds trust. Expansionist governments weigh border opportunities; prolonged wars
               create pressure for peace.
@@ -844,8 +924,10 @@ export function Inspector({
                 </button>
                 <Meter label="Supply" value={a.supply} />
                 <Meter label="Morale" value={a.morale} color="#8ea6b5" />
+                <ArmyLogistics world={w} army={a} command={command} />
                 <button
                   className={`button full ${orderedArmy === a.id ? 'primary' : ''}`}
+                  disabled={a.operations?.embarkedOn != null}
                   onClick={() => onArmy(orderedArmy === a.id ? null : a.id)}
                 >
                   <Flag size={13} />
@@ -870,10 +952,12 @@ export function Inspector({
               Up to 3,000 adults are recruited locally. Each recruit costs 200 crowns and 12 kg of arms.
               Armies consume food and equipment; terrain, supply, morale, and technology determine battles.
             </p>
+            <NavalForces world={w} nation={n.id} command={command} />
           </>
         )}
         {tab === 'chronicle' && (
           <>
+            <HistoricalForces world={w} nation={n.id} />
             <div className="chronicle-filter">
               <button className={eventFilter === 'all' ? 'active' : ''} onClick={() => setEventFilter('all')}>
                 World
@@ -888,14 +972,24 @@ export function Inspector({
             {w.events
               .filter((e) => eventFilter === 'all' || e.nation === n.id)
               .map((e) => (
-                <article className={`chronicle-entry ${e.type}`} key={e.id}>
+                <article className={`chronicle-entry ${e.type}`} key={e.id} id={`history-event-${e.id}`}>
                   <div>
                     <span className="event-mark" />
                     <time>{dateLabel({ month: e.month, startYear: w.startYear })}</time>
-                    <span>{title(e.type)}</span>
+                    <span>{title(e.historical?.category ?? e.type)}</span>
                   </div>
                   <h4>{e.title}</h4>
-                  <p>{e.detail}</p>
+                  <p>
+                    {e.historical && e.detail.length > 520
+                      ? `${e.detail.slice(0, 500).replace(/\s+\S*$/, '')}…`
+                      : e.detail}
+                  </p>
+                  <HistoricalConsequences
+                    event={e}
+                    world={w}
+                    onExpand={onEventDetails}
+                    pending={pendingDetails.includes(e.id)}
+                  />
                   {e.region !== undefined && (
                     <button
                       className="text-button"
@@ -1023,10 +1117,7 @@ function Province({
         <span>Food reserves</span>
         <b>{(r.stocks.food / Math.max(1, population(r) * 0.025)).toFixed(1)} months</b>
       </div>
-      <div className="data-row">
-        <span>Local culture</span>
-        <b>{world.nations[r.culture].shortName}</b>
-      </div>
+      <PopulationIdentities world={world} nation={r.nation} region={r.id} />
       <SectionTitle>Develop this province</SectionTitle>
       <div className="development-list">
         {(

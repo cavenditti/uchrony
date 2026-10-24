@@ -1,5 +1,10 @@
-import { GOODS, FIELDS, type World } from './types'
+import { GOODS, FIELDS, type World, type RouteLeg } from './types'
 import { neighbors } from './hex'
+import { validateHistoryState, validateHistoricalRecord } from './history-schema'
+import { validateStatecraft } from './statecraft-persistence'
+import { validatePopulation } from './population-persistence'
+import { validateCharacters } from './character-persistence'
+import { validateWarfare } from './military-persistence'
 
 /** Validates untrusted save files before they enter the simulation worker. */
 export function validateWorld(value: unknown): World {
@@ -40,7 +45,7 @@ export function validateWorld(value: unknown): World {
   if (w.width !== 112 || w.height !== 72 || !Array.isArray(w.cells) || w.cells.length !== w.width * w.height)
     fail('unsupported map dimensions')
   if (!Array.isArray(w.regions) || w.regions.length < 4 || w.regions.length > 600) fail('invalid provinces')
-  if (!Array.isArray(w.nations) || w.nations.length < 4 || w.nations.length > 18) fail('invalid states')
+  if (!Array.isArray(w.nations) || w.nations.length < 4 || w.nations.length > 64) fail('invalid states')
   const regionId = (id: unknown) => number(id, 0, w.regions.length - 1) && Number.isInteger(id)
   const nationId = (id: unknown) => number(id, 0, w.nations.length - 1) && Number.isInteger(id)
   const cellId = (id: unknown) => number(id, 0, w.cells.length - 1) && Number.isInteger(id)
@@ -149,6 +154,14 @@ export function validateWorld(value: unknown): World {
       !['open', 'controlled', 'closed'].includes(n.policies.migration)
     )
       fail('invalid government policies')
+    for (const [key, options] of Object.entries({
+      citizenship: ['civic', 'pluralist', 'heritage'],
+      languagePolicy: ['local', 'common', 'multilingual'],
+      beliefPolicy: ['protected', 'favored', 'restricted'],
+    })) {
+      const value = n.policies[key as keyof typeof n.policies]
+      if (value !== undefined && !options.includes(String(value))) fail('invalid identity policy')
+    }
     for (const key of [
       'tax',
       'welfare',
@@ -225,6 +238,33 @@ export function validateWorld(value: unknown): World {
       fail('invalid army')
     armyIds.add(a.id)
   }
+  const validateLegs = (from: number, to: number, legs: RouteLeg[], maxLegs = w.regions.length * 3) => {
+    if (!Array.isArray(legs) || legs.length < 1 || legs.length > maxLegs) fail('invalid freight legs')
+    let last = w.regions[from].center
+    for (const leg of legs) {
+      if (
+        !object(leg) ||
+        !['land', 'sea'].includes(leg.mode) ||
+        !Array.isArray(leg.cells) ||
+        leg.cells.length < 2 ||
+        leg.cells.length > w.cells.length ||
+        leg.cells.some((id) => !cellId(id))
+      )
+        fail('invalid freight geometry')
+      if (leg.cells[0] !== last) fail('disconnected freight legs')
+      for (let i = 0; i < leg.cells.length; i++) {
+        const id = leg.cells[i],
+          water = w.cells[id].terrain === 'water',
+          seaInterior = leg.mode === 'sea' && i > 0 && i < leg.cells.length - 1
+        if (water !== seaInterior) fail('freight path crosses invalid terrain')
+        if (i > 0 && !neighbors(leg.cells[i - 1], w.width, w.height).includes(id))
+          fail('freight path skips map cells')
+      }
+      if (leg.mode === 'sea' && leg.cells.length < 3) fail('shipping path needs water')
+      last = leg.cells[leg.cells.length - 1]
+    }
+    if (last !== w.regions[to].center) fail('freight endpoints do not match shipment')
+  }
   if (!Array.isArray(w.routes) || w.routes.length > 20000) fail('invalid routes')
   for (const r of w.routes) {
     if (
@@ -244,33 +284,8 @@ export function validateWorld(value: unknown): World {
     )
       fail('invalid trade route')
     if (r.legs !== undefined) {
-      if (!Array.isArray(r.legs) || r.legs.length < 1 || r.legs.length > w.regions.length * 3)
-        fail('invalid freight legs')
-      let last = w.regions[r.from].center
-      for (const leg of r.legs) {
-        if (
-          !object(leg) ||
-          !['land', 'sea'].includes(leg.mode) ||
-          !Array.isArray(leg.cells) ||
-          leg.cells.length < 2 ||
-          leg.cells.length > w.cells.length ||
-          leg.cells.some((id) => !cellId(id))
-        )
-          fail('invalid freight geometry')
-        if (leg.cells[0] !== last) fail('disconnected freight legs')
-        for (let i = 0; i < leg.cells.length; i++) {
-          const id = leg.cells[i],
-            water = w.cells[id].terrain === 'water',
-            seaInterior = leg.mode === 'sea' && i > 0 && i < leg.cells.length - 1
-          if (water !== seaInterior) fail('freight path crosses invalid terrain')
-          if (i > 0 && !neighbors(leg.cells[i - 1], w.width, w.height).includes(id))
-            fail('freight path skips map cells')
-        }
-        if (leg.mode === 'sea' && leg.cells.length < 3) fail('shipping path needs water')
-        last = leg.cells[leg.cells.length - 1]
-      }
+      validateLegs(r.from, r.to, r.legs)
       if (
-        last !== w.regions[r.to].center ||
         r.sea !== r.legs.some((leg) => leg.mode === 'sea') ||
         r.path[0] !== r.from ||
         r.path[r.path.length - 1] !== r.to
@@ -306,8 +321,62 @@ export function validateWorld(value: unknown): World {
       seen.add(key)
     }
   }
+  if (w.corridors !== undefined) {
+    if (!Array.isArray(w.corridors) || w.corridors.length > w.cells.length * 3)
+      fail('invalid corridor memory')
+    const seen = new Set<number>()
+    for (const trace of w.corridors) {
+      if (
+        !object(trace) ||
+        !cellId(trace.a) ||
+        !cellId(trace.b) ||
+        trace.a >= trace.b ||
+        !neighbors(trace.a, w.width, w.height).includes(trace.b) ||
+        !number(trace.familiarity, 0, 1) ||
+        !number(trace.traffic)
+      )
+        fail('invalid corridor trace')
+      const key = trace.a * w.cells.length + trace.b
+      if (seen.has(key)) fail('duplicate corridor trace')
+      seen.add(key)
+    }
+  }
+  if (w.corridorPlan !== undefined) {
+    const plan = w.corridorPlan
+    if (
+      !object(plan) ||
+      !number(plan.month, 0, w.month) ||
+      !Number.isInteger(plan.month) ||
+      !Array.isArray(plan.links) ||
+      plan.links.length > (w.regions.length * (w.regions.length - 1)) / 2
+    )
+      fail('invalid corridor plan')
+    const seen = new Set<string>()
+    let cells = 0
+    for (const link of plan.links) {
+      if (
+        !object(link) ||
+        !regionId(link.from) ||
+        !regionId(link.to) ||
+        link.from >= link.to ||
+        !number(link.changedAt, 0, plan.month) ||
+        !Number.isInteger(link.changedAt)
+      )
+        fail('invalid corridor connection')
+      const key = `${link.from}-${link.to}`
+      if (seen.has(key)) fail('duplicate corridor connection')
+      seen.add(key)
+      validateLegs(link.from, link.to, link.legs, 3)
+      for (const leg of link.legs) {
+        cells += leg.cells.length
+        if (leg.mode === 'land' && leg.cells.some((id) => ![link.from, link.to].includes(w.cells[id].region)))
+          fail('corridor road crosses an unrelated province')
+      }
+      if (cells > w.cells.length * 16) fail('oversized corridor plan')
+    }
+  }
   if (!Array.isArray(w.events) || w.events.length > 240) fail('invalid chronicle')
-  for (const e of w.events)
+  for (const e of w.events) {
     if (
       !object(e) ||
       !number(e.id) ||
@@ -319,6 +388,21 @@ export function validateWorld(value: unknown): World {
       (e.nation !== undefined && !nationId(e.nation))
     )
       fail('invalid chronicle entry')
+    if (
+      e.expandedAccount !== undefined &&
+      (typeof e.expandedAccount !== 'string' || e.expandedAccount.length > 2400)
+    )
+      fail('invalid expanded historical account')
+    if (e.historical !== undefined) {
+      validateHistoricalRecord(w, e.historical)
+      if (e.historical.causeEvent >= e.id) fail('historical cause must precede its consequence')
+    }
+  }
+  if (w.historical !== undefined) validateHistoryState(w, w.historical)
+  validateWarfare(w, validateLegs)
+  validateStatecraft(w)
+  validatePopulation(w)
+  validateCharacters(w)
   if (!Array.isArray(w.history) || w.history.length > 15000) fail('invalid history')
   for (const h of w.history) {
     if (

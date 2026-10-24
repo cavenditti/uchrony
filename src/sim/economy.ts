@@ -1,3 +1,4 @@
+import { seaPassageFactor } from './naval-control'
 import {
   GOODS,
   inventory,
@@ -12,7 +13,10 @@ import {
   type RouteLeg,
 } from './types'
 
-import { transportNetwork, reverseLegs } from './transport'
+import { diplomaticAccess, preferentialTrade, agreementTerms } from './agreements'
+import { effectMultiplier } from './effects'
+import { transportNetwork, reverseLegs, refreshTransport } from './transport'
+import { corridorCost, corridorProfile, corridorUsage, learnCorridors } from './corridors'
 import {
   rememberedTrade,
   rememberShipments,
@@ -79,9 +83,12 @@ export function produce(world: World) {
       (1 + tech.agriculture * 0.19) *
       season *
       world.climate *
-      efficiency
+      efficiency *
+      effectMultiplier(world, 'harvest', n.id, r.id)
     const industrial = (1 - farmShare) / 0.52
     const raw = (g: Good, amount: number) => {
+      if (['timber', 'stone', 'iron', 'coal'].includes(g))
+        amount *= effectMultiplier(world, 'extraction', n.id, r.id)
       r.production[g] = amount
       r.stocks[g] += amount
     }
@@ -104,7 +111,13 @@ export function produce(world: World) {
     // Farming and extraction use explicit shares; the remaining 36.5% of
     // non-farm labor works in manufacturing. The recipe rates include its
     // allocation among toolmakers, textile workers, and arms makers.
-    const factory = workers * (1 - farmShare) * (1 - 0.33 / 0.52) * r.industry * efficiency
+    const factory =
+      workers *
+      (1 - farmShare) *
+      (1 - 0.33 / 0.52) *
+      r.industry *
+      efficiency *
+      effectMultiplier(world, 'manufacturing', n.id, r.id)
     manufacture('tools', factory * (0.007 / 0.19), { iron: 0.65, coal: 0.3, timber: 0.25 })
     manufacture('textiles', factory * (0.013 / 0.19), { timber: 0.3, food: 0.12 })
     manufacture('arms', factory * (0.0025 / 0.19) * (p.priority === 'military' ? 2 : 1), {
@@ -129,39 +142,38 @@ export interface Edge {
 }
 export type Graph = Edge[][]
 
-export function transportGraph(world: World, militaryNation?: number): Graph {
+export function transportGraph(
+  world: World,
+  militaryNation?: number,
+  profile = corridorProfile(world),
+): Graph {
   const graph: Graph = world.regions.map(() => [])
   const allowed = (a: Region, b: Region) => {
     if (militaryNation !== undefined) {
       const rel = relation(world, militaryNation, b.nation)
-      return b.nation === militaryNation || rel?.treaty === 'war' || rel?.treaty === 'alliance'
+      return (
+        b.nation === militaryNation ||
+        rel?.treaty === 'war' ||
+        rel?.treaty === 'alliance' ||
+        diplomaticAccess(world, militaryNation, b.nation)
+      )
     }
     return a.nation === b.nation || relation(world, a.nation, b.nation)?.treaty !== 'war'
   }
   for (const link of transportNetwork(world).links) {
     const a = world.regions[link.from],
       b = world.regions[link.to],
-      infra = (a.infrastructure + b.infrastructure) / 2,
-      tech = Math.min(
-        world.nations[a.nation].technologies.logistics,
-        world.nations[b.nation].technologies.logistics,
-      ),
-      damage = 1 - Math.max(a.devastation, b.devastation) * 0.6,
+      usage = corridorUsage(profile, link.legs),
+      capacity =
+        Math.min(...[...usage].map(([index, count]) => profile.capacity[index] / count)) *
+        Math.min(seaPassageFactor(world, a.nation, link.legs), seaPassageFactor(world, b.nation, link.legs)),
       sea = link.seaCost > 0,
-      roadCapacity = (1000 + infra * 6000) * (1 + tech * 0.25) * damage,
-      portCapacity =
-        (2500 + Math.min(a.infrastructure, b.infrastructure) * 9000) * (1 + tech * 0.15) * damage,
-      capacity = sea
-        ? link.landCost > 0
-          ? Math.min(roadCapacity, portCapacity)
-          : portCapacity
-        : roadCapacity,
-      cost =
-        ((link.landCost / 6) * (2 - infra)) / (1 + tech * 0.1) +
-        (sea ? 2 + link.seaCost / 18 / (1 + tech * 0.1) : 0)
+      cost = corridorCost(profile, link.legs)
     // Each direction is checked independently: military access is directional.
-    if (allowed(a, b)) graph[a.id].push({ to: b.id, cost, capacity, sea, legs: link.legs })
-    if (allowed(b, a)) graph[b.id].push({ to: a.id, cost, capacity, sea, legs: reverseLegs(link.legs) })
+    if (capacity > 0.001 && allowed(a, b))
+      graph[a.id].push({ to: b.id, cost, capacity, sea, legs: link.legs })
+    if (capacity > 0.001 && allowed(b, a))
+      graph[b.id].push({ to: a.id, cost, capacity, sea, legs: reverseLegs(link.legs) })
   }
   return graph
 }
@@ -201,15 +213,89 @@ export function pathTo(previous: Int32Array, from: number, to: number): number[]
 }
 
 export function trade(world: World) {
-  const graph = transportGraph(world),
+  const profile = corridorProfile(world)
+  refreshTransport(world, profile)
+  const graph = transportGraph(world, undefined, profile),
+    physicalCapacity = profile.capacity.slice(),
     capacity = new Map<string, number>(),
     routes = new Map<string, Route>(),
     memory = rememberedTrade(world)
   const key = (a: number, b: number) => `${Math.min(a, b)}-${Math.max(a, b)}`
   for (let a = 0; a < graph.length; a++) for (const e of graph[a]) capacity.set(key(a, e.to), e.capacity)
   const pathCache = new Map<number, ReturnType<typeof shortestPaths>>(),
-    plans = new Map<string, { path: number[]; cost: number }>()
+    plans = new Map<
+      string,
+      {
+        path: number[]
+        cost: number
+        physical?: { legs: RouteLeg[]; usage: ReadonlyMap<number, number> }
+      }
+    >()
   world.routes = []
+  for (const { offer, term } of agreementTerms(world, 'goods')) {
+    const buyers = world.regions
+      .filter((region) => region.nation === term.to)
+      .sort(
+        (a, b) =>
+          a.stocks[term.good as Good] / Math.max(1, population(a)) -
+          b.stocks[term.good as Good] / Math.max(1, population(b)),
+      )
+    const good = term.good as Good
+    let owed = term.amount
+    for (const buyer of buyers) {
+      if (owed < 0.1) break
+      const paths = shortestPaths(graph, buyer.id)
+      const sellers = world.regions
+        .filter(
+          (region) =>
+            region.nation === term.from &&
+            region.stocks[good] > reserveTarget(region, good) &&
+            Number.isFinite(paths.distance[region.id]),
+        )
+        .sort((a, b) => paths.distance[a.id] - paths.distance[b.id])
+      for (const seller of sellers) {
+        if (owed < 0.1) break
+        const path = pathTo(paths.previous, buyer.id, seller.id).reverse(),
+          legs = path.slice(1).flatMap((to, i) => graph[path[i]].find((edge) => edge.to === to)!.legs),
+          usage = corridorUsage(profile, legs),
+          edgeKeys = path.slice(1).map((to, i) => key(path[i], to))
+        let amount = Math.min(
+          owed,
+          seller.stocks[good] - reserveTarget(seller, good),
+          Math.max(0, reserveTarget(buyer, good) * 4 - buyer.stocks[good]),
+          ...edgeKeys.map((edge) => capacity.get(edge) ?? 0),
+        )
+        for (const [index, count] of usage) amount = Math.min(amount, physicalCapacity[index] / count)
+        if (amount < 0.1) continue
+        seller.stocks[good] -= amount
+        buyer.stocks[good] += amount
+        owed -= amount
+        offer.delivered += amount
+        for (const edge of edgeKeys) capacity.set(edge, capacity.get(edge)! - amount)
+        for (const [index, count] of usage) physicalCapacity[index] -= amount * count
+        const id = `${seller.id}-${buyer.id}`,
+          existing = routes.get(id)
+        if (existing) {
+          existing.goods[good] += amount
+          existing.volume += amount
+        } else
+          routes.set(id, {
+            id,
+            from: seller.id,
+            to: buyer.id,
+            path,
+            legs,
+            sea: legs.some((leg) => leg.mode === 'sea'),
+            goods: { ...inventory(), [good]: amount },
+            volume: amount,
+            value: 0,
+            capacity: amount,
+            international: seller.nation !== buyer.nation,
+          })
+      }
+    }
+    if (owed > 0.1) offer.breaches++
+  }
   for (const g of GOODS) {
     const establishedBuyers = new Set(
       [...memory.values()].filter((lane) => lane.flow[g] >= 0.1).map((lane) => lane.to),
@@ -241,13 +327,14 @@ export function trade(world: World) {
             prior = memory.get(id)
           if (!plans.has(id)) {
             const best = pathTo(paths.previous, buyer.id, seller.id).reverse(),
-              path = establishedPath(graph, prior?.path, best)
+              path = routes.get(id)?.path ?? establishedPath(graph, prior?.path, best)
             plans.set(id, { path, cost: pathCost(graph, path) })
           }
           const plan = plans.get(id)!
           return {
             seller,
             path: plan.path,
+            plan,
             score: plan.cost * (seller.nation === buyer.nation ? 0.6 : 1),
             prior: prior?.flow[g] ?? 0,
           }
@@ -255,17 +342,27 @@ export function trade(world: World) {
         .sort((a, b) => a.score - b.score || a.seller.id - b.seller.id)
       if (!candidates.length) continue
       const transfer = (candidate: (typeof candidates)[number], requested: number) => {
-        const { seller, path } = candidate
+        const { seller, path, plan } = candidate
         if (needed < 0.1 || requested < 0.1 || path.length < 2) return
         const edgeKeys = path.slice(1).map((id, i) => key(path[i], id))
-        const available = Math.min(...edgeKeys.map((k) => capacity.get(k) ?? 0))
+        let available = Math.min(...edgeKeys.map((k) => capacity.get(k) ?? 0))
+        if (available < 0.1) return
+        if (!plan.physical) {
+          const legs = path.slice(1).flatMap((to, i) => graph[path[i]].find((edge) => edge.to === to)!.legs)
+          plan.physical = { legs, usage: corridorUsage(profile, legs) }
+        }
+        const { legs, usage } = plan.physical
+        for (const [index, count] of usage) available = Math.min(available, physicalCapacity[index] / count)
         const international = seller.nation !== buyer.nation
         const nBuyer = world.nations[buyer.nation],
           nSeller = world.nations[seller.nation]
         const unitPrice = (buyer.prices[g] + seller.prices[g]) / 2 / 1000
         const agreement = relation(world, buyer.nation, seller.nation)?.treaty
         const tariff =
-          international && agreement !== 'trade' && agreement !== 'alliance'
+          international &&
+          agreement !== 'trade' &&
+          agreement !== 'alliance' &&
+          !preferentialTrade(world, buyer.nation, seller.nation)
             ? nBuyer.policies.tariff / 100
             : 0
         const affordable = international
@@ -284,6 +381,7 @@ export function trade(world: World) {
         buyer.stocks[g] += amount
         needed -= amount
         edgeKeys.forEach((k) => capacity.set(k, capacity.get(k)! - amount))
+        for (const [index, count] of usage) physicalCapacity[index] -= amount * count
         const value = amount * unitPrice
         if (international) {
           nBuyer.treasury -= value
@@ -304,7 +402,7 @@ export function trade(world: World) {
             from: seller.id,
             to: buyer.id,
             path,
-            legs: path.slice(1).flatMap((to, i) => graph[path[i]].find((edge) => edge.to === to)!.legs),
+            legs,
             sea,
             goods,
             volume: amount,
@@ -321,7 +419,7 @@ export function trade(world: World) {
       if (!urgentFood && previousTotal > 0) {
         for (const candidate of established) {
           // Preserve normal supplier shares. When a meaningfully better option
-          // appears, release 25% per month instead of replacing the relationship.
+          // appears, release a small monthly share instead of replacing the relationship.
           const competitive = candidate.score * (1 - TRADE_INERTIA.improvement) <= candidates[0].score,
             retention = competitive ? 1 : 1 - TRADE_INERTIA.adjustment
           transfer(candidate, ((initialNeed * candidate.prior) / previousTotal) * retention)
@@ -337,6 +435,7 @@ export function trade(world: World) {
   }
   world.routes = [...routes.values()]
   rememberShipments(world, memory)
+  learnCorridors(world, profile)
 }
 
 export function consume(world: World) {

@@ -34,6 +34,8 @@ import {
   dateLabel,
 } from './sim/types'
 import { parseSave } from './sim/persistence'
+import type { AgentServiceStatus } from './sim/statecraft-types'
+import type { StorytellerStatus } from './sim/history-types'
 import { WorldMap } from './components/WorldMap'
 import { Inspector, TAB_INFO, FlagMark, compact, type Tab } from './components/Inspector'
 import './styles.css'
@@ -70,14 +72,32 @@ export default function App() {
     [orderedArmy, setOrderedArmy] = useState<number | null>(null)
   const [savedAt, setSavedAt] = useState('Not saved yet'),
     [restoreWarning, setRestoreWarning] = useState<string | null>(null)
+  const [storyteller, setStoryteller] = useState<StorytellerStatus>({
+    state: 'connecting',
+    model: 'deepseek/deepseek-v4.1-flash',
+    message: 'Connecting historical simulation…',
+  })
+  const [agents, setAgents] = useState<AgentServiceStatus>({
+    pending: 0,
+    active: [],
+    decisionModel: '',
+    strategyModel: '',
+    refereeModel: '',
+    error: '',
+  })
+  const [pendingDetails, setPendingDetails] = useState<number[]>([])
   const worker = useRef<Worker | null>(null),
     pending = useRef(false),
     currentWorld = useRef<World | null>(null)
+  const savedHistoricalEvent = useRef(0),
+    savedStatecraftRevision = useRef(0),
+    savedOpportunity = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null),
     searchInput = useRef<HTMLInputElement>(null),
     dialogRef = useRef<HTMLDialogElement>(null)
   const notify = useCallback((text: string, error = false) => setToast({ text, error }), [])
   const send = useCallback((data: WorkerRequest) => {
+    if (data.type === 'generate' || data.type === 'load') setPendingDetails([])
     pending.current = true
     setBusy(true)
     worker.current?.postMessage(data)
@@ -87,8 +107,27 @@ export default function App() {
     const instance = new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' })
     worker.current = instance
     instance.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
-      pending.current = false
-      setBusy(false)
+      if (data.type === 'storyteller') {
+        setStoryteller(data.status)
+        return
+      }
+      if (data.type === 'agents') {
+        setAgents(data.status)
+        return
+      }
+      if (data.type === 'event-detail') {
+        setPendingDetails((current) =>
+          data.state === 'loading'
+            ? [...new Set([...current, data.event])]
+            : current.filter((id) => id !== data.event),
+        )
+        if (data.state === 'error' && data.message) notify(data.message, true)
+        return
+      }
+      if (data.type === 'error' || data.acknowledgement !== false) {
+        pending.current = false
+        setBusy(false)
+      }
       if (data.type === 'error') {
         notify(data.message, true)
         setRunning(false)
@@ -140,16 +179,31 @@ export default function App() {
       setNation(world.nations.find((n) => n.population > 0)?.id ?? 0)
   }, [world, region, nation])
   useEffect(() => {
-    if (!world || (running && world.month % 12 !== 0)) return
-    const timeout = window.setTimeout(() => {
-      try {
-        localStorage.setItem(SAVE_KEY, JSON.stringify(world))
-        setSavedAt(`Saved ${dateLabel(world)}`)
-      } catch {
-        setSavedAt('Autosave unavailable')
-        setRestoreWarning('Browser storage is full or unavailable. Export your world to keep it.')
-      }
-    }, 350)
+    if (!world) return
+    const historicalEvent = world.events.find((event) => event.historical)?.id ?? 0
+    if (
+      running &&
+      world.month % 12 !== 0 &&
+      (world.historical?.opportunity?.id ?? 0) === savedOpportunity.current &&
+      historicalEvent === savedHistoricalEvent.current &&
+      (world.statecraft?.revision ?? 0) === savedStatecraftRevision.current
+    )
+      return
+    const timeout = window.setTimeout(
+      () => {
+        try {
+          localStorage.setItem(SAVE_KEY, JSON.stringify(world))
+          savedHistoricalEvent.current = historicalEvent
+          savedStatecraftRevision.current = world.statecraft?.revision ?? 0
+          savedOpportunity.current = world.historical?.opportunity?.id ?? 0
+          setSavedAt(`Saved ${dateLabel(world)}`)
+        } catch {
+          setSavedAt('Autosave unavailable')
+          setRestoreWarning('Browser storage is full or unavailable. Export your world to keep it.')
+        }
+      },
+      running ? 0 : 350,
+    )
     return () => clearTimeout(timeout)
   }, [world, running])
   useEffect(() => {
@@ -191,6 +245,9 @@ export default function App() {
             'political',
             'terrain',
             'population',
+            'culture',
+            'language',
+            'belief',
             'prosperity',
             'food',
             'trade',
@@ -378,6 +435,27 @@ export default function App() {
           </button>
         ))}
       </nav>
+      {(storyteller.state === 'error' || storyteller.state === 'generating') && (
+        <div className={`history-service-banner ${storyteller.state}`} role="status">
+          {storyteller.state === 'generating' ? (
+            <LoaderCircle size={15} className="spin" />
+          ) : (
+            <Info size={15} />
+          )}
+          <span>
+            {storyteller.message}
+            {storyteller.state === 'generating' && ' Local events continue while the draft develops.'}
+          </span>
+          {storyteller.state === 'error' && (
+            <button className="text-button" onClick={() => send({ type: 'retry-history' })}>
+              Retry connection
+            </button>
+          )}
+          <button className="text-button" onClick={() => chooseTab('chronicle')}>
+            Chronicle
+          </button>
+        </div>
+      )}
       {restoreWarning && (
         <div className="warning-banner" role="alert">
           <Info size={15} />
@@ -573,12 +651,22 @@ export default function App() {
             </button>
             <span className="save-status" title={savedAt}>
               {busy ? <LoaderCircle className="spin" size={12} /> : <Check size={12} />}
-              <span>{busy ? 'Simulating' : savedAt}</span>
+              <span>
+                {busy
+                  ? 'Simulating'
+                  : agents.pending
+                    ? `${agents.pending} background deliberations`
+                    : savedAt}
+              </span>
             </span>
           </footer>
         </section>
         <Inspector
           world={world}
+          agentStatus={agents}
+          onStrategy={(nation) => worker.current?.postMessage({ type: 'agent-strategy', nation })}
+          onEventDetails={(event) => worker.current?.postMessage({ type: 'event-details', event })}
+          pendingDetails={pendingDetails}
           nationId={selected.id}
           regionId={region}
           tab={tab}
@@ -752,9 +840,10 @@ export default function App() {
             <details open>
               <summary>What the model simulates</summary>
               <p>
-                Regional age cohorts; births, deaths, and migration; eight goods and three manufacturing
-                chains; shared transport capacity; taxation and spending; six technology fields; diplomatic
-                relationships; and provincial warfare with supply, morale, terrain, and casualties.
+                Community age cohorts, cultures, languages, beliefs and loyalties; births, deaths, and
+                migration; eight goods and three manufacturing chains; shared transport capacity; taxation and
+                spending; six technology fields; diplomatic relationships; and provincial warfare with supply,
+                morale, terrain, and casualties.
               </p>
             </details>
             <details>
@@ -762,10 +851,11 @@ export default function App() {
               <p>
                 This is an experimental aggregate model, not a calibrated historical forecast. Provinces
                 represent populations rather than individual people. Trade settles within a month through
-                public inventories; animated dots visualize completed monthly flows. Sea links abstract port
-                access. Diplomacy uses transparent rules rather than language models. Technology is six levels
-                per field. Real geography, individual firms, detailed naval combat, and historical calibration
-                are not implemented.
+                public inventories; animated dots visualize completed monthly flows. Armies and fleets use
+                aggregate monthly operations. State agents and historical generation use language models, with
+                authority and resource constraints enforced by the simulation. Technology has six levels per
+                field. Real geography, individual firms, ship-by-ship tactics, and historical calibration are
+                not implemented.
               </p>
             </details>
             <div className="keyboard-guide">

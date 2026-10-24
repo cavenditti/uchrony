@@ -2,9 +2,9 @@ import { GOODS, inventory, relation, type TradeLane, type World } from './types'
 import type { Graph } from './economy'
 
 export const TRADE_INERTIA = {
-  improvement: 0.2,
-  adjustment: 0.25,
-  idleMonths: 12,
+  improvement: 0.25,
+  adjustment: 0.12,
+  idleMonths: 18,
 }
 export const laneKey = (from: number, to: number) => `${from}-${to}`
 
@@ -54,7 +54,7 @@ export function pathCost(graph: Graph, path: number[]) {
   return cost
 }
 
-/** Keep a viable route until its replacement is more than 20% cheaper. */
+/** Keep a viable route until its replacement is more than 25% cheaper. */
 export function establishedPath(graph: Graph, previous: number[] | undefined, best: number[]) {
   if (previous && previous[0] === best[0] && previous.at(-1) === best.at(-1)) {
     const oldCost = pathCost(graph, previous),
