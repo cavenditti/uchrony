@@ -46,6 +46,7 @@ import {
   relation,
   dateLabel,
 } from '../sim/types'
+import { routeDistance } from '../map/trade'
 import { TECH_NAMES, researchCost } from '../sim/engine'
 
 export type Tab =
@@ -536,25 +537,50 @@ export function Inspector({
               <option value="industry">Industrial production</option>
               <option value="military">Military equipment</option>
             </select>
-            <SectionTitle aside={<Route size={14} />}>Active goods routes</SectionTitle>
+            <SectionTitle aside={<Route size={14} />}>Shipments this month</SectionTitle>
             {w.routes
               .filter((route) => w.regions[route.from].nation === n.id || w.regions[route.to].nation === n.id)
               .sort((a, b) => b.volume - a.volume)
               .slice(0, 8)
-              .map((route) => (
-                <div className="route-row" key={route.id}>
-                  <div>
-                    <span>{w.regions[route.from].name}</span>
-                    <ArrowRight size={11} />
-                    <span>{w.regions[route.to].name}</span>
+              .map((route) => {
+                const distance = routeDistance(w, route),
+                  harbors = route.legs
+                    ?.filter((leg) => leg.mode === 'sea')
+                    .flatMap((leg) =>
+                      [leg.cells[0], leg.cells[leg.cells.length - 1]].map(
+                        (id) => w.regions[w.cells[id].region].name,
+                      ),
+                    ),
+                  cargo = GOODS.filter((g) => route.goods[g] > 0).sort(
+                    (a, b) => route.goods[b] - route.goods[a],
+                  )
+                return (
+                  <div className="route-row" key={route.id}>
+                    <div>
+                      <span>{w.regions[route.from].name}</span>
+                      <ArrowRight size={11} />
+                      <span>{w.regions[route.to].name}</span>
+                    </div>
+                    <small>
+                      {route.sea
+                        ? route.legs?.some((leg) => leg.mode === 'land')
+                          ? 'Road + sea'
+                          : 'Sea'
+                        : 'Road'}{' '}
+                      ·{' '}
+                      {distance === undefined
+                        ? 'Route refresh pending'
+                        : `${Math.round(distance).toLocaleString()} km`}{' '}
+                      · {route.international ? 'International' : 'Domestic'}
+                    </small>
+                    <small className="route-cargo">
+                      {cargo.map((g) => `${g} ${compact(route.goods[g])} t`).join(' · ')}
+                    </small>
+                    {!!harbors?.length && <small>Harbors: {[...new Set(harbors)].join(' → ')}</small>}
+                    <b>{compact(route.volume)} t</b>
                   </div>
-                  <small>
-                    {route.sea ? 'Maritime' : 'Overland'} ·{' '}
-                    {route.international ? 'International' : 'Domestic'}
-                  </small>
-                  <b>{compact(route.volume)} t</b>
-                </div>
-              ))}
+                )
+              })}
             {!w.routes.some(
               (route) => w.regions[route.from].nation === n.id || w.regions[route.to].nation === n.id,
             ) && (
@@ -564,8 +590,10 @@ export function Inspector({
               </p>
             )}
             <p className="panel-note">
-              Tools require iron, coal, and timber. Arms require tools, iron, and coal. Routes share limited
-              road or port capacity; hostile borders close to trade.
+              Shipments move surplus goods to shortages along the lowest-cost open route. Roads follow
+              terrain; shipping uses coastal harbors and connected water. Corridors share limited capacity,
+              and hostile borders close to trade. Select a province on the map to highlight its imports and
+              exports.
             </p>
           </>
         )}

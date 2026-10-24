@@ -2,6 +2,20 @@
 
 Verified locally on 24 October 2026 using Node 26.11.1 and Chrome for Testing 151.0.7922.47. Results are grouped by implementation revision below; no production deployment is implied.
 
+## Geographic freight revision
+
+The trade network and renderer pass `npm run build`, `npm run format:check`, and **24 tests**. Five new regressions exercise water-only navigation around headlands, disconnected seas, low mountain passes, road and harbor continuity across three generated worlds, symmetric civilian costs and directional military access, exact shipment geometry, malformed/legacy save handling, and aggregation of opposing flows. Existing tests still verify conservation of goods and treasury, shared connection capacity, deterministic continuation, and population accounting.
+
+All three 200-year / 2,400-month runs pass after the new transport model, with monthly population accounting and periodic full save validation:
+
+| Seed | Final population | Surviving states | Active routes | Event IDs |
+| --- | ---: | ---: | ---: | ---: |
+| A world unwritten | 20,045,246 | 8 | 136 | 267 |
+| Long winter | 19,545,715 | 7 | 169 | 707 |
+| Maritime republics | 20,802,169 | 6 | 113 | 349 |
+
+The original JSON export from January 1722 imports successfully; its route refresh notice appears, and advancing one month generates geographic route legs. Browser checks also use a 20-year world with 269 shipments, including 117 journeys with shipping legs. The 1440px desktop and 390px phone layouts have no horizontal overflow; the cargo ledger, mixed-mode legs, harbor markers, and province highlighting were checked. No browser runtime errors were reported. Final desktop, local detail, and phone captures are under `.impeccable/review/trade-final-*.png` (local, ignored by Git).
+
 ## Map generation and rendering revision
 
 The revised generator and renderer pass `npm run build`, `npm run format:check`, and **19 tests**. Six geography-specific regressions cover major-landmass counts over three seeds and four settings, the ocean boundary, downstream reachability and runoff, connected provinces and polygon hit testing, static-geometry cache invalidation, pointer-anchored zoom, and legacy-save compatibility/rejection of malformed drainage. The existing simulation suite still passes, including the 100-year validity check and deterministic save continuation.

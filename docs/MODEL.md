@@ -84,13 +84,17 @@ Remaining food loses 3.5% monthly to storage/spoilage, timber and textiles lose 
 
 ## Goods routes
 
-The transport graph links neighboring provinces. Mountain and hill terrain raise route costs. Infrastructure and logistics technology raise road throughput, while devastation reduces it. Nearby coastal provinces can gain maritime links when intermediate geographic samples contain water. These links abstract shipping rather than pathfinding every sea hex.
+The physical transport network is deterministic and cached for the world's immutable geography. Within each province, a shortest-cost road tree connects its settlement to border crossings and its harbor. Terrain difficulty, elevation changes, and river crossings raise road effort. Neighboring provinces join at the least-cost reachable border; roads cannot cross water or an unrelated third province.
+
+Each coastal province selects a shore reachable from its settlement, preferring the largest connected water body and then the cheapest road access. Shipping paths visit adjacent water hexes between those harbors, with a small preference for clearance from shore. Disconnected water bodies cannot gain a direct sea link. The graph includes a minimum-cost connectivity backbone, the three cheapest shipping connections at each harbor, and crossings to its two nearest other landmasses. This avoids both a dense all-to-all graph and a single artificial crossing for an entire continent. Inland access remains a road leg; each sea transfer has a fixed handling cost.
+
+Monthly route costs depend on physical travel effort, infrastructure, and logistics research. Shipping has a lower distance cost than overland haulage. Infrastructure and technology increase connection throughput, while devastation reduces it; a sea connection with inland access is capped by the smaller road or port allowance. Capacity is shared by all shipments in both directions on each province-to-province connection. Roads or harbors shared by *different* connections do not yet have a separate total-throughput constraint. There are no persistent fleets, port construction levels, or navigable-river freight.
 
 Buyers with shortages seek reachable sellers with surplus. Domestic sources receive a preference. Route paths use shortest-cost searches. Every shipment consumes the capacity shared by its path's edges for that month; later goods and shipments see the remaining capacity. Food is processed first.
 
 International trades transfer treasury funds from buyer to seller. Domestic transfers use public stocks without a treasury payment. Buyers retain a minimum treasury reserve. Tariffs reduce cross-border shipment quantity and affordability; trade agreements and alliances remove that friction. There is no separate tariff-revenue ledger because inventories and payments represent a public allocation abstraction.
 
-War closes hostile border edges and prohibits direct trade between the belligerents. Ships do not have persistent positions or voyage delays. Map route particles visualize actual monthly shipments, but are presentation-only.
+War closes hostile border edges and prohibits direct trade between the belligerents. Ships do not have persistent positions or voyage delays. The map merges shared physical segments, displays road and shipping legs separately, marks active harbors, and highlights the selected state's or province's imports and exports. Line width uses a square-root scale of combined monthly tonnage. Symbolic particles indicate actual shipment directions at a constant screen speed; they are presentation-only. The shipment ledger lists each cargo, total path distance (using the atlas scale), and harbor names. Older saves without physical route geometry load normally and regenerate routes on the next tick.
 
 ## Government and insolvency
 

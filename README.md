@@ -44,7 +44,7 @@ Keyboard shortcuts: **Space** play/pause, **1–4** speed, **L** cycle layers, *
 | Geography | Reproducible seeded continent generation; 8,064 hex cells; about 180 provinces plus isolated islands; separated continents and offshore islands; irregular coasts, mountain belts, latitude/moisture biomes, connected river basins, and resource richness. Start with 4–12 fictional states. |
 | Demography | Children, adults, and elders; births, aging, health-dependent mortality, food-shortage mortality, literacy, employment, urbanization, migration, local culture, contentment, and unrest. Military recruitment removes adults from civilian work. |
 | Resources and production | Eight goods: food, timber, stone, iron, coal, tools, textiles, arms. Terrain, labor, land capacity, infrastructure, damage, policy, and technology affect output. Manufacturing consumes actual inputs. |
-| Distribution | Local reserves, scarcity-sensitive prices, domestic and international shipments, shortest accessible paths, road and port capacity shared by shipments, tariff friction, wartime border closures, spoilage and storage limits. |
+| Distribution | Local reserves, scarcity-sensitive prices, domestic and international shipments, terrain-cost roads, water-only shipping between reachable harbors, shared freight corridors and connection capacity, tariff friction, wartime border closures, spoilage and storage limits. |
 | Government | Taxation, migration rules, production priority, conscription, weighted allocations for welfare, schools, military training, research, administration, and infrastructure; treasury, debt service, insolvency, legitimacy, and stability. |
 | Diplomacy | Bilateral opinion, paid missions, trade accords, alliances, military access, war, exhaustion, armistices, and revocation of preferential access. Autonomous governments react to trade, shortages, borders, and personality. |
 | Warfare | Provincial movement, port connections, recruitment, food and equipment consumption, supply attrition, morale, experience, training, terrain defense, technology, garrisons, casualties, occupation, devastation, retreat, capital relocation, and state collapse. |
@@ -71,7 +71,9 @@ src/sim/random.ts       Seed hashing, PRNG, geographic noise
 src/sim/geography.ts    Continental relief, climate, and drainage
 src/sim/generate.ts     Terrain-aware provinces, states, and initial armies
 src/map/               Shared polygon geometry, relief rendering, and label placement
-src/sim/economy.ts      Production, route graph, trade, consumption
+src/sim/economy.ts      Production, trade allocation, consumption
+src/sim/transport.ts    Terrain roads, harbors, navigable shipping network
+src/map/trade.ts        Aggregated freight corridors and distance-based flow
 src/sim/engine.ts       Fiscal policy, demographics, research, diplomacy, warfare
 src/sim/persistence.ts  Untrusted-save validation
 src/sim/worker.ts       Simulation worker and command dispatch
@@ -92,10 +94,12 @@ The atlas traces shared province boundaries, smooths shorelines, blends terrain 
 
 Existing saved worlds retain their geography and load normally. Use **New world** to see the revised generator. New worlds with an old seed now differ from the original generator; exports retain their complete map and generator version.
 
+The trade layer shows actual monthly freight on shared roads and shipping lanes. Roads use low-cost terrain paths; ships follow connected water between reachable coastal harbors. The selected state's or province's imports and exports are emphasized. Width represents summed tonnage in both directions, and moving dots indicate direction. The economy panel lists cargo, distance, and harbors. Old saved shipments without physical paths become visible again after advancing one month.
+
 ## Scope and next extensions
 
 The present model operates at provincial and monthly resolution. Trade dots visualize monthly deliveries rather than persistent vehicles. States administer a public-inventory economy rather than separate firms and household markets. Mineral richness is renewable throughput, not a finite geological reserve. Port links are geographic approximations. Alliances grant access but do not automatically draw allies into war. The independent-region mechanic is simple and requires sustained severe unrest.
 
-Natural next extensions are real geography imports, more granular professions and markets, persistent freight and supply lines, terrain-aware sea routing, separate naval forces, treaty terms and war goals, a larger technology graph, and historical calibration. None is represented as implemented in this build.
+Natural next extensions are real geography imports, more granular professions and markets, persistent freight and supply lines, separate naval forces, treaty terms and war goals, a larger technology graph, and historical calibration. None is represented as implemented in this build.
 
 Browser-local saves belong to the current origin and browser profile. Export important worlds. A suspended or closed tab does not continue simulating; a changed model version is not guaranteed to reproduce a previous build's future.

@@ -3,6 +3,7 @@ import { Check, Plus, Minus, Maximize2, MapPin, Layers3, Navigation } from 'luci
 import { HEX } from '../sim/hex'
 import { geographyKey, contains, zoomAt } from '../map/geometry'
 import { buildAtlas, drawAtlas, drawPlaceLabels, terrainColors } from '../map/renderer'
+import { freightOverlay, drawFreight } from '../map/trade'
 import { population, type World, type Layer } from '../sim/types'
 
 interface Props {
@@ -62,6 +63,7 @@ export function WorldMap({
         : layer === 'food'
           ? { label: 'Food needs met', colors: '#bf5c50, #84ae80', ticks: ['0%', '50%', '100%'] }
           : null
+  const freight = useMemo(() => freightOverlay(world, nation, region), [world, nation, region])
   const mapKey = geographyKey(world.cells)
   const atlas = useMemo(() => buildAtlas(world), [mapKey])
   const mapW = world.width * Math.sqrt(3) * HEX,
@@ -134,37 +136,8 @@ export function WorldMap({
       ctx.translate(offsetX, offsetY)
       ctx.scale(scale, scale)
       if (baseRef.current) ctx.drawImage(baseRef.current, 0, 0, mapW, mapH)
-      if (showRoutes || layer === 'trade') {
-        const visible = [...world.routes].sort((a, b) => b.volume - a.volume).slice(0, 100)
-        for (const [index, route] of visible.entries()) {
-          const points = route.path.map((id) => world.cells[world.regions[id].center])
-          if (points.length < 2) continue
-          ctx.strokeStyle = route.sea ? '#e8d3a599' : '#64503480'
-          ctx.lineWidth = Math.max(0.8, Math.min(2.3, route.volume / 800))
-          ctx.setLineDash(route.sea ? [4, 5] : [])
-          ctx.beginPath()
-          points.forEach((p, i) => {
-            if (i === 0) ctx.moveTo(p.x, p.y)
-            else ctx.lineTo(p.x, p.y)
-          })
-          ctx.stroke()
-          ctx.setLineDash([])
-          const phase = ((running && !reduced ? time / 2400 : 0.4) + index * 0.137) % 1,
-            progress = phase * (points.length - 1)
-          const i = Math.min(points.length - 2, Math.floor(progress)),
-            t = progress - i
-          ctx.fillStyle = route.sea ? '#f4dfa8' : '#f5ebd1'
-          ctx.beginPath()
-          ctx.arc(
-            points[i].x + (points[i + 1].x - points[i].x) * t,
-            points[i].y + (points[i + 1].y - points[i].y) * t,
-            1.6 / Math.sqrt(scale),
-            0,
-            Math.PI * 2,
-          )
-          ctx.fill()
-        }
-      }
+      if (showRoutes || layer === 'trade')
+        drawFreight(ctx, world, freight, scale, time, layer === 'trade', running && !reduced)
       ctx.save()
       ctx.clip(atlas.land, 'evenodd')
       ctx.strokeStyle = '#f4e8bd'
@@ -251,6 +224,7 @@ export function WorldMap({
     mapH,
     atlas,
     fontReady,
+    freight,
   ])
 
   const locate = (clientX: number, clientY: number) => {
@@ -385,10 +359,16 @@ export function WorldMap({
           <div className="symbol-legend">
             <span>
               <i className="legend-route" />
-              Land freight <i className="legend-route sea" />
-              Sea freight
+              Road <i className="legend-route sea" />
+              Shipping <i className="legend-harbor" />
+              Harbor
             </span>
-            <span>Wider strokes = more goods · territorial colors</span>
+            <span>Width = monthly tonnage · shared corridors</span>
+            <span>
+              Highlighted: {region === null ? world.nations[nation].shortName : world.regions[region].name}{' '}
+              imports &amp; exports
+            </span>
+            {freight.legacy && <span>Advance one month to refresh saved routes.</span>}
           </div>
         ) : layer === 'military' ? (
           <div className="symbol-legend">

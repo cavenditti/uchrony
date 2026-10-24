@@ -226,7 +226,7 @@ export function validateWorld(value: unknown): World {
     armyIds.add(a.id)
   }
   if (!Array.isArray(w.routes) || w.routes.length > 20000) fail('invalid routes')
-  for (const r of w.routes)
+  for (const r of w.routes) {
     if (
       !object(r) ||
       !regionId(r.from) ||
@@ -243,6 +243,41 @@ export function validateWorld(value: unknown): World {
       typeof r.international !== 'boolean'
     )
       fail('invalid trade route')
+    if (r.legs !== undefined) {
+      if (!Array.isArray(r.legs) || r.legs.length < 1 || r.legs.length > w.regions.length * 3)
+        fail('invalid freight legs')
+      let last = w.regions[r.from].center
+      for (const leg of r.legs) {
+        if (
+          !object(leg) ||
+          !['land', 'sea'].includes(leg.mode) ||
+          !Array.isArray(leg.cells) ||
+          leg.cells.length < 2 ||
+          leg.cells.length > w.cells.length ||
+          leg.cells.some((id) => !cellId(id))
+        )
+          fail('invalid freight geometry')
+        if (leg.cells[0] !== last) fail('disconnected freight legs')
+        for (let i = 0; i < leg.cells.length; i++) {
+          const id = leg.cells[i],
+            water = w.cells[id].terrain === 'water',
+            seaInterior = leg.mode === 'sea' && i > 0 && i < leg.cells.length - 1
+          if (water !== seaInterior) fail('freight path crosses invalid terrain')
+          if (i > 0 && !neighbors(leg.cells[i - 1], w.width, w.height).includes(id))
+            fail('freight path skips map cells')
+        }
+        if (leg.mode === 'sea' && leg.cells.length < 3) fail('shipping path needs water')
+        last = leg.cells[leg.cells.length - 1]
+      }
+      if (
+        last !== w.regions[r.to].center ||
+        r.sea !== r.legs.some((leg) => leg.mode === 'sea') ||
+        r.path[0] !== r.from ||
+        r.path[r.path.length - 1] !== r.to
+      )
+        fail('freight endpoints do not match shipment')
+    }
+  }
   if (!Array.isArray(w.events) || w.events.length > 240) fail('invalid chronicle')
   for (const e of w.events)
     if (

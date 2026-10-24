@@ -124,11 +124,17 @@ export interface Army {
   experience: number
   casualties: number
 }
+export interface RouteLeg {
+  mode: 'land' | 'sea'
+  cells: number[]
+}
 export interface Route {
   id: string
   from: number
   to: number
   path: number[]
+  /** Physical freight path. Older saves acquire this on the next monthly tick. */
+  legs?: RouteLeg[]
   sea: boolean
   goods: Inventory
   volume: number

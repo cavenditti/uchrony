@@ -205,6 +205,8 @@ The layer picker, stacked zoom controls, and tooltip use compact dark floating s
 
 The atlas renders shared province polygons over interpolated terrain, with slope lighting and a deep-water field (`#243f49`) that blends into the map surround. Shorelines use the shared smoothed land silhouette. Political fills are grouped by state; detailed province divisions appear on closer inspection. Labels reserve screen space to avoid overlaps, and the title retains an opaque slate backing while panning over bright land. Pointer-anchored wheel zoom and double-click zoom preserve geographic orientation. These are map-specific devices, not decorative treatments for other panels.
 
+Freight is a physical network overlay: muted solid roads, warm dashed shipping lanes, and hollow harbor markers. Each shared segment is drawn once, with width based on total monthly tonnage. The trade layer dims unrelated shipments while emphasizing the selected state's or province's imports and exports. Cargo dots follow actual travel direction at a constant screen speed and stop when paused or reduced motion is requested. The dossier explains cargo, distance, and harbor transfers without requiring map hover.
+
 ### Meters and Chronicle
 
 Meters pair a left label and right value with a narrow tonal track. Research emphasis reuses brass. Chronicle entries pair a timestamp and event marker with an Alegreya title and explanatory text, separated by rules. Use actual event categories and available state values rather than decorative indicators.

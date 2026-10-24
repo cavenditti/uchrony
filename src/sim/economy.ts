@@ -9,7 +9,10 @@ import {
   type Good,
   type Inventory,
   type Route,
+  type RouteLeg,
 } from './types'
+
+import { transportNetwork, reverseLegs } from './transport'
 
 export const BASE_PRICE: Inventory = {
   food: 14,
@@ -114,6 +117,7 @@ export interface Edge {
   cost: number
   capacity: number
   sea: boolean
+  legs: RouteLeg[]
 }
 export type Graph = Edge[][]
 
@@ -126,50 +130,30 @@ export function transportGraph(world: World, militaryNation?: number): Graph {
     }
     return a.nation === b.nation || relation(world, a.nation, b.nation)?.treaty !== 'war'
   }
-  for (const a of world.regions)
-    for (const to of a.neighbors) {
-      const b = world.regions[to]
-      if (!allowed(a, b)) continue
-      const infra = (a.infrastructure + b.infrastructure) / 2
-      const tech = Math.min(
+  for (const link of transportNetwork(world).links) {
+    const a = world.regions[link.from],
+      b = world.regions[link.to],
+      infra = (a.infrastructure + b.infrastructure) / 2,
+      tech = Math.min(
         world.nations[a.nation].technologies.logistics,
         world.nations[b.nation].technologies.logistics,
-      )
-      const mountain = b.terrain === 'mountains' ? 2 : b.terrain === 'hills' ? 1.3 : 1
-      graph[a.id].push({
-        to,
-        cost: mountain * (2 - infra),
-        capacity:
-          (1000 + infra * 6000) * (1 + tech * 0.25) * (1 - Math.max(a.devastation, b.devastation) * 0.6),
-        sea: false,
-      })
-    }
-  const ports = world.regions.filter((r) => r.coastal)
-  // Maritime transport connects the nearest ports across water, not arbitrary inland shortcuts.
-  for (const a of ports) {
-    const ca = world.cells[a.center]
-    const candidates = ports
-      .filter((b) => b.id !== a.id && !a.neighbors.includes(b.id) && allowed(a, b))
-      .map((b) => ({ b, d: Math.hypot(ca.x - world.cells[b.center].x, ca.y - world.cells[b.center].y) }))
-      .sort((x, y) => x.d - y.d)
-      .slice(0, 4)
-    for (const { b, d } of candidates) {
-      if (d > 320) continue
-      const cb = world.cells[b.center]
-      let water = 0
-      for (let t = 0.15; t < 0.9; t += 0.08) {
-        const y = ca.y + (cb.y - ca.y) * t,
-          x = ca.x + (cb.x - ca.x) * t
-        const row = Math.round(y / 10.5),
-          col = Math.round(x / (Math.sqrt(3) * 7) - (row % 2) / 2)
-        if (world.cells[row * world.width + col]?.terrain === 'water') water++
-      }
-      if (water < 2) continue
-      const cap = 2500 + Math.min(a.infrastructure, b.infrastructure) * 9000
-      graph[a.id].push({ to: b.id, cost: 2 + d / 70, capacity: cap, sea: true })
-      if (!graph[b.id].some((e) => e.to === a.id))
-        graph[b.id].push({ to: a.id, cost: 2 + d / 70, capacity: cap, sea: true })
-    }
+      ),
+      damage = 1 - Math.max(a.devastation, b.devastation) * 0.6,
+      sea = link.seaCost > 0,
+      roadCapacity = (1000 + infra * 6000) * (1 + tech * 0.25) * damage,
+      portCapacity =
+        (2500 + Math.min(a.infrastructure, b.infrastructure) * 9000) * (1 + tech * 0.15) * damage,
+      capacity = sea
+        ? link.landCost > 0
+          ? Math.min(roadCapacity, portCapacity)
+          : portCapacity
+        : roadCapacity,
+      cost =
+        ((link.landCost / 6) * (2 - infra)) / (1 + tech * 0.1) +
+        (sea ? 2 + link.seaCost / 18 / (1 + tech * 0.1) : 0)
+    // Each direction is checked independently: military access is directional.
+    if (allowed(a, b)) graph[a.id].push({ to: b.id, cost, capacity, sea, legs: link.legs })
+    if (allowed(b, a)) graph[b.id].push({ to: a.id, cost, capacity, sea, legs: reverseLegs(link.legs) })
   }
   return graph
 }
@@ -289,6 +273,7 @@ export function trade(world: World) {
             from: seller.id,
             to: buyer.id,
             path,
+            legs: path.slice(1).flatMap((to, i) => graph[path[i]].find((edge) => edge.to === to)!.legs),
             sea,
             goods,
             volume: amount,
