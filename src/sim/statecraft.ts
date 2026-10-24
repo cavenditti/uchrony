@@ -10,6 +10,11 @@ import { ensureHistory, applyRefereeEffects } from './history'
 import { validateHistoricalEffect } from './history-schema'
 import { parseReferee, parseStatePlan } from './statecraft-schema'
 import { agreementTerms, currentAgreements } from './agreements'
+import {
+  agreementReference,
+  agreementReferenceIndex,
+  retainAgreementReferences,
+} from './agreement-references'
 import { FIELDS, clamp, population, relation, type Command, type Policies, type World } from './types'
 import type {
   DiplomaticClause,
@@ -760,12 +765,7 @@ export function advanceStatecraft(world: World) {
       )
   }
   if (state.offers.length > 240) {
-    const keep = state.offers.filter((offer) => offer.status === 'ratified' || offer.status === 'proposed'),
-      old =
-        keep.length < 240
-          ? state.offers.filter((offer) => !keep.includes(offer)).slice(-(240 - keep.length))
-          : []
-    state.offers = [...old, ...keep]
+    state.offers = retainAgreementReferences(state)
   }
 }
 
@@ -781,6 +781,22 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
       )
       .slice(-(strategic ? 24 : 6))
   const { character: _profile, personality: _legacyPersonality, ...government } = n
+  const currentOffers = visible
+    .filter((offer) => offer.status === 'proposed' || offer.status === 'ratified')
+    .slice(-30)
+  const referenceTexts = [
+    agent.assessment,
+    agent.strategy,
+    agent.memory,
+    ...agent.goals,
+    ...inbox.flatMap((message) => [message.subject, message.body, agreementReference(message.offer)]),
+    ...currentOffers.flatMap((offer) => [
+      offer.title,
+      offer.ruling,
+      agreementReference(offer.supersedes),
+      ...offer.terms.map((term) => term.text),
+    ]),
+  ]
   return {
     month: world.month,
     nation,
@@ -851,7 +867,8 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
         }))
       : [],
     inbox,
-    offers: visible.filter((offer) => offer.status === 'proposed' || offer.status === 'ratified').slice(-30),
+    offers: currentOffers.map((offer) => ({ ...offer, reference: agreementReference(offer.id) })),
+    agreementReferences: agreementReferenceIndex(visible, referenceTexts),
     recentPublicHistory: world.events
       .filter((event) => event.nation === nation || event.type === 'war' || event.type === 'peace')
       .slice(0, 8),
@@ -864,7 +881,16 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
 export function refereeContext(world: World, offers: DiplomaticOffer[]) {
   return {
     month: world.month,
-    submitted: offers,
+    submitted: offers.map((offer) => ({ ...offer, reference: agreementReference(offer.id) })),
+    agreementReferences: agreementReferenceIndex(
+      ensureStatecraft(world).offers,
+      offers.flatMap((offer) => [
+        offer.title,
+        offer.ruling,
+        agreementReference(offer.supersedes),
+        ...offer.terms.map((term) => term.text),
+      ]),
+    ),
     groundTruth: {
       nations: world.nations.map((nation) => ({ ...nation, character: characterContext(nation) })),
       identities: world.nations
@@ -888,7 +914,10 @@ export function refereeContext(world: World, offers: DiplomaticOffer[]) {
       fleets: world.warfare?.fleets.map(({ communities: _crew, ...fleet }) => fleet) ?? [],
       relations: world.relations,
     },
-    agreements: currentAgreements(world),
+    agreements: currentAgreements(world).map((offer) => ({
+      ...offer,
+      reference: agreementReference(offer.id),
+    })),
     messages: ensureStatecraft(world).messages.slice(-40),
     institutions: world.historical?.societies,
     recentHistory: world.events.slice(0, 12),

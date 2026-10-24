@@ -34,13 +34,15 @@ import {
   dateLabel,
 } from './sim/types'
 import { parseSave } from './sim/persistence'
+import { AutosaveClient } from './storage/client'
+import { LEGACY_SAVE_KEY, LatestSaveQueue } from './storage/autosave'
+import { MAX_SAVE_BYTES } from './storage/save-types'
 import type { AgentServiceStatus } from './sim/statecraft-types'
 import type { StorytellerStatus } from './sim/history-types'
 import { WorldMap } from './components/WorldMap'
 import { Inspector, TAB_INFO, FlagMark, compact, type Tab } from './components/Inspector'
 import './styles.css'
 
-const SAVE_KEY = 'uchrony.world.v1'
 const speedOptions = [1, 4, 12, 60]
 const tabLayer: Partial<Record<Tab, Layer>> = {
   atlas: 'political',
@@ -89,15 +91,23 @@ export default function App() {
   const worker = useRef<Worker | null>(null),
     pending = useRef(false),
     currentWorld = useRef<World | null>(null)
-  const savedHistoricalEvent = useRef(0),
-    savedStatecraftRevision = useRef(0),
-    savedOpportunity = useRef(0)
+  const saveQueue = useRef<LatestSaveQueue | null>(null),
+    lastSavedWorld = useRef<World | null>(null),
+    retryDiskAt = useRef(Infinity),
+    retryRestore = useRef<(() => void) | null>(null)
+  const [startupError, setStartupError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null),
     searchInput = useRef<HTMLInputElement>(null),
     dialogRef = useRef<HTMLDialogElement>(null)
   const notify = useCallback((text: string, error = false) => setToast({ text, error }), [])
   const send = useCallback((data: WorkerRequest) => {
-    if (data.type === 'generate' || data.type === 'load') setPendingDetails([])
+    if (data.type === 'generate' || data.type === 'load') {
+      setPendingDetails([])
+      saveQueue.current?.reset()
+      currentWorld.current = null
+      lastSavedWorld.current = null
+      retryDiskAt.current = Infinity
+    }
     pending.current = true
     setBusy(true)
     worker.current?.postMessage(data)
@@ -143,22 +153,62 @@ export default function App() {
       setRunning(false)
       notify('The simulation worker stopped. Reload to restore your latest autosave.', true)
     }
-    let saved: World | null = null
-    try {
-      const raw = localStorage.getItem(SAVE_KEY)
-      if (raw) saved = parseSave(raw)
-    } catch {
-      setRestoreWarning(
-        'The previous autosave could not be restored. A new world has been created; import a valid exported save to recover another world.',
-      )
+    const storage = new AutosaveClient()
+    const queue = new LatestSaveQueue(
+      (snapshot) => {
+        setSavedAt('Saving…')
+        return storage.save(snapshot)
+      },
+      (result) => {
+        if (result.error) {
+          setSavedAt('Autosave will retry')
+          setRestoreWarning(result.error)
+        } else {
+          lastSavedWorld.current = result.world
+          retryDiskAt.current = result.source === 'browser' ? Date.now() + 15000 : Infinity
+          setSavedAt(
+            `Saved ${dateLabel(result.world)} · ${result.source === 'disk' ? 'local disk' : 'browser database'}`,
+          )
+          setRestoreWarning(null)
+        }
+      },
+    )
+    saveQueue.current = queue
+    const restore = async () => {
+      setStartupError(null)
+      let legacy: string | null = null
+      try {
+        legacy = localStorage.getItem(LEGACY_SAVE_KEY)
+      } catch {
+        /* A disk or database save can still restore. */
+      }
+      try {
+        const saved = await storage.restore(legacy)
+        if (worker.current !== instance) return
+        if (saved.world) {
+          send({ type: 'load', world: saved.world })
+          setSavedAt('Autosave restored')
+        } else send({ type: 'generate', seed: 'A world unwritten' })
+      } catch (error) {
+        if (worker.current === instance)
+          setStartupError(
+            error instanceof Error
+              ? error.message
+              : 'Could not restore the saved world. Existing saves have been kept.',
+          )
+      }
     }
-    if (saved) {
-      send({ type: 'load', world: saved })
-      setSavedAt('Autosave restored')
-    } else send({ type: 'generate', seed: 'A world unwritten' })
+    retryRestore.current = () => {
+      void restore()
+    }
+    void restore()
     return () => {
+      queue.reset()
+      storage.dispose()
       instance.terminate()
       worker.current = null
+      saveQueue.current = null
+      retryRestore.current = null
     }
   }, [notify, send])
 
@@ -179,43 +229,22 @@ export default function App() {
       setNation(world.nations.find((n) => n.population > 0)?.id ?? 0)
   }, [world, region, nation])
   useEffect(() => {
-    if (!world) return
-    const historicalEvent = world.events.find((event) => event.historical)?.id ?? 0
-    if (
-      running &&
-      world.month % 12 !== 0 &&
-      (world.historical?.opportunity?.id ?? 0) === savedOpportunity.current &&
-      historicalEvent === savedHistoricalEvent.current &&
-      (world.statecraft?.revision ?? 0) === savedStatecraftRevision.current
-    )
-      return
-    const timeout = window.setTimeout(
-      () => {
-        try {
-          localStorage.setItem(SAVE_KEY, JSON.stringify(world))
-          savedHistoricalEvent.current = historicalEvent
-          savedStatecraftRevision.current = world.statecraft?.revision ?? 0
-          savedOpportunity.current = world.historical?.opportunity?.id ?? 0
-          setSavedAt(`Saved ${dateLabel(world)}`)
-        } catch {
-          setSavedAt('Autosave unavailable')
-          setRestoreWarning('Browser storage is full or unavailable. Export your world to keep it.')
-        }
-      },
-      running ? 0 : 350,
-    )
-    return () => clearTimeout(timeout)
-  }, [world, running])
-  useEffect(() => {
     const persist = () => {
-      try {
-        if (currentWorld.current) localStorage.setItem(SAVE_KEY, JSON.stringify(currentWorld.current))
-      } catch {
-        /* Export remains available when browser storage is full. */
-      }
+      const latest = currentWorld.current
+      if (latest && (latest !== lastSavedWorld.current || Date.now() >= retryDiskAt.current))
+        void saveQueue.current?.enqueue(latest)
     }
+    const visibility = () => {
+      if (document.visibilityState === 'hidden') persist()
+    }
+    const interval = window.setInterval(persist, 2000)
     window.addEventListener('pagehide', persist)
-    return () => window.removeEventListener('pagehide', persist)
+    document.addEventListener('visibilitychange', visibility)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('pagehide', persist)
+      document.removeEventListener('visibilitychange', visibility)
+    }
   }, [])
   useEffect(() => {
     if (!toast) return
@@ -305,7 +334,7 @@ export default function App() {
   }
   const importWorld = async (file: File) => {
     try {
-      if (file.size > 20_000_000) throw new Error('Choose a world save smaller than 20 MB.')
+      if (file.size > MAX_SAVE_BYTES) throw new Error('Choose a world save smaller than 128 MiB.')
       const restored = parseSave(await file.text())
       setRunning(false)
       setNation(0)
@@ -323,7 +352,39 @@ export default function App() {
         <Brand />
         <LoaderCircle className="spin" size={22} />
         <h1>Drawing a world into existence.</h1>
-        <p>Raising continents. Settling provinces. Setting history in motion.</p>
+        {!startupError && <p>Raising continents. Settling provinces. Setting history in motion.</p>}
+        {startupError && (
+          <>
+            <p role="alert">{startupError}</p>
+            <button className="button primary" onClick={() => retryRestore.current?.()}>
+              Retry restoring saved world
+            </button>
+            <button className="button" onClick={() => fileInput.current?.click()}>
+              Import a backup
+            </button>
+            <input
+              hidden
+              type="file"
+              accept=".json,application/json"
+              ref={fileInput}
+              aria-label="Import a backup world"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) void importWorld(file)
+                event.target.value = ''
+              }}
+            />
+            <button
+              className="button"
+              onClick={() => {
+                setStartupError(null)
+                send({ type: 'generate', seed: 'A world unwritten' })
+              }}
+            >
+              Start a new world
+            </button>
+          </>
+        )}
         {toast?.error && <p role="alert">{toast.text}</p>}
       </div>
     )
@@ -460,6 +521,14 @@ export default function App() {
         <div className="warning-banner" role="alert">
           <Info size={15} />
           <span>{restoreWarning}</span>
+          <button
+            className="text-button"
+            onClick={() => {
+              if (currentWorld.current) void saveQueue.current?.enqueue(currentWorld.current)
+            }}
+          >
+            Retry save
+          </button>
           <button aria-label="Dismiss storage warning" onClick={() => setRestoreWarning(null)}>
             <X size={14} />
           </button>
@@ -832,7 +901,7 @@ export default function App() {
               <div>
                 <Download size={18} />
                 <span>
-                  <strong>Keep an alternate history</strong>Autosaves stay in this browser. Export a world to
+                  <strong>Keep an alternate history</strong>Autosaves stay on this computer. Export a world to
                   preserve its geography, history, and exact random state.
                 </span>
               </div>

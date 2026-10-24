@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.uchrony/
 *.tsbuildinfo
 .impeccable/review/
 .impeccable/mocks/

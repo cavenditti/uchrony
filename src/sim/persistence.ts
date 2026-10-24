@@ -5,6 +5,7 @@ import { validateStatecraft } from './statecraft-persistence'
 import { validatePopulation } from './population-persistence'
 import { validateCharacters } from './character-persistence'
 import { validateWarfare } from './military-persistence'
+import { MAX_SAVE_BYTES } from '../storage/save-types'
 
 /** Validates untrusted save files before they enter the simulation worker. */
 export function validateWorld(value: unknown): World {
@@ -432,8 +433,8 @@ export function validateWorld(value: unknown): World {
 }
 
 export function parseSave(text: string): World {
-  if (text.length > 20_000_000)
-    throw new Error('This save is too large. Choose an Uchrony save smaller than 20 MB.')
+  if (text.length > MAX_SAVE_BYTES)
+    throw new Error('This save is too large. Choose an Uchrony save smaller than 128 MiB.')
   let value: unknown
   try {
     value = JSON.parse(text)

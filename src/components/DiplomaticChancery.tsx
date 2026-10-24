@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { dateLabel, type World } from '../sim/types'
 import type { DiplomaticClause, AgentServiceStatus } from '../sim/statecraft-types'
+import { visibleAgreement } from '../sim/agreement-references'
+import { AgreementReference, AgreementText } from './AgreementReference'
 
 function describe(world: World, term: DiplomaticClause) {
   const from = world.nations[term.from]?.shortName ?? 'New state',
@@ -43,14 +45,19 @@ export function DiplomaticChancery({
   status: AgentServiceStatus
   onReview: (nation: number) => void
 }) {
-  const [confidential, setConfidential] = useState(false),
-    state = world.statecraft,
+  const [confidentialFor, setConfidentialFor] = useState<number | null>(null)
+  const [navigation, setNavigation] = useState({ scope: '', ids: [] as number[], position: -1 })
+  const selectedRef = useRef<HTMLElement>(null),
+    agreementsHeading = useRef<HTMLHeadingElement>(null)
+  const confidential = confidentialFor === nation,
+    scope = `${nation}:${confidential}`
+  const state = world.statecraft,
     agent = state?.agents.find((entry) => entry.nation === nation),
     offers =
       state?.offers
         .filter((offer) => offer.visibility === 'public' || (confidential && offer.parties.includes(nation)))
-        .slice(-12)
-        .reverse() ?? [],
+        .sort((a, b) => b.month - a.month || b.id - a.id)
+        .slice(0, 12) ?? [],
     messages =
       state?.messages
         .filter(
@@ -61,6 +68,29 @@ export function DiplomaticChancery({
         .slice(-12)
         .reverse() ?? [],
     working = status.active.find((job) => job.nation === nation)
+  const selected =
+    navigation.scope === scope
+      ? visibleAgreement(state?.offers ?? [], navigation.ids[navigation.position], nation, confidential)
+      : undefined
+  const documents = selected ? [selected, ...offers.filter((offer) => offer.id !== selected.id)] : offers
+  useEffect(() => {
+    if (!selected) return
+    selectedRef.current?.focus({ preventScroll: true })
+    selectedRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [selected?.id])
+  const onOpen = (id: number) => {
+    if (!visibleAgreement(state?.offers ?? [], id, nation, confidential)) return
+    setNavigation((previous) => {
+      if (previous.scope === scope && previous.ids[previous.position] === id) return previous
+      const ids = [
+        ...(previous.scope === scope ? previous.ids.slice(0, previous.position + 1) : []),
+        id,
+      ].slice(-40)
+      return { scope, ids, position: ids.length - 1 }
+    })
+  }
+  const referenceProps = { world, nation, confidential, onOpen }
+  const text = (value: string) => <AgreementText {...referenceProps} text={value} />
   return (
     <section className="diplomatic-chancery">
       <h3>State agency</h3>
@@ -72,7 +102,7 @@ export function DiplomaticChancery({
       </p>
       {agent && (
         <>
-          <p className="agent-assessment">{agent.assessment}</p>
+          <p className="agent-assessment">{text(agent.assessment)}</p>
           <div className="data-row">
             <span>Last strategic review</span>
             <b>
@@ -90,20 +120,20 @@ export function DiplomaticChancery({
         <input
           type="checkbox"
           checked={confidential}
-          onChange={(event) => setConfidential(event.target.checked)}
+          onChange={(event) => setConfidentialFor(event.target.checked ? nation : null)}
         />
         Inspect this state's confidential archive
       </label>
       {confidential && agent && (
         <details className="agent-private-plan">
           <summary>Private strategy and institutional record</summary>
-          <p>{agent.strategy}</p>
+          <p>{text(agent.strategy)}</p>
           <ul>
             {agent.goals.map((goal, index) => (
-              <li key={index}>{goal}</li>
+              <li key={index}>{text(goal)}</li>
             ))}
           </ul>
-          <p>{agent.memory}</p>
+          <p>{text(agent.memory)}</p>
           <small>
             Institutional compliance: {agent.integrity}/100 ·{' '}
             {agent.lastModel || 'Awaiting first deliberation'}
@@ -112,34 +142,79 @@ export function DiplomaticChancery({
             .filter((entry) => entry.nation === nation)
             .slice(0, 3)
             .map((entry) => (
-              <p key={entry.id}>{entry.message}</p>
+              <p key={entry.id}>{text(entry.message)}</p>
             ))}
         </details>
       )}
-      <h4>Agreements and proposals</h4>
+      <h4 ref={agreementsHeading} tabIndex={-1}>
+        Agreements and proposals
+      </h4>
       {!offers.length && <p className="panel-note">No diplomatic proposals have been recorded yet.</p>}
-      {offers.map((offer) => (
-        <article className="diplomatic-document" key={offer.id}>
+      {documents.map((offer) => (
+        <article
+          className={`diplomatic-document ${selected?.id === offer.id ? 'referenced-agreement' : ''}`}
+          id={`agreement-${offer.id}`}
+          key={offer.id}
+          ref={selected?.id === offer.id ? selectedRef : undefined}
+          tabIndex={selected?.id === offer.id ? -1 : undefined}
+        >
+          {selected?.id === offer.id && (
+            <nav className="agreement-navigation" aria-label="Agreement reference history">
+              <button
+                className="text-button"
+                disabled={navigation.position < 1}
+                onClick={() => setNavigation({ ...navigation, position: navigation.position - 1 })}
+              >
+                Back
+              </button>
+              <button
+                className="text-button"
+                disabled={navigation.position >= navigation.ids.length - 1}
+                onClick={() => setNavigation({ ...navigation, position: navigation.position + 1 })}
+              >
+                Forward
+              </button>
+              <button
+                className="text-button"
+                onClick={() => {
+                  setNavigation({ scope, ids: [], position: -1 })
+                  agreementsHeading.current?.focus({ preventScroll: true })
+                }}
+              >
+                Close reference
+              </button>
+            </nav>
+          )}
           <div>
             <small>
               {offer.visibility === 'secret' ? 'Confidential' : 'Public'} · {offer.status}
             </small>
             <time>{dateLabel({ month: offer.month, startYear: world.startYear })}</time>
           </div>
-          <h5>{offer.title}</h5>
+          <h5>{text(offer.title)}</h5>
           <p>{offer.parties.map((id) => world.nations[id].shortName).join(' · ')}</p>
-          <details>
+          {!!offer.supersedes && (
+            <p className="agreement-relationship">
+              Revises <AgreementReference {...referenceProps} id={offer.supersedes} />
+            </p>
+          )}
+          <details open={selected?.id === offer.id ? true : undefined}>
             <summary>Terms and adjudication</summary>
             <ul>
               {offer.terms.map((term, index) => (
-                <li key={index}>{describe(world, term)}</li>
+                <li key={index}>
+                  {text(describe(world, term))}
+                  {term.text && !describe(world, term).includes(term.text) && (
+                    <small className="agreement-clause-note">{text(term.text)}</small>
+                  )}
+                </li>
               ))}
             </ul>
             <p>
               Accepted by{' '}
               {offer.signatures.map((signature) => world.nations[signature.nation].shortName).join(', ')}.
             </p>
-            {offer.ruling && <p className="referee-explanation">Referee: {offer.ruling}</p>}
+            {offer.ruling && <p className="referee-explanation">Referee: {text(offer.ruling)}</p>}
             {offer.breaches > 0 && <small>Recorded obligation shortfalls: {offer.breaches}</small>}
           </details>
         </article>
@@ -152,12 +227,17 @@ export function DiplomaticChancery({
             <small>{message.visibility === 'secret' ? 'Confidential' : 'Public'}</small>
             <time>{dateLabel({ month: message.month, startYear: world.startYear })}</time>
           </div>
-          <h5>{message.subject}</h5>
+          <h5>{text(message.subject)}</h5>
           <p className="message-parties">
             {world.nations[message.from].shortName} →{' '}
             {message.to.map((id) => world.nations[id].shortName).join(', ')}
           </p>
-          <p>{message.body}</p>
+          <p>{text(message.body)}</p>
+          {!!message.offer && (
+            <p className="agreement-relationship">
+              Regarding <AgreementReference {...referenceProps} id={message.offer} />
+            </p>
+          )}
         </article>
       ))}
       {!!status.error && (

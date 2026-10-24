@@ -58,7 +58,7 @@ Keyboard shortcuts: **Space** play/pause, **1–4** speed, **L** cycle layers, *
 | Warfare and navy | Armies carry provisions and arms, use capacity-limited supply lines, accumulate fatigue, entrench and interact with civilians. Troop identities, shared language, loyalty, pay and provisioning affect cohesion, desertion and disorder. Actual population levies defend provinces. Funded warships and transports have crews, hull condition, provisions, ammunition, water-only courses, sea battles, escorts and blockades. Overseas troops need embarkation, transport berths and landings. |
 | Research | Agriculture, industry, medicine, logistics, military, and governance, with six implemented levels each. Funding and literacy generate knowledge; changing focus preserves progress. |
 | Historical causation | Required contextual OpenRouter generation: succession, discoveries, literature, beliefs, institutions, social movements, commerce, disasters and diplomacy. Immediate changes, delayed and fading effects, policy-driven government responses, conditional follow-ups, leadership and cultural memory. Existing physical-system events still record climate, shortages, wars and discoveries. |
-| Persistence | Versioned JSON exports, strict import validation, recorded historical effects and pending generation, browser autosaves, recent monthly history, older annual history, and the latest 240 chronicle entries. |
+| Persistence | Versioned JSON exports, strict import validation, recorded effects and pending generation, background disk autosaves with a verified previous copy, IndexedDB fallback, legacy browser-save recovery, recent monthly history, older annual history, and the latest 240 chronicle entries. |
 
 ### A few causal chains
 
