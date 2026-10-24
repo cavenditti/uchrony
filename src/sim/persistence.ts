@@ -1,3 +1,4 @@
+import { validatePressures } from './pressure-persistence'
 import { GOODS, FIELDS, type World, type RouteLeg } from './types'
 import { neighbors } from './hex'
 import { validateHistoryState, validateHistoricalRecord } from './history-schema'
@@ -78,6 +79,8 @@ export function validateWorld(value: unknown): World {
   }
   const seenCells = new Set<number>()
   for (const [i, r] of w.regions.entries()) {
+    if (r.materialCoverage !== undefined && !number(r.materialCoverage, 0, 1))
+      fail('invalid material coverage')
     if (
       !object(r) ||
       r.id !== i ||
@@ -399,6 +402,7 @@ export function validateWorld(value: unknown): World {
       if (e.historical.causeEvent >= e.id) fail('historical cause must precede its consequence')
     }
   }
+  validatePressures(w)
   if (w.historical !== undefined) validateHistoryState(w, w.historical)
   validateWarfare(w, validateLegs)
   validateStatecraft(w)

@@ -1,3 +1,5 @@
+import { DEFAULT_SETTINGS, simulationSettings, type SimulationSettings } from './sim/settings'
+import { SimulationConditions } from './components/SimulationConditions'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Play,
@@ -64,12 +66,14 @@ export default function App() {
     [showArmies, setShowArmies] = useState(false)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null),
     [busy, setBusy] = useState(false)
-  const [modal, setModal] = useState<'new' | 'help' | null>(null),
+  const [modal, setModal] = useState<'new' | 'help' | 'conditions' | null>(null),
     [stateSearch, setStateSearch] = useState(''),
     [showStates, setShowStates] = useState(false)
   const [seed, setSeed] = useState('A world unwritten'),
     [continents, setContinents] = useState(3),
     [nationCount, setNationCount] = useState(8)
+  const [conditions, setConditions] = useState<SimulationSettings>({ ...DEFAULT_SETTINGS }),
+    [newConditions, setNewConditions] = useState<SimulationSettings>({ ...DEFAULT_SETTINGS })
   const [focus, setFocus] = useState<{ region: number; key: number } | null>(null),
     [orderedArmy, setOrderedArmy] = useState<number | null>(null)
   const [savedAt, setSavedAt] = useState('Not saved yet'),
@@ -213,15 +217,8 @@ export default function App() {
   }, [notify, send])
 
   useEffect(() => {
-    if (!running) return
-    const interval = window.setInterval(
-      () => {
-        if (!pending.current) send({ type: 'step', count: speed === 60 ? 12 : speed === 12 ? 3 : 1 })
-      },
-      speed === 1 ? 1000 : speed === 4 ? 250 : speed === 12 ? 250 : 200,
-    )
-    return () => window.clearInterval(interval)
-  }, [running, speed, send])
+    worker.current?.postMessage({ type: 'playback', running, speed } satisfies WorkerRequest)
+  }, [running, speed])
   useEffect(() => {
     if (!world) return
     if (region !== null && world.regions[region]) setNation(world.regions[region].nation)
@@ -405,6 +402,18 @@ export default function App() {
           <span className="world-type">Generated world</span>
         </div>
         <div className="header-actions">
+          <button
+            className="icon-button"
+            title="Simulation conditions"
+            aria-label="Simulation conditions"
+            onClick={() => {
+              setRunning(false)
+              setConditions({ ...simulationSettings(world) })
+              setModal('conditions')
+            }}
+          >
+            <Settings2 size={18} />
+          </button>
           <button
             className="icon-button"
             aria-label="How the simulation works"
@@ -820,6 +829,7 @@ export default function App() {
                 seed: seed.trim() || 'A world unwritten',
                 continents,
                 nations: nationCount,
+                settings: newConditions,
               })
               setModal(null)
             }}
@@ -859,6 +869,7 @@ export default function App() {
                 </select>
               </label>
             </div>
+            <SimulationConditions value={newConditions} onChange={setNewConditions} />
             <p className="panel-note">
               The same seed and settings create the same world. This replaces your current world; export it
               first to keep a copy.
@@ -867,6 +878,39 @@ export default function App() {
               <Plus size={16} />
               Generate world
             </button>
+          </form>
+        ) : modal === 'conditions' ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              send({ type: 'command', command: { type: 'conditions', settings: conditions } })
+              setModal(null)
+            }}
+          >
+            <Settings2 className="dialog-symbol" size={34} strokeWidth={1} />
+            <h2 id="dialog-title">Conditions of history.</h2>
+            <p>
+              Shape the pressures governments and households must respond to. These conditions are saved with
+              this world.
+            </p>
+            <SimulationConditions value={conditions} onChange={setConditions} />
+            <button className="button primary full" type="submit">
+              Apply conditions
+            </button>
+            {!!world.pressures?.incidents.length && (
+              <div className="conditions-incidents">
+                <h3>Recent pressures</h3>
+                {world.pressures.incidents.slice(0, 5).map((incident) => (
+                  <p key={incident.id}>
+                    <strong>{incident.title}</strong>
+                    <br />
+                    <small>
+                      {incident.scope} · {incident.expires > world.month ? 'Ongoing' : 'Aftermath'}
+                    </small>
+                  </p>
+                ))}
+              </div>
+            )}
           </form>
         ) : (
           <>

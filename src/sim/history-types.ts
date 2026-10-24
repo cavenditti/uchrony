@@ -1,3 +1,4 @@
+import type { HistoryPattern } from './history-repertoire'
 export const HISTORY_CATEGORIES = [
   'succession',
   'discovery',
@@ -143,6 +144,7 @@ export interface HistoricalState {
   nextRoll: number
   nextId: number
   opportunity: HistoricalOpportunity | null
+  repertoire?: HistoryPattern[]
   prepared?: { proposal: HistoricalProposal; model: string; received: number; requested: number }[]
   effects: ActiveHistoricalEffect[]
   scheduled: {

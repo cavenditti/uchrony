@@ -1,3 +1,5 @@
+import { strategicPressures } from './ambitions'
+import { simulationSettings } from './settings'
 import { ensurePopulation, returnArmyPeople, identityDistribution } from './population'
 import { populationIdentitySummary } from './identities'
 import { characterContext } from './character'
@@ -801,6 +803,8 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
     month: world.month,
     nation,
     strategic,
+    simulationConditions: simulationSettings(world),
+    strategicLandscape: strategicPressures(world, n),
     government,
     character: characterContext(n),
     agent: {
@@ -819,6 +823,10 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
         name: region.name,
         people: population(region),
         food: region.foodCoverage,
+        materialCoverage: region.materialCoverage ?? 1,
+        production: region.production,
+        consumption: region.consumption,
+        deposits: region.deposits,
         unrest: region.unrest,
         infrastructure: region.infrastructure,
         industry: region.industry,

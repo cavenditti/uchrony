@@ -102,13 +102,14 @@ test('different province connections and opposing cargo share the same tile capa
   const world = corridorWorld(['AAABBBBBBBBBBB', 'AAABBBBBBBBBBB', 'CCCBBBBBBBBBBB'])
   world.regions[1].center = 13
   world.regions[0].population.adults = 100000
-  world.regions[1].population.adults = 1000000
+  // Household coal maintenance is a fraction of raw industrial demand; keep this buyer large enough to saturate the trunk.
+  world.regions[1].population.adults = 4000000
   for (const region of world.regions)
     for (const good of GOODS) region.stocks[good] = reserveTarget(region, good)
   world.regions[0].stocks.coal += 1000
   world.regions[2].stocks.coal += 1000000
   world.regions[1].stocks.coal = 0
-  world.regions[1].stocks.timber += 2000
+  world.regions[1].stocks.timber += reserveTarget(world.regions[1], 'timber') * 0.2
   world.regions[0].stocks.timber -= 500
   const profile = corridorProfile(world),
     stocks = GOODS.map((good) => world.regions.reduce((sum, region) => sum + region.stocks[good], 0))

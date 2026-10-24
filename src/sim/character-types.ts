@@ -1,3 +1,4 @@
+import type { PoliticalAmbition } from './ambitions'
 import type { ModifierStat } from './history-types'
 
 export const CHARACTER_AXES = [
@@ -13,6 +14,7 @@ export type Attitudes = Record<CharacterAxis, number>
 export const LEADER_SKILLS = ['administration', 'diplomacy', 'logistics', 'scholarship', 'command'] as const
 export type LeaderSkill = (typeof LEADER_SKILLS)[number]
 export interface LeaderCharacter {
+  politics?: PoliticalAmbition
   name: string
   since: number
   generation: number

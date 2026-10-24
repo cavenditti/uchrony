@@ -1,3 +1,4 @@
+import { Playback } from './playback'
 import { ensurePopulation } from './population'
 import { ensureWarfare } from './navy'
 import { generateWorld } from './generate'
@@ -33,11 +34,15 @@ let models = {
   strategyModel: 'deepseek/deepseek-v4.1-flash',
   refereeModel: 'deepseek/deepseek-v4.1-flash',
 }
-const detailQueue = new Map<number, World>(),
-  strategicSignals = new Map<number, string>()
+const detailQueue = new Map<number, World>()
 const jobs = new Map<string, Job>(),
   retryAt = new Map<string, number>(),
-  lastStrategy = new Map<number, number>()
+  lastStrategy = new Map<number, number>(),
+  lastLaunch = new Map<string, number>(),
+  decisionSignals = new Map<number, string>()
+let nextBackgroundAt = 0,
+  lastHistoryMonth = -Infinity,
+  backgroundPublish: ReturnType<typeof setTimeout> | undefined
 let agentError = ''
 const send = (message: WorkerResponse) => self.postMessage(message)
 const status = (state: StorytellerStatus['state'], message: string) =>
@@ -53,6 +58,10 @@ function agentStatus() {
   send({ type: 'agents', status: { pending: jobs.size, active, ...models, error: agentError } })
 }
 function publish(message?: string, acknowledgement = false) {
+  if (acknowledgement) {
+    clearTimeout(backgroundPublish)
+    backgroundPublish = undefined
+  }
   if (world) send({ type: 'world', world, message, acknowledgement })
 }
 async function connection() {
@@ -80,11 +89,24 @@ async function connection() {
     return false
   }
 }
+const playback = new Playback(
+  () => {
+    if (world) tick(world)
+  },
+  () => publish(),
+  (error) => send({ type: 'error', message: error instanceof Error ? error.message : 'Simulation stopped.' }),
+)
 function reset() {
+  playback.stop()
   for (const job of jobs.values()) job.controller.abort()
   jobs.clear()
   detailQueue.clear()
-  strategicSignals.clear()
+  decisionSignals.clear()
+  lastLaunch.clear()
+  nextBackgroundAt = 0
+  lastHistoryMonth = -Infinity
+  clearTimeout(backgroundPublish)
+  backgroundPublish = undefined
   retryAt.clear()
   lastStrategy.clear()
   agentError = ''
@@ -100,6 +122,9 @@ async function launch(
   if (!world || jobs.has(key) || jobs.size >= 4 || (retryAt.get(key) ?? 0) > Date.now()) return
   const job: Job = { key, role, nation, since: world.month, world, controller: new AbortController() }
   jobs.set(key, job)
+  lastLaunch.set(key, Date.now())
+  if (role !== 'details') nextBackgroundAt = Date.now() + 5000
+  if (role === 'history') lastHistoryMonth = world.month
   agentStatus()
   if (role === 'history') status('generating', 'A historical account is being developed in the background.')
   const endpoint =
@@ -139,7 +164,12 @@ async function launch(
     if (role === 'strategy') lastStrategy.set(nation, Date.now())
     if (role === 'history') status('ready', 'A historical draft is ready for a suitable moment.')
     if (role === 'details') send({ type: 'event-detail', event: Number(key.split(':')[1]), state: 'done' })
-    publish()
+    // Coalesce completions; never serialize a multi-megabyte world once per agent reply.
+    if (!backgroundPublish)
+      backgroundPublish = setTimeout(() => {
+        backgroundPublish = undefined
+        if (!playback.running) publish()
+      }, 500)
   } catch (error) {
     if (job.controller.signal.aborted || world !== job.world) return
     const message = error instanceof Error ? error.message : 'Model request failed.'
@@ -164,8 +194,15 @@ async function launch(
 function schedule() {
   if (!world || !connected) return
   const current = world,
+    now = Date.now(),
+    eligible = (key: string, interval: number) =>
+      !jobs.has(key) &&
+      jobs.size < 4 &&
+      now >= (retryAt.get(key) ?? 0) &&
+      now - (lastLaunch.get(key) ?? -Infinity) >= interval &&
+      now >= nextBackgroundAt,
     opportunity = world.historical?.opportunity
-  if (opportunity && !jobs.has('history'))
+  if (opportunity && current.month >= lastHistoryMonth + 24 && eligible('history', 90000))
     void launch('history', 'history', -1, historicalContext(current), (value, model) => {
       receiveHistoricalEvent(current, opportunity.id, value, model)
     })
@@ -201,14 +238,17 @@ function schedule() {
   const ready = readyOffers(current)
     .filter((offer) => (offer.reviewAfter ?? 0) <= current.month)
     .slice(0, 6)
-  if (ready.length && !jobs.has('referee') && jobs.size < 4 && (retryAt.get('referee') ?? 0) <= Date.now()) {
+  if (ready.length && eligible('referee', 5000)) {
     const submitted = ready.map((offer) => ({ id: offer.id, digest: offer.digest }))
     ready.forEach((offer) => (offer.reviewAfter = current.month + 3))
     void launch('referee', 'referee', -1, refereeContext(current, ready), (value, model) =>
       acceptRefereeDecision(current, value, submitted, model),
     )
   }
-  for (const agent of ensureStatecraft(current).agents) {
+  for (const agent of [...ensureStatecraft(current).agents].sort(
+    (a, b) =>
+      (lastLaunch.get(`state:${a.nation}`) ?? -Infinity) - (lastLaunch.get(`state:${b.nation}`) ?? -Infinity),
+  )) {
     if (jobs.size >= 4) break
     if (
       !current.regions.some((region) => region.nation === agent.nation) ||
@@ -216,20 +256,41 @@ function schedule() {
     )
       continue
     if (current.month < agent.nextDecision && agent.lastDecision === 0) continue
-    const urgent =
-        /New diplomatic|negotiation requires|Strategic review requested|Decision model requests|wartime/.test(
-          agent.escalation,
-        ),
-      signal = `${agent.escalation}:${Math.max(0, ...current.statecraft!.messages.filter((message) => message.to.includes(agent.nation)).map((message) => message.id))}:${Math.max(0, ...current.statecraft!.offers.filter((offer) => offer.parties.includes(agent.nation)).map((offer) => offer.id))}`
-    if (urgent && strategicSignals.get(agent.nation) !== signal) {
-      lastStrategy.delete(agent.nation)
-      retryAt.delete(`state:${agent.nation}`)
-      strategicSignals.set(agent.nation, signal)
-    }
-    const full =
-      (!!agent.escalation || current.month >= agent.nextStrategy) &&
-      Date.now() - (lastStrategy.get(agent.nation) ?? 0) >= 30000
+    const key = `state:${agent.nation}`
+    // Check budgets BEFORE building census, map, agreements and prompts. Clock speed never raises request rate.
+    if (!eligible(key, 30000)) continue
+    const requestedByObserver = agent.escalation === 'Strategic review requested by the observer.',
+      newCrisis = current.pressures?.incidents.some(
+        (incident) =>
+          incident.nations.includes(agent.nation) &&
+          incident.month > agent.lastStrategy &&
+          incident.expires > current.month,
+      ),
+      full =
+        requestedByObserver ||
+        ((!!agent.escalation || current.month >= agent.nextStrategy) &&
+          now - (lastStrategy.get(agent.nation) ?? -Infinity) >= (newCrisis ? 60000 : 120000))
     if (!full && current.month < agent.nextDecision) continue
+    const nation = current.nations[agent.nation],
+      signal = JSON.stringify([
+        Math.floor(nation.foodCoverage * 5),
+        Math.floor(nation.stability / 15),
+        nation.treasury < 0,
+        nation.character?.leader.generation,
+        current.relations
+          .filter((rel) => (rel.a === agent.nation || rel.b === agent.nation) && rel.treaty === 'war')
+          .map((rel) => [rel.a, rel.b]),
+        current.statecraft!.messages.filter((message) => message.to.includes(agent.nation)).at(-1)?.id,
+        current
+          .statecraft!.offers.filter(
+            (offer) => offer.parties.includes(agent.nation) && offer.status === 'proposed',
+          )
+          .map((offer) => offer.id),
+        agent.escalation,
+      ])
+    if (!full && decisionSignals.get(agent.nation) === signal && current.month < agent.lastDecision + 24)
+      continue
+    decisionSignals.set(agent.nation, signal)
     const context = stateAgentContext(current, agent.nation, full),
       requested = current.month
     void launch(
@@ -254,10 +315,18 @@ function schedule() {
 }
 self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
   try {
+    if (data.type === 'playback') {
+      if (world && data.running) playback.start(data.speed)
+      else {
+        playback.stop()
+        publish()
+      }
+      return
+    }
     let message: string | undefined
     if (data.type === 'generate') {
       reset()
-      world = generateWorld(data.seed, data.continents, data.nations)
+      world = generateWorld(data.seed, data.continents, data.nations, data.settings)
       ensurePopulation(world)
       ensureHistory(world)
       ensureStatecraft(world)
@@ -282,6 +351,8 @@ self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
       summarize(world, false)
     } else if (data.type === 'retry-history') {
       retryAt.clear()
+      lastLaunch.clear()
+      nextBackgroundAt = 0
       agentError = ''
       void connection().then(schedule)
     } else if (data.type === 'agent-strategy') {
@@ -291,6 +362,7 @@ self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
         agent.nextDecision = world!.month
         retryAt.delete(`state:${data.nation}`)
         lastStrategy.delete(data.nation)
+        lastLaunch.delete(`state:${data.nation}`)
       }
     } else if (data.type === 'event-details') {
       const current = world,

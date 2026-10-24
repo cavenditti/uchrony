@@ -1,3 +1,5 @@
+import { ensureAmbition } from './ambitions'
+import { simulationSettings } from './settings'
 import {
   CHARACTER_AXES,
   LEADER_SKILLS,
@@ -275,7 +277,13 @@ function makeLeader(
   const profile = governmentProfile(nation.government)
   const temperament = attitudes(
     CHARACTER_AXES.map((axis, i) =>
-      clamp(0.08 + random(rng) * 0.68 + popular[axis] * 0.14 + profile.values[i] * 0.1),
+      clamp(
+        0.5 +
+          (random(rng) ** (random(rng) < 0.5 ? 0.35 : 2.8) - 0.5) *
+            (0.45 + simulationSettings(world).extremity * 0.65) +
+          (popular[axis] - 0.5) * 0.1 +
+          (profile.values[i] - 0.5) * 0.1,
+      ),
     ),
   )
   const skills = Object.fromEntries(LEADER_SKILLS.map((skill) => [skill, 0.2 + random(rng) * 0.6])) as Record<
@@ -333,7 +341,10 @@ function derive(character: StateCharacter) {
     { score: 1 - a.patience, name: 'impetuous', aim: 'Seize opportunities before rivals can respond' },
   ].sort((x, y) => y.score - x.score)
   character.title = `${styles[0].name[0].toUpperCase()}${styles[0].name.slice(1)} · ${styles[1].name}`
-  character.priorities = styles.slice(0, 3).map((style) => style.aim)
+  character.priorities = [
+    l.politics?.ambition ?? styles[0].aim,
+    ...styles.slice(0, 2).map((style) => style.aim),
+  ]
   const popularStyle = CHARACTER_AXES.map((axis) => ({
     axis,
     distance: Math.abs(character.popular[axis] - 0.5),
@@ -362,22 +373,27 @@ function derive(character: StateCharacter) {
   )
 }
 
-function target(character: StateCharacter) {
+function target(character: StateCharacter, extremity = 1.2) {
   const weights = character.influence
   return attitudes(
-    CHARACTER_AXES.map(
-      (axis) =>
-        character.popular[axis] * weights.people +
-        character.institutions[axis] * weights.institutions +
-        character.leader.attitudes[axis] * weights.leader,
-    ),
+    CHARACTER_AXES.map((axis) => {
+      const blended =
+          character.popular[axis] * weights.people +
+          character.institutions[axis] * weights.institutions +
+          character.leader.attitudes[axis] * weights.leader,
+        conviction = character.leader.politics?.drives.dogmatism ?? 0.5
+      return clamp(0.5 + (blended - 0.5) * (1 + extremity * (0.35 + conviction * 0.4)))
+    }),
   )
 }
 
 /** Idempotent legacy upgrade. No policies or population counts change here. */
 export function ensureCharacters(world: World) {
   for (const nation of world.nations) {
-    if (nation.character) continue
+    if (nation.character) {
+      ensureAmbition(world, nation)
+      continue
+    }
     const society = world.historical?.societies.find((s) => s.nation === nation.id)
     const profile = governmentProfile(nation.government),
       popular = popularAttitudes(world, nation)
@@ -404,9 +420,10 @@ export function ensureCharacters(world: World) {
       priorities: [],
       modifiers: {},
     }
-    character.effective = target(character)
-    derive(character)
     nation.character = character
+    ensureAmbition(world, nation, true)
+    character.effective = target(character, simulationSettings(world).extremity)
+    derive(character)
   }
 }
 
@@ -425,7 +442,7 @@ export function advanceCharacters(world: World) {
       character.institutions[axis] +=
         (profile.values[i] - character.institutions[axis]) * (1 - 0.992 ** elapsed)
     }
-    const goals = target(character)
+    const goals = target(character, simulationSettings(world).extremity)
     for (const axis of CHARACTER_AXES)
       character.effective[axis] += (goals[axis] - character.effective[axis]) * (1 - 0.88 ** elapsed)
     character.updated = world.month
@@ -445,7 +462,8 @@ export function replaceStateLeader(world: World, nationId: number, name: string)
     character.leader.generation + 1,
     character.popular,
   )
-  const goals = target(character)
+  ensureAmbition(world, nation, true)
+  const goals = target(character, simulationSettings(world).extremity)
   for (const axis of CHARACTER_AXES)
     character.effective[axis] += (goals[axis] - character.effective[axis]) * 0.45
   derive(character)
@@ -463,16 +481,17 @@ export function replaceStateLeader(world: World, nationId: number, name: string)
 }
 
 export function characterPolicyTargets(nation: Nation): Policies {
-  const a = nation.character!.effective
+  const a = nation.character!.effective,
+    drives = nation.character!.leader.politics?.drives
   return {
     ...nation.policies,
     tax: Math.round(16 + a.solidarity * 12 + a.centralization * 5),
     welfare: Math.round(8 + a.solidarity * 35),
     education: Math.round(8 + a.openness * 28),
-    military: Math.round(8 + a.assertiveness * 32),
+    military: Math.round(5 + a.assertiveness * 42 + (drives?.dominance ?? 0.5) * 12),
     research: Math.round(6 + a.openness * 26),
     tariff: Math.round(3 + (1 - a.commercialism) * 20),
-    conscription: Number((0.3 + a.assertiveness * 2.2).toFixed(1)),
+    conscription: Number((0.1 + a.assertiveness * 3.1 + (drives?.riskTolerance ?? 0.5) * 0.6).toFixed(1)),
     migration: a.commercialism > 0.55 && a.openness > 0.45 ? 'open' : 'controlled',
     citizenship:
       a.openness > 0.6 && a.solidarity > 0.5

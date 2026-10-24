@@ -1,3 +1,5 @@
+import type { SimulationSettings } from './settings'
+import type { PressureState } from './pressures'
 import type { HistoricalRecord, HistoricalState, StorytellerStatus } from './history-types'
 import type { Statecraft, AgentServiceStatus } from './statecraft-types'
 import type { StateCharacter } from './character-types'
@@ -74,6 +76,7 @@ export interface Region {
   consumption: Inventory
   prices: Inventory
   foodCoverage: number
+  materialCoverage?: number
   migration: number
   births: number
   deaths: number
@@ -214,6 +217,8 @@ export interface HistoryPoint {
 }
 export interface World {
   version: 1
+  simulation?: SimulationSettings
+  pressures?: PressureState
   generatorVersion?: number
   seed: string
   rng: number
@@ -250,6 +255,7 @@ export interface World {
   }
 }
 export type Command =
+  | { type: 'conditions'; settings: SimulationSettings }
   | { type: 'policy'; nation: number; key: keyof Policies; value: Policies[keyof Policies] }
   | { type: 'identity-policy'; nation: number; key: 'culture' | 'language' | 'belief'; identity: number }
   | { type: 'research'; nation: number; field: Research }
@@ -279,8 +285,9 @@ export type Command =
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }
 export type WorkerRequest =
-  | { type: 'generate'; seed: string; continents?: number; nations?: number }
+  | { type: 'generate'; seed: string; continents?: number; nations?: number; settings?: SimulationSettings }
   | { type: 'step'; count: number }
+  | { type: 'playback'; running: boolean; speed: number }
   | { type: 'command'; command: Command }
   | { type: 'load'; world: unknown }
   | { type: 'retry-history' }

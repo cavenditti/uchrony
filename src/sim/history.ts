@@ -1,3 +1,5 @@
+import { simulationSettings } from './settings'
+import { parseHistoryPatterns } from './history-repertoire'
 import { introduceCulturalLegacy, populationIdentitySummary } from './identities'
 import { proceduralEvent } from './history-procedural'
 import { ensureCharacters, replaceStateLeader, characterContext } from './character'
@@ -243,6 +245,25 @@ function record(
   installEffects(world, id, title, region, effectsToInstall, historical.source === 'openrouter')
   return id
 }
+export function recordLocalDevelopment(
+  world: World,
+  category: HistoryCategory,
+  title: string,
+  detail: string,
+  nation: number,
+  region: number,
+  effects: HistoricalEffect[],
+) {
+  return record(world, title, detail, nation, region, {
+    category,
+    source: 'procedural',
+    model: 'structural-pressures',
+    causeEvent: 0,
+    response: '',
+    rationale: '',
+    effects,
+  })
+}
 export function applyRefereeEffects(
   world: World,
   effects: HistoricalEffect[],
@@ -400,11 +421,14 @@ export function advanceHistory(world: World) {
       const opportunity = chooseOpportunity(world)
       if (opportunity) {
         state.opportunity = opportunity
+        const proposal = proceduralEvent(world, opportunity)
         acceptHistoricalEvent(
           world,
           opportunity.id,
-          proceduralEvent(world, opportunity),
-          'local-history',
+          proposal,
+          proposal.patternModel
+            ? `local adaptation: ${proposal.patternModel}`.slice(0, 160)
+            : 'local-history',
           'procedural',
         )
       }
@@ -422,13 +446,21 @@ export function receiveHistoricalEvent(world: World, id: number, input: unknown,
     state.opportunity = null
     return false
   }
-  const proposal = validateHistoricalProposal(world, input)
+  const bundle = input as { event?: unknown; patterns?: unknown },
+    patterns = bundle?.event ? parseHistoryPatterns(bundle.patterns, model) : [],
+    proposal = validateHistoricalProposal(world, bundle?.event ?? input)
   if (
     proposal.nation !== opportunity.nation ||
     proposal.region !== opportunity.region ||
     proposal.category !== opportunity.category
   )
     throw new Error('The generated event does not match its requested context.')
+  const repertoire = new Map((state.repertoire ?? []).map((pattern) => [pattern.name, pattern]))
+  for (const pattern of patterns) {
+    repertoire.delete(pattern.name)
+    repertoire.set(pattern.name, pattern)
+  }
+  state.repertoire = [...repertoire.values()].slice(-64)
   state.prepared!.push({ proposal, model, received: world.month, requested: opportunity.month })
   state.prepared = state.prepared!.slice(-3)
   state.opportunity = null
@@ -514,6 +546,8 @@ export function historicalContext(world: World) {
       happiness: region.happiness,
       unrest: region.unrest,
       foodCoverage: region.foodCoverage,
+      materialCoverage: region.materialCoverage ?? 1,
+      deposits: region.deposits,
       infrastructure: region.infrastructure,
       devastation: region.devastation,
       identities: populationIdentitySummary(world, nation.id, region.id),
@@ -534,6 +568,13 @@ export function historicalContext(world: World) {
         treaty: rel.treaty,
         opinion: rel.opinion,
       })),
+    simulationConditions: simulationSettings(world),
+    currentPressures:
+      world.pressures?.incidents.filter(
+        (incident) => incident.nations.includes(nation.id) && incident.expires > world.month,
+      ) ?? [],
+    repertoireVersion: 1,
+    existingPatterns: (state.repertoire ?? []).map((pattern) => pattern.name),
     recentHistory: world.events
       .filter((entry) => entry.nation === nation.id || entry.historical)
       .slice(0, 12)

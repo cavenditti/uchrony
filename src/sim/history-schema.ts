@@ -1,3 +1,4 @@
+import { parseHistoryPatterns } from './history-repertoire'
 import {
   CHANGE_STATS,
   HISTORY_CATEGORIES,
@@ -389,7 +390,13 @@ export function validateHistoricalRecord(world: World, value: unknown) {
     record.rationale.length > 500
   )
     fail('invalid historical provenance')
-  effects(world, record.effects, 20)
+  effects(
+    world,
+    record.effects,
+    record.source === 'procedural' && record.model === 'structural-pressures'
+      ? Math.max(20, world.regions.length * 2)
+      : 20,
+  )
 }
 export function validateHistoryState(world: World, value: unknown) {
   if (!isObject(value)) fail('invalid historical state')
@@ -471,6 +478,10 @@ export function validateHistoryState(world: World, value: unknown) {
       !text(legacy.name, 180)
     )
       fail('invalid cultural memory')
+  if (state.repertoire !== undefined) {
+    parseHistoryPatterns(state.repertoire, 'saved-repertoire', 64)
+    if (state.repertoire.some((pattern) => !text(pattern.model, 160))) fail('invalid repertoire provenance')
+  }
   if (state.prepared !== undefined) {
     if (!Array.isArray(state.prepared) || state.prepared.length > 3)
       fail('invalid prepared historical accounts')

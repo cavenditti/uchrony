@@ -372,7 +372,8 @@ export function updateCommunityDemography(world: World, region: Region) {
   const nation = world.nations[region.nation],
     mortality = effectMultiplier(world, 'mortality', nation.id, region.id),
     fertility = effectMultiplier(world, 'birthRate', nation.id, region.id),
-    shortage = 1 - region.foodCoverage
+    shortage = 1 - region.foodCoverage,
+    education = effectMultiplier(world, 'education', nation.id, region.id)
   region.births = 0
   region.deaths = 0
   for (const group of region.communities!) {
@@ -392,8 +393,7 @@ export function updateCommunityDemography(world: World, region: Region) {
     group.literacy = clamp(
       group.literacy +
         Math.max(0, region.literacy - group.literacy) * 0.04 * access +
-        ((effectMultiplier(world, 'education', nation.id, region.id) * nation.budget.education) /
-          Math.max(1, nation.population / 10000)) *
+        ((education * nation.budget.education) / Math.max(1, nation.population / 10000)) *
           0.0001 *
           (1 - group.literacy) *
           access,
@@ -628,6 +628,32 @@ export function ageMilitaryPopulation(world: World) {
 }
 
 export function migrateCommunities(world: World) {
+  // Plans are simultaneous: destination communities stay unchanged until every household has chosen.
+  // Marginals give the same affinity as scanning every destination group for every comparison.
+  const destinations = world.regions.map((region) => {
+    const language = new Map<number, number>(),
+      belief = new Map<number, number>(),
+      culture = new Map<number, number>()
+    for (const group of region.communities!) {
+      const size = communitySize(group)
+      for (const [axis, counts] of [
+        ['language', language],
+        ['belief', belief],
+        ['culture', culture],
+      ] as const)
+        counts.set(group[axis], (counts.get(group[axis]) ?? 0) + size)
+    }
+    return {
+      language,
+      belief,
+      culture,
+      people: Math.max(1, population(region)),
+      attraction: effectValue(world, 'migrationAttraction', region.nation, region.id) * 0.2,
+      prestige:
+        (world.historical?.societies.find((society) => society.nation === region.nation)?.prestige ?? 0) /
+        3000,
+    }
+  })
   const sea = new Map<number, Map<number, number>>()
   for (const route of world.routes)
     if (route.sea) {
@@ -657,25 +683,20 @@ export function migrateCommunities(world: World) {
         ),
         refugee = pressure > 0.17,
         appeal = (to: Region) => {
-          const compatible =
-            to.communities!.reduce(
-              (sum, other) =>
-                sum +
-                communitySize(other) *
-                  ((other.language === group.language ? 0.6 : 0) +
-                    (other.belief === group.belief ? 0.2 : 0) +
-                    (other.culture === group.culture ? 0.2 : 0)),
-              0,
-            ) / Math.max(1, population(to))
+          const destination = destinations[to.id],
+            compatible =
+              ((destination.language.get(group.language) ?? 0) * 0.6 +
+                (destination.belief.get(group.belief) ?? 0) * 0.2 +
+                (destination.culture.get(group.culture) ?? 0) * 0.2) /
+              destination.people
           return (
             to.happiness * 0.35 +
             to.health * 0.2 +
             to.foodCoverage * 0.2 +
             to.infrastructure * 0.1 +
             compatible * 0.12 +
-            effectValue(world, 'migrationAttraction', to.nation, to.id) * 0.2 +
-            (world.historical?.societies.find((society) => society.nation === to.nation)?.prestige ?? 0) /
-              3000 -
+            destination.attraction +
+            destination.prestige -
             to.devastation * 0.6 -
             discrimination(world, to, group) * 0.3
           )

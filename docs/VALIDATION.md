@@ -4,6 +4,12 @@ Verified locally on 24 October 2026 using Node 26.11.1 and Chrome for Testing 15
 
 ## Current asynchronous history and statecraft work
 
+The characterization/structural-pressure/scarcity revision adds seven focused checks: deterministic private leader archetypes and both cautious/reckless tails, legacy-person preservation, foreign-profile confidentiality, motive-sensitive native mobilization targets, pressure frequency and all four geographic scopes, conservation of ownership/people during incident creation, exact save continuation, malformed settings/drive/incident rejection, geological concentrations and absent deposits, abundance-sensitive output, actual food/material shortfalls in a constrained twelve-month scenario, and shortage feedback without creating people or goods. Existing physical corridor and trade-inertia contracts also pass with demand-aware fixtures. The build passes. Live-provider boldness, long-run geopolitical/economic balance and browser qualification remain deferred during this iteration; no paid model calls were made for these checks.
+
+The performance/hybrid-history revision passes the TypeScript/Vite build and 23 focused checks covering unresolved-model playback, request-rate isolation, clock pacing/pause/error handling, local narrative/mechanism variety, model-authored repertoire persistence and validation, and existing trade/corridor/transport conservation contracts. A mocked provider remained pending while both explicit stepping and automatic playback advanced local history. The local repertoire produced at least 45 distinct mechanisms and over 600 effect/response/aftermath combinations in the fixed nine-category fixture; the implemented catalog contains 47 mechanisms. No paid provider calls were made for this revision.
+
+A read-only copy of the existing month-168 world (8,064 hexes, 5,829 civilian community records) was advanced twelve months twice per revision, in sequential runs without CPU profiling. Baseline `e694cd2`: 4,181 / 4,138 ms (2.87 / 2.90 months/s). Updated engine: 1,103 / 967 ms (10.88 / 12.40 months/s), approximately four times faster. Every benchmark month checked civilian + army + naval-crew accounting, and each final world passed full save validation. These are local engine timings including first-use geography preparation, not an end-to-end browser guarantee or a sustained 60× claim. The benchmark is reproducible with `node --import tsx tests/performance.ts --save <world.json> --months 12`; `--engine-root <checkout>` compares another revision without editing or saving that world. Broad longevity, browser qualification and live-provider adherence to the new repertoire response remain deferred.
+
 Durable autosaves pass seven focused tests for independent disk/database failure, newest-replica selection, legacy restoration without mutation, failed-restore preservation, ordered/coalesced writes, stale-notification suppression, same-origin HTTP writes, browser-slot isolation and atomic disk recovery from a damaged current file. The disk test round-trips a world over 7 MB. In an isolated browser with model calls disabled, a 9.26 MB fixture reproduced `QuotaExceededError` in the old localStorage path, then saved to disk and restored after reload. With the disk API deliberately unavailable, its next month saved and restored through IndexedDB without a warning. Existing local save files were preserved, including a verified 168-month world. This is targeted storage qualification; broad simulation qualification remains deferred.
 
 Agreement references pass six focused regressions covering canonical/legacy parsing, ordinary-number preservation, title-based local links to older agreements, confidential and unavailable references, escaped model text, retention of cited/counteroffer ancestors (including cycles), unchanged signed records, visibility-filtered agent catalogs and full save validation. The TypeScript/Vite build passes. Live provider adherence to the new citation format and interactive browser navigation remain part of the deferred consolidated qualification.
@@ -28,19 +34,19 @@ The corridor work immediately preceding these additions passed 35 regression tes
 
 `npm run test:trade-stability` runs three 20-year scenarios and measures months 61–240. A recurring supplier is the same origin, destination, and good as in the preceding month, weighted by current freight tonnage. Monthly reallocation is `sum(abs(current - previous)) / sum(current + previous)` across those relationships; it includes changes in total volume. Baseline is commit `45bf3da`, using the same seeds and measurement script. These are evolving synthetic scenarios, not calibrated economic observations.
 
-| Seed | Recurring supplier, before | Recurring supplier, after | Reallocation, before | Reallocation, after |
-| --- | ---: | ---: | ---: | ---: |
-| A world unwritten | 25.22% | 96.56% | 77.29% | 5.04% |
-| Long winter | 22.35% | 82.66% | 80.42% | 21.46% |
-| Maritime republics | 27.49% | 82.97% | 76.40% | 22.80% |
+| Seed               | Recurring supplier, before | Recurring supplier, after | Reallocation, before | Reallocation, after |
+| ------------------ | -------------------------: | ------------------------: | -------------------: | ------------------: |
+| A world unwritten  |                     25.22% |                    96.56% |               77.29% |               5.04% |
+| Long winter        |                     22.35% |                    82.66% |               80.42% |              21.46% |
+| Maritime republics |                     27.49% |                    82.97% |               76.40% |              22.80% |
 
 Three 200-year runs also pass monthly population accounting and periodic save validation:
 
-| Seed | Final population | Surviving states | Active routes | Event IDs |
-| --- | ---: | ---: | ---: | ---: |
-| A world unwritten | 20,747,827 | 8 | 384 | 272 |
-| Long winter | 20,186,560 | 6 | 437 | 525 |
-| Maritime republics | 20,723,378 | 7 | 358 | 579 |
+| Seed               | Final population | Surviving states | Active routes | Event IDs |
+| ------------------ | ---------------: | ---------------: | ------------: | --------: |
+| A world unwritten  |       20,747,827 |                8 |           384 |       272 |
+| Long winter        |       20,186,560 |                6 |           437 |       525 |
+| Maritime republics |       20,723,378 |                7 |           358 |       579 |
 
 The compiled browser build imports the prior 20-year save without trade memory and initializes 473 remembered relationships on the next monthly tick. Reloading restores the same month and an identical SHA-256 digest of the serialized trade memory. The updated economy explanation and eight shipment rows render successfully, with no browser runtime errors.
 
@@ -50,11 +56,11 @@ The trade network and renderer pass `npm run build`, `npm run format:check`, and
 
 All three 200-year / 2,400-month runs pass after the new transport model, with monthly population accounting and periodic full save validation:
 
-| Seed | Final population | Surviving states | Active routes | Event IDs |
-| --- | ---: | ---: | ---: | ---: |
-| A world unwritten | 20,045,246 | 8 | 136 | 267 |
-| Long winter | 19,545,715 | 7 | 169 | 707 |
-| Maritime republics | 20,802,169 | 6 | 113 | 349 |
+| Seed               | Final population | Surviving states | Active routes | Event IDs |
+| ------------------ | ---------------: | ---------------: | ------------: | --------: |
+| A world unwritten  |       20,045,246 |                8 |           136 |       267 |
+| Long winter        |       19,545,715 |                7 |           169 |       707 |
+| Maritime republics |       20,802,169 |                6 |           113 |       349 |
 
 The original JSON export from January 1722 imports successfully; its route refresh notice appears, and advancing one month generates geographic route legs. Browser checks also use a 20-year world with 269 shipments, including 117 journeys with shipping legs. The 1440px desktop and 390px phone layouts have no horizontal overflow; the cargo ledger, mixed-mode legs, harbor markers, and province highlighting were checked. No browser runtime errors were reported. Final desktop, local detail, and phone captures are under `.impeccable/review/trade-final-*.png` (local, ignored by Git).
 
@@ -64,11 +70,11 @@ The revised generator and renderer pass `npm run build`, `npm run format:check`,
 
 The three 200-year / 2,400-month soak runs completed on the revised geography, with monthly population accounting and periodic full save validation:
 
-| Seed | Final population | Surviving states | Active routes | Event IDs |
-| --- | ---: | ---: | ---: | ---: |
-| A world unwritten | 20,334,747 | 8 | 133 | 292 |
-| Long winter | 19,839,054 | 6 | 127 | 623 |
-| Maritime republics | 20,491,661 | 7 | 130 | 434 |
+| Seed               | Final population | Surviving states | Active routes | Event IDs |
+| ------------------ | ---------------: | ---------------: | ------------: | --------: |
+| A world unwritten  |       20,334,747 |                8 |           133 |       292 |
+| Long winter        |       19,839,054 |                6 |           127 |       623 |
+| Maritime republics |       20,491,661 |                7 |           130 |       434 |
 
 Browser verification uses the compiled build on local port 4174. The political atlas, terrain, zoomed detail, mobile layout, and legend views were inspected. Clicking Aurel's rendered center selected the correct province. The geometry controls generated a different five-continent, twelve-state world. The 390px phone layout has no horizontal overflow. A real JSON export from the initial build was imported and advanced from January 1722 to January 1723 successfully; no browser runtime errors were reported. Captures are under `.impeccable/review/map-final-*.png` (local, ignored by Git).
 

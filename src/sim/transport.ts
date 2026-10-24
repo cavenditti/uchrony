@@ -28,7 +28,12 @@ export interface TransportNetwork {
 }
 const cache = new WeakMap<Cell[], TransportNetwork>()
 
-function search(start: number, adjacent: number[][], cost: (a: number, b: number) => number) {
+function search(
+  start: number,
+  adjacent: number[][],
+  cost: (a: number, b: number) => number,
+  targets?: Set<number>,
+) {
   const distance = new Float64Array(adjacent.length).fill(Infinity),
     previous = new Int32Array(adjacent.length).fill(-1),
     queue = new MinHeap()
@@ -37,6 +42,10 @@ function search(start: number, adjacent: number[][], cost: (a: number, b: number
   while (queue.size) {
     const at = queue.pop()
     if (at.cost !== distance[at.id]) continue
+    if (targets) {
+      targets.delete(at.id)
+      if (!targets.size) break
+    }
     for (const next of adjacent[at.id]) {
       const candidate = at.cost + cost(at.id, next)
       if (candidate < distance[next]) {
@@ -113,6 +122,11 @@ export function refreshTransport(world: World, profile: CorridorProfile) {
     previous &&
     Math.floor(previous.month / CORRIDOR_LEARNING.replanMonths) ===
       Math.floor(world.month / CORRIDOR_LEARNING.replanMonths)
+  )
+    return
+  if (
+    previous &&
+    previous.links.every((link) => world.month - link.changedAt < CORRIDOR_LEARNING.minimumPathMonths)
   )
     return
   const base = baseNetwork(world),
@@ -237,12 +251,25 @@ function buildNetwork(world: World, profile?: CorridorProfile, base?: TransportN
   for (let i = 0; i < harbors.length; i++) {
     const a = harbors[i]
     if (seaPairs && !harbors.slice(i + 1).some((b) => seaPairs.has(`${a.region}-${b.region}`))) continue
-    const paths = search(a.water, adjacent, (from, to) =>
-      isWater(to)
-        ? profile
-          ? profile.cost[profile.index(from, to)]
-          : 1 + (Number(shore[from]) + Number(shore[to])) * 0.15
-        : Infinity,
+    // A replan needs only the existing destination ports, not distances to every sea tile.
+    const targets = seaPairs
+      ? new Set(
+          harbors
+            .slice(i + 1)
+            .filter((b) => seaPairs.has(`${a.region}-${b.region}`))
+            .map((b) => b.water),
+        )
+      : undefined
+    const paths = search(
+      a.water,
+      adjacent,
+      (from, to) =>
+        isWater(to)
+          ? profile
+            ? profile.cost[profile.index(from, to)]
+            : 1 + (Number(shore[from]) + Number(shore[to])) * 0.15
+          : Infinity,
+      targets,
     )
     for (let j = i + 1; j < harbors.length; j++) {
       const b = harbors[j],

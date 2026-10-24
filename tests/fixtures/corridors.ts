@@ -29,6 +29,9 @@ export function corridorWorld(rows: string[]): World {
       infrastructure: 0.5,
       devastation: 0,
       population: { children: 1000, adults: 8000, elders: 1000 },
+      urban: 0.3,
+      industry: 0.5,
+      production: inventory(),
       stocks: inventory(),
       prices: inventory(10),
     })) as Region[]

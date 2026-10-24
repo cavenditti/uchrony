@@ -69,6 +69,35 @@ export function StateCharacter({
           ? 'Public opinion and leadership are pulling in different directions.'
           : 'Personal priorities operate within the state’s institutions.'}
       </p>
+      {c.leader.politics && (
+        <div className="leader-politics">
+          <h4>{c.leader.politics.archetype}</h4>
+          <p className="character-account">
+            <strong>Private ambition.</strong> {c.leader.politics.ambition}
+          </p>
+          <p className="character-account">
+            <strong>Red line.</strong> {c.leader.politics.redLine}
+          </p>
+          <p className="character-account">
+            <strong>Blind spot.</strong> {c.leader.politics.blindSpot}
+          </p>
+          <div className="data-row">
+            <span>Appetite for risk</span>
+            <b>{score(c.leader.politics.drives.riskTolerance)} / 100</b>
+          </div>
+          <div className="data-row">
+            <span>Personal ambition</span>
+            <b>{score(c.leader.politics.drives.ambition)} / 100</b>
+          </div>
+          <div className="data-row">
+            <span>Opportunism</span>
+            <b>{score(c.leader.politics.drives.opportunism)} / 100</b>
+          </div>
+          <p className="panel-note">
+            Observer access to private motives. Other states see public posture, not this profile.
+          </p>
+        </div>
+      )}
       <div className="leader-qualities">
         {c.leader.perks.map((id) => {
           const perk = LEADER_PERKS[id]

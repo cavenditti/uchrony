@@ -33,7 +33,11 @@ export function navalPressure(world: World) {
   return pressure
 }
 export function seaPassageFactor(world: World, nation: number, legs: RouteLeg[]) {
-  if (!world.warfare?.fleets.length) return 1
+  if (
+    !world.warfare?.fleets.length ||
+    !world.relations.some((rel) => rel.treaty === 'war' && (rel.a === nation || rel.b === nation))
+  )
+    return 1
   const pressure = navalPressure(world)
   let factor = 1
   for (const leg of legs)

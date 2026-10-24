@@ -1,3 +1,5 @@
+import { simulationSettings } from './settings'
+import { MinHeap } from './heap'
 import { seaPassageFactor } from './naval-control'
 import {
   GOODS,
@@ -13,10 +15,16 @@ import {
   type RouteLeg,
 } from './types'
 
-import { diplomaticAccess, preferentialTrade, agreementTerms } from './agreements'
+import { agreementTerms } from './agreements'
 import { effectMultiplier } from './effects'
 import { transportNetwork, reverseLegs, refreshTransport } from './transport'
-import { corridorCost, corridorProfile, corridorUsage, learnCorridors } from './corridors'
+import {
+  corridorCost,
+  corridorProfile,
+  corridorUsage,
+  learnCorridors,
+  type CorridorProfile,
+} from './corridors'
 import {
   rememberedTrade,
   rememberShipments,
@@ -47,11 +55,33 @@ export const MONTHLY_NEED: Inventory = {
   arms: 0.00015,
 }
 
+export function householdNeed(r: Region, good: Good) {
+  const livingStandard =
+      good === 'food'
+        ? 0.95 + r.urban * 0.15
+        : 0.65 + r.urban * 1.3 + r.infrastructure * 0.3 + r.industry * 0.3,
+    allocation = good === 'arms' ? 0.15 : good === 'iron' || good === 'coal' ? 0.25 : 1
+  return population(r) * MONTHLY_NEED[good] * livingStandard * allocation
+}
 export function reserveTarget(r: Region, good: Good) {
-  return population(r) * MONTHLY_NEED[good] * (good === 'food' ? 2.4 : 3)
+  const p = r.production,
+    inputs =
+      good === 'iron'
+        ? p.tools * 0.65 + p.arms * 0.9
+        : good === 'coal'
+          ? p.tools * 0.3 + p.arms * 0.5
+          : good === 'timber'
+            ? p.tools * 0.25 + p.textiles * 0.3
+            : good === 'tools'
+              ? p.arms * 0.3
+              : good === 'food'
+                ? p.textiles * 0.12
+                : 0
+  return householdNeed(r, good) * (good === 'food' ? 2.4 : 3) + inputs * 2
 }
 
 export function produce(world: World) {
+  const abundance = simulationSettings(world).abundance
   for (const r of world.regions) {
     const n = world.nations[r.nation],
       pop = population(r),
@@ -66,7 +96,7 @@ export function produce(world: World) {
       0.15,
       0.96,
     )
-    const workers = labor * utilization
+    const workers = labor * utilization * (0.75 + 0.25 * (r.materialCoverage ?? 1))
     r.employed = workers
     const efficiency = (1 + r.literacy * 0.35 + tech.industry * 0.13) * (1 - r.devastation * 0.55)
     const farmShare = clamp(
@@ -79,7 +109,8 @@ export function produce(world: World) {
     const effectiveFarmLabor = arableCapacity * (1 - Math.exp((-workers * farmShare) / arableCapacity))
     const farm =
       effectiveFarmLabor *
-      (0.24 + r.fertility * 0.25) *
+      (0.105 + r.fertility * 0.125) *
+      abundance *
       (1 + tech.agriculture * 0.19) *
       season *
       world.climate *
@@ -88,7 +119,7 @@ export function produce(world: World) {
     const industrial = (1 - farmShare) / 0.52
     const raw = (g: Good, amount: number) => {
       if (['timber', 'stone', 'iron', 'coal'].includes(g))
-        amount *= effectMultiplier(world, 'extraction', n.id, r.id)
+        amount *= abundance * effectMultiplier(world, 'extraction', n.id, r.id)
       r.production[g] = amount
       r.stocks[g] += amount
     }
@@ -142,12 +173,30 @@ export interface Edge {
 }
 export type Graph = Edge[][]
 
+// Physical link work is shared by civilian freight and each army's directional access view.
+// The profile is an explicit phase snapshot, so later damage, ownership or sea control is not cached here.
+const linkMetrics = new WeakMap<CorridorProfile, Map<object, { capacity: number; cost: number }>>()
 export function transportGraph(
   world: World,
   militaryNation?: number,
   profile = corridorProfile(world),
 ): Graph {
-  const graph: Graph = world.regions.map(() => [])
+  const graph: Graph = world.regions.map(() => []),
+    terms = agreementTerms(world),
+    hosts = new Set(
+      terms
+        .filter(
+          ({ term }) =>
+            (term.kind === 'access' && term.to === militaryNation) ||
+            (term.kind === 'alliance' && (term.from === militaryNation || term.to === militaryNation)),
+        )
+        .flatMap(({ term }) => (term.kind === 'access' ? [term.from] : [term.from, term.to])),
+    )
+  let metrics = linkMetrics.get(profile)
+  if (!metrics) {
+    metrics = new Map()
+    linkMetrics.set(profile, metrics)
+  }
   const allowed = (a: Region, b: Region) => {
     if (militaryNation !== undefined) {
       const rel = relation(world, militaryNation, b.nation)
@@ -155,21 +204,27 @@ export function transportGraph(
         b.nation === militaryNation ||
         rel?.treaty === 'war' ||
         rel?.treaty === 'alliance' ||
-        diplomaticAccess(world, militaryNation, b.nation)
+        hosts.has(b.nation)
       )
     }
     return a.nation === b.nation || relation(world, a.nation, b.nation)?.treaty !== 'war'
   }
   for (const link of transportNetwork(world).links) {
     const a = world.regions[link.from],
-      b = world.regions[link.to],
-      usage = corridorUsage(profile, link.legs),
-      capacity =
-        Math.min(...[...usage].map(([index, count]) => profile.capacity[index] / count)) *
+      b = world.regions[link.to]
+    let physical = metrics.get(link)
+    if (!physical) {
+      let capacity = Infinity
+      for (const [index, count] of corridorUsage(profile, link.legs))
+        capacity = Math.min(capacity, profile.capacity[index] / count)
+      physical = { capacity, cost: corridorCost(profile, link.legs) }
+      metrics.set(link, physical)
+    }
+    const capacity =
+        physical.capacity *
         Math.min(seaPassageFactor(world, a.nation, link.legs), seaPassageFactor(world, b.nation, link.legs)),
-      sea = link.seaCost > 0,
-      cost = corridorCost(profile, link.legs)
-    // Each direction is checked independently: military access is directional.
+      cost = physical.cost,
+      sea = link.seaCost > 0
     if (capacity > 0.001 && allowed(a, b))
       graph[a.id].push({ to: b.id, cost, capacity, sea, legs: link.legs })
     if (capacity > 0.001 && allowed(b, a))
@@ -177,30 +232,25 @@ export function transportGraph(
   }
   return graph
 }
-
 export function shortestPaths(graph: Graph, from: number) {
-  const distance = new Float64Array(graph.length).fill(Infinity)
-  const previous = new Int32Array(graph.length).fill(-1),
-    visited = new Uint8Array(graph.length)
+  const distance = new Float64Array(graph.length).fill(Infinity),
+    previous = new Int32Array(graph.length).fill(-1),
+    queue = new MinHeap()
   distance[from] = 0
-  for (let step = 0; step < graph.length; step++) {
-    let at = -1,
-      best = Infinity
-    for (let i = 0; i < graph.length; i++)
-      if (!visited[i] && distance[i] < best) {
-        at = i
-        best = distance[i]
-      }
-    if (at < 0) break
-    visited[at] = 1
-    for (const e of graph[at])
-      if (distance[e.to] > best + e.cost) {
-        distance[e.to] = best + e.cost
-        previous[e.to] = at
+  queue.push(from, 0)
+  while (queue.size) {
+    const at = queue.pop()!
+    if (at.cost !== distance[at.id]) continue
+    for (const edge of graph[at.id])
+      if (distance[edge.to] > at.cost + edge.cost) {
+        distance[edge.to] = at.cost + edge.cost
+        previous[edge.to] = at.id
+        queue.push(edge.to, distance[edge.to])
       }
   }
   return { distance, previous }
 }
+
 export function pathTo(previous: Int32Array, from: number, to: number): number[] {
   if (from === to) return [from]
   const path = [to]
@@ -213,6 +263,11 @@ export function pathTo(previous: Int32Array, from: number, to: number): number[]
 }
 
 export function trade(world: World) {
+  const preferences = new Set(
+    agreementTerms(world)
+      .filter(({ term }) => ['trade', 'alliance'].includes(term.kind))
+      .flatMap(({ term }) => [`${term.from}:${term.to}`, `${term.to}:${term.from}`]),
+  )
   const profile = corridorProfile(world)
   refreshTransport(world, profile)
   const graph = transportGraph(world, undefined, profile),
@@ -362,7 +417,7 @@ export function trade(world: World) {
           international &&
           agreement !== 'trade' &&
           agreement !== 'alliance' &&
-          !preferentialTrade(world, buyer.nation, seller.nation)
+          !preferences.has(`${buyer.nation}:${seller.nation}`)
             ? nBuyer.policies.tariff / 100
             : 0
         const affordable = international
@@ -440,16 +495,29 @@ export function trade(world: World) {
 
 export function consume(world: World) {
   for (const r of world.regions) {
-    const pop = population(r)
+    let materialCoverage = 0
+    const weights: Partial<Inventory> = {
+      tools: 0.35,
+      textiles: 0.25,
+      timber: 0.15,
+      stone: 0.1,
+      iron: 0.05,
+      coal: 0.1,
+    }
     for (const g of GOODS) {
       // Inputs consumed by factories have already been accounted for; these are household and maintenance demands.
-      const need = pop * MONTHLY_NEED[g] * (g === 'arms' ? 0.15 : g === 'iron' || g === 'coal' ? 0.25 : 1)
+      const need = householdNeed(r, g)
       const actual = Math.min(r.stocks[g], need)
       r.stocks[g] -= actual
       r.consumption[g] += actual
-      if (g === 'food') r.foodCoverage = need > 0 ? actual / need : 1
+      const coverage = need > 0 ? actual / need : 1
+      if (g === 'food') r.foodCoverage = coverage
+      materialCoverage += (weights[g] ?? 0) * coverage
       const decay = g === 'food' ? 0.035 : g === 'timber' || g === 'textiles' ? 0.006 : 0.001
       r.stocks[g] = Math.min(r.stocks[g] * (1 - decay), Math.max(1, reserveTarget(r, g)) * 20)
     }
+    r.materialCoverage = clamp(materialCoverage)
+    if (r.materialCoverage < 0.7)
+      r.infrastructure = Math.max(0.05, r.infrastructure - (0.7 - r.materialCoverage) * 0.002)
   }
 }

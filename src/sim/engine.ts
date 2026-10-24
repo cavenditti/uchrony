@@ -1,3 +1,5 @@
+import { advancePressures } from './pressures'
+import { validateSettings } from './settings'
 import { allForces, militaryPeople } from './forces'
 import { advanceArmies, landGraph } from './military'
 import { advanceNavy, ensureWarfare, commissionFleet, orderFleet, embarkArmy } from './navy'
@@ -186,7 +188,12 @@ function demographics(w: World) {
     const school =
       (n.budget.education / Math.max(1, n.population / 10000)) * effectMultiplier(w, 'education', n.id, r.id)
     const healthTarget = clamp(
-      0.44 + services * 0.014 + n.technologies.medicine * 0.05 + r.foodCoverage * 0.2 - r.devastation * 0.35,
+      0.44 +
+        services * 0.014 +
+        n.technologies.medicine * 0.05 +
+        r.foodCoverage * 0.2 -
+        r.devastation * 0.35 -
+        (1 - (r.materialCoverage ?? 1)) * 0.06,
     )
     r.health = clamp(r.health + (healthTarget - r.health) * 0.035)
     r.literacy = clamp(
@@ -201,6 +208,7 @@ function demographics(w: World) {
         r.health * 0.2 -
         (1 - r.foodCoverage) * 0.55 -
         r.devastation * 0.4 -
+        (1 - (r.materialCoverage ?? 1)) * 0.14 -
         n.policies.conscription * 0.012,
     )
     r.happiness = clamp(r.happiness + (happinessTarget - r.happiness) * 0.09)
@@ -558,6 +566,7 @@ export function tick(w: World): World {
   beginPopulationMonth(w)
   worldEvents(w)
   advanceHistory(w)
+  advancePressures(w)
   advanceCharacters(w)
   if (w.statecraft) advanceStatecraft(w)
   produce(w)
@@ -574,6 +583,10 @@ export function tick(w: World): World {
 }
 
 export function applyCommand(w: World, command: Command): string {
+  if (command.type === 'conditions') {
+    w.simulation = validateSettings(command.settings)
+    return 'Simulation conditions updated. Existing people, stocks and commitments are preserved.'
+  }
   if (command.type === 'commission')
     return commissionFleet(w, command.nation, command.region, command.warships, command.transports)
   if (command.type === 'fleet-order') return orderFleet(w, command.fleet, command.target, command.mission)

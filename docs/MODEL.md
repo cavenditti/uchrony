@@ -74,22 +74,32 @@ Every state has six continuous tendencies: assertiveness, openness to reform, so
 
 Public attitudes are weighted from civilian and military adults and elders, using political movements, literacy, urbanization, wealth, grievance, loyalty, rootedness, displacement, real trade activity and war exhaustion. They adjust 2.5% toward current circumstances each month. Institutional habits move 0.8% monthly toward assumptions associated with the form of government. These assumptions are explicit synthetic model choices, not calibrated claims about real governments:
 
-| Government family | People | Institutions | Leader |
-| --- | ---: | ---: | ---: |
-| Republic | 48% | 29% | 23% |
-| Federation or confederation | 50% | 32% | 18% |
-| Commonwealth or assembly | 55% | 25% | 20% |
-| Monarchy | 23% | 30% | 47% |
-| Empire or autocracy | 16% | 30% | 54% |
-| Unclassified form | 35% | 35% | 30% |
+| Government family           | People | Institutions | Leader |
+| --------------------------- | -----: | -----------: | -----: |
+| Republic                    |    48% |          29% |    23% |
+| Federation or confederation |    50% |          32% |    18% |
+| Commonwealth or assembly    |    55% |          25% |    20% |
+| Monarchy                    |    23% |          30% |    47% |
+| Empire or autocracy         |    16% |          30% |    54% |
+| Unclassified form           |    35% |          35% |    30% |
 
-Effective state direction moves 12% monthly toward the weighted combination. The inspector shows its strongest tendencies, current priorities, sources of influence and detailed comparisons. A reform-minded public and a traditional ruler can coexist. The distance between public attitudes and leadership contributes a small social-cohesion cost.
+Effective state direction moves 12% monthly toward a conviction-adjusted weighted combination. The political-extremity setting amplifies distance from the midpoint, moderated by institutional/public/leader influence and personal dogmatism; it does not erase those constraints. The inspector shows its strongest tendencies, current priorities, sources of influence and detailed comparisons. A reform-minded public and a traditional ruler can coexist. The distance between public attitudes and leadership contributes a small social-cohesion cost.
+
+Leaders also have a persistent private political profile with eight drives: ambition, risk tolerance, dominance, opportunism, vengefulness, dogmatism, empathy and vanity. Ten seeded archetypes include territorial hegemons, revanchists, predatory oligarchs, revolutionary reformers, doctrinal guardians, mercantile opportunists, encirclement obsessives, glory-seeking adventurers, constitutional stewards and civic solidarists. Each has an ambition, a red line and a blind spot. Motives correlate with temperament without predetermining every action; a public-interest leader can be confrontational and an ambitious leader can face strong institutional limits. Existing leaders gain motives without replacing their names, skills, perks or recorded temperaments. Extreme dispositions remain tendencies, not mechanical guarantees of war.
 
 Leaders have persistent temperaments and five skills: administration, diplomacy, logistics, scholarship and command. Two strengths and one limitation are assigned deterministically from the world seed, state, tenure, succession generation and recorded name. Examples include commercial contacts, scholarly patronage, methodical administration, command reputation, impulsiveness, patronage dependence and distrust. These affect decision preferences and modest institutional effectiveness, scaled by executive influence. Their combined contribution to each supported effectiveness channel is bounded to ±9%; historical effects retain their existing combined 0.2–2.5 multiplier bounds. Transport, tax collection, funded education/research, command effectiveness and morale use these contributions. Resources, treaty consent and ownership constraints remain enforced separately.
 
-New worlds begin with character-dependent policy allocations and research priorities. Older saves acquire profiles without changing their existing policies or recorded leaders. State-agent and historical-generation prompts receive the evolving profile; other states see public posture and leadership rather than private motives or skill records. The native government fallback uses the same tendencies for policy adjustment, trade/alliance propensity, war risk, exhaustion tolerance and research focus. The legacy four-value `personality` field remains only for version-1 compatibility, not as the behavioral driver.
+New worlds begin with character-dependent policy allocations and research priorities. Older saves acquire profiles without changing their existing policies or recorded leaders. Private motives affect native military and conscription targets, autonomous responses and research through temperament, and enter state-agent strategic assessments. Strategic context includes actual supplied force ratios, neighboring states, resource-production asymmetries, material constraints and active disputes. Agents are explicitly allowed to pursue selfish, unequal or risky initiatives, and must consider a bold attainable alternative to accommodation or waiting. Referee plausibility does not require prudence or benevolence; risky undertakings still cannot fabricate assets, victories or consent. State-agent and historical-generation prompts receive the evolving profile; other states see public posture and leadership rather than private motives or skill records. The native government fallback uses the same tendencies for policy adjustment, trade/alliance propensity, war risk, exhaustion tolerance and research focus. The legacy four-value `personality` field remains only for version-1 compatibility, not as the behavioral driver.
 
 Succession assigns a fresh leader profile and immediately moves executive direction 45% toward the new weighted target, retaining institutional and popular attitudes. It triggers a strategic review, preserving inherited state memory, signed agreements, population and resources. Replies from an agent deliberating under the old leader are discarded without misconduct penalties. Leader traits cannot be rewritten through ordinary agent orders or unsupported claims. Individual lifespans, family trees, elections, candidate selection and constitutional procedure are not simulated; leadership turnover still enters through historical events. Behavioral consistency of live LLM agents awaits the consolidated validation pass.
+
+## Structural instability and observer controls
+
+Simulation conditions are saved per world and can be changed through **Simulation conditions** or selected at world creation: instability 0–3 (default 1), raw-resource abundance 0.35–1.6 (default 0.85), and political extremity 0–2 (default 1.2). Changes preserve stocks, people, leaders and treaties. Extremity changes the strength of convictions immediately through subsequent monthly adjustment and shapes newly generated leaders; existing ambitions persist.
+
+A separate saved PRNG generates additional disturbances independently of model requests. Instability targets roughly `2 × intensity` disturbances per simulated year world-wide, with exponential arrival times calibrated for integer months, a maximum one-month arrival rate and a 120-month upper interval. Zero suppresses new additional disturbances; existing effects, ordinary climate and endogenous shortages/politics continue. The four scopes are province (20%), state (18%), connected geographic region (29%) and international dispute (33%). State pressures currently involve competing factions. Local/regional cases also include harvest failures, extraction interruptions and epidemics. Regional effects follow contiguous neighboring provinces and may cross borders.
+
+International pressures create concrete competing frontier claims, resource-concession disputes or contested transit rights at actual neighboring provinces. They reduce relations, accumulate grievances and may increase transit friction; they never declare a war, transfer territory, invent agreement signatures or create resources. The public ledger records up to 64 recent pressures and feeds affected agents and contextual history generation. A new crisis permits strategic reconsideration after a one-minute strategic cooldown, still subject to the existing thirty-second state cooldown, five-second global launch spacing and concurrency limits. Effects resolve through the native historical mechanism, so pressure frequency does not increase the model request budget. Wider region records can contain up to two effects per province; ordinary model-authored historical records retain their twenty-effect limit.
 
 ## Production and carrying capacity
 
@@ -100,22 +110,24 @@ Farm output has diminishing returns to labor and a land-based upper bound:
 ```text
 arable capacity = province hex count × 1,800 × (0.35 + 0.65 × fertility)
 effective farm labor = capacity × (1 - exp(-farm workers / capacity))
-food output = effective farm labor × fertility yield × technology × season × climate × efficiency
+food output = effective farm labor × (0.105 + 0.125 × fertility) × abundance × technology × season × climate × efficiency
 ```
 
 This prevents adding people from creating unlimited farmland. Agricultural investment and research increase supportable population. Seasonal output varies by ±23%; annual climate varies from 0.82 to 1.16 of baseline. Industrial technology, literacy, and damage influence overall production efficiency.
 
-Timber, stone, iron, and coal throughput depends on allocated workers and the province's resource richness. Richness currently does not deplete. Industrial capacity constrains manufacturing. Recipe inputs are removed from stocks before outputs are credited:
+Timber, stone, iron, and coal throughput depends on allocated workers, resource abundance and the province's resource richness. New worlds distribute iron and coal through separate spatially correlated geological fields with thresholds for workable deposits; some provinces have none, others have concentrated sources. Existing saves retain their recorded deposits. Scarce industrial inputs constrain manufacturing and create reasons for access agreements, leverage and conflict. Richness currently does not deplete. Industrial capacity constrains manufacturing. Recipe inputs are removed from stocks before outputs are credited:
 
-| Output, 1 tonne | Inputs |
-| --- | --- |
-| Tools | 0.65 t iron + 0.30 t coal + 0.25 t timber |
-| Textiles | 0.30 t timber + 0.12 t food |
-| Arms | 0.90 t iron + 0.50 t coal + 0.30 t tools |
+| Output, 1 tonne | Inputs                                    |
+| --------------- | ----------------------------------------- |
+| Tools           | 0.65 t iron + 0.30 t coal + 0.25 t timber |
+| Textiles        | 0.30 t timber + 0.12 t food               |
+| Arms            | 0.90 t iron + 0.50 t coal + 0.30 t tools  |
 
 These recipes are economic abstractions; timber in the textile recipe stands in for fibrous raw material. Factories can only produce the amount supported by the scarcest input. Military priority increases arms output; agricultural and industrial priorities alter labor allocation.
 
-Households require 25 kg of food per person per month. Other per-capita maintenance requirements are defined in `MONTHLY_NEED`. Prices vary between 0.55× and 3× base prices according to stocks relative to target reserves. Food targets 2.4 months of need; other goods target three months.
+Food demand starts at 25 kg per person per month, scaled by `0.95 + 0.15 × urbanization`. Other household/maintenance requirements use `MONTHLY_NEED`, scaled by `0.65 + 1.3 × urbanization + 0.3 × infrastructure + 0.3 × industry`; iron/coal use one quarter of their base rate and household arms use 15%. Reserves cover 2.4 months of household food demand or three months of other household demand, plus two months of current manufacturing recipe inputs. This avoids treating all raw industrial demand as household consumption while still retaining inputs for workshops. Prices vary between 0.55× and 3× base prices according to stocks relative to target reserves.
+
+The inspector reports a material-coverage index in addition to food coverage. It weights tools (35%), textiles (25%), timber (15%), stone (10%), coal (10%) and iron (5%) household/maintenance fulfillment. Previous-month coverage scales effective labor by `0.75 + 0.25 × coverage`; shortages also lower health/contentment targets and erode infrastructure modestly below 70% fulfillment. These are synthetic dependencies, not calibrated empirical elasticities.
 
 Remaining food loses 3.5% monthly to storage/spoilage, timber and textiles lose 0.6%, and other stocks lose 0.1%. Stored quantities are capped at 20× target reserves; excess is discarded. The ledger's “Used” column reports consumption and manufacturing inputs, not storage losses.
 
@@ -158,7 +170,9 @@ War closes hostile border edges and prohibits direct trade between the belligere
 
 OpenRouter generates contextual historical drafts using `deepseek/deepseek-v4.1-flash` by default. The server reads credentials from `.env`; keys never enter prompts, worker state, exports or browser bundles. Model work is asynchronous. Time continues through missing credentials, slow requests, validation failures and provider outages.
 
-A separate saved historical PRNG samples context-weighted states, provinces and themes: succession, discovery, literature, belief, institutions, social change, commerce, disaster and diplomacy. Event intervals follow a bounded exponential draw of 2–18 months, with war and low stability increasing the hazard. A draft request can remain in flight while the local simulation advances. At the next historical moment, a suitable validated LLM draft is preferred; otherwise a small contextual procedural event occurs. Up to three prepared drafts wait in a saved queue. Conditions, current territorial control and intervening leadership changes are checked before use; unsuitable drafts are discarded or expire. Existing climate, fiscal, research and military mechanisms also continue recording their own events.
+A separate saved historical PRNG samples context-weighted states, provinces and themes: succession, discovery, literature, belief, institutions, social change, commerce, disaster and diplomacy. Event intervals follow a bounded exponential draw of 2–18 months, with war and low stability increasing the hazard. A draft request can remain in flight while the local simulation advances. At the next historical moment, a suitable validated LLM draft is preferred; otherwise a locally composed contextual event occurs. The native repertoire contains 47 distinct mechanisms across the nine categories, with seeded intensities, durations, response alternatives and conditional aftermath. Local recent titles suppress immediate repetition. Material conditions weight selection and shape the account; effects are resolved by the same bounded historical system as model-authored events. Up to three prepared drafts wait in a saved queue. Conditions, current territorial control and intervening leadership changes are checked before use; unsuitable drafts are discarded or expire. Existing climate, fiscal, research and military mechanisms also continue recording their own events.
+
+New clients request a bundle containing one bespoke draft and up to three portable mechanisms; older clients retain the original event response contract. Portable mechanisms contain short generic developments and supported gain/friction modifier names, never executable instructions or arbitrary property paths. Up to 64 are retained in the save and can be instantiated with future local contexts and new outcomes; their model provenance remains recorded. This amortizes creative generation across many later events. History launches require both ninety seconds since the last launch and twenty-four simulated months; native events do not wait for that budget.
 
 Each LLM draft contains a title and two or three short sentences, concrete effects, optional autonomous government responses and up to two conditional follow-ups. The API requests a kind-aware JSON Schema, then the worker checks IDs, scopes, units and effect compatibility independently. Actor-relative national target `-1` is resolved to the actual requesting state; it cannot select another state. Invalid structured responses receive one repair pass. The original integration defect was reproduced with a syntactically valid provider response containing unresolved national targets and an unsupported modifier; those are now handled by explicit target binding, separate effect-kind schemas and repair feedback.
 
@@ -177,7 +191,7 @@ Saved outcomes, modifier clocks, response choices, follow-up draws and cultural 
 
 ## State agency, communication and adjudication
 
-Every state identity has persistent private assessment, strategy, goals, memory, institutional compliance, and decision/strategic clocks. Routine decisions default to OpenRouter's `mistralai/ministral-8b-2512`; strategy and referee roles default to the configured DeepSeek event model. The roles can be overridden independently in `.env`. A routine pass handles small domestic adjustments and requests escalation when needed. Strategic reviews become due every 12 simulated months and can also be requested by the lightweight model, new negotiations or the observer. Calls are bounded by wall-clock throttles and four concurrent worker requests; outstanding requests are coalesced by state. Deliberation can continue while the monthly world evolves. The current implementation is a hybrid: standing policies and military/logistical rules execute locally while models periodically revise intentions.
+Every state identity has persistent private assessment, strategy, goals, memory, institutional compliance, and decision/strategic clocks. Routine decisions default to OpenRouter's `mistralai/ministral-8b-2512`; strategy and referee roles default to the configured DeepSeek event model. The roles can be overridden independently in `.env`. A routine pass handles small domestic adjustments and requests escalation when needed. Strategic reviews become due every 12 simulated months and can also be requested by the lightweight model, new negotiations or the observer. Background calls share a five-second launch spacing and four concurrent worker requests. Each state has a thirty-second minimum launch interval; full strategy passes have an additional two-minute interval, except explicit observer requests. Routine passes reuse unchanged decisions for at least twenty-four simulated months unless hunger, stability, war, leadership, correspondence or proposed agreements change. Due states are scheduled by oldest launch so one state cannot monopolize the service. Eligibility is checked before constructing expensive census/map contexts; outstanding requests are coalesced by state. Deliberation can continue while the monthly world evolves. The current implementation is a hybrid: standing policies and military/logistical rules execute locally while models periodically revise intentions.
 
 An agent receives its own exact government state, private notes, owned provinces and armies, public foreign summaries, visible correspondence and agreements. Secret messages and offers are included only for participants. Public broadcasts and offers are visible to other states. Observer controls can inspect a selected state's confidential archive; that UI capability does not grant the other state models access to it. Agents have no shared conversation or direct world-write capability.
 
@@ -193,7 +207,7 @@ Payments, territory, state creation and mergers execute as one transaction after
 
 A recurring goods clause is a real logistical obligation, prioritized before ordinary market clearing and sharing the same tile and connection capacity. It draws on actual surplus, reserves, reachable buyers and real carriage; promises do not teleport or create goods. Payments for goods are separate agreed terms. Tribute transfers available treasury funds monthly and records shortfalls. Research cooperation shares bounded knowledge subject to the source's funding. Secret trade/access/alliance rights affect the relevant mechanics without automatically becoming public treaty labels. Term expiration and obligation shortfalls are retained for subsequent negotiation. Guarantees and political promises inform agent strategy; they do not automatically spawn armies or declare a new war.
 
-Model responses are checked against current ownership and assets, and outstanding requests are canceled when a different world is generated or loaded. Background world snapshots do not acknowledge unrelated playback requests. Diplomacy ledgers and accepted external events trigger autosaves between normal annual playback saves. The full regression, longevity and adversarial-agent qualification remains deferred during the ongoing feature iteration.
+Model responses are checked against current ownership and assets, and outstanding requests are canceled when a different world is generated or loaded. The worker owns playback timing and yields after short slices (one expensive month may exceed the slice budget). World snapshots are coalesced to two per second above 12×, and five per second otherwise; pause flushes the latest world. Pending external requests do not gate ticks. The requested pace is a CPU-bounded target, not a guarantee of sixty months per second for arbitrarily large worlds. Background snapshots do not acknowledge unrelated commands. Autosaves independently coalesce current snapshots every two seconds. The full regression, longevity and adversarial-agent qualification remains deferred during the ongoing feature iteration.
 
 ## Government and insolvency
 
@@ -209,14 +223,14 @@ If expenses exceed treasury plus revenue, the difference becomes debt. Debt incu
 
 Each of six fields has six levels. Required knowledge is `140 × (level + 1)^1.45`. Funding produces knowledge, modified by literacy and governance technology. Focus changes preserve all field progress.
 
-| Field | Implemented effects per completed level |
-| --- | --- |
-| Agriculture | +19% base farm productivity |
-| Industry | +13% base overall production efficiency |
-| Medicine | +0.05 health-target contribution |
-| Logistics | +25% base road throughput |
-| Military | +16% combat-effectiveness contribution, plus morale support |
-| Governance | Better tax collection, literacy growth, and research effectiveness |
+| Field       | Implemented effects per completed level                            |
+| ----------- | ------------------------------------------------------------------ |
+| Agriculture | +19% base farm productivity                                        |
+| Industry    | +13% base overall production efficiency                            |
+| Medicine    | +0.05 health-target contribution                                   |
+| Logistics   | +25% base road throughput                                          |
+| Military    | +16% combat-effectiveness contribution, plus morale support        |
+| Governance  | Better tax collection, literacy growth, and research effectiveness |
 
 Discoveries are named in `TECH_NAMES`. Their labels describe an abstract progression; e.g. “Steam shipping” is not a separate naval vessel system.
 
@@ -264,3 +278,7 @@ The old browser save remains intact and is read as a legacy fallback. `/save-rec
 The deterministic core is reproducible for the same build, starting save, commands and recorded external historical inputs; future LLM outputs are not guaranteed to repeat. Rendering frame rate never changes random state. Background tab throttling changes wall-clock playback pace; it does not simulate elapsed real time while closed.
 
 Meaningful future additions include finite mineral reserves, firms and households, occupations, investment completion times, individual convoy voyages, ship classes and naval weather, detailed prisoners/rescue, formal war goals, and empirical calibration.
+
+## Computation and scheduling
+
+Migration evaluates simultaneous plans using per-province culture, language and belief marginals instead of rescanning every destination community for each sort comparison. Corridors use compact undirected hex-edge indices; phase profiles share physical link costs and capacities across military views. Supply and movement graphs are shared per state within the army phase and invalidated on ownership changes. Maritime replanning stops once the required destination ports have settled shortest paths, and plans still inside their minimum adoption period avoid redundant replanning. Provincial shortest paths use a heap. Tariff preferences are prepared once per market-clearing phase; civilian and military traffic still share actual physical capacities. These are computational changes, not coarse time steps: demographic, production, consumption, research, obligations and military effects continue monthly.

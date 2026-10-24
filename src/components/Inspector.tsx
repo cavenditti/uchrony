@@ -303,8 +303,10 @@ export function Inspector({
     r = regionId !== null ? w.regions[regionId] : null
   const [diplomat, setDiplomat] = useState<number | null>(null),
     [eventFilter, setEventFilter] = useState('all')
-  const avg = (key: 'literacy' | 'health' | 'happiness' | 'foodCoverage' | 'infrastructure') =>
-    regions.reduce((s, r) => s + r[key] * population(r), 0) /
+  const avg = (
+    key: 'literacy' | 'health' | 'happiness' | 'foodCoverage' | 'infrastructure' | 'materialCoverage',
+  ) =>
+    regions.reduce((s, r) => s + (r[key] ?? 1) * population(r), 0) /
     Math.max(
       1,
       regions.reduce((s, r) => s + population(r), 0),
@@ -398,6 +400,7 @@ export function Inspector({
                 <Chart world={w} nation={n.id} />
                 <SectionTitle>The state of the nation</SectionTitle>
                 <Meter label="Food needs met" value={avg('foodCoverage')} />
+                <Meter label="Other needs met" value={avg('materialCoverage')} />
                 <Meter label="Public contentment" value={avg('happiness')} />
                 <Meter label="Literacy" value={avg('literacy')} color="#8aa8b6" />
                 <button className="research-summary" onClick={() => onTab('research')}>
@@ -469,6 +472,7 @@ export function Inspector({
             <Meter label="Health" value={avg('health')} />
             <Meter label="Literacy" value={avg('literacy')} />
             <Meter label="Food needs met" value={avg('foodCoverage')} />
+            <Meter label="Other needs met" value={avg('materialCoverage')} />
             <PopulationIdentities world={w} nation={n.id} />
             <SectionTitle>Population history</SectionTitle>
             <Chart world={w} nation={n.id} />
@@ -1105,6 +1109,7 @@ function Province({
         <Metric icon={Factory} label="Output / month" value={money(r.gdp)} />
       </div>
       <Meter label="Food needs met" value={r.foodCoverage} />
+      <Meter label="Other needs met" value={r.materialCoverage ?? 1} />
       <Meter label="Public health" value={r.health} />
       <Meter label="Literacy" value={r.literacy} />
       <Meter label="Infrastructure" value={r.infrastructure / 1.5} text={percent(r.infrastructure)} />

@@ -3251,3 +3251,28 @@ select {
 .naval-forces .button {
   white-space: normal;
 }
+
+.simulation-conditions {
+  display: grid;
+  gap: 18px;
+  margin: 22px 0;
+}
+.simulation-conditions small {
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--muted);
+}
+.simulation-conditions input[type='range'] {
+  width: 100%;
+  padding: 0;
+  accent-color: var(--accent);
+}
+.conditions-incidents {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.conditions-incidents p {
+  margin: 12px 0;
+}

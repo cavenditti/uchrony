@@ -1,3 +1,4 @@
+import { DRIVE_AXES } from './ambitions'
 import type { World } from './types'
 import { CHARACTER_AXES, LEADER_SKILLS, type Attitudes } from './character-types'
 import { LEADER_PERKS } from './character'
@@ -64,6 +65,18 @@ export function validateCharacters(world: World) {
       new Set(leader.perks).size !== 3 ||
       leader.perks.some((key) => typeof key !== 'string' || !Object.hasOwn(LEADER_PERKS, key)) ||
       leader.perks.filter((key) => LEADER_PERKS[key].strength).length !== 2
+    )
+      fail()
+    const politics = leader.politics
+    if (
+      politics !== undefined &&
+      (!object(politics) ||
+        !text(politics.archetype, 100) ||
+        !object(politics.drives) ||
+        !DRIVE_AXES.every((key) => number(politics.drives[key])) ||
+        !text(politics.ambition, 500) ||
+        !text(politics.redLine, 500) ||
+        !text(politics.blindSpot, 500))
     )
       fail()
     const society = world.historical?.societies.find((s) => s.nation === nation.id)

@@ -1,3 +1,5 @@
+import { noise } from './random'
+import { DEFAULT_SETTINGS, validateSettings, type SimulationSettings } from './settings'
 import { ensureWarfare, commissionFleet, portAt } from './navy'
 import { militaryPeople } from './forces'
 import { ensurePopulation } from './population'
@@ -127,7 +129,13 @@ export function makeNation(id: number, capital: number): Nation {
   }
 }
 
-export function generateWorld(seed = 'A world unwritten', continents = 3, nationCount = 8): World {
+export function generateWorld(
+  seed = 'A world unwritten',
+  continents = 3,
+  nationCount = 8,
+  settings: SimulationSettings = DEFAULT_SETTINGS,
+): World {
+  settings = validateSettings(settings)
   continents = Math.round(clamp(continents, 1, 5))
   nationCount = Math.round(clamp(nationCount, 4, 12))
   const rng = { rng: hashSeed(seed) },
@@ -237,8 +245,14 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
       deposits: {
         timber: 0.25 + c.moisture,
         stone: 0.2 + c.elevation,
-        iron: 0.1 + rand() * c.elevation * 2,
-        coal: 0.1 + rand() * c.elevation * 2,
+        iron:
+          Math.max(0, noise(c.x / 90, c.y / 90, hashSeed(`${seed}:iron`)) - 0.38) ** 2 *
+          (1 + c.elevation) *
+          9,
+        coal:
+          Math.max(0, noise(c.x / 80, c.y / 80, hashSeed(`${seed}:coal`)) - 0.4) ** 2 *
+          (1.5 - c.elevation * 0.4) *
+          10,
       },
       population: {
         children: Math.round(size * 0.29),
@@ -369,6 +383,7 @@ export function generateWorld(seed = 'A world unwritten', continents = 3, nation
   const world: World = {
     version: 1,
     generatorVersion: 2,
+    simulation: { ...settings },
     seed,
     rng: rng.rng,
     month: 0,

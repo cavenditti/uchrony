@@ -44,8 +44,12 @@ function buildGeography(world: World) {
     water = (id: number) => cells[id].terrain === 'water',
     shore = cells.map((cell) => water(cell.id) && adjacent[cell.id].some((id) => !water(id))),
     segments: Segment[] = [],
-    indices = new Map<number, number>(),
-    key = (a: number, b: number) => Math.min(a, b) * cells.length + Math.max(a, b)
+    indices = new Int32Array(cells.length * 4).fill(-1),
+    key = (a: number, b: number) => {
+      const low = Math.min(a, b),
+        delta = Math.abs(a - b)
+      return low * 4 + (delta === 1 ? 0 : delta === width - 1 ? 1 : delta === width ? 2 : 3)
+    }
   for (const a of cells)
     for (const b of adjacent[a.id]) {
       if (a.id >= b) continue
@@ -56,13 +60,13 @@ function buildGeography(world: World) {
             : mode === 'port'
               ? 1
               : 1 + (+shore[a.id] + +shore[b]) * 0.15
-      indices.set(key(a.id, b), segments.length)
+      indices[key(a.id, b)] = segments.length
       segments.push({ a: a.id, b, mode, effort })
     }
   return {
     adjacent,
     segments,
-    index: (a: number, b: number) => indices.get(key(a, b))!,
+    index: (a: number, b: number) => indices[key(a, b)],
     usages: new WeakMap<RouteLeg[], ReadonlyMap<number, number>>(),
   }
 }
@@ -110,6 +114,8 @@ export function corridorProfile(world: World) {
         effectMultiplier(world, 'tradeCapacity', region.nation, region.id),
     }
   })
+  const globalCost = effectMultiplier(world, 'tradeCost'),
+    globalCapacity = effectMultiplier(world, 'tradeCapacity')
   geo.segments.forEach((segment, i) => {
     const { a, b, mode, effort } = segment,
       pa = provinces[world.cells[a].region],
@@ -123,8 +129,8 @@ export function corridorProfile(world: World) {
       baseCost[i] = (effort / 18) * port.seaFriction
       capacity[i] = port.port
     } else {
-      baseCost[i] = (effort / 18) * effectMultiplier(world, 'tradeCost')
-      capacity[i] = 16000 * effectMultiplier(world, 'tradeCapacity')
+      baseCost[i] = (effort / 18) * globalCost
+      capacity[i] = 16000 * globalCapacity
     }
     capacity[i] *= 1 + learning * 0.8
     const congestion = Math.min(8, 1.5 * (traffic[i] / capacity[i]) ** 2)

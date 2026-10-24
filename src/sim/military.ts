@@ -25,8 +25,8 @@ import { effectMultiplier } from './effects'
 import { random } from './random'
 import { seaPassageFactor } from './naval-control'
 
-export function landGraph(w: World, nation: number) {
-  return transportGraph(w, nation).map((edges) => edges.filter((e) => !e.sea))
+export function landGraph(w: World, nation: number, profile = corridorProfile(w)) {
+  return transportGraph(w, nation, profile).map((edges) => edges.filter((e) => !e.sea))
 }
 const accessible = (w: World, nation: number, region: number) =>
   w.regions[region].nation === nation ||
@@ -52,15 +52,36 @@ export function advanceArmies(w: World) {
       ),
     ]),
   )
+  let owners = ''
+  const supplyGraphs = new Map<number, ReturnType<typeof transportGraph>>(),
+    landGraphs = new Map<number, ReturnType<typeof landGraph>>()
+  function graphFor(nation: number, land: boolean) {
+    const currentOwners = w.regions.map((region) => region.nation).join(',')
+    if (owners !== currentOwners) {
+      owners = currentOwners
+      supplyGraphs.clear()
+      landGraphs.clear()
+    }
+    const cache = land ? landGraphs : supplyGraphs
+    let graph = cache.get(nation)
+    if (!graph) {
+      const access = w.regions.map((region) => accessible(w, nation, region.id))
+      graph = land
+        ? landGraph(w, nation, profile)
+        : transportGraph(w, nation, profile).map((edges, from) =>
+            edges.filter((edge) => access[from] && access[edge.to]),
+          )
+      cache.set(nation, graph)
+    }
+    return graph
+  }
   function supply(army: Army) {
     const ops = army.operations!,
       r = w.regions[army.region],
       n = w.nations[army.nation]
     ops.source = null
     ops.line = []
-    const graph = transportGraph(w, army.nation, profile).map((edges, from) =>
-      edges.filter((e) => accessible(w, army.nation, from) && accessible(w, army.nation, e.to)),
-    )
+    const graph = graphFor(army.nation, false)
     const paths = shortestPaths(graph, army.region)
     const sources = w.regions
       .filter(
@@ -363,7 +384,12 @@ export function advanceArmies(w: World) {
     }
     supply(a)
     if (engaged.has(a.id) || ops.disorder || a.soldiers < 50 || ops.stance !== 'march') continue
-    const graph = landGraph(w, a.nation),
+    if (
+      a.target === null &&
+      !w.relations.some((rel) => rel.treaty === 'war' && (rel.a === a.nation || rel.b === a.nation))
+    )
+      continue
+    const graph = graphFor(a.nation, true),
       paths = shortestPaths(graph, a.region)
     if (n.ai && a.target === null) {
       const targets = w.regions
