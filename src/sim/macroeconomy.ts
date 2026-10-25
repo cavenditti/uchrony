@@ -12,7 +12,7 @@ import {
 } from './types'
 import { STRATA, type EconomicStratum } from './economic-types'
 import { MODEL_PARAMETERS as P } from './model-parameters'
-import { settleBanks } from './banking'
+import { settleBanks, updateMonetaryPolicy } from './banking'
 import { ensureFirms, beginFirmMonth, finishFirms, hireFirms, regionalFirms, retailDecay } from './firms'
 import {
   beginNationalAccounts,
@@ -540,6 +540,7 @@ export function finishEconomyMonth(w: World) {
   reconcileGDP(w)
   for (const r of economicRegions(w)) e.producers[r.id].valueAdded = r.gdp
   summarizeEconomy(w)
+  updateMonetaryPolicy(w)
   auditLedger(w)
   auditGoods(w)
 }

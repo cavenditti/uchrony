@@ -1,16 +1,31 @@
-import { useState, type ReactNode } from 'react'
+import { memo, useState, type ReactNode } from 'react'
+import 'katex/dist/katex.min.css'
+import guide from '../../docs/MATHEMATICS.md?raw'
+import { modelSections, renderFormula } from './model-formulas'
 import reference from '../../docs/MODEL.md?raw'
 import { MODEL_PARAMETERS } from '../sim/model-parameters'
 
-const sections = reference
-  .split(/^## /m)
-  .slice(1)
-  .map((text) => {
-    const end = text.indexOf('\n')
-    return { title: text.slice(0, end), body: text.slice(end + 1).trim() }
-  })
+const sections = modelSections(guide)
+const fullReference = modelSections(reference)
+
+const Formula = memo(function Formula({ source, display = false }: { source: string; display?: boolean }) {
+  const html = renderFormula(source, display)
+  return display ? (
+    <div
+      className="model-equation"
+      tabIndex={0}
+      role="region"
+      aria-label="Equation"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  ) : (
+    <span dangerouslySetInnerHTML={{ __html: html }} />
+  )
+})
+
 function inline(text: string): ReactNode {
-  return text.split(/(\[[^\]]+\]\(https:\/\/[^)]+\)|`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
+  return text.split(/(\$[^$\n]+\$|\[[^\]]+\]\(https:\/\/[^)]+\)|`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
+    if (part.startsWith('$')) return <Formula key={i} source={part.slice(1, -1)} />
     const link = part.match(/^\[([^\]]+)\]\((https:\/\/[^)]+)\)$/)
     if (link)
       return (
@@ -23,10 +38,11 @@ function inline(text: string): ReactNode {
     return part
   })
 }
-/** A deliberately small, text-only renderer for the checked-in model reference. No HTML execution. */
+/** Small renderer for checked-in prose and TeX. Markdown HTML is never executed. */
 function ModelText({ text }: { text: string }) {
-  const blocks = text.split(/(```[\s\S]*?```)/g)
+  const blocks = text.split(/(\$\$[\s\S]*?\$\$|```[\s\S]*?```)/g)
   return blocks.map((block, index) => {
+    if (block.startsWith('$$')) return <Formula key={index} source={block.slice(2, -2).trim()} display />
     if (block.startsWith('```'))
       return (
         <pre key={index}>
@@ -94,17 +110,26 @@ function ModelText({ text }: { text: string }) {
     )
   })
 }
-export function ModelMathematics() {
+export default function ModelMathematics() {
   const [query, setQuery] = useState('')
+  const [full, setFull] = useState(false)
   const search = query.trim().toLowerCase(),
-    visible = sections.filter((s) => !search || `${s.title} ${s.body}`.toLowerCase().includes(search))
+    visible = (full ? fullReference : sections).filter(
+      (s) => !search || `${s.title} ${s.body}`.toLowerCase().includes(search),
+    )
   return (
     <section className="model-mathematics" aria-label="Simulation mathematics">
-      <p>Model {MODEL_PARAMETERS.version} · Monthly time steps · People, tonnes and thousands of crowns.</p>
-      <p>
-        Explore the equations, assumptions and limits behind the world. These are synthetic scenarios, with
-        standard demographic and economic model forms; they are not calibrated historical forecasts.
+      <p className="model-notation">
+        Model {MODEL_PARAMETERS.version} · Monthly steps. People, tonnes and thousands of crowns unless stated
+        otherwise. Rates are fractions; logs are natural. Symbols are defined locally.
       </p>
+      <label className="model-reference-select">
+        Reading view
+        <select value={full ? 'full' : 'guide'} onChange={(event) => setFull(event.target.value === 'full')}>
+          <option value="guide">Equations and assumptions</option>
+          <option value="full">Full implementation reference</option>
+        </select>
+      </label>
       <label className="model-search">
         Find a mechanism
         <input
@@ -121,13 +146,13 @@ export function ModelMathematics() {
       {!visible.length && <p>No matching mechanism. Try a broader term or clear the search.</p>}
       <div className="model-topics">
         {visible.map((s) => (
-          <details key={`${s.title}:${search}`} open={search ? true : undefined}>
+          <details key={`${full}:${s.title}:${search}`} open={search ? true : undefined}>
             <summary>{s.title}</summary>
             <ModelText text={s.body} />
           </details>
         ))}
       </div>
-      <details>
+      <details className="model-core-parameters">
         <summary>Current core parameters</summary>
         <dl className="model-parameters">
           {Object.entries(MODEL_PARAMETERS).map(([key, value]) => (

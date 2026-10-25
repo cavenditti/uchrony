@@ -1,5 +1,33 @@
 # Validation record
 
+## Labor, monetary contracts and US historical benchmark — 25 October 2026
+
+Model version 5 introduces persistent private employment, separation and feasible job matching; staggered wage bargaining with consumption-dependent reservation compensation; quarterly resets on new floating loans and principal-weighted prices on top-ups; a rolling-inflation monetary rule; debt-service-based working-capital underwriting; and a real financing hurdle for investment. Accounting still determines paid jobs, deposits, loan assets, reserves and GDP. New fields have strict save validation, while legacy fixed-rate loans retain their terms. Public services remain monthly purchases of labor and aggregate private contracts do not track named individuals.
+
+The first labor prototype incorrectly treated a fixed fraction of an unaffordable subsistence basket as guaranteed outside income. Its diagnostic trajectory developed mass unemployment and severe food deprivation. Reservation compensation now follows the marginal rate of substitution implied by CRRA consumption utility and work disutility; actual deprivation changes the willingness to accept work. A separate save-continuation regression exposed insertion-order differences caused by retaining an undefined optional labor record when reopening an enterprise. Deleting the absent record preserves exact JSON continuation. Neither repair changes population, goods, money or debt to hit an outcome target.
+
+The [US historical report](validation/us-1960-1985-v1.json) is a reproducible **failed first benchmark**, not a historical qualification. The frozen dataset contains six official BEA/BLS/Federal Reserve series, with source URLs, units, retrieval date and SHA-256 hashes. Forty training quarters (1960–1969) select from an explicit 81-candidate grid. All four arms start from observed 1969Q4 and run for 64 unreinitialized evaluation quarters (1970–1985). GDP, CPI, unemployment and labor force in the evaluation period are never passed into the forecast. Tests cover data integrity, deterministic calibration, holdout rejection, absence of lookahead, lagged monetary contraction and stagflation after an energy-cost shock.
+
+| Holdout experiment | Growth RMSE, percentage points | Inflation RMSE, percentage points | Unemployment RMSE, percentage points |
+|---|---:|---:|---:|
+| Recorded policy and energy | 9.262 | 24.306 | 10.855 |
+| Recorded policy, constant energy | 14.797 | 40.832 | 17.246 |
+| Modern policy rule, recorded energy | 4.795 | 4.030 | 1.956 |
+| Modern policy rule, constant energy | 4.937 | 5.525 | 2.465 |
+| 1969-origin persistence/drift baseline | 4.603 | 3.141 | 3.684 |
+
+The recorded-rate arm develops an excessive deflation/unemployment spiral. Fixed observed nominal policy cannot respond to the model's divergent inflation path. The rule-based counterfactual improves unemployment fit but misses the growth and inflation baseline. Energy sensitivity is reported at 0.5× and 1.5× the declared coefficients. The report includes every observed and projected quarter, training fit, GDP-level errors, MAE/bias, paired energy effects and event-window turning points. No parameters were retuned using these displayed holdout failures.
+
+This aggregate IS/Phillips/search model shares matching and policy functions with the world engine; it does **not** validate spatial firms, banking balance sheets, wage bargaining, US geography or national-accounting reconciliation. Recorded oil and policy paths are conditional inputs with endogenous historical components, not identified exogenous shocks. The modern inflation-target rule is not the historical Fed regime. Missing productivity and participation shifts, fiscal/external demand, historical expectations and monetary regimes remain substantive limitations. The Mathematical model dialog documents the equations, assumptions, sources and failed scorecard. Reproduce with `npm run evaluate:history`.
+
+The [version-5 mechanics report](validation/labor-monetary-v5.json) records **268 unique passing selected checks and one pre-existing failing diplomacy fixture**. That fixture expects three exposed neighbors in a seed that no longer supplies them; it also fails with the changed economic modules restored to HEAD. Seven local save-service checks pass with loopback access. The 240-month census, 120-month research and 1,200-month prolonged simulation cases are excluded, so this is not an unfiltered `npm test`. New contract checks cover feasible matching, nominal wage-scale invariance, consumption-dependent reservation compensation, paid-job identities, unfunded layoffs, rate timing, fixed/floating loan terms, investment transmission, strict save validation and future-data isolation. Split/merge checks now explicitly conserve employment records, floating-loan reset terms and monetary-policy memory.
+
+One frozen Regional world, **A world unwritten**, completed **120 months**, with exact compressed restoration and identical continuation through month **121** in a separate process. Monthly census, deposits, bank balance sheets, goods and all three GDP approaches reconcile. Population increased from 10,406,997 to 11,072,955 (+6.40%); eight states remained eight. Final food coverage is **80.71%**, unemployment **19.58%**, and the price index **5.64**. These are substantial remaining behavioral problems, not evidence of empirical realism. Final residuals are 3.87e-11 thousand crowns in customer accounts, 1.11e-8 in bank accounts, 1.46e-11 between GDP approaches, and 4.37e-10 tonnes in goods. The report retains annual trajectories, extrema, policy and labor-flow diagnostics, source hashes, checkpoint hash and continuation hash.
+
+The frozen qualification uses the committed corridor implementation to exclude concurrent corridor redesign. All nine task-owned simulation modules match the working checkout. Current TypeScript and production builds pass, with the existing large-bundle warning. Unrelated map work is preserved. The Mathematical model dialog explains version-5 mechanics and the historical failures; the bank display now quotes the annualized nominal rate used by the policy rule.
+
+The earlier 200-year qualification below belongs to version 4. It must not be reused as evidence that the new mechanics are stable for 200 years.
+
 ## Long-run demographic, economic and political mechanics — 25 October 2026
 
 Three fresh Regional resident-district worlds completed **2,400 monthly steps each (200 years)**, followed by strict restoration checks and identical decoded-versus-validated continuation to month 2,401. Every month checks the civilian-plus-military census, balanced migration, deposits and bank balance sheets, goods and independent GDP approaches. Annual checkpoints undergo strict world validation and the cumulative deposit-creation/destruction identity. The [machine-readable report](validation/long-run-stability-v4.json) retains all 200 annual observations per seed, whole-run extrema, source fingerprints, final account residuals and compressed-save hashes.
@@ -286,3 +314,9 @@ The final 1,080-year run took **154,992 ms** on this machine, ending with 25,228
 ## Remaining limits
 
 These checks validate implemented behavior and internal invariants. They do not establish historical realism, numerical calibration against empirical data, compatibility with all browsers, or production deployment. The full model boundaries are documented in MODEL.md and the app's help dialog.
+
+## Separate mathematical guide — 2026-10-25
+
+World menu now has separate **About Uchrony** and **Mathematical model** entries; About also links to the guide. The default guide renders `docs/MATHEMATICS.md`: 14 concise topics with typeset equations, local symbol definitions and primary-source links. Its reading selector retains the full `docs/MODEL.md` reference, and the parameter disclosure still reads the running parameter module. Formula rendering and fonts are bundled locally and loaded with the guide; mathematical markup includes MathML.
+
+Production build, focused formula tests (2/2) and formatting checks passed. Browser checks covered About-to-guide navigation, the direct menu entry, searching and empty results, the full-reference selector, dismissal and focus restoration. Desktop (1440 × 1000), phone (390 × 844) and narrow-phone (320 × 740) inspection confirmed readable notation, a persistent title/close header, and horizontally scrollable long equations without dialog/page overflow. No browser JavaScript errors occurred. The final preview excluded the disk-save service. The existing large map-chunk build warning remains. These checks qualify the documentation interface only; no simulation mechanics or historical qualification results changed.

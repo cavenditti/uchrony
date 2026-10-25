@@ -1,0 +1,69 @@
+{
+  "retrievedAt": "2026-10-25T20:09:52.419987+00:00",
+  "vintage": "Latest revised observations at retrieval; not a real-time information set.",
+  "method": "Date/value rows from official FRED table pages, normalized to CSV. Direct CSV download timed out; table pages were retrieved through web browsing.",
+  "calibration": [
+    "1960-01-01",
+    "1969-12-31"
+  ],
+  "evaluation": [
+    "1970-01-01",
+    "1985-12-31"
+  ],
+  "series": [
+    {
+      "id": "GDPC1",
+      "producer": "BEA",
+      "frequency": "quarterly",
+      "units": "billions of chained 2017 dollars, SA annual rate",
+      "source": "https://fred.stlouisfed.org/data/GDPC1",
+      "sha256": "33d41d931470444a6f9e063b0caf0d010fb043da88171bca18ac5c0ccfa5044d",
+      "observations": 108
+    },
+    {
+      "id": "CPIAUCSL",
+      "producer": "BLS",
+      "frequency": "monthly",
+      "units": "index 1982-1984=100, seasonally adjusted",
+      "source": "https://fred.stlouisfed.org/data/CPIAUCSL",
+      "sha256": "41aaa1223e526ddca4218d39779c5dccdf3326ac2cfdc6d4f8158f2b4ca8372e",
+      "observations": 324
+    },
+    {
+      "id": "UNRATE",
+      "producer": "BLS",
+      "frequency": "monthly",
+      "units": "percent of civilian labor force, seasonally adjusted",
+      "source": "https://fred.stlouisfed.org/data/UNRATE",
+      "sha256": "5e9cc7c600c46ba288e81ad8e3c878f662d37755b251a5de5a1b93247052e235",
+      "observations": 324
+    },
+    {
+      "id": "FEDFUNDS",
+      "producer": "Federal Reserve",
+      "frequency": "monthly",
+      "units": "percent per year, effective federal funds rate",
+      "source": "https://fred.stlouisfed.org/data/FEDFUNDS",
+      "sha256": "e3b13a6462f478f3a03c69b17b525b18e255ce52293c1217570366f5f23b18ad",
+      "observations": 324
+    },
+    {
+      "id": "CLF16OV",
+      "producer": "BLS",
+      "frequency": "monthly",
+      "units": "thousands, civilian labor force age 16+, seasonally adjusted",
+      "source": "https://fred.stlouisfed.org/data/CLF16OV",
+      "sha256": "2d6637b733af5df3018532d7dc50d329c1e4572cdf4f1538d0e3436714e8a25b",
+      "observations": 324
+    },
+    {
+      "id": "WPU0561",
+      "producer": "BLS",
+      "frequency": "monthly",
+      "units": "index 1982=100, domestic crude petroleum PPI, not seasonally adjusted",
+      "source": "https://fred.stlouisfed.org/data/WPU0561",
+      "sha256": "8bfda121d0f6298666e9610aeec5a4c9561d96ec723923e1fa5fc2288028b185",
+      "observations": 324
+    }
+  ]
+}

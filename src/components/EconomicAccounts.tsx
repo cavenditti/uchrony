@@ -182,8 +182,8 @@ export function MacroAccounts({ world, nation }: { world: World; nation: number 
             These banks serve the whole world. Lending creates deposits; repayments destroy them.
           </p>
           <div className="data-row">
-            <span>Policy rate, annual equivalent</span>
-            <b>{percent(Math.pow(1 + e.banking.centralBank.rate, 12) - 1)}</b>
+            <span>Policy rate, annualized</span>
+            <b>{percent(e.banking.centralBank.rate * 12)}</b>
           </div>
           {e.banking.banks.map((bank) => (
             <details key={bank.id}>

@@ -1,10 +1,9 @@
-import { ModelMathematics } from './components/ModelMathematics'
 import { DEFAULT_WORLD_SCALE, WORLD_SCALES, type WorldScale } from './sim/scale'
 import { WorldOverview } from './components/WorldOverview'
 import { inWorldText, narrativeProjection, presentWorld } from './sim/narrative'
 import { DEFAULT_SETTINGS, simulationSettings, type SimulationSettings } from './sim/settings'
 import { SimulationConditions } from './components/SimulationConditions'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Play,
   Pause,
@@ -54,6 +53,8 @@ import { WorldMap } from './components/WorldMap'
 import { Inspector, TAB_INFO, FlagMark, compact, type Tab } from './components/Inspector'
 import './styles.css'
 
+const ModelMathematics = lazy(() => import('./components/ModelMathematics'))
+
 const speedOptions = [1, 4, 12, 60]
 const tabLayer: Partial<Record<Tab, Layer>> = {
   atlas: 'political',
@@ -75,7 +76,7 @@ export default function App() {
     [showArmies, setShowArmies] = useState(false)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null),
     [busy, setBusy] = useState(false)
-  const [modal, setModal] = useState<'new' | 'help' | 'conditions' | null>(null),
+  const [modal, setModal] = useState<'new' | 'help' | 'model' | 'conditions' | null>(null),
     [stateSearch, setStateSearch] = useState(''),
     [showStates, setShowStates] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false),
@@ -294,8 +295,13 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [toast])
   useEffect(() => {
-    if (modal) dialogRef.current?.showModal()
-    else dialogRef.current?.close()
+    if (modal) {
+      const dialog = dialogRef.current
+      if (dialog && !dialog.open) dialog.showModal()
+      if (dialog) dialog.scrollTop = 0
+      if (modal === 'model' || modal === 'help')
+        dialog?.querySelector<HTMLButtonElement>('.dialog-close')?.focus()
+    } else dialogRef.current?.close()
   }, [modal])
   useEffect(() => {
     const keydown = (e: KeyboardEvent) => {
@@ -601,11 +607,21 @@ export default function App() {
                 onClick={() => {
                   closeMenus()
                   setRunning(false)
+                  setModal('model')
+                }}
+              >
+                <BookOpen size={16} />
+                Mathematical model
+              </button>
+              <button
+                onClick={() => {
+                  closeMenus()
+                  setRunning(false)
                   setModal('help')
                 }}
               >
                 <CircleHelp size={16} />
-                About &amp; mathematics
+                About Uchrony
               </button>
               <p>Fictional world · Experimental simulation</p>
             </div>
@@ -938,7 +954,7 @@ export default function App() {
       <dialog
         ref={dialogRef}
         aria-labelledby="dialog-title"
-        className={`app-dialog ${modal === 'help' ? 'help-dialog' : ''}`}
+        className={`app-dialog ${modal === 'help' ? 'help-dialog' : modal === 'model' ? 'mathematics-dialog' : ''}`}
         onCancel={() => setModal(null)}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -953,9 +969,16 @@ export default function App() {
           }
         }}
       >
-        <button className="dialog-close icon-button" aria-label="Close dialog" onClick={() => setModal(null)}>
-          <X size={20} />
-        </button>
+        <div className={modal === 'model' ? 'model-dialog-heading' : undefined}>
+          {modal === 'model' && <h2 id="dialog-title">Mathematical model</h2>}
+          <button
+            className="dialog-close icon-button"
+            aria-label="Close dialog"
+            onClick={() => setModal(null)}
+          >
+            <X size={20} />
+          </button>
+        </div>
         {modal === 'new' ? (
           <form
             onSubmit={(e) => {
@@ -1075,17 +1098,30 @@ export default function App() {
               </div>
             )}
           </form>
+        ) : modal === 'model' ? (
+          <>
+            <p className="model-intro">
+              Equations, assumptions and references. Behavioral coefficients are synthetic.
+            </p>
+            <Suspense fallback={<p role="status">Loading the mathematical model…</p>}>
+              <ModelMathematics />
+            </Suspense>
+          </>
         ) : modal === 'help' ? (
           <>
             <CompassIcon />
-            <h2 id="dialog-title">About &amp; mathematics</h2>
+            <h2 id="dialog-title">About Uchrony</h2>
             <p>
-              Uchrony is a local, deterministic world-history sandbox. Let states govern themselves, or
-              intervene in any one of them.
+              Uchrony is a local world-history simulation. Let states govern themselves, or intervene in any
+              one of them.
             </p>
-            <ModelMathematics />
+            <button className="about-model-link" onClick={() => setModal('model')}>
+              <BookOpen size={17} aria-hidden="true" />
+              Mathematical model
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
             <details className="model-controls">
-              <summary>Playing and controlling the world</summary>
+              <summary>Simulation controls</summary>
               <div className="help-steps">
                 <div>
                   <Play size={18} />
@@ -1098,7 +1134,7 @@ export default function App() {
                   <Search size={18} />
                   <span>
                     <strong>Follow a place or a system</strong>Select a state, click a province, or change the
-                    map layer. Every number comes from the same simulation.
+                    map layer. Explore the same world through its population, economy and history.
                   </span>
                 </div>
                 <div>

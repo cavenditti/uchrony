@@ -255,6 +255,8 @@ test('construction cannot overdraw a limiting stock through floating-point multi
   beginEconomyMonth(w)
   const firm = regionalFirms(w, 0)[0]
   firm.employment = firm.desiredEmployment = 100
+  // Investment now also needs a positive return above its financing cost.
+  firm.sales = 1
   w.economy!.households[0].artisan.laborForce = 100
   finishFirms(w)
   assert(firm.projects.length > 0)

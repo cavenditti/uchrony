@@ -44,20 +44,65 @@ bank dividend: recipient deposit +D; bank deposit liability +D; bank equity −D
 loan write-down: borrower debt −W; bank loan asset −W; bank equity −W
 ```
 
-Lending creates deposits rather than transferring an existing pool. Banks require 10% equity against loan assets. Firms can borrow up to max(1, four months of forecast sales, 30 × physical capacity); wholesalers up to max(1, six months of local subsistence sales); governments up to max(1,000, 24 × measured monthly GDP). These are synthetic underwriting rules. Interest is fixed at origination at the policy rate plus 0.15% per month. Additional borrowing on an existing facility retains that facility's rate. Scheduled principal repayment is 1.5% per month, bounded by cash after interest.
+Lending creates deposits rather than transferring an existing pool. Banks require 10% equity against loan assets. Firm working-capital debt is limited to 30% of expected monthly sales divided by the monthly interest-plus-principal-service rate, for both payroll and material procurement. Wholesalers retain their synthetic limit of max(1, six months of local subsistence sales); governments retain max(1,000, 24 × measured monthly GDP). Bank capital can constrain lending further. These are underwriting assumptions, not historically estimated credit standards.
+
+New loans float at the policy rate plus 0.15% per month, resetting every three months. Existing legacy loans remain fixed. New borrowing on an existing facility blends its current rate with the rate on the additional principal; a floating facility subsequently resets as a whole on its contractual date. A fixed facility retains the blended rate until another top-up. This pooled-facility approximation does not track individual vintages or contractual maturity. Reset terms, principal, lender, arrears and origination dates survive district splits and save restoration. Scheduled principal repayment is 1.5% per month, bounded by cash after interest. No rate change itself creates deposits or income.
 
 Twelve consecutive months of unpaid interest trigger a 65% principal write-down. Full interest payment resets the counter. Sovereign restructuring reduces legitimacy by four and stability by three. Financial default does not destroy physical inventories or capital. Firms in persistent distress liquidate: available cash repays creditors first, unrecovered loans are written down, remaining goods and equipment transfer to local shared capacity, and residual cash belongs to owners.
 
 A solvent bank can obtain central-bank reserves for an outgoing settlement, limited to 95% of its loan assets less existing advances. This creates both reserves and a central-bank claim, without increasing commercial-bank equity. Advances pay the policy rate; excess reserves above 10% of deposits repay them. An insolvent bank wipes out existing ownership and converts enough deposit claims into equity to restore the 10% loan-capital target, bounded by outstanding deposits. Conversion is proportional across depositors, who receive explicit ownership shares. It destroys deposits and is reported separately; there is no free recapitalization or deposit guarantee. If deposit conversion is exhausted, any remaining central-bank claim is written down with a matching loss in central-bank equity. This recognizes a creditor loss; it issues no new deposits. Bank income is interest received less central-bank charges and credit losses. Up to 65% of positive monthly income can be distributed, subject to a 12.5% loan-capital buffer; losses reduce both income and equity. Enterprise liquidations after bank settlement enter the next settlement’s retained capital constraint.
 
 ```text
-annualized observed inflation = 12 × log(basket index[t−1] / basket index[t−2])
-desired monthly policy rate = clamp(0.0015 + 0.15 × (inflation−0.02)/12
-                                   − 0.002 × unemployment, 0, 0.012)
-policy rate += 0.05 × (desired rate − policy rate)
+monthly price change = log(P[t] / P[t−1])
+inflation π = sum(last 12 monthly log changes)
+expected inflation += (π − expected inflation) / 24
+annual desired policy rate i* = r* + π + 0.5 × (π − π*) + (u* − u)
+next annual policy rate = max(0, 0.85 × current annual rate + 0.15 × i*)
+monthly loan/advance policy rate = annual policy rate / 12
+r* = 0.02; π* = 0.02; u* = 0.04
 ```
 
-This is a smoothed Taylor-style response, not an estimated central-bank reaction function. The model omits deposit interest, reserve remuneration, interbank unsecured loans, bond trading, deposit insurance and imputed financial-service output. Loan interest is property income, excluded from GDP; no financial-service charge is inferred from the interest spread.
+The policy announcement follows completed monthly GDP, price and employment measurement; it affects subsequent decisions. Initial missing price history uses the prior expected inflation for each missing month. Expectations start at 2%; legacy saves start a new observation window. Annual nominal rates are quoted as twelve times the monthly contractual charge; inflation is a log change. There is no upper policy-rate cap. The zero lower bound is an explicit regime assumption. This inertial inflation-target rule follows the structure of the [Federal Reserve's illustrative policy rules](https://www.federalreserve.gov/monetarypolicy/2026-07-mpr-part2.htm); it is not a reconstruction of the historical Federal Reserve, a full monetary equilibrium, or an estimated reaction function.
+
+Policy affects loan repricing, debt-service affordability, inventory carrying costs and the real financing hurdle for investment. Deposits remain created by lending and extinguished by principal repayment, with interest, distributions and bank losses booked explicitly. This mechanism follows the distinction explained in the [Bank of England's money-creation paper](https://www.bankofengland.co.uk/quarterly-bulletin/2014/q1/money-creation-in-the-modern-economy). The model still omits deposit interest, reserve remuneration, interbank unsecured loans, bond trading, deposit insurance and imputed financial-service output. Loan interest is property income, excluded from GDP; no financial-service charge is inferred from the interest spread.
+
+## United States historical research benchmark: 1960–1985
+
+The first historical experiment uses frozen BEA real GDP, BLS CPI, unemployment, civilian labor force and domestic crude-petroleum prices, and Federal Reserve effective policy rates, obtained from [FRED](https://fred.stlouisfed.org/). Dataset files preserve source URLs, units, retrieval date and hashes. These are revised observations, not historical real-time vintages. Monthly observations become quarterly arithmetic means; GDP remains a quarterly seasonally adjusted annual-rate level. Annual inflation is the four-quarter log CPI change; growth is four times quarterly log GDP change.
+
+This is a **separate quarterly aggregate research model**, sharing the spatial world's job-retention, matching and policy-rate functions. It does not simulate the US map, individual banks, wage bargaining or the transaction/GDP ledger. It supplies a falsifiable macroeconomic benchmark while those fuller historical initial conditions remain unimplemented. The generated world has no explicit petroleum sector or historical US institutional reconstruction.
+
+Forty quarters in 1960–1969 fit a fixed 81-candidate grid for demand persistence, interest sensitivity, the Phillips slope and expectations adjustment. The objective is squared growth RMSE divided by 4², plus squared inflation and unemployment RMSE each divided by 2², all in percentage points. Potential output and labor supply use log-linear trends estimated only on those forty quarters; natural unemployment and the neutral real rate use their training means. Energy pass-through (0.04), energy demand effect (0.025), matching efficiency (0.65), quarterly separations (1−0.985³), and employment elasticity (0.5) remain declared assumptions. Calm 1960s energy prices cannot identify the later oil-crisis response reliably.
+
+```text
+x[t] = ρ x[t−1] − σ × (i[t−1] − πe[t−1] − r*)/4 − χ Δlog(oil[t])
+potential log GDP[t] = fitted intercept + fitted trend × quarter
+desired employment = min(L, L × (1−u*) × exp(0.5 × x[t]))
+retained employment = min(L, desired employment, previous employment × (1−separation))
+vacancies = desired employment − retained employment
+hires = min(L−retained, vacancies, 0.65 × sqrt((L−retained) × vacancies))
+u[t] = 1 − (retained + hires) / L
+quarterly log inflation = (πe[t−1] + κ × (u*−u[t]))/4 + γ Δlog(oil[t])
+annual inflation = sum(last four quarterly log changes)
+πe[t] = πe[t−1] + λ × (annual inflation − πe[t−1])
+log GDP[t] = potential log GDP[t] + x[t]
+```
+
+Here x is the log output gap; i is the annualized nominal policy rate; πe is annual expected log inflation; L grows at its training trend. The initial four-quarter inflation window is initialized evenly from the observed annual rate. The comparison begins from the common observed 1969Q4 state and runs for 64 quarters without resetting to later outcomes. Subsequent GDP, CPI, unemployment and labor force are scoring data only. Four experiments combine recorded versus rule-based policy with recorded versus constant energy prices. The policy-rule experiment uses the world rule's form with quarterly inertia 0.6 and a modern 2% target; it does not represent the historical Federal Reserve.
+
+Event annotations identify the [1973–74 embargo](https://www.federalreservehistory.org/essays/oil-shock-of-1973-74), [1978–79 oil shock](https://www.federalreservehistory.org/essays/oil-shock-of-1978-79) and [October 1979 monetary-policy change](https://www.federalreservehistory.org/essays/anti-inflation-measures). Replayed policy and domestic oil prices are conditional paths with endogenous historical components, not statistically identified shocks. Paired experiments measure this model's responses, not the historical causal contribution of each event. Half and one-and-a-half energy-coefficient runs report sensitivity, not confidence intervals.
+
+The first holdout **fails historical qualification**. RMSE in percentage points:
+
+| Experiment, 1970–1985 | GDP growth | Annual inflation | Unemployment |
+|---|---:|---:|---:|
+| Recorded policy and energy | 9.26 | 24.31 | 10.85 |
+| Modern policy rule and recorded energy | 4.79 | 4.03 | 1.96 |
+| Simple 1969-origin persistence/drift baseline | 4.60 | 3.14 | 3.68 |
+
+The declared criterion requires beating that baseline on all three targets. The baseline persists 1969Q4 inflation and unemployment and extrapolates mean 1960s GDP growth. Recorded-rate replay develops excessive deflation and unemployment: its interest-rate path cannot respond to the model's own divergent inflation expectations. The policy-rule experiment improves unemployment fit but misses growth and inflation. Neither result validates the spatial engine. Missing productivity/participation shifts, fiscal and external demand, wage-price controls, exchange-rate regimes, sectoral energy substitution and historical expectations are material limitations. This failed experiment is retained; fitting parameters to the displayed holdout would require a new independent evaluation period.
+
+The reproducible command is `npm run evaluate:history`; its report contains every quarterly observation, every simulated path, MAE/RMSE/bias, GDP-level errors, sensitivity runs, paired energy responses, data hashes and source fingerprint. This evaluation is independent of accounting-conservation and long-run endurance checks. The earlier 200-year report applies to model version 4 and does not qualify version 5.
 
 ## Demographic equations
 
@@ -108,15 +153,24 @@ anticipated public payroll = min(local population share of treasury,
                                 labor force × mean wage × collected tax rate × service share)
 private labor = max(0, labor force − anticipated public payroll / mean wage)
 desired jobs = private labor / active firms × utilization × (1−0.5 devastation)
-previous employment rate = previous funded jobs / previous participating labor
-wage *= exp(0.04 × (previous employment rate−0.96) + 0.20 × local monthly log inflation)
-wage = max(0.00005, wage)
-funding fraction = min(1, firm deposits / requested wage bill)
+consumption c = 0.7 × previous food coverage + 0.3 × previous material coverage
+reservation b = 0.65 × basket cost per skill-adjusted worker × c²
+productive value y = benchmark output value less recipe inputs, per skill-adjusted worker
+bargaining share β = 0.5 × previous funded employment / previous labor force
+negotiated wage = b + β × max(0, y − b)
+wage[t] = (11/12) × wage[t−1] × exp(expected annual log inflation / 12)
+          + (1/12) × negotiated wage
+retained jobs = min(funded desired jobs, previous jobs × (1−0.015))
+vacancies V = max(0, funded desired jobs − retained jobs)
+new matches M = min(U, V, 0.65 × U^0.5 × V^0.5)
+employment = retained jobs + hires
 ```
 
-Firms offer wages in descending order and hire from the remaining local labor pool; equal offers use persistent firm ID. Hired workers retain the stratum proportions of that remaining pool. Wage bills are funded before output is produced. Available credit can cover a shortfall; insufficient credit means fewer paid jobs. Private, public and construction jobs share one labor-force ceiling. The wage rule is an expectations-augmented bargaining response to realized labor-market pressure; 4% reference unemployment and partial price indexation are synthetic coefficients, not a forced employment outcome. Desired production alone cannot raise wages through an assumed labor shortage. Public hiring reserves only a treasury-backed expectation, and unused reservations remain unemployment. Public services are valued at actual labor cost. Their reference-price output uses the base wage 0.0015 times the skill multiplier, so a wage-price rise alone does not create real output. Unemployment is one minus employed labor divided by participating labor, rather than one minus employment divided by the entire population.
+Reservation compensation follows the marginal rate of substitution under CRRA consumption utility (risk aversion 2) and linear work disutility: with utility derivative c^(−2), compensation for an extra unit of work is proportional to c². The subsistence basket supplies the consumption unit; it is **not guaranteed outside income**. Deprivation increases marginal utility and lowers reservation compensation. Work disutility 0.65 and the 70/30 coverage proxy are synthetic assumptions. There is no fixed nominal wage floor. Productive value uses benchmark average value added rather than a differentiated marginal product or solved firm value function. Firms with productive value below reservation compensation do not open jobs. Existing nominal wages renegotiate gradually; new hires require an offer at least as high as reservation compensation.
 
-The existing minimum wage offer is 0.00005 thousand crowns per worker-month before skill weighting; goods quotes have an existing positive lower bound of 0.01 crowns per tonne. These numerical bounds remain model limitations. Endurance validation reports the fraction of private employment at the wage minimum, alongside actual price trends, so an apparent equilibrium can be distinguished from widespread binding of that constraint.
+Private contracts persist across months. Desired downsizing, separation and inability to pay reduce retained staff. If migration, retirement or boundary changes reduce the resident pool, retained claims scale together to fit it. Remaining vacancies match remaining job seekers; firms receive matches in proportion to their funded vacancies. Wage differences enter acceptance and funding, rather than letting a high offer confiscate another firm's retained staff. Staff are aggregate local claims, not named individual employment histories; allocation across strata follows the resident labor-force shares. Each firm records opening staff, retained jobs, separations, hires, vacancies and unfilled openings. Wages settle through actual transfers before output. The [search-and-matching literature](https://www.nobelprize.org/uploads/2018/06/advanced-economicsciences2010.pdf) motivates the matching law; this model does not solve the full Diamond–Mortensen–Pissarides free-entry and surplus equations.
+
+Private, public and construction jobs share one labor-force ceiling. Public hiring reserves only a treasury-backed expectation; unused reservations remain unemployment. Public and construction employment remain monthly purchased services, not persistent civil-service contracts. Public services are valued at actual labor cost. Reference-price output uses base wage 0.0015 times the skill multiplier, so wage inflation alone creates no real services. Unemployment is one minus employed labor divided by participating labor, rather than the entire population.
 
 Slow occupational mobility uses probability 0.0005 × opportunity per month: urban smallholders can become laborers; literate laborers artisans; sufficiently literate artisans professionals; wealthy professionals owners. Severe deprivation can push artisans, professionals or owners back into laboring work. Exact age/sex profiles and proportional cash move together. This is a reduced-form family-group transition model, not individual schooling, inheritance or occupational licensing.
 
@@ -172,6 +226,10 @@ private capital after wear = capital × (1−0.0015)
 shared capacity after wear = capacity × (1−0.0015) × (1−0.002 devastation)
 desired new firm capacity = max(0, jobs / desired jobs − 0.75) × 0.025
                             + capital × 0.0015
+monthly real finance cost = (1 + monthly loan rate) × exp(−expected annual inflation / 12) − 1
+user cost = real finance cost + 0.0015 depreciation
+operating yield = (sales − payroll − inputs) / max(unit construction cost, capital × unit construction cost)
+desired new capacity = 0 when operating yield ≤ user cost
 construction inputs per unit = 300 t timber + 400 t stone + 40 t tools
 construction labor per unit = 1,000 artisan person-months
 actual construction = min(desired, input availability, unused artisan labor,
@@ -618,9 +676,9 @@ An organized coalition can found a regional state, join an adjacent successor wi
 
 ## Long-run validation and remaining limitations
 
-Three Regional resident-district scenarios completed 2,400 monthly steps and exact save restoration with identical continuation through month 2,401. Population changed by +32.6%, +31.1% and −5.2%; the eight opening states finished as eight, eight and ten. Monthly census, money, banking, goods and GDP reconciliation checks passed.
+Under model version 4, three Regional resident-district scenarios completed 2,400 monthly steps and exact save restoration with identical continuation through month 2,401. Population changed by +32.6%, +31.1% and −5.2%; the eight opening states finished as eight, eight and ten. Monthly census, money, banking, goods and GDP reconciliation checks passed.
 
-These are broad diagnostic passes, not calibrated forecasts or proof of a stationary equilibrium. Across the last 30 annual observations, population contracts by 0.13–0.41% per year and prices deflate by 0.63–4.52% per year. Earlier price indices peak at 6.62–8.33 times their reference level. The existing wage minimum binds for 8.4–38.7% of private employment at the endpoints, so these runs do not establish stability independent of numerical bounds. Full trajectories, food coverage, acceptance thresholds and source fingerprints are in the validation record. The 200-year runs use frozen baseline geography; concurrent terrain changes have separate, shorter compatibility checks.
+These are broad diagnostic passes, not calibrated forecasts or proof of a stationary equilibrium. Across the last 30 annual observations, population contracts by 0.13–0.41% per year and prices deflate by 0.63–4.52% per year. Earlier price indices peak at 6.62–8.33 times their reference level. The version-4 wage minimum bound 8.4–38.7% of private employment at the endpoints. Version 5 replaces that wage rule, so these older runs do not qualify the current labor and monetary mechanics. Full trajectories, food coverage, acceptance thresholds and source fingerprints are in the validation record. The 200-year runs use frozen baseline geography; concurrent terrain changes have separate, shorter compatibility checks.
 
 ## Persistence and performance boundaries
 

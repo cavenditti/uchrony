@@ -6,6 +6,7 @@ import { balances } from '../src/sim/ledger'
 import { parseSave, validateWorld } from '../src/sim/persistence'
 import { packWorldSave, unpackWorldSave } from '../src/sim/save-codec'
 import type { World } from '../src/sim/types'
+import { MODEL_PARAMETERS } from '../src/sim/model-parameters'
 
 // Run separately from the endurance process so restoration does not reuse its caches.
 const path = process.argv[2]
@@ -45,7 +46,7 @@ assert.equal(JSON.stringify(packWorldSave(restored)), bytes, 'restoration must p
 const economy = restored.economy!
 const firms = economy.firms!.filter((f) => f.active)
 const privateJobs = firms.reduce((sum, f) => sum + f.employment, 0)
-const minimumWageJobs = firms
+const belowFormerMinimumJobs = firms
   .filter((f) => f.wage <= 0.00005000000001)
   .reduce((sum, f) => sum + f.employment, 0)
 const final = {
@@ -64,7 +65,20 @@ const final = {
   createdDeposits: economy.banking!.created,
   destroyedDeposits: economy.banking!.destroyed,
   activeFirms: firms.length,
-  employmentAtWageMinimum: privateJobs ? minimumWageJobs / privateJobs : 0,
+  modelVersion: MODEL_PARAMETERS.version,
+  // Version 5 has no nominal wage floor. This is a historical comparison only.
+  employmentBelowFormerWageMinimum: privateJobs ? belowFormerMinimumJobs / privateJobs : 0,
+  annualPolicyRate: economy.banking!.centralBank.rate * 12,
+  expectedAnnualInflation: economy.banking!.policy?.expectedInflation,
+  measuredAnnualInflation: economy.banking!.policy?.inflation,
+  activeFirmLaborFlows: firms.reduce(
+    (flows, f) => ({
+      hires: flows.hires + (f.labor?.hires ?? 0),
+      separations: flows.separations + (f.labor?.separations ?? 0),
+      unfilled: flows.unfilled + (f.labor?.unfilled ?? 0),
+    }),
+    { hires: 0, separations: 0, unfilled: 0 },
+  ),
   employmentWeightedWage: privateJobs
     ? firms.reduce((sum, f) => sum + f.wage * f.employment, 0) / privateJobs
     : 0,

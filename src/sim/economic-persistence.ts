@@ -141,6 +141,23 @@ export function validateEconomy(w: World) {
       ] as const)
         if (!num(f[key])) fail(`firm ${key}`)
       if (!num(f.profit, -1e16)) fail('firm profit')
+      if (f.labor !== undefined) {
+        if (
+          !obj(f.labor) ||
+          ['opening', 'retained', 'hires', 'separations', 'vacancies', 'unfilled'].some(
+            (key) => !num(f.labor![key as keyof NonNullable<typeof f.labor>]),
+          )
+        )
+          fail('firm labor flows')
+        const flow = f.labor
+        const tolerance = 1e-7 * Math.max(1, flow.opening, f.employment)
+        if (
+          Math.abs(flow.opening - flow.retained - flow.separations) > tolerance ||
+          Math.abs(flow.vacancies - flow.hires - flow.unfilled) > tolerance ||
+          (f.active && Math.abs(f.employment - flow.retained - flow.hires) > tolerance)
+        )
+          fail('firm employment identity')
+      }
       if (
         f.laborMix !== undefined &&
         (!obj(f.laborMix) ||
@@ -198,6 +215,19 @@ export function validateEconomy(w: World) {
       fail('loan claim')
     if (e.banking && (!Number.isInteger(l.bank) || !e.banking.banks[l.bank!] || !num(l.rate)))
       fail('bank loan terms')
+    if (l.rateType !== undefined && l.rateType !== 'fixed' && l.rateType !== 'floating')
+      fail('loan rate type')
+    if (
+      l.rateType === 'floating' &&
+      (!num(l.spread) ||
+        !Number.isInteger(l.resetMonths) ||
+        l.resetMonths! < 1 ||
+        l.resetMonths! > 120 ||
+        !Number.isSafeInteger(l.nextReset) ||
+        l.nextReset! < l.originated ||
+        l.nextReset! > w.month + l.resetMonths!)
+    )
+      fail('floating loan reset')
     ids.add(l.id)
   }
   for (const n of w.nations) {
@@ -272,6 +302,32 @@ export function validateEconomy(w: World) {
     for (const key of ['advances', 'reserves', 'rate'] as const)
       if (!num(b.centralBank[key], -1e-7)) fail('central bank')
     if (!num(b.centralBank.equity, -1e16)) fail('central bank equity')
+    if (b.policy !== undefined) {
+      const p = b.policy
+      if (
+        !obj(p) ||
+        p.regime !== 'inflation-target' ||
+        !Array.isArray(p.logChanges) ||
+        p.logChanges.length > 12 ||
+        p.logChanges.some((x) => !num(x, -1e16)) ||
+        !Number.isSafeInteger(p.lastMonth) ||
+        p.lastMonth < 0 ||
+        p.lastMonth > w.month ||
+        !num(p.target, -1) ||
+        !num(p.neutralRealRate, -1) ||
+        !num(p.inflation, -1e16) ||
+        !num(p.expectedInflation, -1e16) ||
+        !num(p.referenceUnemployment) ||
+        p.referenceUnemployment > 1 ||
+        !num(p.inflationResponse) ||
+        !num(p.unemploymentResponse) ||
+        !num(p.inertia) ||
+        p.inertia >= 1 ||
+        !num(p.expectationAdjustment) ||
+        p.expectationAdjustment > 1
+      )
+        fail('monetary policy')
+    }
     auditBanks(w, false)
   }
   if (e.accounts) {

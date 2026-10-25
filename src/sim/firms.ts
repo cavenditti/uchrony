@@ -24,6 +24,8 @@ import { BASE_PRICE, householdNeed, reserveTarget } from './economy'
 import { participatingLabor } from './age-cohorts'
 import { collectedTaxRate } from './macroeconomy'
 import { MODEL_PARAMETERS as P } from './model-parameters'
+import { bargainWage, matchJobs, retainedJobs, reservationWage } from './labor-market'
+import { realFinancingRate } from './monetary-policy'
 import { effectMultiplier } from './effects'
 import { simulationSettings } from './settings'
 import { hashSeed } from './random'
@@ -52,6 +54,11 @@ const recipes: Partial<Record<Good, Partial<Inventory>>> = {
   tools: { iron: 0.65, coal: 0.3, timber: 0.25 },
   textiles: { timber: 0.3, food: 0.12 },
   arms: { iron: 0.9, coal: 0.5, tools: 0.3 },
+}
+function workingCapitalLimit(w: World, f: CompetitiveFirm) {
+  const sales = GOODS.reduce((sum, g) => sum + (f.forecast[g] * f.prices[g]) / 1000, 0)
+  const rate = (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
+  return (sales * 0.3) / (P.creditRepaymentMonthly + rate)
 }
 const firmIndexes = new WeakMap<
   World,
@@ -158,7 +165,7 @@ export function beginFirmMonth(w: World) {
     f.capital *= 1 - P.depreciationMonthly
     for (const p of f.projects) if (--p.remaining <= 0) f.capital += p.capital
     f.projects = f.projects.filter((p) => p.remaining > 0)
-    f.payroll = f.sales = f.purchases = f.interest = f.taxes = f.employment = 0
+    f.payroll = f.sales = f.purchases = f.interest = f.taxes = 0
     f.production = inventory()
     f.planned = inventory()
     f.sold = inventory()
@@ -176,11 +183,23 @@ export function hireFirms(w: World, r: Region) {
   for (const c of r.communities ?? []) hh[c.stratum ?? 'laborer'].laborForce += participatingLabor(c)
   const labor = STRATA.reduce((sum, s) => sum + hh[s].laborForce, 0)
   const basket = GOODS.reduce((sum, g) => sum + householdNeed(r, g) * r.prices[g], 0)
-  const reference = GOODS.reduce((sum, g) => sum + householdNeed(r, g) * BASE_PRICE[g], 0)
-  const index = reference > 0 ? basket / reference : 1,
-    p = e.producers[r.id]
-  const inflation = Math.log(Math.max(0.001, index) / Math.max(0.001, p.previousPriceIndex ?? index))
-  p.previousPriceIndex = index
+  const p = e.producers[r.id]
+  const averageSkill =
+    labor > 0 ? STRATA.reduce((sum, s) => sum + hh[s].laborForce * WAGE_SKILL[s], 0) / labor : 1
+  // Actual consumption changes marginal utility. An unaffordable basket must
+  // not be treated as guaranteed outside income that makes work unattractive.
+  const consumption = 0.7 * (r.foodCoverage ?? 1) + 0.3 * (r.materialCoverage ?? 1)
+  const reservation =
+    labor > 0
+      ? reservationWage(
+          basket / (1000 * labor * averageSkill),
+          consumption,
+          P.reservationConsumptionShare,
+          P.consumptionRiskAversion,
+        )
+      : 0
+  const expectedInflation = e.banking?.policy?.expectedInflation ?? 0.02
+  const plans = new Map<number, { opening: number; retained: number; wanted: number }>()
   const n = w.nations[r.nation]
   const serviceShare =
     (n.policies.education + n.policies.military + n.policies.research + 30) /
@@ -223,40 +242,67 @@ export function hireFirms(w: World, r: Region) {
     f.laborMix = inventory()
     for (const g of GOODS) f.laborMix[g] = needed > 0 ? required[g] / needed : baseline[g]
     f.desiredEmployment = benchmarkJobs * utilization * (1 - r.devastation * 0.5)
-    // Bargaining responds to realized employment, including public jobs. Desired
-    // utilization is not evidence that labor is scarce or that wages were funded.
-    const employmentRate = p.previousLabor
-      ? (p.previousJobs ?? 0) / p.previousLabor
+    const valueAdded = GOODS.reduce((sum, g) => {
+      const inputs = Object.entries(recipes[g] ?? {}).reduce(
+        (cost, [input, rate]) => cost + r.prices[input as Good] * rate,
+        0,
+      )
+      return sum + (q[g] * Math.max(0, f.prices[g] - inputs)) / 1000
+    }, 0)
+    const productivity = benchmarkJobs > 0 ? valueAdded / (benchmarkJobs * averageSkill) : 0
+    const employedShare = p.previousLabor
+      ? Math.min(1, (p.previousJobs ?? 0) / p.previousLabor)
       : 1 - P.referenceUnemployment
-    f.wage *= Math.exp(
-      P.wageBargainingAdjustment * (employmentRate - (1 - P.referenceUnemployment)) +
-        P.wagePriceIndexation * inflation,
+    const bargainingPower = P.workerBargainingPower * employedShare
+    f.wage = bargainWage(
+      f.wage,
+      reservation,
+      productivity,
+      bargainingPower,
+      P.wageRenegotiationMonthly,
+      expectedInflation / 12,
     )
-    f.wage = Math.max(0.00005, f.wage)
+    if (productivity < reservation) f.desiredEmployment = 0
+    const opening = f.employment
+    const bill = f.desiredEmployment * f.wage * averageSkill
+    // At most 30% of expected receipts can service working-capital debt.
+    if (f.cash < bill) borrow(w, firmAccount(f.id), bill - f.cash, workingCapitalLimit(w, f))
+    const wanted = f.wage > 0 ? Math.min(f.desiredEmployment, f.cash / (f.wage * averageSkill)) : 0
+    const retained = retainedJobs(opening, wanted, P.jobSeparationMonthly)
+    plans.set(f.id, { opening, retained, wanted: f.wage >= reservation ? wanted : retained })
   }
+  // Existing contracts have priority over new vacancies. Migration, retirement
+  // and changing boundaries can reduce the resident pool; scale claims together.
+  const claimed = [...plans.values()].reduce((sum, p) => sum + p.retained, 0)
+  const retentionScale = claimed > 0 ? Math.min(1, privateLabor / claimed) : 1
+  for (const plan of plans.values()) plan.retained *= retentionScale
+  const retained = [...plans.values()].reduce((sum, p) => sum + p.retained, 0)
+  const vacancies = [...plans.values()].reduce((sum, p) => sum + Math.max(0, p.wanted - p.retained), 0)
+  const matches = matchJobs(
+    Math.max(0, privateLabor - retained),
+    vacancies,
+    P.matchingEfficiency,
+    P.matchingElasticity,
+  )
   let jobs = 0,
     payroll = 0
-  for (const f of [...firms].sort((a, b) => b.wage - a.wage || a.id - b.id)) {
-    const available = STRATA.reduce((sum, s) => sum + Math.max(0, hh[s].laborForce - hh[s].employed), 0)
-    const wanted = Math.min(f.desiredEmployment, available)
-    const averageSkill =
-      STRATA.reduce((sum, s) => sum + Math.max(0, hh[s].laborForce - hh[s].employed) * WAGE_SKILL[s], 0) /
-      Math.max(1, available)
-    const bill = wanted * f.wage * averageSkill
-    const sales = GOODS.reduce((sum, g) => sum + (f.forecast[g] * f.prices[g]) / 1000, 0)
-    if (f.cash < bill) borrow(w, firmAccount(f.id), bill - f.cash, Math.max(1, sales * 4, f.capital * 30))
-    const funded = Math.min(1, f.cash / Math.max(1e-12, bill))
+  for (const f of firms) {
+    const plan = plans.get(f.id)!
+    const vacant = Math.max(0, plan.wanted - plan.retained)
+    const hires = vacancies > 0 ? (matches * vacant) / vacancies : 0
+    const count = plan.retained + hires
+    f.employment = 0
     for (const s of STRATA) {
-      const h = hh[s],
-        count = available ? (Math.max(0, h.laborForce - h.employed) / available) * wanted * funded : 0
+      const h = hh[s]
+      const allocation = labor > 0 ? (count * h.laborForce) / labor : 0
       const paid = transfer(
         w,
         firmAccount(f.id),
         householdAccount(r.id, s),
-        count * f.wage * WAGE_SKILL[s],
+        allocation * f.wage * WAGE_SKILL[s],
         'enterprise wages',
       )
-      const actual = paid / Math.max(1e-12, f.wage * WAGE_SKILL[s])
+      const actual = f.wage > 0 ? paid / (f.wage * WAGE_SKILL[s]) : 0
       const tax = transfer(
         w,
         householdAccount(r.id, s),
@@ -272,13 +318,22 @@ export function hireFirms(w: World, r: Region) {
       f.payroll += paid
       recordWages(w, r.id, firmAccount(f.id), paid)
     }
+    // Payroll settlement is the authority for actual jobs, including rounding.
+    const actualRetained = Math.min(plan.retained, f.employment)
+    f.labor = {
+      opening: plan.opening,
+      retained: actualRetained,
+      hires: Math.max(0, f.employment - actualRetained),
+      separations: plan.opening - actualRetained,
+      vacancies: vacant,
+      unfilled: Math.max(0, vacant - (f.employment - actualRetained)),
+    }
     jobs += f.employment
     payroll += f.payroll
   }
   p.payroll = payroll
   p.desiredEmployment = firms.reduce((sum, f) => sum + f.desiredEmployment, 0)
-  p.wage = firms.reduce((sum, f) => sum + f.wage * f.employment, 0) / Math.max(1, jobs)
-  p.wage = Math.max(0.00005, p.wage)
+  p.wage = jobs > 0 ? firms.reduce((sum, f) => sum + f.wage * f.employment, 0) / jobs : p.wage
   r.employed = jobs
   return jobs
 }
@@ -402,8 +457,7 @@ export function produceFirms(w: World, r: Region) {
       if (perUnit > 0) {
         const desiredCash = made * perUnit
         if (f.cash < desiredCash) {
-          const expectedSales = GOODS.reduce((s, good) => s + (f.forecast[good] * f.prices[good]) / 1000, 0)
-          borrow(w, firmAccount(f.id), desiredCash - f.cash, Math.max(1, expectedSales * 4, f.capital * 30))
+          borrow(w, firmAccount(f.id), desiredCash - f.cash, workingCapitalLimit(w, f))
         }
         made = Math.min(made, f.cash / perUnit)
       }
@@ -524,9 +578,15 @@ function invest(w: World, r: Region, f: CompetitiveFirm) {
     recipe = { timber: 300, stone: 400, tools: 40 }
   const materials = Object.entries(recipe).reduce((s, [g, q]) => s + (q * r.prices[g as Good]) / 1000, 0)
   const unitCost = materials + labor * wage
+  const loanRate = (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
+  const userCost =
+    realFinancingRate(loanRate, w.economy!.banking?.policy?.expectedInflation ?? 0.02) + P.depreciationMonthly
+  const operatingYield = (f.sales - f.payroll - f.purchases) / Math.max(unitCost, f.capital * unitCost)
   const target =
-    Math.max(0, f.employment / Math.max(1, f.desiredEmployment) - 0.75) * P.investmentAdjustment +
-    f.capital * P.depreciationMonthly
+    operatingYield > userCost
+      ? Math.max(0, f.employment / Math.max(1, f.desiredEmployment) - 0.75) * P.investmentAdjustment +
+        f.capital * P.depreciationMonthly
+      : 0
   const amount = Math.max(
     0,
     Math.min(
@@ -666,6 +726,9 @@ export function finishFirms(w: World) {
         slot.active = true
         if (w.localEconomy) slot.owners = { [owner]: 1 }
         slot.generation++
+        // Delete absent optional state: an own undefined property disappears in
+        // JSON and would change insertion order on the next paid labor record.
+        delete slot.labor
         slot.distress = 0
         slot.profit = 0
         slot.wage = merchant.wage

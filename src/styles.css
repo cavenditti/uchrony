@@ -1962,19 +1962,65 @@ select {
   margin: 0;
 }
 .help-dialog {
-  width: 780px;
+  width: 520px;
 }
-.help-dialog .model-mathematics {
+.mathematics-dialog {
+  width: 860px;
+}
+.mathematics-dialog .model-mathematics {
   font-size: 14px;
 }
-.help-dialog .model-mathematics details p,
-.help-dialog .model-mathematics li {
-  font-size: 13px;
-  padding-top: 0;
-  line-height: 1.7;
+.mathematics-dialog .model-intro {
+  max-width: 66ch;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 18px;
 }
-.help-dialog .model-mathematics summary {
-  font-size: 15px;
+.model-dialog-heading {
+  position: sticky;
+  top: -33px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -33px -35px 18px;
+  padding: 20px 22px 16px 35px;
+  background: #22343a;
+  border-bottom: 1px solid #4a615a;
+}
+.model-dialog-heading h2 {
+  margin: 0;
+}
+.model-dialog-heading .dialog-close {
+  position: static;
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .model-dialog-heading {
+    top: -30px;
+    margin: -30px -23px 18px;
+    padding: 18px 13px 16px 23px;
+  }
+  .mathematics-dialog .model-dialog-heading h2 {
+    font-size: 26px;
+  }
+}
+.about-model-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 0;
+  margin-bottom: 18px;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  border-block: 1px solid #4a615a;
+  text-align: left;
+}
+.about-model-link svg:last-child {
+  margin-left: auto;
 }
 .model-mathematics summary,
 .model-controls summary,
@@ -4791,7 +4837,47 @@ select option {
   }
 }
 .model-mathematics {
-  margin-block: 1.5rem;
+  margin-block: 1.25rem 0;
+}
+.model-mathematics .model-notation {
+  color: #bbccbc;
+  font-size: 13px;
+}
+.model-reference-select {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+.model-reference-select select {
+  width: 100%;
+}
+.model-mathematics p {
+  margin-block: 12px;
+}
+.model-topics > details > summary {
+  color: #e1e6d5;
+}
+.model-equation {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 8px 4px;
+  margin-block: 18px;
+  color: #f0dfb9;
+  scrollbar-color: #66756c #22343a;
+}
+.model-equation .katex-display {
+  margin: 0;
+  text-align: left;
+}
+.model-equation .katex-display > .katex {
+  text-align: left;
+}
+.model-mathematics .katex {
+  font-size: 1.08em;
+}
+.model-core-parameters {
+  border-top: 1px solid #48545a;
+  padding-top: 18px;
 }
 .model-mathematics p,
 .model-mathematics li {

@@ -365,6 +365,8 @@ test('private construction pays and taxes labor without creating extra workers o
   for (const s of STRATA) e.households[0][s].laborForce = 1000
   const firm = regionalFirms(w, 0)[0]
   firm.employment = firm.desiredEmployment = 100
+  // Positive operating returns are required by the investment financing hurdle.
+  firm.sales = 1
   const h = e.households[0].artisan,
     income = h.income,
     taxes = h.taxes

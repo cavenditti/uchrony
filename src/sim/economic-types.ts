@@ -1,4 +1,5 @@
 import type { Inventory } from './types'
+import type { MonetaryPolicy } from './monetary-policy'
 export const STRATA = ['smallholder', 'laborer', 'artisan', 'professional', 'owner'] as const
 export type EconomicStratum = (typeof STRATA)[number]
 export const STRATUM_LABELS: Record<EconomicStratum, string> = {
@@ -73,6 +74,10 @@ export interface Loan {
   originated: number
   bank?: number
   rate?: number
+  rateType?: 'fixed' | 'floating'
+  spread?: number
+  resetMonths?: number
+  nextReset?: number
 }
 export interface Bank {
   id: number
@@ -91,6 +96,7 @@ export interface BankingSystem {
   accounts: Record<string, number>
   centralBank: { advances: number; reserves: number; equity: number; rate: number }
   lastPriceIndex: number
+  policy?: MonetaryPolicy
   created: number
   destroyed: number
   discrepancy: number
@@ -111,6 +117,14 @@ export interface CompetitiveFirm {
   wage: number
   markup: number
   employment: number
+  labor?: {
+    opening: number
+    retained: number
+    hires: number
+    separations: number
+    vacancies: number
+    unfilled: number
+  }
   desiredEmployment: number
   payroll: number
   sales: number

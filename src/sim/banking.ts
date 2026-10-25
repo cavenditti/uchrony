@@ -2,6 +2,7 @@ import { balance, balances, changeDeposit, ensureEconomy, governmentAccount } fr
 import { clamp, type World } from './types'
 import type { Bank, EconomicStratum, Loan } from './economic-types'
 import { MODEL_PARAMETERS as P } from './model-parameters'
+import { newMonetaryPolicy, observePrices, policyRate } from './monetary-policy'
 
 const accountHash = (key: string) => {
   let h = 0
@@ -30,6 +31,7 @@ export function ensureBanking(w: World) {
     accounts: {},
     centralBank: { advances: 0, reserves: capital, equity: -capital, rate: P.policyRateMonthly },
     lastPriceIndex: 1,
+    policy: newMonetaryPolicy(w.month),
     created: 0,
     destroyed: 0,
     discrepancy: 0,
@@ -109,8 +111,14 @@ export function issueBankLoan(w: World, borrower: string, requested: number, lim
   const capacity = Math.max(0, bank.equity / P.bankCapitalRatio - assets)
   const amount = Math.max(0, Math.min(requested, limit - outstanding, capacity))
   if (!Number.isFinite(amount) || amount <= 1e-9) return 0
-  if (existing) existing.principal += amount
-  else
+  const rate = b.centralBank.rate + P.bankLoanSpread
+  if (existing) {
+    // A top-up is new lending at today's price; preserve the weighted cost of
+    // outstanding fixed principal instead of granting an old rate indefinitely.
+    existing.rate =
+      ((existing.rate ?? rate) * existing.principal + rate * amount) / (existing.principal + amount)
+    existing.principal += amount
+  } else
     e.credit.loans.push({
       id: e.credit.nextId++,
       borrower,
@@ -118,7 +126,11 @@ export function issueBankLoan(w: World, borrower: string, requested: number, lim
       arrears: 0,
       originated: w.month,
       bank: bank.id,
-      rate: b.centralBank.rate + P.bankLoanSpread,
+      rate,
+      rateType: 'floating',
+      spread: P.bankLoanSpread,
+      resetMonths: P.loanResetMonths,
+      nextReset: w.month + P.loanResetMonths,
     })
   changeDeposit(w, borrower, amount, `bank:${bank.id}`, 'bank loan origination')
   bank.deposits += amount
@@ -213,6 +225,10 @@ export function settleBanks(w: World) {
   const e = ensureEconomy(w),
     b = ensureBanking(w)
   for (const loan of e.credit.loans) {
+    if (loan.rateType === 'floating' && w.month >= loan.nextReset!) {
+      loan.rate = b.centralBank.rate + loan.spread!
+      loan.nextReset = w.month + loan.resetMonths!
+    }
     const due = loan.principal * (loan.rate ?? b.centralBank.rate + P.bankLoanSpread)
     const interest = payBank(w, loan.borrower, loan.bank!, due, 'bank loan interest', true)
     const principal = payBank(
@@ -276,14 +292,20 @@ export function settleBanks(w: World) {
       if (totalShares)
         bankDistribution(w, bank, owner, (distributable * shares) / totalShares, 'bank equity dividend')
   }
-  const inflation = Math.log(Math.max(0.001, e.totals.priceIndex) / Math.max(0.001, b.lastPriceIndex)) * 12
-  const desired = clamp(
-    P.policyRateMonthly + ((inflation - 0.02) * 0.15) / 12 - e.totals.unemployment * 0.002,
-    0,
-    0.012,
-  )
-  b.centralBank.rate += (desired - b.centralBank.rate) * 0.05
+}
+/** Announce the next month's rate after this month's prices and employment are
+ * measured. Legacy saves start with a fresh observation window, not fabricated history. */
+export function updateMonetaryPolicy(w: World) {
+  const e = ensureEconomy(w),
+    b = ensureBanking(w)
+  const policy = (b.policy ??= newMonetaryPolicy(w.month - 1))
+  if (policy.lastMonth >= w.month) return
+  if (e.totals.priceIndex > 0 && b.lastPriceIndex > 0)
+    observePrices(policy, Math.log(e.totals.priceIndex / b.lastPriceIndex))
+  b.centralBank.rate =
+    policyRate(b.centralBank.rate * 12, policy.inflation, e.totals.unemployment, policy) / 12
   b.lastPriceIndex = e.totals.priceIndex
+  policy.lastMonth = w.month
 }
 export function auditBanks(w: World, record = true) {
   ensureEconomy(w)

@@ -51,7 +51,7 @@ function assets(w: World) {
       }
   const claims: Record<string, number> = {}
   for (const l of w.economy!.credit.loans) {
-    const key = `${l.bank}:${l.originated}:${l.rate}:${l.arrears}`
+    const key = `${l.bank}:${l.originated}:${l.rate}:${l.arrears}:${l.rateType}:${l.spread}:${l.resetMonths}:${l.nextReset}`
     claims[key] = (claims[key] ?? 0) + l.principal
   }
   return {
@@ -86,12 +86,15 @@ function assets(w: World) {
       cash: f.cash,
       stocks: { ...f.stocks },
       capital: f.capital,
+      employment: f.employment,
+      labor: f.labor && { ...f.labor },
       projects: structuredClone(f.projects),
     })),
     deposits: w.economy!.banking!.banks.reduce((s, b) => s + b.deposits, 0),
     equity: w.economy!.banking!.banks.reduce((s, b) => s + b.equity, 0),
     gdp: w.economy!.accounts?.world.productionGDP ?? 0,
     holdings: w.economy!.accounts?.world.holdingGains ?? 0,
+    policy: structuredClone(w.economy!.banking!.policy),
   }
 }
 function conserved(a: ReturnType<typeof assets>, b: ReturnType<typeof assets>) {
@@ -104,6 +107,7 @@ function conserved(a: ReturnType<typeof assets>, b: ReturnType<typeof assets>) {
     near(a[key], b[key])
   assert.equal(b.reserves, a.reserves)
   assert.deepEqual(b.firms, a.firms)
+  assert.deepEqual(b.policy, a.policy)
 }
 function coarse(w: World): SpatialDistrict[] {
   const span = 2 ** Math.ceil(Math.log2(Math.max(w.width, w.height)))
