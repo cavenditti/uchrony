@@ -184,7 +184,7 @@ test('provincial charters retain only their tax share, fund services and cannot 
   const unrest = province.unrest
   advanceInstitutions(w)
   assert(d.budget > 0 && d.treasury < income)
-  assert.equal(d.treasury + d.budget, income)
+  assert(Math.abs(d.treasury + d.budget - income) < 1e-12)
   assert(province.unrest <= unrest)
   const foreign = w.regions.find((r) => r.nation !== 0)!
   assert.throws(

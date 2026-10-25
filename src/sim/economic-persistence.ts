@@ -46,6 +46,18 @@ export function validateEconomy(w: World) {
       'realServices',
     ] as const)
       if (!num(f[key])) fail(`producer ${key}`)
+    for (const key of [
+      'previousLabor',
+      'previousJobs',
+      'previousResearchServices',
+      'educationServices',
+      'administrationServices',
+      'infrastructureServices',
+      'researchServices',
+      'militaryServices',
+      'provincialServices',
+    ] as const)
+      if (f[key] !== undefined && !num(f[key])) fail(`producer ${key}`)
     for (const key of ['profit', 'valueAdded', 'realOutput'] as const)
       if (!num(f[key], -1e16)) fail(`producer ${key}`)
     for (const key of [

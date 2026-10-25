@@ -21,6 +21,15 @@ export interface HouseholdAccount {
   consumption: Inventory
 }
 export interface ProducerAccount {
+  previousLabor?: number
+  previousJobs?: number
+  previousResearchServices?: number
+  educationServices?: number
+  administrationServices?: number
+  infrastructureServices?: number
+  researchServices?: number
+  militaryServices?: number
+  provincialServices?: number
   previousPriceIndex?: number
   cash: number
   wage: number

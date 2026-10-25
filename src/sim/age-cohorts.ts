@@ -103,7 +103,8 @@ export function annualMortality(age: number, health: number, shortage: number, m
         : P.adultHazardAnnual + P.ageingHazardScale * Math.exp(P.ageingHazardSlope * Math.max(0, age - 30))
   return Math.max(
     0,
-    (baseline * (1.5 - health) + shortage * (age < 5 ? 0.18 : age >= 65 ? 0.22 : 0.1)) * multiplier,
+    (baseline * (1.5 - health) + Math.max(0, shortage) ** 2 * (age < 5 ? 0.18 : age >= 65 ? 0.22 : 0.1)) *
+      multiplier,
   )
 }
 export const expectedInteger = (rng: { rng: number }, expected: number) => {
@@ -135,6 +136,17 @@ export function cohortDeaths(
   refreshAges(group, month)
   return deaths
 }
+/** Desired surviving family size, not a world population target. Education changes
+ * the rural child-labor/old-age-security motive; urban opportunity costs can still
+ * produce below-replacement fertility. Childhood survival changes planned births. */
+export function desiredFertility(group: Pick<PopulationCommunity, 'literacy' | 'urban' | 'health'>) {
+  const desiredSurvivors =
+    P.desiredChildrenBase +
+    P.ruralFamilyMotive * (1 - group.literacy) * (1 - group.urban) -
+    P.urbanFamilyCost * group.urban * group.literacy
+  const childSurvival = Math.exp(-(P.infantHazardAnnual + 14 * P.childHazardAnnual) * (1.5 - group.health))
+  return desiredSurvivors / childSurvival
+}
 export function cohortBirths(
   group: PopulationCommunity,
   month: number,
@@ -148,7 +160,8 @@ export function cohortBirths(
     const age = (month - born) / 12
     if (age >= 15 && age < 50) expected += (female * P.fertilityAnnual[Math.floor((age - 15) / 5)]) / 12
   }
-  const modifier = (1 - group.literacy * 0.5) * (1 - group.urban * 0.2) * (1 - shortage * 0.8) * multiplier
+  const scheduleTFR = 5 * P.fertilityAnnual.reduce((sum, rate) => sum + rate, 0)
+  const modifier = (desiredFertility(group) / scheduleTFR) * (1 - shortage * 0.8) * multiplier
   const births = expectedInteger(rng, expected * Math.max(0, modifier))
   if (births) {
     const female = expectedInteger(rng, births * P.femaleBirthShare)

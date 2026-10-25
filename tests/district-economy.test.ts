@@ -29,6 +29,17 @@ import { produce } from '../src/sim/economy'
 const digest = (x: unknown) => createHash('sha256').update(JSON.stringify(x)).digest('hex')
 const near = (a: number, b: number) =>
   assert(Math.abs(a - b) < 1e-8 * Math.max(1, Math.abs(a), Math.abs(b)), `${a} differs from ${b}`)
+const serviceCounters = [
+  'previousLabor',
+  'previousJobs',
+  'previousResearchServices',
+  'educationServices',
+  'administrationServices',
+  'infrastructureServices',
+  'researchServices',
+  'militaryServices',
+  'provincialServices',
+] as const
 function assets(w: World) {
   const ages: Record<string, number> = {}
   for (const r of w.regions)
@@ -46,6 +57,12 @@ function assets(w: World) {
   return {
     ages,
     claims,
+    services: Object.fromEntries(
+      serviceCounters.map((key) => [
+        key,
+        Object.values(w.economy!.producers).reduce((sum, producer) => sum + (producer[key] ?? 0), 0),
+      ]),
+    ),
     stocks: physicalStocks(w),
     money: Object.values(balances(w)).reduce((a, b) => a + b, 0),
     capital:
@@ -82,6 +99,7 @@ function conserved(a: ReturnType<typeof assets>, b: ReturnType<typeof assets>) {
   for (const key of new Set([...Object.keys(a.claims), ...Object.keys(b.claims)]))
     near(a.claims[key] ?? 0, b.claims[key] ?? 0)
   for (const g of GOODS) near(a.stocks[g], b.stocks[g])
+  for (const key of serviceCounters) near(a.services[key], b.services[key])
   for (const key of ['money', 'capital', 'projectCost', 'deposits', 'equity', 'gdp', 'holdings'] as const)
     near(a[key], b[key])
   assert.equal(b.reserves, a.reserves)
@@ -133,6 +151,9 @@ test('repeated split/merge cycles preserve claims, equipment, goods, money and G
   const p = w.localEconomy!.active.find((id) => id >= w.regions.length)!
   borrow(w, producerAccount(p), 19, 1000)
   w.economy!.producers[p].projects.push({ remaining: 5, capital: 0.11, cost: 7 })
+  w.economy!.producers[p].previousLabor = 1000
+  w.economy!.producers[p].previousJobs = 850
+  w.economy!.producers[p].previousResearchServices = 0.125
   const fine = buildSpatial(w).districts
   const before = assets(w)
   for (let i = 0; i < 3; i++) {

@@ -174,6 +174,16 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
         Object.fromEntries(GOODS.map((g) => [g, reserveTarget(r, g)])) as Record<Good, number>,
       ]),
     )
+  // A desired precautionary reserve is not an export embargo. Retain one
+  // month's local use; offer the rest. Imported lots cannot be resold this tick.
+  const exportable = new Map(
+    units.map((r) => [
+      r.id,
+      Object.fromEntries(
+        GOODS.map((g) => [g, Math.max(0, r.stocks[g] - targets.get(r.id)![g] / (g === 'food' ? 2.4 : 3))]),
+      ) as Record<Good, number>,
+    ]),
+  )
   const paths = new Map<number, ReturnType<typeof nearby>>(),
     routes: Route[] = [],
     preferential = new Set<string>()
@@ -186,15 +196,34 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     if (body.status === 'active' && body.charter.powers.includes('trade'))
       for (const a of body.members) for (const b of body.members) preferential.add(`${a}:${b}`)
   system.shipments = []
-  const tariffFor = (buyer: number, seller: number) => {
-    const a = system.units[buyer].nation,
-      b = system.units[seller].nation
-    if (a === b) return 0
-    const treaty = relation(w, a, b)?.treaty
-    return treaty === 'trade' || treaty === 'alliance' || preferential.has(`${a}:${b}`)
-      ? 0
-      : w.nations[a].policies.tariff / 100
-  }
+  // Treaty membership cannot change during this clearing phase. Price comparisons
+  // need a matrix lookup, not repeated scans of every bilateral relationship.
+  const nationCount = w.nations.length,
+    tariffs = new Float64Array(nationCount * nationCount)
+  for (let a = 0; a < nationCount; a++)
+    for (let b = 0; b < nationCount; b++) {
+      if (a === b) continue
+      const treaty = relation(w, a, b)?.treaty
+      tariffs[a * nationCount + b] =
+        treaty === 'trade' || treaty === 'alliance' || preferential.has(`${a}:${b}`)
+          ? 0
+          : w.nations[a].policies.tariff / 100
+    }
+  const tariffFor = (buyer: number, seller: number) =>
+    tariffs[system.units[buyer].nation * nationCount + system.units[seller].nation]
+  // Within goods clearing, loan principal can only increase and bank lending
+  // capacity can only fall. A rejected limit cannot become fundable until the
+  // buyer receives deposits or requests a higher limit. Cache only rejections;
+  // every actual origination still passes the bank's complete balance-sheet check.
+  const rejectedCredit = new Map<number, number>()
+  const creditLimit = (id: number) =>
+    Math.max(
+      1,
+      GOODS.reduce(
+        (sum, g) => sum + (householdNeed(system.units[id], g) * system.units[id].prices[g]) / 1000,
+        0,
+      ) * 6,
+    )
   const pathFor = (buyer: number, seller: number) => {
     const search = paths.get(buyer)!,
       chain: DistrictLink[] = [],
@@ -202,33 +231,44 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     let at = seller
     while (at !== buyer) {
       const prev = search.previous.get(at)
-      if (!prev) return null
+      if (!prev || (linkRemaining.get(prev.edge) ?? prev.edge.capacity) < 1e-6) return null
+      for (const [edge, count] of prev.edge.usage) if (remaining[edge] / count < 1e-6) return null
       chain.push(prev.edge)
       at = prev.from
       steps.push(at)
     }
-    const legs = chain.flatMap((edge) => reverseLegs(edge.legs))
-    return { chain, legs, steps, cost: search.distance.get(seller)!, usage: corridorUsage(profile, legs) }
+    const usage = new Map<number, number>()
+    for (const link of chain)
+      for (const [edge, count] of link.usage) usage.set(edge, (usage.get(edge) ?? 0) + count)
+    return { chain, steps, cost: search.distance.get(seller)!, usage }
   }
   const ship = (buyerId: number, sellerId: number, good: Good, requested: number, donor?: number) => {
     const buyer = system.units[buyerId],
-      seller = system.units[sellerId],
-      path = pathFor(buyerId, sellerId)
+      seller = system.units[sellerId]
+    const tariff = donor !== undefined ? 0 : tariffFor(buyerId, sellerId)
+    const price = seller.prices[good] / 1000,
+      freightRate = price * paths.get(buyerId)!.distance.get(sellerId)! * 0.002
+    const payer = donor === undefined ? producerAccount(buyerId) : governmentAccount(donor)
+    const unitCost = price * (1 + tariff) + freightRate
+    const limit = donor === undefined ? creditLimit(buyerId) : 0
+    if (
+      (donor !== undefined || limit <= (rejectedCredit.get(buyerId) ?? -Infinity)) &&
+      balance(w, payer) / Math.max(1e-12, unitCost) < 1e-6
+    )
+      return 0
+    const path = pathFor(buyerId, sellerId)
     if (!path) return 0
     // A loan finances only an executable order. Exhausted corridors and unavailable
     // stocks must not leave a buyer with new debt and idle deposits.
-    requested = Math.max(0, Math.min(requested, seller.stocks[good] - targets.get(sellerId)![good]))
+    requested = Math.max(0, Math.min(requested, seller.stocks[good], exportable.get(sellerId)![good]))
     for (const [index, count] of path.usage) requested = Math.min(requested, remaining[index] / count)
     for (const edge of path.chain) requested = Math.min(requested, linkRemaining.get(edge) ?? edge.capacity)
     if (requested < 1e-6) return 0
-    const tariff = donor !== undefined ? 0 : tariffFor(buyerId, sellerId)
-    const price = seller.prices[good] / 1000,
-      freightRate = price * path.cost * 0.002
-    const payer = donor === undefined ? producerAccount(buyerId) : governmentAccount(donor)
-    const unitCost = price * (1 + tariff) + freightRate
     if (donor === undefined && balance(w, payer) < requested * unitCost) {
-      const revenue = GOODS.reduce((sum, g) => sum + (householdNeed(buyer, g) * buyer.prices[g]) / 1000, 0)
-      borrow(w, payer, requested * unitCost - balance(w, payer), Math.max(1, revenue * 6))
+      if (limit > (rejectedCredit.get(buyerId) ?? -Infinity)) {
+        const lent = borrow(w, payer, requested * unitCost - balance(w, payer), limit)
+        if (!lent) rejectedCredit.set(buyerId, limit)
+      }
     }
     const amount = Math.max(0, Math.min(requested, balance(w, payer) / Math.max(1e-12, unitCost)))
     if (amount < 1e-6) return 0
@@ -262,6 +302,8 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     buyer.prices[good] *= Math.exp(
       Math.max(-0.06, Math.min(0.06, Math.log(targetPrice / Math.max(0.01, buyer.prices[good])))),
     )
+    const legs = path.chain.flatMap((edge) => reverseLegs(edge.legs))
+    exportable.get(sellerId)![good] -= amount
     system.shipments.push({
       from: sellerId,
       to: buyerId,
@@ -270,8 +312,8 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       value: amount * price,
       freight: amount * freightRate,
       tariff: amount * price * tariff,
-      cells: path.legs.flatMap((l) => l.cells),
-      legs: path.legs,
+      cells: legs.flatMap((l) => l.cells),
+      legs: legs,
     })
     const provincePath = path.steps
       .map((id) => system.units[id].province)
@@ -283,8 +325,8 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       from: provinceId(seller),
       to: provinceId(buyer),
       path: provincePath,
-      legs: path.legs,
-      sea: path.legs.some((l) => l.mode === 'sea'),
+      legs: legs,
+      sea: legs.some((l) => l.mode === 'sea'),
       goods: { ...inventory(), [good]: amount },
       volume: amount,
       value: amount * price,
@@ -340,15 +382,36 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
             b.stocks[good] / Math.max(1, targets.get(b.id)![good]) || a.id - b.id,
       )
     for (const buyer of buyers) {
+      if (
+        balance(w, producerAccount(buyer.id)) <= 0 &&
+        creditLimit(buyer.id) <= (rejectedCredit.get(buyer.id) ?? -Infinity)
+      )
+        continue
       const found = search(buyer.id)
-      const sellers = found.reached
-        .filter((id) => system.units[id].stocks[good] > targets.get(id)![good])
-        .sort(
-          (a, b) =>
-            system.units[a].prices[good] * (1 + tariffFor(buyer.id, a) + found.distance.get(a)! * 0.002) -
-              system.units[b].prices[good] * (1 + tariffFor(buyer.id, b) + found.distance.get(b)! * 0.002) ||
-            a - b,
-        )
+      // Dijkstra settlement order places a predecessor before its descendants.
+      // Propagate exhausted paths once through this tree before sorting offers;
+      // rebuilding a closed journey for every commodity cannot enable a shipment.
+      const reachable = new Set([buyer.id])
+      const candidates: { id: number; cost: number }[] = []
+      for (const id of found.reached) {
+        const prev = found.previous.get(id)!
+        if (!reachable.has(prev.from) || (linkRemaining.get(prev.edge) ?? prev.edge.capacity) < 1e-6) continue
+        let open = true
+        for (const [edge, count] of prev.edge.usage)
+          if (remaining[edge] / count < 1e-6) {
+            open = false
+            break
+          }
+        if (!open) continue
+        reachable.add(id)
+        if (exportable.get(id)![good] > 1e-6)
+          candidates.push({
+            id,
+            cost:
+              system.units[id].prices[good] * (1 + tariffFor(buyer.id, id) + found.distance.get(id)! * 0.002),
+          })
+      }
+      const sellers = candidates.sort((a, b) => a.cost - b.cost || a.id - b.id).map((o) => o.id)
       for (const seller of sellers) {
         const needed = targets.get(buyer.id)![good] - buyer.stocks[good]
         if (needed < 1e-6) break

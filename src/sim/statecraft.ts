@@ -1,4 +1,5 @@
 import { publicTransfer, transferDebt } from './ledger'
+import { previousResearchOutput } from './public-services'
 import { clonePopulationHolders } from './population-clone'
 import { advisorContext, validateAdviceReplies, deliverAdvice } from './advisors'
 import {
@@ -815,9 +816,7 @@ export function acceptRefereeDecision(
           // Territorial terms still need isolated nested records for normalization.
           nations: territorial ? structuredClone(world.nations) : world.nations.map((n) => ({ ...n })),
           regions: territorial ? clonePopulationHolders(world.regions) : world.regions,
-          relations: territorial
-            ? structuredClone(world.relations)
-            : world.relations.map((r) => ({ ...r })),
+          relations: territorial ? structuredClone(world.relations) : world.relations.map((r) => ({ ...r })),
           armies: territorial
             ? clonePopulationHolders(world.armies)
             : world.armies.map((army) => ({ ...army })),
@@ -988,7 +987,7 @@ export function advanceStatecraft(world: World) {
     } else if (term.kind === 'research' && term.field)
       world.nations[term.to].researchProgress[term.field] += Math.min(
         term.amount,
-        world.nations[term.from].budget.research / 20,
+        previousResearchOutput(world, term.from) / 20,
       )
   }
   if (state.offers.length > 240) {

@@ -76,7 +76,7 @@ Keyboard shortcuts: **Space** play/pause, **1–4** speed, **L** cycle layers, *
 ## Model and architecture
 
 The formulas, units, approximations, and monthly order are documented in [docs/MODEL.md](docs/MODEL.md).
-Validation is recorded in [docs/VALIDATION.md](docs/VALIDATION.md), with resident-district checks separated from historical provincial-model results. The earlier three 200-year provincial scenarios lost 93–95% of their population. Those runs predate resident district economies and do not qualify the new model; accounting checks do not establish empirical calibration.
+Validation is recorded in [docs/VALIDATION.md](docs/VALIDATION.md). Three Regional resident-district scenarios now pass 200-year census, accounting and long-run trend checks, with exact final-save restoration and identical continuation. The report includes complete annual trajectories and the frozen source manifest; concurrent terrain and rendering changes are outside that qualification. Earlier provincial-model failures remain documented. These checks do not establish empirical calibration.
 
 ```text
 src/sim/types.ts        Shared state, commands, and worker messages

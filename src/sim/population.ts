@@ -1,3 +1,6 @@
+import { householdNeed, BASE_PRICE } from './economy'
+import { GOODS } from './types'
+import { realService } from './public-services'
 import { relocateHouseholdClaims } from './district-finance'
 import { economicRegions, economicRegion } from './local-units'
 import { marketStore, armyStore, fleetStore, recordGift } from './national-accounts'
@@ -417,6 +420,9 @@ export function updateCommunityDemography(world: World, region: Region) {
     education = effectMultiplier(world, 'education', nation.id, region.id)
   region.births = 0
   region.deaths = 0
+  const basket = GOODS.reduce((sum, g) => sum + householdNeed(region, g) * region.prices[g], 0)
+  const baseBasket = GOODS.reduce((sum, g) => sum + householdNeed(region, g) * BASE_PRICE[g], 0)
+  const priceIndex = baseBasket > 0 ? basket / baseBasket : 1
   const openingStrata = Object.fromEntries(
     STRATA.map((s) => [s, stratumPeople(world, region.id, s)]),
   ) as Record<EconomicStratum, number>
@@ -437,7 +443,7 @@ export function updateCommunityDemography(world: World, region: Region) {
     group.literacy = clamp(
       group.literacy +
         Math.max(0, region.literacy - group.literacy) * 0.04 * access +
-        ((education * nation.budget.education) / Math.max(1, nation.population / 10000)) *
+        ((education * realService(world, region, 'education')) / Math.max(1, population(region) / 10000)) *
           0.0001 *
           (1 - group.literacy) *
           access,
@@ -447,7 +453,10 @@ export function updateCommunityDemography(world: World, region: Region) {
     const household = world.economy?.households[region.id]?.[group.stratum ?? 'laborer']
     if (household) {
       const people = openingStrata[group.stratum ?? 'laborer']
-      group.wealth = clamp(Math.log1p((household.cash / Math.max(1, people)) * 1000) / Math.log(21))
+      group.wealth = clamp(
+        Math.log1p(((household.cash / Math.max(1, people)) * 1000) / Math.max(1e-9, priceIndex)) /
+          Math.log(21),
+      )
     }
     group.urban = clamp(
       group.urban + (clamp(region.industry * 0.5, 0.03, 0.92) - group.urban) * 0.001,

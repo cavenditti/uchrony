@@ -16,7 +16,8 @@ import {
 import { ensureHistory } from './history'
 import { ensureWarfare, warEvent } from './navy'
 import { allForces } from './forces'
-import { sharedInstitution, provincialServiceBudget } from './institutions'
+import { sharedInstitution } from './institutions'
+import { provincialRealService } from './public-services'
 
 export interface ProvincialAuthority {
   region: number
@@ -269,7 +270,9 @@ export function advanceSovereignty(world: World) {
       rootedness = 0
     for (const group of groups) {
       const size = group.population.adults
-      movements.set(group.movement, (movements.get(group.movement) ?? 0) + size)
+      // A common political identity is not itself an opposition organization.
+      const dissent = clamp(((group.grievance + 1 - group.loyalty + r.unrest / 100) / 3 - 0.35) / 0.65)
+      movements.set(group.movement, (movements.get(group.movement) ?? 0) + size * dissent)
       loyalty += size * group.loyalty
       grievance += size * group.grievance
       rootedness += size * group.rootedness
@@ -324,18 +327,9 @@ export function advanceSovereignty(world: World) {
         loyal += strength(army) * nearby * (army.nation === n.id ? 1 : 0.5)
       else if (relation(world, n.id, army.nation)?.treaty === 'war') hostile += strength(army) * nearby
     }
-    const targetSupport = clamp(
-        grievance * 0.55 +
-          (1 - loyalty) * 0.3 +
-          r.unrest / 180 +
-          (1 - r.foodCoverage) * 0.2 +
-          (1 - (r.materialCoverage ?? 1)) * 0.12,
-      ),
+    const targetSupport = clamp(((grievance + 1 - loyalty + r.unrest / 100) / 3 - 0.35) / 0.65),
       targetOrganization = clamp(
-        share * 0.55 +
-          r.literacy * 0.25 +
-          rootedness * 0.12 +
-          report.support * 0.25 -
+        Math.sqrt(share) * (0.5 + r.literacy * 0.25 + rootedness * 0.15) -
           Math.min(0.2, loyal / Math.max(1, population(r) * 0.02)),
       )
     report.support += (targetSupport - report.support) * 0.08
@@ -351,18 +345,22 @@ export function advanceSovereignty(world: World) {
       challenge = report.organization > 0.4 && report.support > 0.35 ? potential : 0,
       civil =
         clamp(
-          0.25 +
+          0.2 +
             n.stability * 0.002 +
-            n.legitimacy * 0.002 +
-            r.infrastructure * 0.12 +
-            loyalty * 0.15 +
-            Math.min(
-              0.1,
-              (provincialServiceBudget(r, 'policing') / Math.max(1, population(r) / 10000)) * 0.004,
-            ),
+            n.legitimacy * 0.0025 +
+            r.infrastructure * 0.15 +
+            loyalty * 0.35 +
+            0.15 *
+              (1 -
+                Math.exp(
+                  -(
+                    provincialRealService(world, r, 'administration') +
+                    provincialRealService(world, r, 'policing')
+                  ) / Math.max(1, population(r) * 0.00001),
+                )),
         ) *
-        (1 - r.unrest / 140) *
-        (0.65 + r.foodCoverage * 0.35),
+        (1 - (r.unrest / 100) * 0.3) *
+        (0.75 + r.foodCoverage * 0.25),
       civilSafe = civil / (1 + Math.max(0, hostile + challenge - loyal) / need),
       armed = clamp(loyal / (need + hostile * 0.8 + challenge)),
       protection = clamp(civilSafe + (1 - civilSafe) * armed)

@@ -38,7 +38,7 @@ import {
   beginLedgerMonth,
   auditLedger,
 } from './ledger'
-import { BASE_PRICE, householdNeed } from './economy'
+import { BASE_PRICE, householdNeed, foodEquivalentPeople } from './economy'
 import { beginGoodsMonth, auditGoods } from './goods-accounting'
 const skill: Record<EconomicStratum, number> = {
   smallholder: 0.9,
@@ -107,6 +107,11 @@ export function beginEconomyMonth(w: World) {
     f.investment = 0
     f.publicServices = 0
     f.realServices = 0
+    f.previousResearchServices = f.researchServices ?? 0
+    f.educationServices = f.administrationServices = f.infrastructureServices = 0
+    f.researchServices = f.militaryServices = f.provincialServices = 0
+    f.previousLabor = STRATA.reduce((sum, s) => sum + e.households[r.id][s].laborForce, 0)
+    f.previousJobs = STRATA.reduce((sum, s) => sum + e.households[r.id][s].employed, 0)
     f.capital = Math.max(0, f.capital * (1 - P.depreciationMonthly) * (1 - r.devastation * 0.002))
     for (const project of f.projects) if (--project.remaining <= 0) f.capital += project.capital
     f.projects = f.projects.filter((p) => p.remaining > 0)
@@ -177,8 +182,17 @@ export function consumeHouseholds(w: World) {
     const offers = new Map(GOODS.map((g) => [g, [...sellers].sort((a, b) => a.prices[g] - b.prices[g])]))
     const salesQuantity = inventory(),
       salesValue = inventory()
-    let food = 0,
-      material = 0
+    const foodWeights = Object.fromEntries(STRATA.map((s) => [s, 0])) as Record<EconomicStratum, number>
+    for (const group of r.communities ?? [])
+      foodWeights[group.stratum ?? 'laborer'] += foodEquivalentPeople(group.population)
+    const foodTotal = Object.values(foodWeights).reduce((sum, x) => sum + x, 0)
+    const orders: {
+      s: EconomicStratum
+      people: number
+      needs: Inventory
+      requested: Inventory
+      remainingBudget: number
+    }[] = []
     for (const s of STRATA) {
       const h = e.households[r.id][s],
         people = stratumPeople(w, r.id, s)
@@ -192,12 +206,13 @@ export function consumeHouseholds(w: World) {
             h.cash,
             'unclaimed household estate',
           )
-        h.foodCoverage = 1
-        h.materialCoverage = 1
+        h.foodCoverage = h.materialCoverage = 1
         continue
       }
       const needs = inventory()
-      for (const g of GOODS) needs[g] = (householdNeed(r, g) * people) / total
+      for (const g of GOODS)
+        needs[g] =
+          householdNeed(r, g) * (g === 'food' && foodTotal > 0 ? foodWeights[s] / foodTotal : people / total)
       const prices = Object.fromEntries(
         GOODS.map((g) => [g, offers.get(g)!.find((o) => o.stocks[g] > 1e-9)?.prices[g] ?? r.prices[g]]),
       ) as Inventory
@@ -207,25 +222,37 @@ export function consumeHouseholds(w: World) {
         h.cash,
         Math.max(minimum, disposable * 0.85 + Math.max(0, h.cash - minimum * 3) * 0.05),
       )
-      const requested = householdDemand(prices, needs, spending)
-      let remainingBudget = spending
-      let coverage = 0
-      for (const g of GOODS) {
-        let delivered = 0
-        for (const offer of offers.get(g)!) {
-          const price = offer.prices[g] / 1000
-          const amount = Math.max(
+      orders.push({
+        s,
+        people,
+        needs,
+        requested: householdDemand(prices, needs, spending),
+        remainingBudget: spending,
+      })
+    }
+    // All strata bid at the same quoted offer. A scarce lot is rationed in
+    // proportion to affordable orders, never by the stratum's array position.
+    for (const g of GOODS)
+      for (const offer of offers.get(g)!) {
+        const price = offer.prices[g] / 1000
+        const quantities = orders.map((o) =>
+          Math.max(
             0,
             Math.min(
-              requested[g] - delivered,
-              offer.stocks[g],
-              Math.min(h.cash, remainingBudget) / Math.max(1e-12, price),
+              o.requested[g] - e.households[r.id][o.s].consumption[g],
+              Math.min(e.households[r.id][o.s].cash, o.remainingBudget) / Math.max(1e-12, price),
             ),
-          )
-          if (amount <= 1e-9) continue
+          ),
+        )
+        const demand = quantities.reduce((sum, q) => sum + q, 0)
+        const fill = demand > 0 ? Math.min(1, offer.stocks[g] / demand) : 0
+        orders.forEach((o, i) => {
+          const amount = Math.min(offer.stocks[g], quantities[i] * fill)
+          if (amount <= 1e-9) return
+          const h = e.households[r.id][o.s]
           const paid = transfer(
             w,
-            householdAccount(r.id, s),
+            householdAccount(r.id, o.s),
             offer.account,
             amount * price,
             'household consumption',
@@ -239,20 +266,27 @@ export function consumeHouseholds(w: World) {
           offer.seller.sales += paid
           offer.seller.sold[g] += quantity
           h.expenditure += paid
-          remainingBudget = Math.max(0, remainingBudget - paid)
+          o.remainingBudget = Math.max(0, o.remainingBudget - paid)
           salesQuantity[g] += quantity
           salesValue[g] += paid
-          delivered += quantity
-        }
-        r.consumption[g] += delivered
-        h.consumption[g] += delivered
-        const fraction = needs[g] > 0 ? Math.min(1, delivered / needs[g]) : 1
-        if (g === 'food') h.foodCoverage = fraction
-        else coverage += fraction * materialWeights[g]
+          r.consumption[g] += quantity
+          h.consumption[g] += quantity
+        })
       }
-      h.materialCoverage = clamp(coverage)
-      food += h.foodCoverage * people
-      material += h.materialCoverage * people
+    let food = 0,
+      material = 0
+    for (const o of orders) {
+      const h = e.households[r.id][o.s]
+      h.foodCoverage = o.needs.food > 0 ? Math.min(1, h.consumption.food / o.needs.food) : 1
+      h.materialCoverage = clamp(
+        GOODS.reduce(
+          (sum, g) =>
+            sum + (o.needs[g] > 0 ? Math.min(1, h.consumption[g] / o.needs[g]) : 1) * materialWeights[g],
+          0,
+        ),
+      )
+      food += h.foodCoverage * o.people
+      material += h.materialCoverage * o.people
     }
     r.foodCoverage = food / total
     r.materialCoverage = material / total
@@ -317,7 +351,22 @@ export function fundGovernment(w: World) {
       n.spending += paid
       welfarePaid += paid
     }
-    // Public services purchase local labor; recipients have ordinary household accounts.
+    // Apply a common staffing fill ratio to all services. Category iteration must
+    // not let schooling consume every worker before research/administration hire.
+    const serviceKeys = ['education', 'military', 'research', 'administration', 'infrastructure'] as const
+    const requestedServices = serviceKeys.reduce((sum, key) => sum + n.budget[key], 0)
+    const staffing = new Map(
+      own.map((r) => {
+        const f = e.producers[r.id],
+          hh = e.households[r.id]
+        const capacity = STRATA.reduce(
+          (sum, s) => sum + Math.max(0, hh[s].laborForce - hh[s].employed) * f.wage * skill[s],
+          0,
+        )
+        const request = (requestedServices * population(r)) / Math.max(1, people)
+        return [r.id, request > 0 ? Math.min(1, capacity / request) : 0]
+      }),
+    )
     for (const key of ['education', 'military', 'research', 'administration', 'infrastructure'] as const) {
       const allocation = n.budget[key]
       let delivered = 0
@@ -326,7 +375,7 @@ export function fundGovernment(w: World) {
           w,
           r,
           governmentAccount(n.id),
-          (allocation * population(r)) / Math.max(1, people),
+          ((allocation * population(r)) / Math.max(1, people)) * staffing.get(r.id)!,
           `public ${key} services`,
         )
       }
@@ -383,6 +432,21 @@ export function purchasePublicLabor(
     recordWages(w, r.id, payer, paid, true)
     f.publicServices += paid
     f.realServices += real
+    const service =
+      category === 'provincial services'
+        ? 'provincialServices'
+        : category === 'public education services'
+          ? 'educationServices'
+          : category === 'public administration services'
+            ? 'administrationServices'
+            : category === 'public infrastructure services'
+              ? 'infrastructureServices'
+              : category === 'public research services'
+                ? 'researchServices'
+                : category === 'public military services'
+                  ? 'militaryServices'
+                  : undefined
+    if (service) f[service] = (f[service] ?? 0) + real
     f.valueAdded += paid
     f.realOutput += real
     r.gdp = f.valueAdded

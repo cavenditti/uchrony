@@ -1,3 +1,4 @@
+import { MODEL_PARAMETERS as P } from './model-parameters'
 import { economicRegions } from './local-units'
 import { tradeDistricts } from './district-transport'
 import { marketStore } from './national-accounts'
@@ -58,13 +59,26 @@ export const MONTHLY_NEED: Inventory = {
   arms: 0.00015,
 }
 
+/** Food-equivalent consumers distinguish children's energy needs from adult rations. */
+export function foodEquivalentPeople(population: Region['population']) {
+  return (
+    population.children * P.childFoodEquivalent +
+    population.adults +
+    population.elders * P.elderFoodEquivalent
+  )
+}
 export function householdNeed(r: Region, good: Good) {
   const livingStandard =
       good === 'food'
         ? 0.95 + r.urban * 0.15
         : 0.65 + r.urban * 1.3 + r.infrastructure * 0.3 + r.industry * 0.3,
     allocation = good === 'arms' ? 0.15 : good === 'iron' || good === 'coal' ? 0.25 : 1
-  return population(r) * MONTHLY_NEED[good] * livingStandard * allocation
+  return (
+    (good === 'food' ? foodEquivalentPeople(r.population) : population(r)) *
+    MONTHLY_NEED[good] *
+    livingStandard *
+    allocation
+  )
 }
 export function reserveTarget(r: Region, good: Good) {
   const p = r.plannedProduction ?? r.production,

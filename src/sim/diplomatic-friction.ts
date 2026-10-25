@@ -1,4 +1,5 @@
 import { publicExpense } from './ledger'
+import { nationalRealService } from './public-services'
 import { relation, type World } from './types'
 import type { DiplomaticClause, DiplomaticOffer, StateAgentPlan } from './statecraft-types'
 import { agreementTerms } from './agreements'
@@ -111,7 +112,10 @@ function office(w: World, nation: number) {
 export function diplomaticCapacity(w: World, nation: number) {
   const n = w.nations[nation],
     skill = n.character?.leader.skills.diplomacy ?? 0.5,
-    staff = Math.min(1.4, (n.budget.administration / Math.max(1, n.population / 100000)) * 0.04)
+    staff = Math.min(
+      1.4,
+      (nationalRealService(w, nation, 'administration') / Math.max(1, n.population / 100000)) * 0.04,
+    )
   return {
     capacity: 3 + skill * 0.8 + n.technologies.logistics * 0.2 + staff,
     recovery: (0.35 + skill * 0.2 + staff * 0.15) * (0.5 + n.stability / 200),

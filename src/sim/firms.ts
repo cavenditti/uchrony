@@ -181,8 +181,20 @@ export function hireFirms(w: World, r: Region) {
     p = e.producers[r.id]
   const inflation = Math.log(Math.max(0.001, index) / Math.max(0.001, p.previousPriceIndex ?? index))
   p.previousPriceIndex = index
+  const n = w.nations[r.nation]
+  const serviceShare =
+    (n.policies.education + n.policies.military + n.policies.research + 30) /
+    Math.max(1, n.policies.education + n.policies.military + n.policies.research + n.policies.welfare + 30)
+  const averageWage = firms.length ? firms.reduce((sum, f) => sum + f.wage, 0) / firms.length : p.wage
+  // Anticipated public hiring has a funded wage budget and competes for people.
+  // Unused reservations remain unemployment; they never count as a paid service.
+  const publicFunds = Math.min(
+    (n.treasury * population(r)) / Math.max(1, n.population),
+    labor * averageWage * collectedTaxRate(w, r) * serviceShare,
+  )
+  const privateLabor = Math.max(0, labor - publicFunds / Math.max(1e-9, averageWage))
   for (const f of firms) {
-    const benchmarkJobs = labor / Math.max(1, firms.length)
+    const benchmarkJobs = privateLabor / Math.max(1, firms.length)
     const oldEmployment = f.employment
     f.employment = benchmarkJobs
     const baseline = baseLaborMix(w, r, f)
@@ -193,17 +205,33 @@ export function hireFirms(w: World, r: Region) {
       // Unsatisfied subsistence/input orders remain visible even after a cash-constrained month.
       const demand = Math.max(
         f.forecast[g],
+        p.forecast[g] / Math.max(1, firms.length),
         reserveTarget(r, g) / (g === 'food' ? 2.4 : 3) / Math.max(1, firms.length),
       )
       const plan = Math.max(0, demand + 0.25 * (demand * P.inventoryMonths - f.stocks[g]))
-      required[g] = q[g] > 1e-9 ? baseline[g] * clamp(plan / q[g], 0, 4) : 0
+      f.planned[g] = plan
+      // Idle raw-material-dependent jobs cannot produce anything this month.
+      // Keep the unconstrained order for procurement, but share available inputs
+      // across firms before assigning scarce workers to workshops.
+      let executable = plan
+      for (const [input, rate] of Object.entries(recipes[g] ?? {}))
+        executable = Math.min(executable, r.stocks[input as Good] / rate / Math.max(1, firms.length))
+      required[g] = q[g] > 1e-9 ? baseline[g] * clamp(executable / q[g], 0, 4) : 0
     }
     const needed = GOODS.reduce((sum, g) => sum + required[g], 0)
     const utilization = clamp(needed, 0.05, 0.98)
     f.laborMix = inventory()
     for (const g of GOODS) f.laborMix[g] = needed > 0 ? required[g] / needed : baseline[g]
     f.desiredEmployment = benchmarkJobs * utilization * (1 - r.devastation * 0.5)
-    f.wage *= Math.exp(clamp(0.015 * (utilization - 0.9) + 0.35 * inflation, -0.03, 0.03))
+    // Bargaining responds to realized employment, including public jobs. Desired
+    // utilization is not evidence that labor is scarce or that wages were funded.
+    const employmentRate = p.previousLabor
+      ? (p.previousJobs ?? 0) / p.previousLabor
+      : 1 - P.referenceUnemployment
+    f.wage *= Math.exp(
+      P.wageBargainingAdjustment * (employmentRate - (1 - P.referenceUnemployment)) +
+        P.wagePriceIndexation * inflation,
+    )
     f.wage = Math.max(0.00005, f.wage)
   }
   let jobs = 0,
@@ -350,10 +378,10 @@ export function produceFirms(w: World, r: Region) {
   hireFirms(w, r)
   for (const f of firms) {
     const { q } = firmCapacity(w, r, f, firms.length)
-    f.planned = q
     const laborShares = f.laborMix ?? baseLaborMix(w, r, f)
     for (const g of GOODS) {
-      r.plannedProduction[g] += q[g]
+      f.planned[g] = Math.max(f.planned[g], q[g])
+      r.plannedProduction[g] += f.planned[g]
       if (q[g] <= 1e-9) continue
       const recipe = recipes[g] ?? {}
       const unitInput = Object.entries(recipe).reduce(
@@ -426,7 +454,10 @@ export function restockMarket(w: World, r: Region) {
   for (const g of GOODS) {
     // Merchants carry one additional month for export offers. Filling only the domestic
     // reserve target leaves zero exportable surplus and accidentally shuts all trade.
-    const need = Math.max(0, reserveTarget(r, g) + householdNeed(r, g) - r.stocks[g])
+    const need = Math.max(
+      0,
+      reserveTarget(r, g) + Math.max(householdNeed(r, g), merchant.forecast[g]) - r.stocks[g],
+    )
     let left = need,
       bought = 0,
       value = 0

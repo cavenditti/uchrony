@@ -1,3 +1,5 @@
+import { MODEL_PARAMETERS } from './model-parameters'
+import { realService, nationalRealService } from './public-services'
 import { economicRegions, provinceId } from './local-units'
 import {
   ensureDistrictEconomy,
@@ -17,7 +19,6 @@ import {
   advanceInstitutions,
   foreignPolicyMandate,
   collectiveDefense,
-  provincialServiceBudget,
 } from './institutions'
 import {
   submitStandingOffer,
@@ -162,10 +163,11 @@ function demographics(w: World) {
     const n = w.nations[r.nation],
       pop = population(r)
     const services =
-      (n.budget.welfare / Math.max(1, n.population / 10000)) * effectMultiplier(w, 'healthcare', n.id, r.id)
+      (realService(w, r, 'administration') / Math.max(1, pop / 10000)) *
+      effectMultiplier(w, 'healthcare', n.id, r.id)
     const school =
-      provincialServiceBudget(w.regions[provinceId(r)], 'education') / Math.max(1, pop / 10000) +
-      (n.budget.education / Math.max(1, n.population / 10000)) * effectMultiplier(w, 'education', n.id, r.id)
+      (realService(w, r, 'education') / Math.max(1, pop / 10000)) *
+      effectMultiplier(w, 'education', n.id, r.id)
     const healthTarget = clamp(
       0.44 +
         services * 0.014 +
@@ -182,7 +184,14 @@ function demographics(w: World) {
     )
     const happinessTarget = clamp(
       0.6 +
-        Math.min(0.24, (n.budget.welfare / Math.max(1, n.population)) * 100) -
+        Math.min(
+          0.24,
+          ((Object.values(w.economy!.households[r.id]).reduce((sum, h) => sum + h.transfers, 0) /
+            Math.max(1, pop)) *
+            100 *
+            14) /
+            Math.max(0.01, r.prices.food),
+        ) -
         Math.max(0, n.policies.tax - 20) * 0.006 +
         r.health * 0.2 -
         (1 - r.foodCoverage) * 0.55 -
@@ -203,11 +212,12 @@ function demographics(w: World) {
       100,
     )
     updateCommunityDemography(w, r)
-    const investment =
-      n.budget.infrastructure / Math.max(1, n.population / 10000) +
-      provincialServiceBudget(w.regions[provinceId(r)], 'infrastructure') / Math.max(1, pop / 10000)
+    const investment = realService(w, r, 'infrastructure') / Math.max(1, pop / 10000)
     r.infrastructure = clamp(
-      r.infrastructure + investment * 0.00012 - 0.0007 - r.devastation * 0.0007,
+      r.infrastructure +
+        investment * MODEL_PARAMETERS.infrastructureServiceProductivity -
+        r.infrastructure * MODEL_PARAMETERS.infrastructureWearMonthly -
+        r.devastation * 0.0007,
       0.08,
       1.5,
     )
@@ -246,7 +256,7 @@ function science(w: World) {
       continue
     }
     n.researchProgress[focus] +=
-      (n.budget.research / 7) *
+      (nationalRealService(w, n.id, 'research') / 7) *
       (0.35 + literacy) *
       (1 + n.technologies.governance * 0.07) *
       effectMultiplier(w, 'research', n.id)

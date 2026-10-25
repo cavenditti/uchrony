@@ -1,5 +1,6 @@
 import { transfer, governmentAccount } from './ledger'
 import { purchasePublicLabor } from './macroeconomy'
+import { provincialRealService, nationalRealService } from './public-services'
 import { clamp, population, relation, type World, type Region } from './types'
 import type { DiplomaticClause, DiplomaticOffer, Visibility } from './statecraft-types'
 export const INSTITUTION_POWERS = ['defense', 'trade', 'research', 'taxation', 'foreignPolicy'] as const
@@ -260,7 +261,7 @@ export function advanceInstitutions(w: World) {
       if (d.powers.includes('policing'))
         r.unrest = clamp(
           r.unrest -
-            Math.min(1.5, provincialServiceBudget(r, 'policing') / Math.max(1, population(r) / 10000)) * 0.2,
+            Math.min(1.5, provincialRealService(w, r, 'policing') / Math.max(1, population(r) / 10000)) * 0.2,
           0,
           100,
         )
@@ -303,7 +304,7 @@ export function advanceInstitutions(w: World) {
       }
     }
     if (o.charter.powers.includes('research')) {
-      const knowledge = active.reduce((s, id) => s + w.nations[id].budget.research, 0) * 0.004
+      const knowledge = active.reduce((s, id) => s + nationalRealService(w, id, 'research'), 0) * 0.004
       for (const id of active)
         w.nations[id].researchProgress[w.nations[id].researchFocus] += Math.min(12, knowledge / active.length)
     }
