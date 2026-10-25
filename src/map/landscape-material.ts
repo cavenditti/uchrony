@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-const noise = `
+export const surfaceNoiseShader = `
 float surfaceHash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 float surfaceNoise(vec2 p) {
   vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
@@ -23,7 +23,7 @@ export function terrainMaterial(texture: THREE.Texture) {
       '#include <begin_vertex>',
       '#include <begin_vertex>\nvGround = position;',
     )
-    shader.fragmentShader = 'varying vec3 vGround;\n' + noise + '\n' + shader.fragmentShader
+    shader.fragmentShader = 'varying vec3 vGround;\n' + surfaceNoiseShader + '\n' + shader.fragmentShader
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <map_fragment>',
       `
@@ -47,7 +47,7 @@ export function oceanMaterial(texture: THREE.Texture) {
       '#include <begin_vertex>',
       '#include <begin_vertex>\nvSea = position;',
     )
-    shader.fragmentShader = 'varying vec3 vSea;\n' + noise + '\n' + shader.fragmentShader
+    shader.fragmentShader = 'varying vec3 vSea;\n' + surfaceNoiseShader + '\n' + shader.fragmentShader
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
       `

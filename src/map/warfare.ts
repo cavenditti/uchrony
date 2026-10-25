@@ -1,5 +1,5 @@
 import type { World } from '../sim/types'
-export function drawWarfare(ctx: CanvasRenderingContext2D, w: World, selected: number) {
+export function drawWarfare(ctx: CanvasRenderingContext2D, w: World, selected: number, markers = true) {
   ctx.save()
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
@@ -21,21 +21,23 @@ export function drawWarfare(ctx: CanvasRenderingContext2D, w: World, selected: n
   ctx.setLineDash([])
   for (const f of w.warfare?.fleets ?? []) {
     const c = w.cells[f.cell]
-    ctx.fillStyle = '#24343a'
-    ctx.strokeStyle = w.nations[f.nation].color
-    ctx.lineWidth = 1.6
-    ctx.beginPath()
-    ctx.moveTo(c.x - 10, c.y - 6)
-    ctx.lineTo(c.x + 10, c.y - 6)
-    ctx.lineTo(c.x + 6, c.y + 6)
-    ctx.lineTo(c.x - 6, c.y + 6)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-    ctx.fillStyle = '#f0e9d8'
-    ctx.font = '8px system-ui'
-    ctx.textAlign = 'center'
-    ctx.fillText(`${f.warships + f.transports}`, c.x, c.y + 2)
+    if (markers) {
+      ctx.fillStyle = '#24343a'
+      ctx.strokeStyle = w.nations[f.nation].color
+      ctx.lineWidth = 1.6
+      ctx.beginPath()
+      ctx.moveTo(c.x - 10, c.y - 6)
+      ctx.lineTo(c.x + 10, c.y - 6)
+      ctx.lineTo(c.x + 6, c.y + 6)
+      ctx.lineTo(c.x - 6, c.y + 6)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+      ctx.fillStyle = '#f0e9d8'
+      ctx.font = '8px system-ui'
+      ctx.textAlign = 'center'
+      ctx.fillText(`${f.warships + f.transports}`, c.x, c.y + 2)
+    }
     if (f.nation === selected && f.course.length) {
       ctx.strokeStyle = '#c8b582'
       ctx.lineWidth = 1

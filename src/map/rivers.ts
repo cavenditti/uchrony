@@ -10,6 +10,7 @@ export interface RiverCurve {
   c: Point
   d: Point
   flow: number
+  endFlow?: number
 }
 
 /** Drainage is topology; its presentation is a continuous curve in geographic coordinates.
@@ -86,6 +87,7 @@ export function riverCurves(world: Pick<World, 'cells' | 'width' | 'height'>): R
         b: { x: a.x + start.x * reach, y: a.y + start.y * reach },
         c: { x: d.x - end.x * reach, y: d.y - end.y * reach },
         flow: Math.max(1, a.riverFlow ?? 14),
+        endFlow: Math.max(1, d.riverFlow ?? a.riverFlow ?? 14),
       }
       let last = first + 1
       while (chain[last].id !== d.id) last++
@@ -173,4 +175,10 @@ export function riverPaths(curves: RiverCurve[]) {
     path.bezierCurveTo(curve.b.x, curve.b.y, curve.c.x, curve.c.y, curve.d.x, curve.d.y)
     return { path, flow: curve.flow }
   })
+}
+
+/** One cross-section contract for rendered channels and town setbacks. */
+export function riverHalfWidth(curve: RiverCurve, t: number) {
+  const flow = curve.flow + ((curve.endFlow ?? curve.flow) - curve.flow) * t
+  return Math.min(6, 0.35 + Math.sqrt(flow) * 0.13) / 2
 }

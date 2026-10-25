@@ -1,4 +1,6 @@
 import { spatialState } from '../sim/spatial'
+import { CityScenery } from './city-scenery'
+import { describeCity } from './city-layout'
 import * as THREE from 'three'
 import { type World, type Layer } from '../sim/types'
 import { type AtlasCache, drawAtlas } from './renderer'
@@ -24,8 +26,9 @@ export class ReliefMap {
   private overlayCanvas = document.createElement('canvas')
   private textureCanvas = document.createElement('canvas')
   private scenery = new THREE.Group()
-  private settlements = new THREE.Group()
-  private settlementKey = ''
+  private treeScale = { value: 1 }
+  private sun = new THREE.DirectionalLight('#fff0d8', 2.65)
+  private cities: CityScenery
   private raycaster = new THREE.Raycaster()
   private cameraState: ReliefCamera = { w: 1, h: 1, scale: 1, x: 0, y: 0, tilt: true }
   private overlayUpdates = new OverlayUpdates()
@@ -53,6 +56,9 @@ export class ReliefMap {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
+    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.shadowMap.autoUpdate = false
     const resolution = Math.min(1.5, 4096 / this.width)
     for (const target of [this.textureCanvas, this.overlayCanvas]) {
       target.width = Math.ceil(this.width * resolution)
@@ -78,6 +84,7 @@ export class ReliefMap {
     this.picker = new TerrainPicker(geometry)
     const material = terrainMaterial(this.texture)
     this.terrain = new THREE.Mesh(geometry, material)
+    this.terrain.receiveShadow = true
     this.scene.add(this.terrain)
     this.oceanTexture = new THREE.CanvasTexture(atlas.ocean)
     this.oceanTexture.colorSpace = THREE.SRGBColorSpace
@@ -86,7 +93,11 @@ export class ReliefMap {
     oceanGeometry.translate(this.width / 2, -0.1, this.height / 2)
     const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial(this.oceanTexture))
     this.scene.add(ocean)
-    this.rivers = riverSurface(atlas.riverCurves, this.picker)
+    this.rivers = riverSurface(atlas.riverCurves, this.picker, {
+      texture: this.texture,
+      width: this.width,
+      height: this.height,
+    })
     this.scene.add(this.rivers.mesh)
     const overlayMesh = new THREE.Mesh(
       geometry,
@@ -102,17 +113,41 @@ export class ReliefMap {
     overlayMesh.renderOrder = 2
     this.scene.add(overlayMesh)
     this.scene.add(new THREE.HemisphereLight('#d6e7f0', '#303d25', 1.1))
-    const sun = new THREE.DirectionalLight('#fff0d8', 2.65)
+    const sun = this.sun
+    sun.shadow.mapSize.set(2048, 2048)
+    sun.shadow.bias = -0.00015
+    sun.shadow.normalBias = 0.05
+    sun.shadow.camera.near = 1
+    sun.shadow.camera.far = 2000
+    this.scene.add(sun.target)
     sun.position.set(-700, 850, -500)
     this.scene.add(sun)
     this.scene.add(this.scenery)
+    this.cities = new CityScenery(world, this.picker, atlas.riverCurves)
+    this.scene.add(this.cities.group)
     this.buildScenery(world)
   }
 
   private buildScenery(world: World) {
     const dummy = new THREE.Object3D(),
       color = new THREE.Color()
-    const trees = forestSites(world)
+    const cityBins = new Map<string, ReturnType<typeof describeCity>[]>()
+    for (const site of spatialState(world).settlements) {
+      const city = describeCity(world, site),
+        key = `${Math.floor(city.x / 50)}:${Math.floor(city.z / 50)}`
+      const bin = cityBins.get(key) ?? []
+      bin.push(city)
+      cityBins.set(key, bin)
+    }
+    const trees = forestSites(world).filter((tree) => {
+      const x = Math.floor(tree.x / 50),
+        z = Math.floor(tree.z / 50)
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dz = -1; dz <= 1; dz++)
+          for (const city of cityBins.get(`${x + dx}:${z + dz}`) ?? [])
+            if (Math.hypot(tree.x - city.x, tree.z - city.z) < city.radius + 5) return false
+      return true
+    })
     const geometry = new THREE.IcosahedronGeometry(1, 0)
     const canopy = geometry.attributes.position
     for (let i = 0; i < canopy.count; i++) {
@@ -137,6 +172,15 @@ export class ReliefMap {
       new THREE.MeshStandardMaterial({ roughness: 1, flatShading: false }),
       trees.length,
     )
+    crowns.material.onBeforeCompile = (shader) => {
+      shader.uniforms.townTreeScale = this.treeScale
+      shader.vertexShader = 'uniform float townTreeScale;\n' + shader.vertexShader
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\ntransformed *= townTreeScale;',
+      )
+    }
+    crowns.material.customProgramCacheKey = () => 'town-tree-scale-v1'
     let index = 0
     for (const { x, z, variation: r } of trees) {
       dummy.position.set(x, terrainHeight(world, x, z) + 0.2, z)
@@ -149,64 +193,6 @@ export class ReliefMap {
     }
     crowns.computeBoundingSphere()
     this.scenery.add(crowns)
-    this.scenery.add(this.settlements)
-    this.updateSettlements(world)
-  }
-
-  private updateSettlements(world: World) {
-    const sites = spatialState(world).settlements
-    const key = sites.map((s) => `${s.id}:${s.cell}:${s.kind}:${s.capital}`).join('|')
-    if (key === this.settlementKey) return
-    this.settlementKey = key
-    for (const object of [...this.settlements.children]) {
-      if (object instanceof THREE.Mesh) {
-        object.geometry.dispose()
-        for (const material of Array.isArray(object.material) ? object.material : [object.material])
-          material.dispose()
-      }
-      this.settlements.remove(object)
-    }
-    const countFor = (kind: string) => (kind === 'city' ? 12 : kind === 'town' ? 5 : 1)
-    const count = sites.reduce((sum, s) => sum + countFor(s.kind), 0)
-    if (!count) return
-    const buildings = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshStandardMaterial({ color: '#ded0a8', roughness: 0.95 }),
-      count,
-    )
-    const roofs = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(0.85, 0.65, 4),
-      new THREE.MeshStandardMaterial({ color: '#8e6553', roughness: 1 }),
-      count,
-    )
-    const dummy = new THREE.Object3D()
-    let index = 0
-    for (const site of sites) {
-      const c = world.cells[site.cell]
-      for (let j = 0; j < countFor(site.kind); j++) {
-        const angle = j * 2.4,
-          distance = Math.sqrt(j) * 1.9
-        const x = c.x + Math.cos(angle) * distance,
-          z = c.y + Math.sin(angle) * distance
-        const h =
-          j === 0 && site.capital
-            ? 12
-            : 2.5 + reliefRandom(site.cell * 9 + j) * (site.kind === 'city' ? 6 : 3)
-        const floor = terrainHeight(world, x, z)
-        dummy.position.set(x, floor + h / 2, z)
-        dummy.rotation.set(0, Math.PI / 4, 0)
-        dummy.scale.set(2.2, h, 2.2)
-        dummy.updateMatrix()
-        buildings.setMatrixAt(index, dummy.matrix)
-        dummy.position.y = floor + h + 0.5
-        dummy.scale.set(2.2, 2.2, 2.2)
-        dummy.updateMatrix()
-        roofs.setMatrixAt(index++, dummy.matrix)
-      }
-    }
-    buildings.computeBoundingSphere()
-    roofs.computeBoundingSphere()
-    this.settlements.add(buildings, roofs)
   }
 
   setCamera(next: ReliefCamera) {
@@ -235,12 +221,26 @@ export class ReliefMap {
     this.camera.updateProjectionMatrix()
     this.camera.updateMatrixWorld()
     this.scenery.visible = next.scale > 0.38
+    this.cities.group.visible = next.scale > 0.38
+    this.cities.view(this.camera, next.w, next.h, next.scale)
+    this.treeScale.value = THREE.MathUtils.lerp(1, 0.16, THREE.MathUtils.smoothstep(next.scale, 1.5, 6))
+    this.sun.castShadow = next.scale >= 3
+    if (this.sun.castShadow) {
+      const extent = Math.min(300, Math.max(35, (next.w / next.scale) * 0.7))
+      this.sun.target.position.copy(target)
+      this.sun.position.copy(target).add(new THREE.Vector3(-400, 700, -300))
+      Object.assign(this.sun.shadow.camera, { left: -extent, right: extent, top: extent, bottom: -extent })
+      this.sun.shadow.camera.updateProjectionMatrix()
+      this.renderer.shadowMap.needsUpdate = true
+    }
   }
 
   paint(world: World, layer: Layer, scale: number) {
-    this.updateSettlements(world)
+    this.cities.update(world)
+    if (this.sun.castShadow) this.renderer.shadowMap.needsUpdate = true
+    this.cities.view(this.camera, this.cameraState.w, this.cameraState.h, scale)
     this.rivers.minimumFlow.value = scale >= 0.7 ? 0 : 12 / Math.max(0.08, scale)
-    this.rivers.mesh.material.color.set(layer === 'terrain' ? '#438d9d' : '#457a88')
+    this.rivers.mesh.material.color.set(layer === 'terrain' ? '#306b70' : '#3d6872')
     const ctx = this.textureCanvas.getContext('2d')!
     const ratio = this.textureCanvas.width / this.width
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
@@ -287,6 +287,7 @@ export class ReliefMap {
   }
 
   dispose() {
+    this.cities.dispose()
     const geometries = new Set<THREE.BufferGeometry>(),
       materials = new Set<THREE.Material>()
     this.scene.traverse((object) => {
@@ -301,6 +302,8 @@ export class ReliefMap {
     this.texture.dispose()
     this.oceanTexture.dispose()
     this.overlay.dispose()
+    this.sun.shadow.map?.dispose()
+    this.sun.shadow.mapPass?.dispose()
     this.renderer.dispose()
     // Safari may keep detached canvas backing stores alive until explicitly released.
     this.textureCanvas.width = this.textureCanvas.height = 1

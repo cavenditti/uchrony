@@ -19,3 +19,22 @@
   display: flex;
   position: relative;
 }
+
+.stress-header {
+  flex-wrap: wrap;
+}
+.stress-header > span {
+  flex: 1;
+  min-width: 220px;
+}
+.stress-header select {
+  max-width: 190px;
+}
+@media (max-width: 760px) {
+  .stress-header {
+    font-size: 11px;
+  }
+  .stress-header > span {
+    flex-basis: 100%;
+  }
+}

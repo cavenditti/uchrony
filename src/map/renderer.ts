@@ -290,6 +290,7 @@ export function drawPlaceLabels(
   selected: number,
   project?: (x: number, y: number) => { x: number; y: number },
 ) {
+  if (project && scale >= 6) return
   const placed: { x: number; y: number; w: number; h: number }[] = []
   const place = (text: string, x: number, y: number, font: number, kind: 'state' | 'city' | 'sea') => {
     if (project) ({ x, y } = project(x, y))

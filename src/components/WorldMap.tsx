@@ -1,4 +1,4 @@
-import { districtDensityScale } from '../sim/spatial'
+import { districtDensityScale, spatialState, type Settlement } from '../sim/spatial'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
@@ -20,6 +20,7 @@ import {
   Orbit,
 } from 'lucide-react'
 import type { ReliefMap } from '../map/relief'
+import { terrainHeight } from '../map/relief-field'
 import { resizeCanvas } from '../map/render-budget'
 import { HEX } from '../sim/hex'
 import { contains, zoomAt } from '../map/geometry'
@@ -40,7 +41,7 @@ interface Props {
   showRoutes: boolean
   showArmies: boolean
   running: boolean
-  focus: { region: number; key: number; nation?: number } | null
+  focus: { region: number; key: number; nation?: number; settlement?: string } | null
   onSelect: (region: number) => void
   onLayer: (layer: Layer) => void
   onInspect: (region: number, section: Tab) => void
@@ -176,6 +177,13 @@ export function WorldMap({
   }, [mapKey, reset])
   useEffect(() => {
     if (!focus || !world.regions[focus.region]) return
+    if (focus.settlement) {
+      const city = spatialState(world).settlements.find((s) => s.id === focus.settlement)
+      if (city) {
+        exploreCity(city)
+        return
+      }
+    }
     const c = world.cells[world.regions[focus.region].center]
     // Focus within the map area left visible beside a dossier (or above its
     // mobile sheet), rather than hiding the selected place behind the panel.
@@ -364,21 +372,23 @@ export function WorldMap({
           ctx.fill(atlas.provinces[hover.id], 'evenodd')
         }
         ctx.restore()
-        if (showArmies || layer === 'military') drawWarfare(ctx, world, nation)
+        if (showArmies || layer === 'military') drawWarfare(ctx, world, nation, !(isRelief && scale >= 3))
         if (showArmies || layer === 'military')
           for (const a of world.armies.filter((a) => a.operations?.embarkedOn == null)) {
             const c = world.cells[world.regions[a.region].center]
             const x = c.x - 12,
               y = c.y + 14
-            ctx.fillStyle = '#24343a'
-            ctx.strokeStyle = world.nations[a.nation].color
-            ctx.lineWidth = 1.5
-            ctx.fillRect(x - 10, y - 7, 30, 15)
-            ctx.strokeRect(x - 10, y - 7, 30, 15)
-            ctx.font = '8px system-ui'
-            ctx.textAlign = 'center'
-            ctx.fillStyle = '#f0e9d8'
-            ctx.fillText(`${(a.soldiers / 1000).toFixed(1)}k`, x + 5, y + 3)
+            if (!(isRelief && scale >= 3)) {
+              ctx.fillStyle = '#24343a'
+              ctx.strokeStyle = world.nations[a.nation].color
+              ctx.lineWidth = 1.5
+              ctx.fillRect(x - 10, y - 7, 30, 15)
+              ctx.strokeRect(x - 10, y - 7, 30, 15)
+              ctx.font = '8px system-ui'
+              ctx.textAlign = 'center'
+              ctx.fillStyle = '#f0e9d8'
+              ctx.fillText(`${(a.soldiers / 1000).toFixed(1)}k`, x + 5, y + 3)
+            }
             if (a.target !== null) {
               ctx.strokeStyle = '#a2463bbb'
               ctx.lineWidth = 1.3
@@ -416,6 +426,27 @@ export function WorldMap({
           : undefined,
       )
       ctx.restore()
+      if (isRelief && scale >= 3 && (showArmies || layer === 'military')) {
+        const badge = (cell: number, label: string, owner: number) => {
+          const c = world.cells[cell],
+            p = reliefRef.current!.project(c.x, c.y)
+          if (p.x < -40 || p.x > size.w + 40 || p.y < -40 || p.y > size.h + 40) return
+          ctx.fillStyle = '#24343a'
+          ctx.strokeStyle = world.nations[owner].color
+          ctx.lineWidth = 1.5
+          ctx.fillRect(p.x + 14, p.y + 14, 78, 21)
+          ctx.strokeRect(p.x + 14, p.y + 14, 78, 21)
+          ctx.font = '11px system-ui'
+          ctx.textAlign = 'center'
+          ctx.fillStyle = '#f0e9d8'
+          ctx.fillText(label, p.x + 53, p.y + 29)
+        }
+        for (const a of world.armies)
+          if (a.operations?.embarkedOn == null)
+            badge(world.regions[a.region].center, `Troops ${(a.soldiers / 1000).toFixed(1)}k`, a.nation)
+        for (const f of world.warfare?.fleets ?? [])
+          badge(f.cell, `Ships ${f.warships + f.transports}`, f.nation)
+      }
       if (running && !reduced && (showRoutes || layer === 'trade'))
         frame.current = requestAnimationFrame(draw)
     }
@@ -469,8 +500,69 @@ export function WorldMap({
     }
     return null
   }
+  const maxZoom = isRelief ? Math.max(32, 36 / fit) : 32
+  const settlements = useMemo(() => spatialState(world).settlements, [world])
+  const pickedCity = picked
+    ? settlements.filter((s) => s.region === picked.id).sort((a, b) => b.population - a.population)[0]
+    : undefined
+  const cityScreen = (city: Settlement) => {
+    const c = world.cells[city.cell],
+      elevation = terrainHeight(world, c.x, c.y) + 2
+    return {
+      x: (c.x - mapW / 2) * scale + view.x + size.w / 2,
+      y:
+        (c.y - mapH / 2) * scale * verticalFactor -
+        elevation * scale * (tilt ? Math.cos(Math.PI * 0.29) : 0) +
+        view.y +
+        size.h / 2,
+    }
+  }
+  const closeCity =
+    isRelief && scale >= 6
+      ? settlements.reduce<Settlement | undefined>((best, s) => {
+          const p = cityScreen(s)
+          if (p.x < 0 || p.x > size.w || p.y < 80 || p.y > size.h - 70) return best
+          if (!best) return s
+          const b = cityScreen(best)
+          return Math.hypot(p.x - size.w / 2, p.y - size.h / 2) <
+            Math.hypot(b.x - size.w / 2, b.y - size.h / 2)
+            ? s
+            : best
+        }, undefined)
+      : undefined
+  const exploreCity = (city: Settlement) => {
+    const c = world.cells[city.cell],
+      targetScale = Math.max(6, Math.min(24, (size.w - 50) / 34, (size.h - 140) / 26))
+    const zoom = targetScale / fit,
+      elevation = terrainHeight(world, c.x, c.y) + 2
+    setView({
+      zoom,
+      x: (mapW / 2 - c.x) * targetScale,
+      y:
+        ((mapH / 2 - c.y) * verticalFactor + elevation * (tilt ? Math.cos(Math.PI * 0.29) : 0)) * targetScale,
+    })
+    setPicked(null)
+  }
+  const changePresentation = (mode: 'relief' | 'atlas', nextTilt = tilt) => {
+    const center = isRelief ? reliefRef.current?.locate(size.w / 2, size.h / 2) : undefined
+    const cx = center?.x ?? mapW / 2 - view.x / scale
+    const cy = center?.y ?? mapH / 2 - view.y / (scale * verticalFactor)
+    const angle = mode === 'relief' && nextTilt ? Math.PI * 0.29 : Math.PI / 2
+    const nextFactor = Math.sin(angle),
+      nextFit = Math.min(size.w / mapW, size.h / (mapH * nextFactor)) * 0.94
+    const nextScale = mode === 'atlas' ? Math.min(scale, nextFit * 32) : scale
+    const elevation = mode === 'relief' ? terrainHeight(world, cx, cy) : 0
+    setView({
+      zoom: nextScale / nextFit,
+      x: (mapW / 2 - cx) * nextScale,
+      y: ((mapH / 2 - cy) * nextFactor + elevation * Math.cos(angle)) * nextScale,
+    })
+    setPresentation(mode)
+    setTilt(nextTilt)
+    setPicked(null)
+  }
   const zoom = (factor: number, point = { x: size.w / 2, y: size.h / 2 }) =>
-    setView((v) => zoomAt(v, factor, point, size))
+    setView((v) => zoomAt(v, factor, point, size, maxZoom))
   useEffect(() => {
     const canvas = canvasRef.current!
     const handler = (e: WheelEvent) => {
@@ -480,7 +572,7 @@ export function WorldMap({
     }
     canvas.addEventListener('wheel', handler, { passive: false })
     return () => canvas.removeEventListener('wheel', handler)
-  }, [size])
+  }, [size, maxZoom])
 
   return (
     <div
@@ -571,6 +663,7 @@ export function WorldMap({
                 Math.hypot(a.x - b.x, a.y - b.y) / Math.max(1, start.distance),
                 start.center,
                 size,
+                maxZoom,
               )
             setView({ ...next, x: next.x + center.x - start.center.x, y: next.y + center.y - start.center.y })
             return
@@ -754,20 +847,14 @@ export function WorldMap({
           aria-pressed={presentation === 'relief'}
           disabled={reliefError || reliefReady !== mapKey}
           title={reliefError ? '3D graphics unavailable on this device' : 'Three-dimensional landscape'}
-          onClick={() => {
-            setPresentation('relief')
-            setPicked(null)
-          }}
+          onClick={() => changePresentation('relief')}
         >
           <Mountain size={15} /> 3D
         </button>
         <button
           aria-pressed={presentation === 'atlas'}
           title="Flat cartographic view"
-          onClick={() => {
-            setPresentation('atlas')
-            setPicked(null)
-          }}
+          onClick={() => changePresentation('atlas')}
         >
           <MapIcon size={15} /> Atlas
         </button>
@@ -776,10 +863,7 @@ export function WorldMap({
             aria-label={tilt ? 'View from above' : 'Tilt the landscape'}
             aria-pressed={tilt}
             title={tilt ? 'View from above' : 'Tilt the landscape'}
-            onClick={() => {
-              setTilt((v) => !v)
-              setPicked(null)
-            }}
+            onClick={() => changePresentation('relief', !tilt)}
           >
             <Orbit size={16} />
           </button>
@@ -788,6 +872,21 @@ export function WorldMap({
       {reliefError && (
         <div className="map-render-note" role="status">
           3D unavailable · Atlas view active
+        </div>
+      )}
+      {closeCity && (
+        <div className="city-view-caption" aria-label="City view">
+          <h2>{closeCity.name}</h2>
+          <p>
+            {compact(closeCity.population)} people ·{' '}
+            {closeCity.capital
+              ? 'Capital'
+              : closeCity.kind === 'city'
+                ? 'City'
+                : closeCity.kind === 'town'
+                  ? 'Town'
+                  : 'Village'}
+          </p>
         </div>
       )}
       <div className="zoom-controls">
@@ -845,6 +944,11 @@ export function WorldMap({
               </button>
             ))}
           </div>
+          {isRelief && pickedCity && (
+            <button className="city-explore" onClick={() => exploreCity(pickedCity)}>
+              <ScanSearch size={16} /> Explore {pickedCity.name}
+            </button>
+          )}
           <div className="place-context-footer">
             <button className="text-button" onClick={() => onInspect(picked.id, 'atlas')}>
               Open dossier

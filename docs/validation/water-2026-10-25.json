@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-25",
+  "status": "uncommitted",
+  "cells": 129024,
+  "curves": 1821,
+  "vertices": 80288,
+  "retainedRiverBufferBytes": 3810120,
+  "elapsedMs": 1648.532667,
+  "scope": "Geometry allocation measurement on a flat benchmark surface; not total renderer memory or a full-app endurance qualification",
+  "tests": {
+    "targeted": 15,
+    "typecheck": "passed",
+    "production_build": "passed"
+  },
+  "sha256": {
+    "src/map/river-surface.ts": "f80724e362cdca3196e47271a1779e37151cef208ed811057d4f396b2d6fffae",
+    "src/map/rivers.ts": "98e55599ce207b97bfc21ab45e6302ac17deb8c6622a1396a3fbfe1c88bf6378",
+    "src/map/landscape-material.ts": "f304812bb30ebe758d459cc09ec5ed673defad8b6b5ce36dcbca807ce1a2d841",
+    "src/map/relief.ts": "de64303f3a73d33948ba1758c8cde6bd5df397d6ad8e6b305c6c278cbda9fddb",
+    "src/map/city-layout.ts": "f63c50cd0e5e015de871ad573b250fc0984e1400fc9a8ed3e0423d0dfdd66b85",
+    "tests/river-rendering.test.ts": "47c99a4b276a2696dc67a6d6cf626d646ffd84bfb4eed1221e3db25b62f33ef5"
+  },
+  "browser": {
+    "worldCells": 129024,
+    "cityVisits": 5,
+    "drags": 10,
+    "zoomActions": 10,
+    "tourElapsedMs": 4129,
+    "presentationTransitions": [
+      "3D to Atlas",
+      "Atlas to 3D"
+    ],
+    "viewports": [
+      [
+        1280,
+        720
+      ],
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "warningsAndErrors": [],
+    "simulationAndAutosave": "not exercised; fixed-snapshot visual/interaction check"
+  }
+}

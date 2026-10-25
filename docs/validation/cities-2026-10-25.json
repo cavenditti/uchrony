@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-25",
+  "landscape_commit": "a6aa3b8",
+  "city_changes": "uncommitted",
+  "tests": {
+    "final_rendering": 15,
+    "broader_map_suite_before_final_layout_refinement": 18,
+    "typecheck": "passed",
+    "production_build": "passed"
+  },
+  "bounds": {
+    "visible_detailed_towns": 6,
+    "cached_detailed_towns": 12,
+    "houses_per_town": 350,
+    "shadow_target": [
+      2048,
+      2048
+    ]
+  },
+  "synthetic_cache_test": {
+    "retained_town_buffer_bytes": 1395260,
+    "excludes": [
+      "shared shapes and materials",
+      "shadow target",
+      "terrain and other map resources",
+      "browser memory"
+    ]
+  },
+  "browser_interactions": {
+    "started": "2026-10-25T11:19:48.227Z",
+    "elapsedMs": 11247,
+    "cityVisits": 15,
+    "drags": 30,
+    "zoomActions": 30,
+    "fixture": "129024-cell fixed snapshot; no simulation/autosave qualification",
+    "warningsAndErrors": []
+  },
+  "review": {
+    "disposition": "ship",
+    "scope": "specified fixes resolved; not whole-scene or AAA certification",
+    "reviewer": "fresh default-role fallback"
+  },
+  "sha256": {
+    "src/map/city-layout.ts": "4b7e07a0b0de99332b2c78056c31dbb50d018274bef617d1c7bd89073dd14068",
+    "src/map/city-scenery.ts": "89266994bd2a073f2f89a89afe0bd5aa7a9df0b03546a562b7e07e1f2de27dec",
+    "src/map/relief.ts": "4e2520ffaaf23295c6219cc2d1ae66fab209087cb3478122e85f0be46e42ec77",
+    "src/map/renderer.ts": "6314bcfca694a01a6d13bbe24d290fff0863d76aa65270021ff1adde8718ab77",
+    "src/map/geometry.ts": "29b2d583a7706eb1661e84d36c8ae69e83bf482572bc5c65eb32113ee810218f",
+    "src/map/warfare.ts": "70ef7010eef167951025e86144a5fc9051b70c3e67e4587092c8967ced46d8bc",
+    "src/components/WorldMap.tsx": "3de8c2f6c26d3f23357f5a3f7cb9660d13215b0b730cc40a958d15447ac14c34",
+    "src/styles.css": "d9ced3454866d14780289963bfc232050de46e95cd68c9dffc9324e3b2626a78",
+    "tests/city-rendering.test.ts": "4a415d999b1b4fabed1cf862e98756a6189cc6c040f09370641f5e42e3925417"
+  },
+  "camera_handoff": {
+    "transitions": [
+      "deep city to Atlas",
+      "Atlas to 3D",
+      "deep city to overhead",
+      "overhead to tilted 3D"
+    ],
+    "result": "geographic center preserved in visual checks",
+    "warningsAndErrors": []
+  }
+}

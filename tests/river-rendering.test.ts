@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { riverCurves, riverPoint } from '../src/map/rivers'
+import { riverCurves, riverHalfWidth, riverPoint } from '../src/map/rivers'
 import { landscapeField, landscapeElevation } from '../src/map/landscape-field'
 import { generateGeography } from '../src/sim/geography'
 
@@ -11,7 +11,15 @@ test('smooth reaches preserve drainage endpoints and tributary joins without mut
     curves = riverCurves(world)
   assert(curves.length > 10)
   const represented = new Set<number>()
+  const outgoing = new Map(curves.map((curve) => [curve.from, curve]))
   for (const curve of curves) {
+    const next = outgoing.get(curve.to)
+    if (next)
+      assert.equal(
+        riverHalfWidth(curve, 1),
+        riverHalfWidth(next, 0),
+        'no width step between connected reaches',
+      )
     let id = curve.from
     const channel = [cells[id]]
     while (id !== curve.to) {

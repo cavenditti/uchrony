@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { WorldMap } from '../../src/components/WorldMap'
+import { spatialState } from '../../src/sim/spatial'
 import type { World, Layer } from '../../src/sim/types'
 import '../../src/styles.css'
 import './map-stress.css'
 
 function Fixture({ world }: { world: World }) {
+  const [focus, setFocus] = useState<{ region: number; key: number; settlement?: string } | null>(null)
+  const cityPreview = new URLSearchParams(location.search).has('cities')
+  const cities = spatialState(world).settlements
   const [layer, setLayer] = useState<Layer>('terrain'),
     [region, setRegion] = useState<number | null>(null)
   const [running, setRunning] = useState(false),
@@ -18,6 +22,30 @@ function Fixture({ world }: { world: World }) {
           Stress fixture · {world.cells.length.toLocaleString()} cells ·{' '}
           {world.routes.length.toLocaleString()} shipments · no saving or model calls
         </span>
+        {cityPreview && (
+          <label>
+            Explore city{' '}
+            <select
+              aria-label="Explore city"
+              defaultValue=""
+              onChange={(e) => {
+                const city = cities.find((s) => s.id === e.target.value)
+                if (city) setFocus({ region: city.region, settlement: city.id, key: Date.now() })
+              }}
+            >
+              <option value="" disabled>
+                Select a settlement
+              </option>
+              {cities
+                .filter((s) => s.capital)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
         <button onClick={() => setRunning((v) => !v)}>{running ? 'Pause freight' : 'Animate freight'}</button>
       </header>
       <main className="atlas-shell stress-map">
@@ -30,7 +58,7 @@ function Fixture({ world }: { world: World }) {
           showRoutes={routes}
           showArmies={armies}
           running={running}
-          focus={null}
+          focus={focus}
           onSelect={setRegion}
           onLayer={setLayer}
           onInspect={() => {}}
@@ -38,7 +66,7 @@ function Fixture({ world }: { world: World }) {
           onToggleRoutes={() => setRoutes((v) => !v)}
           onToggleArmies={() => setArmies((v) => !v)}
           orderMode={false}
-          showContext={false}
+          showContext={cityPreview}
         />
       </main>
     </>
