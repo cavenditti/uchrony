@@ -6,10 +6,15 @@ export function resizeCanvas(canvas: { width: number; height: number }, width: n
   if (canvas.height !== h) canvas.height = h
 }
 
-/** Camera movement never invalidates a texture expressed in world coordinates. */
+/** Retain world-coordinate content until it changes or its coverage is replaced. */
 export class OverlayUpdates {
   private revision: object | null = null
   private paintedAt = -Infinity
+
+  invalidate() {
+    this.revision = null
+    this.paintedAt = -Infinity
+  }
 
   shouldPaint(revision: object, time: number, animated: boolean) {
     if (revision === this.revision && (!animated || time - this.paintedAt < 80)) return false

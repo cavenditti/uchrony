@@ -165,8 +165,8 @@ export function WorldMap({
   const scale = fit * view.zoom,
     offsetX = (size.w - mapW * scale) / 2 + view.x,
     offsetY = (size.h - mapH * scale) / 2 + view.y
-  // Only content changes invalidate the world-space overlay. Tooltip position,
-  // pan, tilt and label loading require a redraw, never another texture upload.
+  // Content revisions exclude camera-only changes. ReliefMap separately refreshes
+  // its visible-area texture when a pan, tilt or zoom needs new coverage.
   const overlayRevision = useMemo(
     () => ({}),
     [world, layer, nation, region, showRoutes, showArmies, running, scale, hover?.id, atlas],

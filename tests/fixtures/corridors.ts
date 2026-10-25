@@ -1,4 +1,7 @@
 import { HEX } from '../../src/sim/hex'
+import { corridorGeography } from '../../src/sim/corridors'
+import { MinHeap } from '../../src/sim/heap'
+import { transportNetwork } from '../../src/sim/transport'
 import { inventory, type Cell, type Region, type Route, type World } from '../../src/sim/types'
 
 /** Small maps keep geographic feedback experiments independent of demographic changes. */
@@ -71,4 +74,46 @@ export function parallelHarbors({ gap = 2, width = 40 } = {}) {
   rows[2 + gap][1] = 'C'
   rows[2 + gap][width - 2] = 'D'
   return corridorWorld(rows.map((row) => row.join('')))
+}
+
+/** A saved pre-backbone survey, for testing migration and annual path tenure.
+ * New worlds now share shipping corridors from their initial survey.
+ */
+export function independentHarbors(options: { gap?: number; width?: number } = {}) {
+  const world = parallelHarbors(options),
+    geo = corridorGeography(world)
+  world.corridorPlan = {
+    month: 0,
+    links: transportNetwork(world).links.map((link) => ({
+      from: link.from,
+      to: link.to,
+      changedAt: 0,
+      legs: link.legs.map((leg) => {
+        if (leg.mode === 'land') return leg
+        const start = leg.cells[1],
+          end = leg.cells.at(-2)!,
+          distance = new Map([[start, 0]]),
+          previous = new Map<number, number>(),
+          queue = new MinHeap()
+        queue.push(start, 0)
+        while (queue.size) {
+          const at = queue.pop()
+          if (at.cost !== distance.get(at.id)) continue
+          if (at.id === end) break
+          for (const next of geo.adjacent[at.id]) {
+            if (world.cells[next].terrain !== 'water') continue
+            const cost = at.cost + geo.segments[geo.index(at.id, next)].effort
+            if (cost >= (distance.get(next) ?? Infinity)) continue
+            distance.set(next, cost)
+            previous.set(next, at.id)
+            queue.push(next, cost)
+          }
+        }
+        const cells = [end]
+        while (cells.at(-1) !== start) cells.push(previous.get(cells.at(-1)!)!)
+        return { mode: 'sea' as const, cells: [leg.cells[0], ...cells.reverse(), leg.cells.at(-1)!] }
+      }),
+    })),
+  }
+  return world
 }

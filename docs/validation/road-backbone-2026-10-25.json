@@ -1,0 +1,262 @@
+{
+  "date": "2026-10-25",
+  "status": "implemented locally; uncommitted",
+  "scope": "Sparse civilian road backbones in province and district market graphs; maturity-dependent additional cross-links",
+  "comparison": {
+    "stats": {
+      "connections": 762,
+      "surveyedRoads": 425,
+      "selectedRoads": 203,
+      "before": {
+        "landEdges": 1813,
+        "seaEdges": 959,
+        "effort": 12413.657380941635
+      },
+      "after": {
+        "landEdges": 827,
+        "seaEdges": 959,
+        "effort": 13633.17154494188
+      },
+      "medianDetour": 1,
+      "p95Detour": 1.958325337504079,
+      "maxDetour": 2.9849650518917885,
+      "matureSelectedRoads": 263,
+      "mature": {
+        "landEdges": 1090,
+        "seaEdges": 959,
+        "effort": 12714.10659842946
+      }
+    },
+    "checks": {
+      "journeys": 762,
+      "allOriginalPairsServed": true,
+      "contiguousLegs": true,
+      "cityEndpointsPreserved": true,
+      "shippingUnchanged": true,
+      "roadGraph": {
+        "before": {
+          "connections": 425,
+          "components": 5,
+          "independentLoops": 250
+        },
+        "early": {
+          "connections": 203,
+          "components": 5,
+          "independentLoops": 28
+        },
+        "developed": {
+          "connections": 263,
+          "components": 5,
+          "independentLoops": 88
+        }
+      },
+      "sourceMonth": 48
+    },
+    "landEdgeReduction": 0.543849972421401,
+    "effortIncrease": 0.09823971506355034,
+    "inputSha256": "c1621650f6c93388c6e51e43e6b4d5257bf740ecc1c41f563011cf499c7a42fc",
+    "worldSha256": "e0b224ea6c6ad63fe13b9aa3394be1223d15fe7029a84698b15f995296e9375b",
+    "conditions": "Same frozen geography and 762 equal-volume journeys; every demand is rerouted through selected roads. Source world month 48; remembered corridor traffic cleared for the early-network scenario. Developed scenario sets infrastructure 0.9, logistics 7, familiarity 0.8 and traffic 1000 on occupied early-network segments. These are controlled geometry and maturity scenarios, not live shipment playback."
+  },
+  "freshWorld": {
+    "seed": "Young road hierarchy",
+    "month": 0,
+    "localMarkets": 877,
+    "neighborCandidatePairs": 2358,
+    "activeLandLinks": 1067
+  },
+  "browser": {
+    "desktopViewport": [1600, 960],
+    "phoneViewport": [390, 844],
+    "algorithmReplay": {
+      "earlyMatches": true,
+      "developedMatches": true,
+      "earlyRoads": 203,
+      "developedRoads": 263,
+      "errors": [],
+      "overflow": false
+    },
+    "desktop": {
+      "ready": true,
+      "view": "land",
+      "stats": {
+        "connections": 762,
+        "surveyedRoads": 425,
+        "selectedRoads": 203,
+        "before": {
+          "landEdges": 1813,
+          "seaEdges": 959,
+          "effort": 12413.657380941635
+        },
+        "after": {
+          "landEdges": 827,
+          "seaEdges": 959,
+          "effort": 13633.17154494188
+        },
+        "medianDetour": 1,
+        "p95Detour": 1.958325337504079,
+        "maxDetour": 2.9849650518917885,
+        "matureSelectedRoads": 263,
+        "mature": {
+          "landEdges": 1090,
+          "seaEdges": 959,
+          "effort": 12714.10659842946
+        }
+      },
+      "errors": [],
+      "overflow": false,
+      "canvases": [
+        {
+          "w": 761,
+          "h": 650
+        },
+        {
+          "w": 761,
+          "h": 650
+        }
+      ]
+    },
+    "phone": {
+      "ready": true,
+      "view": "land",
+      "stats": {
+        "connections": 762,
+        "surveyedRoads": 425,
+        "selectedRoads": 203,
+        "before": {
+          "landEdges": 1813,
+          "seaEdges": 959,
+          "effort": 12413.657380941635
+        },
+        "after": {
+          "landEdges": 827,
+          "seaEdges": 959,
+          "effort": 13633.17154494188
+        },
+        "medianDetour": 1,
+        "p95Detour": 1.958325337504079,
+        "maxDetour": 2.9849650518917885,
+        "matureSelectedRoads": 263,
+        "mature": {
+          "landEdges": 1090,
+          "seaEdges": 959,
+          "effort": 12714.10659842946
+        }
+      },
+      "errors": [],
+      "overflow": false,
+      "canvases": [
+        {
+          "w": 366,
+          "h": 390
+        },
+        {
+          "w": 366,
+          "h": 390
+        }
+      ]
+    },
+    "developed": {
+      "ready": true,
+      "view": "mature",
+      "stats": {
+        "connections": 762,
+        "surveyedRoads": 425,
+        "selectedRoads": 203,
+        "before": {
+          "landEdges": 1813,
+          "seaEdges": 959,
+          "effort": 12413.657380941635
+        },
+        "after": {
+          "landEdges": 827,
+          "seaEdges": 959,
+          "effort": 13633.17154494188
+        },
+        "medianDetour": 1,
+        "p95Detour": 1.958325337504079,
+        "maxDetour": 2.9849650518917885,
+        "matureSelectedRoads": 263,
+        "mature": {
+          "landEdges": 1090,
+          "seaEdges": 959,
+          "effort": 12714.10659842946
+        }
+      },
+      "errors": [],
+      "overflow": false,
+      "canvases": [
+        {
+          "w": 761,
+          "h": 650
+        },
+        {
+          "w": 761,
+          "h": 650
+        }
+      ]
+    },
+    "whole": {
+      "ready": true,
+      "view": "whole",
+      "stats": {
+        "connections": 762,
+        "surveyedRoads": 425,
+        "selectedRoads": 203,
+        "before": {
+          "landEdges": 1813,
+          "seaEdges": 959,
+          "effort": 12413.657380941635
+        },
+        "after": {
+          "landEdges": 827,
+          "seaEdges": 959,
+          "effort": 13633.17154494188
+        },
+        "medianDetour": 1,
+        "p95Detour": 1.958325337504079,
+        "maxDetour": 2.9849650518917885,
+        "matureSelectedRoads": 263,
+        "mature": {
+          "landEdges": 1090,
+          "seaEdges": 959,
+          "effort": 12714.10659842946
+        }
+      },
+      "errors": [],
+      "overflow": false,
+      "canvases": [
+        {
+          "w": 761,
+          "h": 650
+        },
+        {
+          "w": 761,
+          "h": 650
+        }
+      ]
+    }
+  },
+  "validation": {
+    "focusedTests": 44,
+    "focusedFailures": 0,
+    "finalBackboneRerun": 4,
+    "productionBuild": "passed",
+    "scopedFormatting": "passed",
+    "whitespace": "passed",
+    "buildAdvisory": "Existing chunks above 500 kB"
+  },
+  "captures": {
+    "roads": ".impeccable/review/trade-backbone/roads-desktop.png",
+    "whole": ".impeccable/review/trade-backbone/whole-desktop.png",
+    "phone": ".impeccable/review/trade-backbone/roads-phone.png",
+    "developed": ".impeccable/review/trade-backbone/mature-desktop.png"
+  },
+  "limits": [
+    "No paid model providers or source save writes",
+    "Selected civilian links change during market clearing; annual tenure still applies to surveyed physical geometry",
+    "Threefold terrain-effort bound is distinct from the earlier per-leg fusion detour caps and does not cap congestion-adjusted prices",
+    "Network maturity thresholds are explicit heuristics, not calibrated construction economics",
+    "No long-run economic or largest-world endurance qualification"
+  ]
+}

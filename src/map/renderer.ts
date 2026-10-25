@@ -141,6 +141,7 @@ export function drawAtlas(
   layer: Layer,
   scale: number,
   relief = false,
+  linework = true,
 ) {
   ctx.drawImage(cache.ocean, 0, 0, cache.worldWidth, cache.worldHeight)
   ctx.save()
@@ -234,6 +235,21 @@ export function drawAtlas(
       ctx.stroke(river.path)
     }
   }
+  ctx.restore()
+  if (linework) drawAtlasLinework(ctx, cache, world, layer, scale, relief)
+}
+
+/** Fine borders and shore ink are repainted independently of terrain textures. */
+export function drawAtlasLinework(
+  ctx: CanvasRenderingContext2D,
+  cache: AtlasCache,
+  world: World,
+  layer: Layer,
+  scale: number,
+  relief = false,
+) {
+  ctx.save()
+  ctx.clip(cache.land, 'evenodd')
   // Adaptive detail is clipped to real land; the quadtree itself is not a square overlay.
   if (layer !== 'terrain' && scale > 2.2) {
     ctx.beginPath()
@@ -271,12 +287,12 @@ export function drawAtlas(
     ctx.stroke()
   }
   ctx.restore()
-  // A narrow wet margin and pale shore, without a heavy cartographic coastline.
+  // Shore ink retains a readable screen width in both presentations.
   ctx.strokeStyle = '#74aea14d'
-  ctx.lineWidth = 3.2
+  ctx.lineWidth = (relief ? 2 : 1.7) / scale
   ctx.stroke(cache.land)
   ctx.strokeStyle = '#cecc9d99'
-  ctx.lineWidth = 1.25
+  ctx.lineWidth = (relief ? 0.8 : 0.65) / scale
   ctx.stroke(cache.land)
 }
 

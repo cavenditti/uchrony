@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-25",
+  "scope": "Browser rendering of frozen month-21 network geometry and in-browser algorithm replay of controlled five-tile parallel crossings",
+  "browser": "Chrome for Testing 151.0.7922.47",
+  "viewports": [
+    {
+      "width": 1600,
+      "height": 960
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "views": ["shipping detail", "road detail", "whole map", "controlled crossing"],
+  "checks": {
+    "controlledCrossing": {
+      "browserAlgorithmMatchesAfter": true,
+      "browserAlgorithmMatchesBefore": true,
+      "sharedEdges": 55
+    },
+    "errors": [],
+    "overflow": false,
+    "savedMap": {
+      "connections": 762,
+      "edgesAfter": 3024,
+      "edgesBefore": 3435,
+      "navigablePaths": true,
+      "portsPreserved": true
+    }
+  },
+  "phone": {
+    "horizontalOverflow": false,
+    "runtimeErrors": [],
+    "bothMapsRendered": true
+  },
+  "captures": {
+    "shipping": ".impeccable/review/trade-fusion/shipping-before-after.png",
+    "roads": ".impeccable/review/trade-fusion/roads-before-after.png",
+    "overview": ".impeccable/review/trade-fusion/whole-map-before-after.png",
+    "controlled": ".impeccable/review/trade-fusion/crossing-before-after.png",
+    "phone": ".impeccable/review/trade-fusion/phone-before-after.png"
+  },
+  "limits": [
+    "Network comparison treats all 762 surveyed connections as eligible and uses equal display weight; it is not a monthly shipment replay.",
+    "The live autosave changed to month 0 during the check. Frozen month-21 geometry was retained; browser algorithm recomputation used the controlled fixture. No user save was written by this check."
+  ]
+}

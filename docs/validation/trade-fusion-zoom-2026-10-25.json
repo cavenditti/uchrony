@@ -1,0 +1,376 @@
+{
+  "date": "2026-10-25",
+  "status": "local implementation and focused browser validation; uncommitted",
+  "scope": "More aggressive physical corridor fusion and display-resolution linework in the 3D renderer",
+  "comparison": {
+    "source": "Frozen network with controlled equal freight",
+    "worldSha256": "6267f865503cc196a404ddbb64dd91f025754f9d909a75032486716ef29b6c4e",
+    "cells": 8064,
+    "connections": 762,
+    "changedFromPrevious": 264,
+    "input": {
+      "edges": 3435,
+      "effort": 1485.9848607044012
+    },
+    "previousFusion": {
+      "edges": 2971,
+      "effort": 1504.0079287632338,
+      "ms": 23.581999999999994
+    },
+    "newFusion": {
+      "edges": 2772,
+      "effort": 1531.5903508501751,
+      "ms": 122.19929200000001
+    },
+    "edgeReductionVsPrevious": 0.06698081454055871,
+    "effortIncreaseVsPrevious": 0.018339279706871325,
+    "conditions": "Both algorithms receive the same frozen geometry and world, with familiarity 0.7 and equal traffic 1000 on occupied input edges. All paths eligible. Frozen paths originated from the earlier month-21 capture; this is not a live month-21 shipment replay. Timings are one local observation, not a performance benchmark."
+  },
+  "geometry": {
+    "connections": 762,
+    "legs": 791,
+    "maxEffortRatio": 1.2442891649892256,
+    "maxCostRatio": 1.3859384337357288,
+    "pairsPreserved": true,
+    "portsPreserved": true,
+    "adjacentSteps": true,
+    "terrainAndProvinceAccess": true,
+    "noLoops": true,
+    "detourBounds": true
+  },
+  "browser": {
+    "desktop": [1600, 960],
+    "phone": [390, 844],
+    "routes": {
+      "previousMatches": true,
+      "currentMatches": true,
+      "connections": 762,
+      "errors": [],
+      "overflow": false
+    },
+    "routesPhone": {
+      "view": "sea",
+      "errors": [],
+      "overflow": false,
+      "canvases": [
+        {
+          "width": 366,
+          "height": 390
+        },
+        {
+          "width": 366,
+          "height": 390
+        }
+      ]
+    },
+    "zoomInteractions": [
+      {
+        "ready": true,
+        "scale": 24,
+        "tilt": true,
+        "layer": "trade",
+        "focus": {
+          "x": 976.0106300650623,
+          "y": 231
+        },
+        "errors": [],
+        "overflow": false,
+        "crop": {
+          "x": 956.0106300650623,
+          "y": 206,
+          "width": 40,
+          "height": 120,
+          "pixelsWide": 1280,
+          "pixelsHigh": 3840
+        },
+        "texture": {
+          "w": 1280,
+          "h": 3840
+        },
+        "renderer": {
+          "geometries": 11,
+          "textures": 6
+        }
+      },
+      {
+        "ready": true,
+        "scale": 24,
+        "tilt": true,
+        "layer": "trade",
+        "focus": {
+          "x": 976.0106300650623,
+          "y": 231
+        },
+        "errors": [],
+        "overflow": false,
+        "crop": {
+          "x": 996.0106300650623,
+          "y": 203.843220511691,
+          "width": 40,
+          "height": 122.15677948830901,
+          "pixelsWide": 1280,
+          "pixelsHigh": 3909
+        },
+        "texture": {
+          "w": 1280,
+          "h": 3909
+        },
+        "renderer": {
+          "geometries": 13,
+          "textures": 6
+        }
+      },
+      {
+        "ready": true,
+        "scale": 24,
+        "tilt": false,
+        "layer": "trade",
+        "focus": {
+          "x": 976.0106300650623,
+          "y": 231
+        },
+        "errors": [],
+        "overflow": false,
+        "crop": {
+          "x": 996.0106300650623,
+          "y": 203.843220511691,
+          "width": 40,
+          "height": 122.15677948830901,
+          "pixelsWide": 1280,
+          "pixelsHigh": 3909
+        },
+        "texture": {
+          "w": 1280,
+          "h": 3909
+        },
+        "renderer": {
+          "geometries": 13,
+          "textures": 6
+        }
+      },
+      {
+        "ready": true,
+        "scale": 24,
+        "tilt": false,
+        "layer": "terrain",
+        "focus": {
+          "x": 976.0106300650623,
+          "y": 231
+        },
+        "errors": [],
+        "overflow": false,
+        "crop": {
+          "x": 996.0106300650623,
+          "y": 203.843220511691,
+          "width": 40,
+          "height": 122.15677948830901,
+          "pixelsWide": 1280,
+          "pixelsHigh": 3909
+        },
+        "texture": {
+          "w": 1280,
+          "h": 3909
+        },
+        "renderer": {
+          "geometries": 13,
+          "textures": 6
+        }
+      },
+      {
+        "ready": true,
+        "scale": 48,
+        "tilt": false,
+        "layer": "terrain",
+        "focus": {
+          "x": 976.0106300650623,
+          "y": 231
+        },
+        "errors": [],
+        "overflow": false,
+        "crop": {
+          "x": 1006.0106300650623,
+          "y": 222.4375,
+          "width": 20,
+          "height": 17.125,
+          "pixelsWide": 1280,
+          "pixelsHigh": 1096
+        },
+        "texture": {
+          "w": 1280,
+          "h": 1096
+        },
+        "renderer": {
+          "geometries": 13,
+          "textures": 6
+        }
+      },
+      {
+        "ready": true,
+        "scale": 96,
+        "tilt": false,
+        "layer": "terrain",
+        "focus": {
+          "x": 976.0106300650623,
+          "y": 231
+        },
+        "errors": [],
+        "overflow": false,
+        "crop": {
+          "x": 1011.0106300650623,
+          "y": 226.71875,
+          "width": 10,
+          "height": 8.5625,
+          "pixelsWide": 1280,
+          "pixelsHigh": 1096
+        },
+        "texture": {
+          "w": 1280,
+          "h": 1096
+        },
+        "renderer": {
+          "geometries": 13,
+          "textures": 6
+        }
+      },
+      {
+        "ready": true,
+        "scale": 96,
+        "tilt": true,
+        "layer": "terrain",
+        "focus": {
+          "x": 976.0106300650623,
+          "y": 231
+        },
+        "errors": [],
+        "overflow": false,
+        "crop": {
+          "x": 1011.0106300650623,
+          "y": 219.79865509286475,
+          "width": 10,
+          "height": 103.20134490713525,
+          "pixelsWide": 1280,
+          "pixelsHigh": 4096
+        },
+        "texture": {
+          "w": 1280,
+          "h": 4096
+        },
+        "renderer": {
+          "geometries": 13,
+          "textures": 6
+        }
+      },
+      {
+        "ready": true,
+        "scale": 24,
+        "tilt": true,
+        "layer": "trade",
+        "focus": {
+          "x": 976.0106300650623,
+          "y": 231
+        },
+        "errors": [],
+        "overflow": false,
+        "crop": {
+          "x": 956.0106300650623,
+          "y": 206,
+          "width": 40,
+          "height": 120,
+          "pixelsWide": 1280,
+          "pixelsHigh": 3840
+        },
+        "texture": {
+          "w": 1280,
+          "h": 3840
+        },
+        "renderer": {
+          "geometries": 13,
+          "textures": 6
+        }
+      }
+    ],
+    "zoomPhone": {
+      "ready": true,
+      "scale": 24,
+      "tilt": true,
+      "layer": "trade",
+      "focus": {
+        "x": 976.0106300650623,
+        "y": 231
+      },
+      "errors": [],
+      "overflow": false,
+      "crop": {
+        "x": 956.0106300650623,
+        "y": 206,
+        "width": 40,
+        "height": 120,
+        "pixelsWide": 1280,
+        "pixelsHigh": 3840
+      },
+      "texture": {
+        "w": 1280,
+        "h": 3840
+      },
+      "renderer": {
+        "geometries": 13,
+        "textures": 6
+      }
+    },
+    "views": [
+      "shipping detail",
+      "road detail",
+      "whole map",
+      "tilted 3D",
+      "view from above",
+      "terrain",
+      "trade"
+    ],
+    "zoomScales": [24, 48, 96],
+    "note": "Scale 96 deliberately exceeds the normal close-zoom range; identical route geometry is used in both zoom panes. Screenshots use the actual atlas and ReliefMap renderers, not an independent drawing approximation."
+  },
+  "validation": {
+    "broadFocusedTests": {
+      "passed": 59,
+      "failed": 0,
+      "log": ".impeccable/review/trade-fusion-v2/tests.log"
+    },
+    "finalRendererTests": {
+      "passed": 13,
+      "failed": 0,
+      "log": ".impeccable/review/trade-fusion-v2/zoom-tests.log"
+    },
+    "stabilityMonths": 48,
+    "firstMergeMonth": 12,
+    "pathChangeEvents": 1,
+    "sharedEdges": 33,
+    "productionBuild": "passed",
+    "formatting": "scoped check passed",
+    "whitespace": "git diff --check passed",
+    "warning": "Existing build chunks exceed 500 kB"
+  },
+  "renderingBudget": {
+    "maximumTextureDimension": 4096,
+    "maximumPixels": 8388608,
+    "rgbaMiB": 32,
+    "mipmaps": false,
+    "overscanScreenPixels": 96,
+    "animatedUploadIntervalMs": 80,
+    "cameraCoverageChanges": "Repaint immediately; contained small pans reuse current bitmap"
+  },
+  "captures": {
+    "shipping": ".impeccable/review/trade-fusion-v2/fusion-desktop.png",
+    "roads": ".impeccable/review/trade-fusion-v2/fusion-roads.png",
+    "wholeMap": ".impeccable/review/trade-fusion-v2/fusion-whole.png",
+    "phoneRoutes": ".impeccable/review/trade-fusion-v2/fusion-phone.png",
+    "zoomDesktop": ".impeccable/review/trade-fusion-v2/zoom-desktop.png",
+    "zoomPhone": ".impeccable/review/trade-fusion-v2/zoom-phone.png"
+  },
+  "boundaries": [
+    "No user saves rewritten by this work",
+    "No paid providers or external model calls",
+    "Annual path tenure and quarterly adoption remain in place",
+    "Texture budgets can still reduce detail on very steep or broad views",
+    "This is not prolonged simulation or all-device qualification"
+  ]
+}

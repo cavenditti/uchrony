@@ -22,6 +22,7 @@ import {
 
 import { agreementTerms } from './agreements'
 import { transportNetwork, reverseLegs, refreshTransport } from './transport'
+import { retainRoadBackbone } from './road-backbone'
 import {
   corridorCost,
   corridorProfile,
@@ -187,6 +188,7 @@ export function transportGraph(
     if (capacity > 0.001 && allowed(b, a))
       graph[b.id].push({ to: a.id, cost, capacity, sea, legs: reverseLegs(link.legs) })
   }
+  if (militaryNation === undefined) retainRoadBackbone(world, graph.entries())
   return graph
 }
 export function shortestPaths(graph: Graph, from: number) {

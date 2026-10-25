@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { corridorCost, corridorProfile, corridorUsage, learnCorridors } from '../src/sim/corridors'
 import { refreshTransport, transportNetwork } from '../src/sim/transport'
-import { completedFreight, parallelHarbors } from './fixtures/corridors'
+import { completedFreight, independentHarbors as parallelHarbors } from './fixtures/corridors'
 
-// Controlled demand: one established crossing, with a parallel port pair nearby.
+// Legacy independent survey: one established crossing, with a parallel port pair nearby.
 // This isolates corridor learning from population, supplier, war and price changes.
 const world = parallelHarbors(),
   base = transportNetwork(world),

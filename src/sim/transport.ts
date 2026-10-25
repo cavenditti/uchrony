@@ -1,5 +1,6 @@
 import { MinHeap } from './heap'
 import { bundleCorridors } from './corridor-bundling'
+import { shippingBackbone } from './shipping-backbone'
 import type { Cell, CorridorPlan, RouteLeg, World } from './types'
 import {
   CORRIDOR_LEARNING,
@@ -84,7 +85,11 @@ export function reverseLegs(legs: RouteLeg[]): RouteLeg[] {
 function baseNetwork(world: World): TransportNetwork {
   let network = cache.get(world.cells)
   if (!network) {
-    network = buildNetwork(world)
+    const surveyed = buildNetwork(world)
+    network = {
+      ...surveyed,
+      links: shippingBackbone(world, surveyed.links).map((link) => physicalLink(world, link)),
+    }
     cache.set(world.cells, network)
   }
   return network
@@ -152,10 +157,16 @@ export function refreshTransport(world: World, profile: CorridorProfile) {
       changedAt: keep ? changedAt : world.month,
     }
   })
-  const bundled = bundleCorridors(
+  const bundled = shippingBackbone(
     world,
-    profile,
-    links,
+    bundleCorridors(
+      world,
+      profile,
+      links,
+      (link) =>
+        world.month - (ages.get(`${link.from}-${link.to}`) ?? world.month) >=
+        CORRIDOR_LEARNING.minimumPathMonths,
+    ),
     (link) =>
       world.month - (ages.get(`${link.from}-${link.to}`) ?? world.month) >=
       CORRIDOR_LEARNING.minimumPathMonths,

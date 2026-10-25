@@ -17,6 +17,7 @@ import {
   type CorridorProfile,
 } from './corridors'
 import { transportNetwork, refreshTransport, reverseLegs } from './transport'
+import { retainRoadBackbone } from './road-backbone'
 import { reserveTarget, householdNeed } from './economy'
 import { recordTrade } from './macroeconomy'
 import {
@@ -136,6 +137,7 @@ export function districtNetwork(w: World): DistrictNetwork {
     add(from, to, legs)
     add(to, from, reverseLegs(legs))
   }
+  retainRoadBackbone(w, graph, (id) => system.units[id])
   for (const edges of graph.values()) edges.sort((a, b) => a.to - b.to)
   return { graph, profile }
 }

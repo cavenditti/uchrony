@@ -7,7 +7,7 @@ import { generateWorld } from '../src/sim/generate'
 import { tick } from '../src/sim/engine'
 import { parseSave, validateWorld } from '../src/sim/persistence'
 import { GOODS, type World } from '../src/sim/types'
-import { completedFreight, corridorWorld, parallelHarbors } from './fixtures/corridors'
+import { completedFreight, corridorWorld, independentHarbors as parallelHarbors } from './fixtures/corridors'
 
 test('successful traffic attracts other journeys onto a shared corridor without moving harbors', () => {
   const world = parallelHarbors(),

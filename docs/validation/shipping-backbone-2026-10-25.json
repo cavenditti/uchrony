@@ -1,0 +1,184 @@
+{
+  "date": "2026-10-25",
+  "status": "validated locally",
+  "baseCommit": "07fe925",
+  "scope": "Physical shared shipping corridors, with fixed port approaches and unchanged land legs; prior road and zoom work included in the same commit.",
+  "provenance": {
+    "source": ".impeccable/review/trade-backbone/after.json",
+    "worldMonth": 48,
+    "worldSha256": "e0b224ea6c6ad63fe13b9aa3394be1223d15fe7029a84698b15f995296e9375b",
+    "beforeSha256": "1f756b325a2b1f7e5157d4d05cc391a0d5265e5430953aa68d4eecdeb4043e7b",
+    "afterSha256": "f59bd352d43d97cfb328ef8c28eb5147056ef1db197f3fb4f90c9705a92073d6",
+    "matureSha256": "38d2dba34f67e2badbe8562b762f7337d9ce0d9ff4151758bfc6566ad82a6eb3",
+    "scenario": "Frozen prior world; corridor traffic cleared for early-network comparison. Equal shipment demand on all original pairs; not a month-zero simulation replay. Mature scenario uses infrastructure 0.9, logistics 7, familiarity 0.8 and traffic 1000 on occupied early-network edges."
+  },
+  "parameters": {
+    "maximumSailingDetour": 2,
+    "matureShortcutRatio": 1.35,
+    "minimumInfrastructure": 0.7,
+    "minimumLogistics": 3,
+    "minimumFamiliarity": 0.65,
+    "minimumTraffic": 0.1,
+    "predecessorCacheLimit": 8
+  },
+  "comparison": {
+    "journeys": 762,
+    "shippingJourneys": 337,
+    "before": {
+      "landEdges": 827,
+      "seaEdges": 959,
+      "ports": 100,
+      "seaEffort": 7213.900000000008,
+      "effort": 13633.171544941879
+    },
+    "after": {
+      "landEdges": 827,
+      "seaEdges": 715,
+      "ports": 100,
+      "seaEffort": 8446.400000000007,
+      "effort": 14865.671544941886
+    },
+    "developed": {
+      "landEdges": 827,
+      "seaEdges": 824,
+      "ports": 100,
+      "seaEffort": 7489.700000000015,
+      "effort": 13908.971544941875
+    },
+    "p95ShippingDetour": 1.5444264943457187,
+    "maximumShippingDetour": 1.9207650273224037,
+    "localMs": 19.860750000000053
+  },
+  "geometryChecks": {
+    "after": {
+      "journeys": 762,
+      "seaLegs": 337,
+      "unchangedLandLegs": 972,
+      "maximumSailingRatio": 1.9207650273224037,
+      "allPairsPreserved": true,
+      "harborsAndApproachesPreserved": true,
+      "contiguousNavigableLoopFree": true
+    },
+    "mature": {
+      "journeys": 762,
+      "seaLegs": 337,
+      "unchangedLandLegs": 972,
+      "maximumSailingRatio": 1.3465909090909092,
+      "allPairsPreserved": true,
+      "harborsAndApproachesPreserved": true,
+      "contiguousNavigableLoopFree": true
+    }
+  },
+  "segmentDefinition": "Displayed shipping edges include 100 unchanged land-to-water port approaches. Water-only edges fall from 859 to 615.",
+  "validation": {
+    "isolatedCommitBuild": "passed TypeScript and production build; existing 500 kB chunk warning",
+    "focusedTests": {
+      "passed": 63,
+      "failed": 0,
+      "logs": [
+        "isolated-tests.log",
+        "isolated-contract-tests.log"
+      ]
+    },
+    "legacy48MonthFixture": {
+      "sharedSegmentsBefore": 0,
+      "sharedSegmentsAfter": 34,
+      "pathEdgesBefore": 39,
+      "pathEdgesAfter": 42,
+      "firstMergeMonth": 12,
+      "pathChanges": 1,
+      "unreinforcedEffortBefore": 4.2,
+      "unreinforcedEffortAfter": 4.4,
+      "learnedCostSaving": 0.2045264986931623
+    },
+    "browser": {
+      "desktop": {
+        "earlyMatches": true,
+        "developedMatches": true,
+        "errors": [],
+        "overflow": false,
+        "stats": {
+          "journeys": 762,
+          "shippingJourneys": 337,
+          "before": {
+            "landEdges": 827,
+            "seaEdges": 959,
+            "ports": 100,
+            "seaEffort": 7213.900000000008,
+            "effort": 13633.171544941879
+          },
+          "after": {
+            "landEdges": 827,
+            "seaEdges": 715,
+            "ports": 100,
+            "seaEffort": 8446.400000000007,
+            "effort": 14865.671544941886
+          },
+          "developed": {
+            "landEdges": 827,
+            "seaEdges": 824,
+            "ports": 100,
+            "seaEffort": 7489.700000000015,
+            "effort": 13908.971544941875
+          },
+          "p95ShippingDetour": 1.5444264943457187,
+          "maximumShippingDetour": 1.9207650273224037,
+          "localMs": 19.860750000000053
+        }
+      },
+      "mature": {
+        "view": "mature",
+        "errors": [],
+        "overflow": false
+      },
+      "phone": {
+        "ready": true,
+        "errors": [],
+        "overflow": false
+      },
+      "screenshots": [
+        "shipping-desktop.png",
+        "shipping-mature.png",
+        "shipping-phone.png"
+      ],
+      "viewports": [
+        [
+          1600,
+          960
+        ],
+        [
+          390,
+          844
+        ]
+      ],
+      "renderer": "Actual atlas and freight renderer; browser algorithm outputs match recorded early and mature paths."
+    }
+  },
+  "sourceSha256": {
+    "src/components/WorldMap.tsx": "6e8006f232fc8a791061e6eab7d78f61e4d68a195f36960cfab63da695b8056c",
+    "src/map/render-budget.ts": "5ad3081717494bae6c8f49f866c55d6ec0d0d2778d8ca4a6bd9a523f904a8c95",
+    "src/map/overlay-window.ts": "ea95c1a104804f98314532471ae77df6d0f75c6b584f6b414f87bb5c3e6373dd",
+    "src/sim/corridor-bundling.ts": "7e678fc2cdbcf514e6dcf34269dd52473d89347300ebda03548db38f96bfaa6d",
+    "src/sim/road-backbone.ts": "71452662eb0d06161cfcbf5ff059e982f2358d134721df2fea2b63df78ef7d4f",
+    "src/sim/shipping-backbone.ts": "ad48ffbc8c2756c8c12ead74da38038e35b18f752ed8c1891f01154e5457faae",
+    "src/sim/transport.ts": "35082bfffca87afafa0a6c8eb2e32eec06ffcc1a4a2c26ccd864cfb6c2862ca6",
+    "src/sim/district-transport.ts": "d81549c433abaa1dd072912d726ca9195fc1c3a4efc95f052c109271ed9570ce",
+    "src/sim/economy.ts": "017fc1596c9d2bee86c40895c7c1ab5f332da2d74592d71539cd1d005d8389c2",
+    "tests/corridor-bundling.test.ts": "399dbb1fabbd1da50dda2f5a169453423a11e006abd29960303eb52114c8ae3d",
+    "tests/corridors.test.ts": "505ce78bce05bccc63eaf8a90d643f59707245fe1a462487990d80541924bc2d",
+    "tests/fixtures/corridors.ts": "cec5742bf2618d8eeacfbd6c8c486f46b18e76d7091c778011674db6b63b0408",
+    "tests/trade-corridors.ts": "b595757ebf03730ca514137245811fbaa046e8055ff780e92536385b2eff2832",
+    "tests/overlay-window.test.ts": "b6608a1072982b0b48efb465e8f03a8a6994ce255e939b1d4859e0eced35fa6b",
+    "tests/road-backbone.test.ts": "a33450547af8816d55994c2d374613ede55b0c9aad04bef8106077bd41452834",
+    "tests/shipping-backbone.test.ts": "a0405f7258a3a74db2ef67446f249ac60c8789bb92c13db3b0e064a96bb8ef6f",
+    "src/map/relief.ts": "12ac61bc277f63f276eda8718dfc7611bf7f124d98d62688f697cb7e054381d1",
+    "src/map/renderer.ts": "566db9b9006666afc95b0acd2a1d5209f003caa90123164eaa48f307126c283a"
+  },
+  "localArtifacts": ".impeccable/review/shipping-backbone/",
+  "limits": [
+    "No user save was modified and no paid provider was called.",
+    "This is controlled geometry and short browser evidence, not long-run economic calibration.",
+    "Local runtime in comparison is one observation, not a benchmark.",
+    "Browser scenery reflects separate ongoing map work; isolated commit build excludes that unrelated work."
+  ]
+}
