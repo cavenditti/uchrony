@@ -52,7 +52,7 @@ worker.onmessage = ({ data }: MessageEvent<World>) => {
   worker.terminate()
 }
 worker.onerror = () => root.render(<p>Stress fixture generation failed. Check the console.</p>)
-worker.postMessage({})
+worker.postMessage({ months: new URLSearchParams(location.search).has('landscape') ? 0 : 3 })
 
 if (import.meta.hot)
   import.meta.hot.dispose(() => {

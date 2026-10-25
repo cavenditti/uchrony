@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-25",
+  "generatorVersion": 4,
+  "erosionPasses": 24,
+  "notes": [
+    "Generation-only benchmark; not a simulation endurance test.",
+    "Straight-run metric counts upstream starting cells, so overlapping runs count separately.",
+    "Baseline is the previous generator captured before this change, on the same seed and extent."
+  ],
+  "before": {
+    "cells": 129024,
+    "riverCells": 12352,
+    "longestStraight": 41,
+    "startsOfRunsAtLeast12": 1472,
+    "confluences": 831,
+    "descentsInvalid": 0
+  },
+  "after": [
+    {
+      "seed": "Map memory stress fixture",
+      "width": 448,
+      "height": 288,
+      "generationMs": 1845.019333,
+      "cells": 129024,
+      "riverCells": 6907,
+      "longestStraight": 20,
+      "startsOfRunsAtLeast12": 85,
+      "confluences": 362,
+      "descentsInvalid": 0,
+      "renderCurves": 1730,
+      "renderGeometry": {
+        "riverVertices": 76018,
+        "riverTriangles": 72558,
+        "riverBufferBytes": 2086984,
+        "forestInstances": 18000,
+        "constructionMsIncludingTerrain": 411.40612499999975
+      }
+    },
+    {
+      "seed": "A world unwritten",
+      "width": 448,
+      "height": 288,
+      "generationMs": 1521.0952499999999,
+      "cells": 129024,
+      "riverCells": 6737,
+      "longestStraight": 26,
+      "startsOfRunsAtLeast12": 116,
+      "confluences": 342,
+      "descentsInvalid": 0,
+      "renderCurves": 1685
+    },
+    {
+      "seed": "Watersheds",
+      "width": 112,
+      "height": 72,
+      "generationMs": 78.59937500000024,
+      "cells": 8064,
+      "riverCells": 206,
+      "longestStraight": 10,
+      "startsOfRunsAtLeast12": 0,
+      "confluences": 2,
+      "descentsInvalid": 0,
+      "renderCurves": 55
+    }
+  ],
+  "sourceSha256": {
+    "src/sim/hydrology.ts": "3e9421bc7ec36819ff9fd7112429719254893afc64b405a08f486f7e937d7efe",
+    "src/sim/geography.ts": "4f05deaea5445dd1950cb830775ae062b885057afabe1b5ee5ab8c38d729268d",
+    "src/map/rivers.ts": "00a803b0000a255266ba8cc98d4fdd03b0137b86d9ccd93f4b9209183d1bbb74",
+    "src/map/river-surface.ts": "8d2938a60823bb8e4c1689251bcaec5c0179cd6f4462a2b493f4a70cd52feaf0",
+    "src/map/landscape-field.ts": "2cdf7063b7203bb0dca794b76f72147430e7d969b26131c9accd8e0d2e220561",
+    "src/map/landscape-material.ts": "553a55763231be6673e49286089bf258946726724af4ce12cead6ca07fdd1be6",
+    "src/map/landscape-raster.ts": "146c41266d25b018bd90bc7e449abc07fd3e15afddfe10c18fdfe9cb98ede83a",
+    "src/map/forest-sites.ts": "0b3d0f4a7c8311ee1086bf69be5be7f3cadb46c390de22918c477ffb175cceb2",
+    "src/map/relief.ts": "7519c9e4549fdc2fccf34524c2674c55745030a40333b331da28dbe2b1c97815",
+    "src/map/relief-field.ts": "6081311979cab8b8d9a9221d761e174fab1ae5781c368b818d95e3ede0e4c051",
+    "src/map/renderer.ts": "4cae8c08c865aff5a436155e8b7ba10bb461d6ca4f2530fd905d6824689e7c54"
+  },
+  "verification": {
+    "targetedTests": 25,
+    "typeCheck": "passed",
+    "productionBuild": "passed",
+    "finishReview": "ship: all four scored material fixes resolved; not an AAA certification",
+    "endurance": "No new 20-minute simulation/autosave test; previous endurance applies to its recorded build only",
+    "interaction": {
+      "started": "2026-10-25T10:05:29.248Z",
+      "elapsedMs": 4493,
+      "realDrags": 30,
+      "buttonZooms": 60,
+      "logs": [],
+      "scope": "Largest newly generated map, retained river mesh, fixed simulation snapshot; no saving"
+    }
+  }
+}

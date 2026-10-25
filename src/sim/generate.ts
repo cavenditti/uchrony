@@ -436,7 +436,7 @@ export function generateWorld(
   })
   const world: World = {
     version: 1,
-    generatorVersion: 3,
+    generatorVersion: 4,
     simulation: { ...settings },
     seed,
     rng: rng.rng,

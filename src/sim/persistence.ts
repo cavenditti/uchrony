@@ -43,7 +43,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   walk(w)
   if (w.viewOnly) fail('display snapshots cannot be restored')
   if (w.version !== 1) fail('unsupported version; this app supports version 1')
-  if (w.generatorVersion !== undefined && ![1, 2, 3].includes(w.generatorVersion))
+  if (w.generatorVersion !== undefined && ![1, 2, 3, 4].includes(w.generatorVersion))
     fail('unsupported geography generator')
   if (
     typeof w.seed !== 'string' ||

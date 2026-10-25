@@ -1,7 +1,7 @@
 import { fractal, hashSeed, random, noise } from './random'
 import { clamp, type Cell, type Terrain } from './types'
 import { HEX, neighbors } from './hex'
-import { MinHeap } from './heap'
+import { erodeDrainage } from './hydrology'
 
 export const SEA_LEVEL = 0.095
 const layouts: Record<number, number[][]> = {
@@ -143,44 +143,26 @@ export function generateGeography(seed: string, continents: number, width: numbe
     c.terrain = 'water'
     c.elevation = SEA_LEVEL - 0.01
   }
-  drain(cells, width, height)
+  erodeDrainage(cells, width, height, seed, SEA_LEVEL)
+  // Erosion changes the actual relief used by both simulation and rendering.
+  for (const c of cells) {
+    if (c.terrain === 'water') continue
+    const latitude = Math.abs(c.r / (height - 1) - 0.5) * 2
+    const temperature = 1 - latitude * 0.85 - Math.max(0, c.elevation - SEA_LEVEL) * 0.8
+    c.terrain =
+      c.elevation > 0.43
+        ? 'mountains'
+        : temperature < 0.24
+          ? 'tundra'
+          : c.elevation > 0.3
+            ? 'hills'
+            : c.moisture < 0.34
+              ? 'desert'
+              : c.moisture > 0.55
+                ? 'forest'
+                : 'plains'
+    // Riparian fertility is local; it should not reclassify the surrounding biome.
+    if (c.river) c.moisture = clamp(c.moisture + 0.08)
+  }
   return cells
-}
-
-/** Priority flood resolves sinks, then accumulates runoff along a cycle-free drainage forest. */
-function drain(cells: Cell[], width: number, height: number) {
-  const visited = new Uint8Array(cells.length),
-    queue = new MinHeap(),
-    order: number[] = []
-  for (const c of cells)
-    if (c.terrain === 'water') {
-      visited[c.id] = 1
-      queue.push(c.id, c.elevation)
-    }
-  while (queue.size) {
-    const { id } = queue.pop(),
-      c = cells[id]
-    order.push(id)
-    for (const next of neighbors(id, width, height))
-      if (!visited[next]) {
-        visited[next] = 1
-        const n = cells[next]
-        n.elevation = Math.max(n.elevation, c.elevation + 0.00001)
-        n.downstream = id
-        n.riverFlow = 0.4 + n.moisture
-        queue.push(next, n.elevation)
-      }
-  }
-  for (let i = order.length - 1; i >= 0; i--) {
-    const c = cells[order[i]]
-    if (c.downstream !== undefined) {
-      const next = cells[c.downstream]
-      next.riverFlow = (next.riverFlow ?? 0) + (c.riverFlow ?? 0)
-    }
-  }
-  for (const c of cells)
-    if (c.terrain !== 'water' && (c.riverFlow ?? 0) >= 12) {
-      c.river = true
-      c.moisture = clamp(c.moisture + 0.08)
-    }
 }

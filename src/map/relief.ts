@@ -1,16 +1,19 @@
 import { spatialState } from '../sim/spatial'
 import * as THREE from 'three'
-import { HEX } from '../sim/hex'
 import { type World, type Layer } from '../sim/types'
 import { type AtlasCache, drawAtlas } from './renderer'
 import { OverlayUpdates } from './render-budget'
 import { TerrainPicker } from './relief-picking'
 import { terrainHeight, reliefRandom } from './relief-field'
+import { terrainMaterial, oceanMaterial } from './landscape-material'
+import { forestSites } from './forest-sites'
+import { riverSurface } from './river-surface'
 
 export type ReliefCamera = { w: number; h: number; scale: number; x: number; y: number; tilt: boolean }
 
 /** A retained GPU scene. Geography is rebuilt only for a new world; camera and data are independent. */
 export class ReliefMap {
+  private rivers: ReturnType<typeof riverSurface>
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
   private camera = new THREE.OrthographicCamera()
@@ -46,10 +49,10 @@ export class ReliefMap {
       powerPreference: 'high-performance',
     })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75))
-    this.renderer.setClearColor('#163e4d')
+    this.renderer.setClearColor('#102c3b')
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 0.95
+    this.renderer.toneMappingExposure = 1.05
     const resolution = Math.min(1.5, 4096 / this.width)
     for (const target of [this.textureCanvas, this.overlayCanvas]) {
       target.width = Math.ceil(this.width * resolution)
@@ -73,13 +76,7 @@ export class ReliefMap {
     }
     geometry.computeVertexNormals()
     this.picker = new TerrainPicker(geometry)
-    const material = new THREE.MeshStandardMaterial({
-      map: this.texture,
-      roughness: 0.94,
-      metalness: 0,
-      transparent: true,
-      alphaTest: 0.3,
-    })
+    const material = terrainMaterial(this.texture)
     this.terrain = new THREE.Mesh(geometry, material)
     this.scene.add(this.terrain)
     this.oceanTexture = new THREE.CanvasTexture(atlas.ocean)
@@ -87,11 +84,10 @@ export class ReliefMap {
     const oceanGeometry = new THREE.PlaneGeometry(this.width, this.height)
     oceanGeometry.rotateX(-Math.PI / 2)
     oceanGeometry.translate(this.width / 2, -0.1, this.height / 2)
-    const ocean = new THREE.Mesh(
-      oceanGeometry,
-      new THREE.MeshBasicMaterial({ map: this.oceanTexture, toneMapped: false }),
-    )
+    const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial(this.oceanTexture))
     this.scene.add(ocean)
+    this.rivers = riverSurface(atlas.riverCurves, this.picker)
+    this.scene.add(this.rivers.mesh)
     const overlayMesh = new THREE.Mesh(
       geometry,
       new THREE.MeshBasicMaterial({
@@ -105,9 +101,9 @@ export class ReliefMap {
     )
     overlayMesh.renderOrder = 2
     this.scene.add(overlayMesh)
-    this.scene.add(new THREE.HemisphereLight('#dceaf0', '#47503a', 1.35))
-    const sun = new THREE.DirectionalLight('#fff0c9', 2.2)
-    sun.position.set(-700, 1100, -500)
+    this.scene.add(new THREE.HemisphereLight('#d6e7f0', '#303d25', 1.1))
+    const sun = new THREE.DirectionalLight('#fff0d8', 2.65)
+    sun.position.set(-700, 850, -500)
     this.scene.add(sun)
     this.scene.add(this.scenery)
     this.buildScenery(world)
@@ -116,31 +112,41 @@ export class ReliefMap {
   private buildScenery(world: World) {
     const dummy = new THREE.Object3D(),
       color = new THREE.Color()
-    const forests = world.cells.filter((c) => c.terrain === 'forest' && !c.river)
-    const stride = Math.max(1, Math.ceil(forests.length / 12000))
-    const trees = forests.filter((_, i) => i % stride === 0)
-    const geometry = new THREE.ConeGeometry(1, 1, 5)
-    geometry.translate(0, 0.5, 0)
+    const trees = forestSites(world)
+    const geometry = new THREE.IcosahedronGeometry(1, 0)
+    const canopy = geometry.attributes.position
+    for (let i = 0; i < canopy.count; i++) {
+      const x = canopy.getX(i),
+        y = canopy.getY(i),
+        z = canopy.getZ(i)
+      const irregularity = 0.88 + reliefRandom(Math.round((x + 2) * 31 + (y + 2) * 71 + (z + 2) * 113)) * 0.24
+      canopy.setXYZ(i, x * irregularity, y * irregularity, z * irregularity)
+    }
+    // Keep continuous crown normals across the non-indexed triangular faces.
+    const normals = geometry.attributes.normal
+    for (let i = 0; i < canopy.count; i++) {
+      const x = canopy.getX(i),
+        y = canopy.getY(i),
+        z = canopy.getZ(i)
+      const length = Math.hypot(x, y, z)
+      normals.setXYZ(i, x / length, y / length, z / length)
+    }
+    geometry.translate(0, 0.8, 0)
     const crowns = new THREE.InstancedMesh(
       geometry,
-      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }),
-      trees.length * 3,
+      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: false }),
+      trees.length,
     )
     let index = 0
-    for (const cell of trees)
-      for (let j = 0; j < 3; j++) {
-        const seed = cell.id * 13 + j * 31,
-          r = reliefRandom(seed)
-        const x = cell.x + (reliefRandom(seed + 1) - 0.5) * HEX * 1.1
-        const z = cell.y + (reliefRandom(seed + 2) - 0.5) * HEX
-        dummy.position.set(x, terrainHeight(world, x, z) + 0.2, z)
-        dummy.rotation.set(0, r * Math.PI, 0)
-        dummy.scale.set(2.3 + r * 1.5, 7 + r * 7, 2.3 + r * 1.5)
-        dummy.updateMatrix()
-        crowns.setMatrixAt(index, dummy.matrix)
-        color.setHSL(0.29 + r * 0.045, 0.22 + r * 0.1, 0.19 + r * 0.09)
-        crowns.setColorAt(index++, color)
-      }
+    for (const { x, z, variation: r } of trees) {
+      dummy.position.set(x, terrainHeight(world, x, z) + 0.2, z)
+      dummy.rotation.set((r - 0.5) * 0.18, r * Math.PI, 0)
+      dummy.scale.set(3.1 + r * 2.2, 4 + r * 5, 2.7 + r * 2.5)
+      dummy.updateMatrix()
+      crowns.setMatrixAt(index, dummy.matrix)
+      color.setHSL(0.25 + r * 0.07, 0.24 + r * 0.1, 0.14 + r * 0.12)
+      crowns.setColorAt(index++, color)
+    }
     crowns.computeBoundingSphere()
     this.scenery.add(crowns)
     this.scenery.add(this.settlements)
@@ -149,7 +155,7 @@ export class ReliefMap {
 
   private updateSettlements(world: World) {
     const sites = spatialState(world).settlements
-    const key = sites.map((s) => `${s.id}:${s.kind}:${s.capital}`).join('|')
+    const key = sites.map((s) => `${s.id}:${s.cell}:${s.kind}:${s.capital}`).join('|')
     if (key === this.settlementKey) return
     this.settlementKey = key
     for (const object of [...this.settlements.children]) {
@@ -233,6 +239,8 @@ export class ReliefMap {
 
   paint(world: World, layer: Layer, scale: number) {
     this.updateSettlements(world)
+    this.rivers.minimumFlow.value = scale >= 0.7 ? 0 : 12 / Math.max(0.08, scale)
+    this.rivers.mesh.material.color.set(layer === 'terrain' ? '#438d9d' : '#457a88')
     const ctx = this.textureCanvas.getContext('2d')!
     const ratio = this.textureCanvas.width / this.width
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)

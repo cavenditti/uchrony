@@ -1,3 +1,5 @@
+import { landscapeRasters } from './landscape-raster'
+import { riverCurves, riverPaths } from './rivers'
 import { spatialState, districtDensityScale } from '../sim/spatial'
 import { HEX, neighbors } from '../sim/hex'
 import { clamp, type World, type Layer } from '../sim/types'
@@ -13,7 +15,6 @@ export const terrainColors = {
   tundra: '#ced5c8',
   water: '#235568',
 }
-const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
 export const pathFor = (rings: Ring[], smooth = false) => {
   const path = new Path2D()
   for (const ring of rings) {
@@ -42,6 +43,8 @@ export interface AtlasCache {
   relief: HTMLCanvasElement
   worldWidth: number
   worldHeight: number
+  rivers: ReturnType<typeof riverPaths>
+  riverCurves: ReturnType<typeof riverCurves>
   seaLabels: { x: number; y: number; name: string }[]
 }
 
@@ -80,70 +83,8 @@ export function buildAtlas(world: World): AtlasCache {
     resolution = Math.min(1, 2400 / Math.max(worldWidth, worldHeight)),
     w = Math.ceil(worldWidth * resolution),
     h = Math.ceil(worldHeight * resolution)
-  const makeCanvas = () => {
-    const c = document.createElement('canvas')
-    c.width = w
-    c.height = h
-    return c
-  }
-  const terrain = makeCanvas(),
-    relief = makeCanvas(),
-    ocean = makeCanvas()
-  const terrainCtx = terrain.getContext('2d')!,
-    reliefCtx = relief.getContext('2d')!
-  const water = terrainCtx.createImageData(w, h)
-  const pixels = terrainCtx.createImageData(w, h),
-    shades = reliefCtx.createImageData(w, h)
-  const colors = cells.map((c) => {
-    if (c.terrain === 'water') {
-      const shelf = clamp((c.elevation + 0.22) / 0.315)
-      return [36 + shelf * 24, 63 + shelf * 32, 73 + shelf * 29, 0, c.elevation]
-    }
-    const west = cells[c.id % width > 0 ? c.id - 1 : c.id].elevation
-    const east = cells[c.id % width < width - 1 ? c.id + 1 : c.id].elevation
-    const north = cells[c.id >= width ? c.id - width : c.id].elevation
-    const south = cells[c.id + width < cells.length ? c.id + width : c.id].elevation
-    const shade = clamp((west - east) * 2.8 + (north - south) * 2, -0.42, 0.38)
-    return [...rgb(terrainColors[c.terrain]), shade, c.elevation]
-  })
-  // Interpolate the simulation field, so relief is continuous instead of a mosaic of flat hexes.
-  for (let y = 0; y < h; y++) {
-    const row = Math.min(height - 1, y / resolution / (HEX * 1.5)),
-      r0 = Math.floor(row),
-      r1 = Math.min(height - 1, r0 + 1),
-      fy = row - r0
-    for (let x = 0; x < w; x++) {
-      const samples = [r0, r1].map((r) => {
-        const col = clamp(x / resolution / (Math.sqrt(3) * HEX) - (r % 2) / 2, 0, width - 1)
-        const q = Math.floor(col),
-          f = col - q,
-          a = colors[r * width + q],
-          b = colors[r * width + Math.min(width - 1, q + 1)]
-        return a.map((v, i) => v + (b[i] - v) * f)
-      })
-      const value = samples[0].map((v, i) => v + (samples[1][i] - v) * fy),
-        index = (y * w + x) * 4
-      for (let k = 0; k < 3; k++) {
-        const grain = Math.sin(x * 1.71 + y * 2.13) * Math.sin(x * 0.63 - y * 1.17) * 2.8
-        const ridge = Math.max(0, value[4] - 0.43)
-        const snow = clamp((value[4] - 0.61) * 5)
-        pixels.data[index + k] = (value[k] + grain - ridge * 22) * (1 - snow) + [228, 234, 222][k] * snow
-        shades.data[index + k] = value[3] > 0 ? 255 : 0
-      }
-      const shelf =
-        clamp((value[4] + 0.22) / 0.315) *
-        clamp(Math.min(x / (w * 0.06), y / (h * 0.08), (w - 1 - x) / (w * 0.06), (h - 1 - y) / (h * 0.08)))
-      water.data[index] = 22 + shelf * 40
-      water.data[index + 1] = 62 + shelf * 58
-      water.data[index + 2] = 77 + shelf * 52
-      water.data[index + 3] = 255
-      pixels.data[index + 3] = 255
-      shades.data[index + 3] = Math.abs(value[3]) * 255
-    }
-  }
-  ocean.getContext('2d')!.putImageData(water, 0, 0)
-  terrainCtx.putImageData(pixels, 0, 0)
-  reliefCtx.putImageData(shades, 0, 0)
+  const { terrain, relief, ocean } = landscapeRasters(world, w, h, worldWidth, worldHeight)
+  const curves = riverCurves(world)
   // Ocean labels go in open water, measured by distance from any land or map edge.
   const distance = new Float64Array(cells.length).fill(Infinity),
     queue: number[] = []
@@ -181,6 +122,8 @@ export function buildAtlas(world: World): AtlasCache {
   return {
     geometry,
     land: pathFor(geometry.coast, true),
+    riverCurves: curves,
+    rivers: riverPaths(curves),
     provinces: geometry.provinces.map((r) => pathFor(r)),
     ocean,
     terrain,
@@ -277,33 +220,22 @@ export function drawAtlas(
         }
     ctx.globalAlpha = 1
   }
-  // Actual drainage edges: adjacent wet cells never create spurious cross-connections.
+  // Curved centerlines share confluence positions and are cached with immutable geography.
+  const minimumFlow = scale >= 0.7 ? 0 : 12 / Math.max(0.08, scale)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  for (const c of world.cells)
-    if (
-      c.river &&
-      c.terrain !== 'water' &&
-      (scale >= 0.7 || (c.riverFlow ?? 0) >= 12 / Math.max(0.08, scale))
-    ) {
-      const targets =
-        c.downstream === undefined
-          ? neighbors(c.id, world.width, world.height).filter(
-              (id) => world.cells[id].river && world.cells[id].elevation < c.elevation,
-            )
-          : [c.downstream]
-      for (const id of targets) {
-        const n = world.cells[id]
-        ctx.beginPath()
-        ctx.moveTo(c.x, c.y)
-        ctx.lineTo(n.x, n.y)
-        ctx.strokeStyle = layer === 'terrain' ? '#477e8bbf' : '#456e7899'
-        ctx.lineWidth = Math.max(0.75 / scale, Math.min(2.8, Math.sqrt(c.riverFlow ?? 14) * 0.18))
-        ctx.stroke()
-      }
+  for (let pass = 0; !relief && pass < 2; pass++) {
+    const bank = pass === 0
+    ctx.strokeStyle = bank ? '#263e366b' : layer === 'terrain' ? '#438d9d' : '#457a88bb'
+    for (const river of cache.rivers) {
+      if (river.flow < minimumFlow) continue
+      const width = Math.max(0.5 / scale, Math.min(6, 0.35 + Math.sqrt(river.flow) * 0.13))
+      ctx.lineWidth = width + (bank ? 0.8 : 0)
+      ctx.stroke(river.path)
     }
+  }
   // Adaptive detail is clipped to real land; the quadtree itself is not a square overlay.
-  if (scale > 2.2) {
+  if (layer !== 'terrain' && scale > 2.2) {
     ctx.beginPath()
     for (const e of districtAtlas(world).edges) {
       ctx.moveTo(e.a.x, e.a.y)
@@ -314,7 +246,7 @@ export function drawAtlas(
     ctx.stroke()
   }
   // Province divisions reveal themselves as the observer zooms in.
-  if (scale > 0.7) {
+  if (layer !== 'terrain' && scale > 0.7) {
     ctx.beginPath()
     for (const e of cache.geometry.edges) {
       ctx.moveTo(e.a.x, e.a.y)
@@ -324,28 +256,27 @@ export function drawAtlas(
     ctx.lineWidth = 0.55 / scale
     ctx.stroke()
   }
-  ctx.beginPath()
-  for (const e of cache.geometry.edges)
-    if (world.regions[e.left].nation !== world.regions[e.right].nation) {
-      ctx.moveTo(e.a.x, e.a.y)
-      ctx.lineTo(e.b.x, e.b.y)
-    }
-  ctx.strokeStyle = '#e1dfbf8c'
-  ctx.lineWidth = 2.1 / scale
-  ctx.stroke()
-  ctx.strokeStyle = '#35473bbf'
-  ctx.lineWidth = 0.8 / scale
-  ctx.stroke()
+  if (layer !== 'terrain') {
+    ctx.beginPath()
+    for (const e of cache.geometry.edges)
+      if (world.regions[e.left].nation !== world.regions[e.right].nation) {
+        ctx.moveTo(e.a.x, e.a.y)
+        ctx.lineTo(e.b.x, e.b.y)
+      }
+    ctx.strokeStyle = '#e1dfbf8c'
+    ctx.lineWidth = 2.1 / scale
+    ctx.stroke()
+    ctx.strokeStyle = '#35473bbf'
+    ctx.lineWidth = 0.8 / scale
+    ctx.stroke()
+  }
   ctx.restore()
-  // Shore contours follow the same smoothed land mask used for the fill.
-  ctx.strokeStyle = '#91b0ab30'
-  ctx.lineWidth = 7
+  // A narrow wet margin and pale shore, without a heavy cartographic coastline.
+  ctx.strokeStyle = '#74aea14d'
+  ctx.lineWidth = 3.2
   ctx.stroke(cache.land)
-  ctx.strokeStyle = '#d6d8b77a'
-  ctx.lineWidth = 2
-  ctx.stroke(cache.land)
-  ctx.strokeStyle = '#223f42'
-  ctx.lineWidth = 0.85
+  ctx.strokeStyle = '#cecc9d99'
+  ctx.lineWidth = 1.25
   ctx.stroke(cache.land)
 }
 
@@ -375,10 +306,17 @@ export function drawPlaceLabels(
     placed.push(box)
     ctx.textAlign = 'center'
     ctx.lineJoin = 'round'
-    ctx.strokeStyle = kind === 'sea' ? '#304e5470' : '#e9e5caa6'
+    ctx.strokeStyle = kind === 'sea' ? '#173640a0' : layer === 'terrain' ? '#182c24b3' : '#e9e5caa6'
     ctx.lineWidth = 1.8 / scale
     ctx.strokeText(text, x, y)
-    ctx.fillStyle = kind === 'sea' ? '#c7d5ce99' : kind === 'state' ? '#293c32' : '#233b35'
+    ctx.fillStyle =
+      kind === 'sea'
+        ? '#b3ccc8ad'
+        : layer === 'terrain'
+          ? '#e7e5cd'
+          : kind === 'state'
+            ? '#293c32'
+            : '#233b35'
     ctx.fillText(text, x, y)
     return true
   }
@@ -390,6 +328,7 @@ export function drawPlaceLabels(
       const regions = world.regions.filter((r) => r.nation === n.id)
       if (!regions.length) continue
       const total = regions.reduce((s, r) => s + r.cells.length, 0)
+      if (layer === 'terrain' && n.id !== selected && total * scale * scale < 8) continue
       const cx = regions.reduce((s, r) => s + world.cells[r.center].x * r.cells.length, 0) / total
       const cy = regions.reduce((s, r) => s + world.cells[r.center].y * r.cells.length, 0) / total
       const candidates = [...regions].sort(
@@ -410,6 +349,13 @@ export function drawPlaceLabels(
   for (const settlement of settlements) {
     const { capital, kind } = settlement,
       c = world.cells[settlement.cell]
+    if (
+      layer === 'terrain' &&
+      scale < 0.65 &&
+      world.regions[settlement.region].nation !== selected &&
+      settlement.population < 50000
+    )
+      continue
     if (!capital && scale < (kind === 'city' ? 0.7 : kind === 'town' ? 1.4 : 3)) continue
     const radius = (capital ? 2.8 : kind === 'city' ? 2.4 : kind === 'town' ? 1.7 : 1) / scale
     ctx.beginPath()
