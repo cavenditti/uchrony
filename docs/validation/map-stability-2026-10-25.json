@@ -1,0 +1,126 @@
+{
+  "testedAt": "2026-10-25",
+  "scope": "Frozen largest-world 3D build, before resident-district model and packed save codec in shared commit 1cfd55f",
+  "parameters": {
+    "seed": "A world unwritten",
+    "cells": 129024,
+    "provinces": 1400,
+    "startingStates": 32,
+    "requestedSpeed": 12,
+    "browser": "Codex in-app browser",
+    "viewport": [
+      1280,
+      720
+    ],
+    "freightVisible": true,
+    "externalModelCalls": false
+  },
+  "endurance": {
+    "passed": true,
+    "checks": {
+      "full20Minutes": true,
+      "largestMap": true,
+      "samePage": true,
+      "reliefThroughout": true,
+      "noErrors": true,
+      "noGraphicsLoss": true,
+      "monthlyProgress": true,
+      "regularReplicatedSaves": true
+    },
+    "wallSeconds": 1209.8090000152588,
+    "startMonth": 104,
+    "endMonth": 171,
+    "drags": 1904,
+    "buttonZooms": 952,
+    "wheelEvents": 2,
+    "saves": 32,
+    "lastTimedSaveMiB": 357,
+    "frameMs": {
+      "p50": 8,
+      "p95": 10,
+      "p99": 17,
+      "max": 1908.5999999999767
+    },
+    "reportedHeapPeakMiB": 1340,
+    "reportedHeapFinalMiB": 482,
+    "maxSampledWorldGapSeconds": 27,
+    "maxSampledSaveGapSeconds": 47,
+    "residentMemory": {
+      "54724": {
+        "peakMiB": 4499.703125,
+        "lastMiB": 4430.015625
+      },
+      "53826": {
+        "peakMiB": 5498.9375,
+        "lastMiB": 5498.9375
+      }
+    },
+    "memorySamplingNote": "Process sampling began around minute four. Browser PID was reused across isolated test tabs on this origin. Heap figures are browser-reported, not a complete process-memory accounting."
+  },
+  "finalSave": {
+    "valid": true,
+    "replicasMatchExport": true,
+    "sha256": "7e8959c288563d4c4364bc6a0f828c5d14f6c63d0eaa183961d3128be67155d8",
+    "seed": "A world unwritten",
+    "month": 172,
+    "cells": 129024,
+    "regions": 1400,
+    "communities": 272560,
+    "cohortTuples": 11840048,
+    "browser": {
+      "bytes": 377302786,
+      "savedAt": 1792911769344
+    },
+    "disk": {
+      "bytes": 377302864,
+      "savedAt": 1792911769344
+    }
+  },
+  "reopened": {
+    "month": 172,
+    "date": "May 1734",
+    "mode": "relief",
+    "consoleErrors": []
+  },
+  "profile": {
+    "startMonth": 99,
+    "endMonth": 100,
+    "baselineTickMs": 29933.39375,
+    "optimizedTickMs": 11906.364709,
+    "identicalWorldSha256": "4fffa3903425c5ac51b43ef0a841bbf88ea4b1b62abd59b635fbfb4d20bf35f6"
+  },
+  "testedBundleHashes": {
+    "assets/alegreya-latin-400-italic-BXpar-rJ.woff2": "9be8976a11463895bb4d590973a684c1c96616b7e40a03333151efa8c7210241",
+    "assets/alegreya-latin-400-italic-CJvUQvZT.woff": "4706871b8dc04fc38f2453187d21b14d676b08f186a6366469e8875f13df9ae1",
+    "assets/alegreya-latin-400-normal-BLlBRtDv.woff2": "7cbcf38a5ef682a8b9e2ef4a330b31a08b33bf1ae08e338267c0d1292479c68a",
+    "assets/alegreya-latin-400-normal-BuQWlRPA.woff": "9d710bbc0839eb54835c957e4c89c502b15238ba9efb182f2a8a86ce0caec803",
+    "assets/alegreya-latin-500-normal-B7TqNLeg.woff": "6c448df38bfe815d16a557dca0be46aa06b922d1645e6ae2ea79d2d2b035c35b",
+    "assets/alegreya-latin-500-normal-C25lLdV_.woff2": "53addbca37745d63946bfb8fefc33570c075a91d5463c4194139b6a2efad3930",
+    "assets/alegreya-latin-600-normal-BWmAhYVc.woff": "b4ad2e2bf18177a4aed366050ebc499fc4ae93ba03dde5907b24cd48adcb4421",
+    "assets/alegreya-latin-600-normal-BeiX5Wwc.woff2": "613096d65a0b482ba1576510fcbed26db985c67aaa76d76b233321e75d1ff1ba",
+    "assets/byte-worker-DfjT9yC6.js": "3c0fa9f9bf2341a17da9c2e6b439121655ce0ebe55959185e0a32e0a70d65aac",
+    "assets/main-7aLE4lv4.js": "f555e50decb45818d4165b06e395cd7fc12d05e35b16f66a34f6c83f316924e4",
+    "assets/main-HUen5UXW.css": "dbfc5aaddbea25d14e38871fe1e3de63c2a0ac0f652d3c2553d2c9c4cf9591c3",
+    "assets/map-soak-Cj1tCI6W.js": "875cff6102c0c46dc66e1cfad26dcaf0584627974149de15a3dd3068c498696d",
+    "assets/modulepreload-polyfill-B5Qt9EMX.js": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0",
+    "assets/relief-BUcB8cYp.js": "734f489acd10c5643ba41a44cf114bf74bfef19212975413f105a9f05728eefe",
+    "assets/statecraft-schema-CxCX-wNb.js": "b5ff66cf9fd8ff8064bdab66bd4ccd12f9faa4c1b4d4659369fc4a214c223448",
+    "assets/storage-check-jrqYchgD.js": "5f0a1a8cb1bf23c8a69fadf20e911988938c3e2ddaeac31a1de5a6e9b0d9daeb",
+    "assets/worker-sAVUUr7-.js": "854316727b94ad8195b69b1d9690a546115e71cbbc24fa884cc337d790423ce8",
+    "tests/browser/map-soak.html": "18c03bd33d9e632c8fb6edefc1cdcd1073b6da904bee3c27e159c8786c7c0377",
+    "tests/browser/storage-check.html": "4fa1d7a9a599e7b07c6922f24856c294de5cc843f2ec80b72e9c2d946b94116c"
+  },
+  "limitations": [
+    "The later resident-district model and packed save codec are outside this endurance result.",
+    "One frame interval reached 1.91 seconds.",
+    "Memory remains high; this is not a lower-memory-device or indefinite-growth qualification.",
+    "Process sampling began about four minutes into the run."
+  ],
+  "integrationChecks": {
+    "commit": "1cfd55f",
+    "typecheck": "passed",
+    "targetedTests": 39,
+    "targetedResult": "passed; the localhost endpoint test was rerun with loopback access after the restricted environment rejected listen()",
+    "fullSuiteRun": false
+  }
+}
