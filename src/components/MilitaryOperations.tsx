@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Anchor } from 'lucide-react'
 import type { Army, Command, World } from '../sim/types'
 import { portAt, transportSeats } from '../sim/navy'
-import { unitLoyalty } from '../sim/forces'
+import { censusUnitLoyalty as unitLoyalty } from '../sim/view-snapshot'
 
 const count = (v: number) => Math.round(v).toLocaleString()
 const pct = (v: number) => `${Math.round(v * 100)}%`

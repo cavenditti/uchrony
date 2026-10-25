@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { generateWorld } from '../src/sim/generate'
 import { restoreWorld, validateWorld } from '../src/sim/persistence'
 import { communitySize, coalesceCommunities } from '../src/sim/population'
+import { extractAges } from '../src/sim/age-cohorts'
 import { persistSave } from '../src/storage/autosave'
 import { DiskAutosaves } from '../server/autosave'
 import type { PopulationCommunity } from '../src/sim/population-types'
@@ -14,11 +15,11 @@ import type { WorldSave } from '../src/storage/save-types'
 
 function duplicate(groups: PopulationCommunity[]) {
   const source = groups[0],
-    copy = structuredClone(source)
-  for (const age of ['children', 'adults', 'elders'] as const) {
-    copy.population[age] = Math.floor(source.population[age] / 2)
-    source.population[age] -= copy.population[age]
-  }
+    copy = extractAges(source, {
+      children: Math.floor(source.population.children / 2),
+      adults: Math.floor(source.population.adults / 2),
+      elders: Math.floor(source.population.elders / 2),
+    })
   groups.push(copy)
   return { source, copy }
 }

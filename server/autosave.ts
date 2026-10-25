@@ -1,3 +1,4 @@
+import { packWorldSave } from '../src/sim/save-codec'
 import { createHash, randomUUID } from 'node:crypto'
 import { copyFile, mkdir, open, readFile, rename, stat, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -14,7 +15,8 @@ const recoveryPage = `<!doctype html><html lang="en"><meta charset="utf-8"><meta
 
 const validSlot = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
-const checksum = (save: WorldSave) => createHash('sha256').update(JSON.stringify(save.world)).digest('hex')
+const checksum = (save: { world: unknown }) =>
+  createHash('sha256').update(JSON.stringify(save.world)).digest('hex')
 export function validateSaveRecord(value: unknown): WorldSave {
   const record = value as WorldSave
   if (
@@ -29,6 +31,22 @@ export function validateSaveRecord(value: unknown): WorldSave {
 }
 export class DiskAutosaves {
   private queues = new Map<string, Promise<void>>()
+  private verified = new Map<string, string>()
+  private async fingerprint(path: string) {
+    const info = await stat(path)
+    return `${info.size}:${info.mtimeMs}:${info.ctimeMs}`
+  }
+  private async verifiedCurrent(path: string) {
+    try {
+      const signature = await this.fingerprint(path)
+      if (this.verified.get(path) === signature) return true
+      if (!(await this.readFile(path))) return false
+      this.verified.set(path, signature)
+      return true
+    } catch {
+      return false
+    }
+  }
   constructor(readonly root: string) {}
   private path(slot: string, previous = false) {
     if (!validSlot(slot)) throw new Error('Invalid save slot.')
@@ -64,7 +82,8 @@ export class DiskAutosaves {
     const save = validateSaveRecord(value),
       current = this.path(slot),
       backup = this.path(slot, true)
-    const data = JSON.stringify({ ...save, checksum: checksum(save) })
+    const packed = { ...save, world: packWorldSave(save.world) }
+    const data = JSON.stringify({ ...packed, checksum: checksum(packed) })
     if (Buffer.byteLength(data) > MAX_SAVE_BYTES) throw new Error('Autosave exceeds the supported size.')
     const previous = this.queues.get(slot) ?? Promise.resolve()
     const task = previous
@@ -82,12 +101,13 @@ export class DiskAutosaves {
             await file.close()
           }
           // Never replace a good backup with an unreadable current file.
-          const prior = await this.readFile(current).catch(() => null)
+          const prior = await this.verifiedCurrent(current)
           if (prior) {
             await copyFile(current, backupTemporary)
             await rename(backupTemporary, backup)
           }
           await rename(temporary, current)
+          this.verified.set(current, await this.fingerprint(current))
           const directory = await open(this.root, 'r')
           try {
             await directory.sync()
@@ -108,7 +128,7 @@ export class DiskAutosaves {
   }
 }
 
-export function autosaveMiddleware(root: string) {
+export function autosaveMiddleware(root: string, onError: (error: unknown) => void = () => {}) {
   const store = new DiskAutosaves(root)
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     if (req.url?.split('?')[0] === '/save-recovery' && req.method === 'GET') {
@@ -160,7 +180,12 @@ export function autosaveMiddleware(root: string) {
         `uchrony_save_slot=${slot}; Path=/api/saves; HttpOnly; SameSite=Strict; Max-Age=31536000`,
       )
       if (req.method === 'GET') {
-        reply(200, { ...(await store.read(slot)), slot })
+        const result = await store.read(slot)
+        reply(200, {
+          ...result,
+          save: result.save ? { ...result.save, world: packWorldSave(result.save.world) } : null,
+          slot,
+        })
         return
       }
       let size = 0
@@ -174,10 +199,11 @@ export function autosaveMiddleware(root: string) {
         }
         chunks.push(chunk)
       }
-      const save = validateSaveRecord(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+      const save = JSON.parse(Buffer.concat(chunks).toString('utf8')) as WorldSave
       await store.write(slot, save)
       reply(200, { savedAt: save.savedAt, slot })
     } catch (error) {
+      onError(error)
       const code = (error as NodeJS.ErrnoException).code
       reply(503, {
         error:

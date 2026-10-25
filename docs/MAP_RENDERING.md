@@ -1,0 +1,140 @@
+# Map rendering
+
+Uchrony's map extends the existing cabinet-map visual world with a three-dimensional landscape. The browser renders raised terrain, forests, and small settlements while retaining the atlas's data layers, province selection, and dossier controls. The interface still uses slate surfaces, brass actions, and Alegreya place names. Landscape colors are cartographic data and materials, not a new interface palette.
+
+## Using the map
+
+The initial presentation is **3D**, tilted toward the landscape, with the **Terrain** layer selected. The lower-right presentation control switches between **3D** and the original flat **Atlas**. In 3D, **View from above** changes the camera to an overhead view; **Tilt the landscape** restores the angle. The camera is orthographic, with these two fixed angles and no orbit rotation.
+
+Drag to pan; scroll, pinch, or double-click to zoom. The zoom buttons and **Fit world** remain available. With the map focused, arrow keys pan, +/− zoom, Home fits the world, and Enter opens the selected province's dossier. Choosing a state in **States** frames its territory; province clicks open the existing contextual actions. The state drawer and population panel provide alternatives to pointer selection.
+
+The layer picker works in both presentations. Political, population, identity, contentment, food, trade, and military themes use the same underlying province data. Trade routes, warfare symbols, selection outlines, and hover highlights follow the raised surface in 3D. **Map key** explains the current layer. Place labels remain a separate, screen-readable overlay rather than becoming part of the terrain texture.
+
+If the 3D renderer cannot initialize or loses its WebGL context, the map switches to Atlas and shows **3D unavailable · Atlas view active**. The 3D button is disabled for that failed scene. There is no automatic context-restoration retry; scene initialization runs again when a different world is loaded or the map mounts again.
+
+## Rendering boundaries
+
+| Source                                           | Responsibility                                                                                                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`WorldMap.tsx`](../src/components/WorldMap.tsx) | Presentation controls, shared camera state, scene lifecycle, data updates, input, picking, and the 2D label canvas.                                               |
+| [`renderer.ts`](../src/map/renderer.ts)          | Cached province geometry, land silhouette, ocean and terrain rasters, thematic fills, borders, rivers, and collision-checked labels shared by both presentations. |
+| [`relief-field.ts`](../src/map/relief-field.ts)  | Continuous display height sampled from simulation elevation, plus deterministic scenery variation.                                                                |
+| [`relief.ts`](../src/map/relief.ts)              | The retained Three.js scene: terrain mesh, ocean plane, textures, lighting, instanced scenery, camera projection, terrain raycasting, and GPU resource disposal.  |
+
+The height field smooths neighboring hex elevations and adds deterministic fine relief. It does not change cells, geographic distances, transport costs, or simulation randomness. Terrain elevation is visually exaggerated; the mesh is a presentation of the world, not a replacement simulation grid. Switching presentations or camera angles does not issue simulation commands.
+
+The scene and atlas cache are constructed for each world identity. Camera changes update the existing camera and reuse the label canvas backing store. Panning and tilting do not repaint or upload world-space textures. New world snapshots, layer changes, and zoom changes repaint the data texture without rebuilding terrain. Settlement scenery updates only when its membership, size classes or capital seats change. The 3D module loads asynchronously, with the atlas available while it initializes. Cleanup disposes mesh geometries, materials, textures, and the WebGL renderer.
+
+The terrain uses a lit surface with hemisphere and directional lighting. A separate flat ocean plane carries the existing ocean raster. Thematic fills, borders, and rivers are painted onto the terrain texture; dynamic overlays use a second texture on the same geometry. Projected labels are drawn afterward on the 2D canvas with the existing font and collision checks. For pointer selection, a ray intersects only the regular-grid triangles between the maximum terrain height and sea level along its path. This produces the same triangle hit as exhaustive raycasting without scanning the whole mesh. The resulting map coordinate is checked against the shared province polygons, including islands and holes.
+
+Forests use deterministic clusters of three low-poly tree crowns per sampled, non-river forest cell. Settlement records are independent of province centers. Their population class chooses one, five or twelve roofed buildings; the current capital seat gets a taller keep. Instances update when settlement membership, size class or capital status changes, while unchanged geometry remains retained. Labels and thematic data use the current world snapshot.
+
+## Performance limits
+
+These are implementation budgets, not a frame-rate guarantee:
+
+| Resource                         | Current bound                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Shared terrain and ocean rasters | Longest dimension at most 2,400 pixels.                                                            |
+| 3D terrain and overlay textures  | Width at most 4,096 pixels; height preserves the world aspect ratio.                               |
+| Terrain mesh                     | Three subdivisions per simulation column/row, capped at 768 × 496 segments.                        |
+| Forest scenery                   | At most 12,000 sampled forest cells, each with three instanced crowns.                             |
+| Settlement scenery               | At most eight settlements per province, with at most twelve instanced bodies and roofs each.                                             |
+| Scenery visibility               | Hidden at map scales of 0.38 or less.                                                              |
+| Display pixel ratio              | At most 1.75 for WebGL; at most 2 for the 2D canvas.                                               |
+| Dynamic texture uploads          | At least 80 ms apart while animated; immediate for changed content, never for camera-only redraws. |
+
+The scene redraws after relevant state or camera changes. Continuous animation is requested while the simulation runs with freight visible, unless reduced motion is enabled. Paused or reduced-motion freight remains static. Tree and building instancing limits draw calls; fixed texture and mesh budgets keep larger worlds from multiplying rendering resolution without bound.
+
+The 3D textures can soften fine boundaries and overlay symbols at close zoom, and their upload cadence limits freight animation smoothness. Atlas remains useful for close cartographic inspection because it repaints province geometry into the visible viewport at display resolution. The height field, projected labels, and scenery add main-thread and GPU work; actual responsiveness depends on the device and world size.
+
+## Further visual work
+
+This is a foundation for the requested richer, Civilization-like landscape. It does not yet include a full environmental art set, animated water, shadow maps, free camera rotation, or individual building construction.
+
+A next art pass can add biome-specific vegetation, more varied settlement silhouettes, and finer shoreline or mountain materials while retaining shared picking geometry and readable data layers. Settlement instances now follow the spatial simulation: one building for a village, five for a town, and twelve for a city, with a taller capital seat. The retained scene rebuilds these bounded instances only when settlement identity, size class or capital status changes; it does not imply individual building ownership. Population density and close-up boundaries use adaptive districts; district geometry is cached until the partition changes. Higher-detail scenery or textures should keep bounded budgets and retain Atlas fallback.
+
+For future changes, inspect world and province views in both presentations, both 3D angles, desktop and narrow layouts, thematic layers, selection, and freight while running and paused. Check reduced motion and a forced WebGL failure as separate workflows. [`tests/relief.test.ts`](../tests/relief.test.ts) covers height-field continuity, finite values, flat sea, geography preservation, and deterministic scenery variation; it does not validate browser rendering or visual quality.
+
+## Dragging and memory regression checks
+
+The original 3D loop reset the label canvas on every camera or hover update and treated every new draw loop as a forced overlay upload. On a paused World map at 1440 × 1000, a controlled 180-frame drag recorded 358 redundant canvas dimension assignments and 177 full overlay uploads (6,308 MiB transferred). The same path after separating camera and content invalidation recorded zero dimension assignments and zero texture uploads. Median frame time was about 16.7 ms in both short Chrome measurements; these results establish removal of allocation/transfer churn, not a universal frame-rate or crash-free guarantee.
+
+The terrain scene retains only geographic fields rather than an entire obsolete simulation snapshot. Switching to 3D releases the unused flat-view bitmap, and scene disposal explicitly releases its private canvas backing stores. Atlas panning also reuses its viewport bitmap. Hover coordinates can move without repainting the overlay until the province under the pointer changes.
+
+`tests/relief.test.ts` checks 10,000 camera-only invalidation decisions, freight upload cadence, immediate content changes, backing-store reuse, and exact picking against exhaustive triangle raycasting across 180 rays. It also retains the geographic height tests.
+
+Start an isolated server with `node node_modules/vite/bin/vite.js --config tests/browser/map-stress.config.ts` and open `http://127.0.0.1:5192/tests/browser/map-stress.html` for an isolated 129,024-cell world advanced three months, with real freight and optional freight animation. This fixture disables live reload, has no save service or model calls, and does not replace a user world. `tests/browser/map-drag-probe.js` instruments canvas setters and WebGL canvas uploads in the test browser. Load it through browser evaluation after the 3D map is ready, press the pointer down over the map, then run `await window.__uchronyDragProbe.run(180)` and release the pointer. Its camera path and operation counts are repeatable; frame and heap timings are machine-dependent. Call `window.__uchronyDragProbe.dispose()` to remove instrumentation. Long calls are time-bounded; an interrupted tool call is not evidence of a completed stress pass.
+
+The isolated stress fixture also completed a paused 720-frame drag (12 seconds, zero backing-store resets or texture uploads) and an animated 600-frame drag (10 seconds, zero resets, 120 overlay uploads). Animated freight therefore stays at the 80 ms upload cadence while the camera moves. Chrome reported no runtime errors; the in-app browser remained in 3D after 40 additional drags with about 1,000 animated shipments. These runs exercise map interaction with a fixed simulation snapshot; they do not qualify prolonged high-speed simulation playback, every device, or the originally reported intermittent page crash. A longer initial browser-tool call failed to return a result and is not counted as a pass.
+
+## Full-app endurance result — 24 October 2026: FAILED
+
+The subsequent full-app test reproduces the reported instability. The planned 20-minute qualification did **not** complete. Do not treat the earlier rendering-only checks as a stability pass.
+
+The test used the largest supported World map: 129,024 hexes, 1,400 provinces, 32 starting states, seed `A world unwritten`, 3D Terrain, freight visible, and simulation speed set to 12×. It ran the real app, simulation worker, snapshot updates, storage worker, browser database, and disk autosave middleware. External model services were disabled. A separate production build and origin kept live source edits and the user's saved world out of the experiment; test disk saves lived under `/tmp/uchrony-endurance-20261024/saves`. The machine had 24 GiB RAM. The speed setting is a requested rate; actual monthly progress was substantially slower.
+
+| Check                                | Observed result                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Original full-app drag/release       | Reproduced twice: `Cannot read properties of null (reading 'vx')`, followed by a blank app.                                                                                                                                                                                                                          |
+| After the drag fix, autosaving       | One browser save was rejected at 149,165,161 serialized bytes against a 133,169,152-byte value limit. The parallel disk save timed out. The app displayed its autosave warning.                                                                                                                                      |
+| After the drag fix, timed Chrome run | Failed after 76 seconds of the attempted 20-minute run. The last successful checkpoint at 45.6 seconds recorded 228 complete drags, 114 keyboard zoom actions, and six monthly advances (month 22 to 28). Input and screenshot calls subsequently failed on that page, and tab activation reported that it was not responding and did not recover. A fresh control tab still worked. |
+| Chrome memory and pauses             | Last sampled page heap: 2,027 MiB. The test renderer process reached 4,107 MiB resident memory before disappearing. Seven frame intervals exceeded one second within the last successfully sampled 45.6 seconds; the longest was 1.38 seconds.                                                                       |
+| In-app browser, fresh world          | Still responsive at 298 seconds, January 1722, after at least 132 complete drags and 66 button zooms. One earlier interaction timed out. By 331 seconds the browser had replaced the app with **This page crashed**.                                                                                                 |
+
+The Chrome memory figures strongly suggest memory pressure, but neither a heap-allocation profile nor an operating-system out-of-memory report was obtained. Heap samples are affected by garbage collection and do not establish a specific leak. At the last successful checkpoint the graphics counts were still bounded at eight textures, 24 buffers and five programs, with no recorded context-loss event. That does not exclude a graphics failure after observation stopped. The exact remaining crash source is unresolved.
+
+The drag exception was fixed locally in `WorldMap.tsx`: capture the starting camera coordinates before queuing a state update, because pointer release can clear the mutable drag reference before that update executes. The exception did not recur in the subsequent runs. TypeScript checking, the production test build, and all 12 geography/relief tests passed; the end-to-end stability qualification still failed. The user's existing preview tab was not refreshed or replaced during this test.
+
+Evidence is retained in [`.impeccable/review/endurance-2026-10-24`](../.impeccable/review/endurance-2026-10-24): the two drag-error records and reproduction video, autosave failure and screenshot, timed Chrome samples and process-memory samples, the in-app crash observation, and hashes of the tested build. The in-app browser tool returned the crash page's title and failed URL but rejected its internal `data:` URL, so no screenshot of that final crash screen was obtained. Preliminary interrupted runs and test-driver corrections are not counted as completed endurance passes.
+
+Before further visual expansion, profile and bound simulation-snapshot/save memory, support saves beyond the browser's single-value limit, resolve disk-save latency, and repeat the full qualification from a fresh world. A packaging change alone has not been tested as a remedy.
+
+### Repeating the full-app test
+
+`tests/browser/map-soak.config.ts` builds the real app with isolated save storage and external model services disabled. Use a fresh `UCHRONY_SOAK_DIR` for each independent qualification:
+
+```sh
+UCHRONY_SOAK_DIR=/tmp/uchrony-soak-next node node_modules/vite/bin/vite.js build --config tests/browser/map-soak.config.ts
+UCHRONY_SOAK_DIR=/tmp/uchrony-soak-next node node_modules/vite/bin/vite.js preview --config tests/browser/map-soak.config.ts
+```
+
+Open `http://127.0.0.1:5193/tests/browser/map-soak.html` in an isolated agent-browser session, set a 1440 × 1000 viewport, confirm the largest world and 3D presentation, select 12× speed, and press Play. Then run:
+
+```sh
+python3 tests/browser/map-soak-run.py --session YOUR_TEST_SESSION --minutes 20 --output /tmp/uchrony-soak-next/results
+```
+
+The driver sends actual browser mouse events, including release, and the map's +/−/Home keyboard controls. Wheel input from this automation provider did not reach the canvas in the preliminary run, so it is not counted as zoom coverage. The monitor retains only bounded counters and primitive snapshot summaries. It checks simulation progress, page identity, rendering mode, errors, resource counts, saves and frame intervals. Storage failures remain recorded while rendering continues; either those failures or an interrupted run produces a nonzero exit. A completed duration alone is insufficient: require no runtime, worker, save or context failures, continuing monthly progress, bounded memory and acceptable worst-case pauses.
+
+
+## Large-world snapshot and save memory
+
+The simulation worker retains the complete world, including all joint communities and exact birth-month/sex cohorts. UI snapshots carry exact per-province and per-force census aggregates, plus the twelve largest displayed communities. Identity layers, language fluency, economic-stratum counts, loyalty, displacement and age/sex bands are computed from the full records. The worker sends immutable geography once and allows one outstanding display snapshot; React acknowledges it after committing, and intermediate updates coalesce.
+
+Display snapshots are marked and rejected by persistence. Import, restore, export and autosave capture operate in the simulation worker, so the main page never needs a second complete census. Autosave validates the canonical state first, captures it synchronously as bounded JSON byte parts, then sends one immutable Blob over a private channel to a dedicated I/O worker, which shares it with the disk and browser destinations. Simulation ticks cannot block that worker while it uploads or writes. It neither retains a backlog of old world objects nor sends the census through another structured clone. Saves run at most once concurrently, every 15 seconds when the world changed, with additional requests when the page hides and a manual retry. Partial replication is reported and retried even while paused.
+
+IndexedDB stores the Blob atomically instead of millions of objects in one structured-clone value; legacy object records remain readable. The disk server validates each incoming record once, retains its atomic replacement and verified previous-copy recovery, and avoids parsing the previous full world again when its file fingerprint is unchanged. A failed validation cannot replace either good replica. The supported-save bound is now 384 MiB, below the JavaScript engine's single-string limit for JSON recovery. The census import budget scales with province count (512 profiles per province, a 150,000 minimum and 1,000,000 absolute maximum); the per-holder bounds and individual census checks remain in force. This accommodates the largest map's valid evolving census without reducing simulation detail.
+
+An offline profile of the former failing month-26 save measured 136.51 MiB of canonical JSON, including 4,327,608 dated cohort tuples. Its display snapshot is 29.52 MiB; census projection took 134 ms and JSON byte capture 351 ms in that local sample. These are measurements of that saved state, not throughput guarantees.
+
+The stability qualification uses a frozen copy of both client and save-server sources because another chat is editing the same simulation checkout. Source/build hashes and run evidence are in `.impeccable/review/stability-2026-10-24`. Preliminary runs are retained separately from the final 20-minute qualification.
+
+The first isolated-I/O qualification failed after 758.7 seconds: the old fixed 150,000-community validator limit rejected a legitimate evolving world. The preserved paused state at month 70 contains 155,853 communities, 6,578,995 dated cohort tuples and 243,115,258 save bytes. It passes full validation and serialization under the map-scaled budget. Its failed run remains in `qualification-io`; it is not a 20-minute pass. The corrected run is recorded separately in `qualification-capacity`.
+
+## Follow-up qualification — 25 October 2026
+
+The corrected Chrome run in `qualification-capacity` completed **1,200.16 seconds**, 6,894 complete drags and 3,447 keyboard zoom actions. The largest world advanced from month 1 to month 91 during the timed interval; pausing completed month 92. There were 38 fully replicated saves during the interval, no runtime/save errors, reloads or lost graphics contexts, and stable GPU resource counts. The 99th-percentile frame interval was 18 ms; the maximum was 830 ms. Sampled page heap peaked at 577 MiB and renderer resident memory at 3,715 MiB. These are measurements on this machine, not a low-memory-device qualification.
+
+The final checkpoint contained 187,129 communities and 7,818,707 exact dated cohort tuples. Its 276,539,118-byte world payload matched the export, browser replica and disk replica by SHA-256 (`4e7f8f38dbe18191715acc18f810e7828d0e2554357260b223a29803bc8fdc3f`). A reload restored month 92. `qualification-capacity/save-fidelity.json` records the independent full-state check.
+
+An additional in-app-browser run exposed two later-world failures that the younger-world pass did not cover. At month 99, a valid 4,315-offer diplomatic ledger exceeded a fixed 4,096-record validation limit. The offer budget now scales with the possible state pairs, with a 4,096 minimum; signed records, signature checks and other collection bounds remain intact. The preserved failing world passes validation after this change. A subsequent attempt reached month 104 but was stopped after 431 seconds when monthly progress stalled for over two minutes. It had no save or runtime error, but did not qualify as stable.
+
+Profiling that saved world found repeated diplomatic-access expansion in army supply and expensive census cloning during institutional settlements. Army movement now uses an explicit phase-local access index, rebuilt each phase. Settlement trials retain isolated records, but copy numeric age-cohort tuples directly instead of repeatedly passing millions of tuples through structured cloning; ordinary agreements copy only the records they can mutate. The original and optimized month-99-to-100 result have identical complete JSON SHA-256 (`4fffa3903425c5ac51b43ef0a841bbf88ea4b1b62abd59b635fbfb4d20bf35f6`). The measured tick fell from 29.9 seconds to 11.9 seconds. Continuous map animation is capped at 30 redraws per second; camera and content changes still request immediate painting.
+
+The final in-app-browser 20-minute qualification starts from the older month-104 world. Its result is pending while the timed run continues. This build is frozen independently of the concurrent adaptive-district simulation work; a pass here does not qualify later district-model changes. Source/build hashes and the earlier failed attempts remain in `.impeccable/review/stability-2026-10-24`.
+
+
+## Resident district presentation
+
+When local economies are initialized, adaptive boundaries follow actual district ownership. Population, food access and prosperity fills use local conditions, with the same logarithmic population key. District geometry caching includes the partition revision so a surviving district ID can change shape. Connected built-up city footprints appear as muted land-use shading in Atlas and on the 3D terrain overlay; the existing settlement markers and labels show the current city nucleus and name. Footprints can cross administrative boundaries without moving those borders. The province dossier includes a local district selector with people, firms, funded accounts, stocks, prices, freight and remaining natural reserves. Provincial material reserves refer to the administrative depot, not every stock inside the province.

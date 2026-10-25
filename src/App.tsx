@@ -1,3 +1,4 @@
+import { ModelMathematics } from './components/ModelMathematics'
 import { DEFAULT_WORLD_SCALE, WORLD_SCALES, type WorldScale } from './sim/scale'
 import { WorldOverview } from './components/WorldOverview'
 import { inWorldText, narrativeProjection, presentWorld } from './sim/narrative'
@@ -45,9 +46,7 @@ import {
   type Layer,
   dateLabel,
 } from './sim/types'
-import { parseSave } from './sim/persistence'
-import { AutosaveClient } from './storage/client'
-import { LEGACY_SAVE_KEY, LatestSaveQueue } from './storage/autosave'
+import { LEGACY_SAVE_KEY } from './storage/autosave'
 import { MAX_SAVE_BYTES } from './storage/save-types'
 import type { AgentServiceStatus } from './sim/statecraft-types'
 import type { StorytellerStatus } from './sim/history-types'
@@ -69,7 +68,7 @@ export default function App() {
     [running, setRunning] = useState(false),
     [speed, setSpeed] = useState(1)
   const [tab, setTab] = useState<Tab>('atlas'),
-    [layer, setLayer] = useState<Layer>('political')
+    [layer, setLayer] = useState<Layer>('terrain')
   const [nation, setNation] = useState(0),
     [region, setRegion] = useState<number | null>(null)
   const [showRoutes, setShowRoutes] = useState(true),
@@ -107,13 +106,10 @@ export default function App() {
   })
   const [pendingDetails, setPendingDetails] = useState<number[]>([])
   const worker = useRef<Worker | null>(null),
-    pending = useRef(false),
-    currentWorld = useRef<World | null>(null)
+    pending = useRef(false)
   const receivedGeography = useRef<{ key: string; cells: World['cells'] } | null>(null)
-  const saveQueue = useRef<LatestSaveQueue | null>(null),
-    lastSavedWorld = useRef<World | null>(null),
-    retryDiskAt = useRef(Infinity),
-    retryRestore = useRef<(() => void) | null>(null)
+  const ensureSaveWorker = useRef<(() => void) | null>(null)
+  const retryRestore = useRef<(() => void) | null>(null)
   const [startupError, setStartupError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null),
     searchInput = useRef<HTMLInputElement>(null),
@@ -124,16 +120,12 @@ export default function App() {
     [],
   )
   const send = useCallback((data: WorkerRequest) => {
-    if (data.type === 'generate' || data.type === 'load') {
+    if (data.type === 'generate' || data.type === 'load' || data.type === 'import') {
       setPendingDetails([])
       setShowStates(false)
       setInspectorOpen(false)
       setOverviewOpen(false)
       setOrderedArmy(null)
-      saveQueue.current?.reset()
-      currentWorld.current = null
-      lastSavedWorld.current = null
-      retryDiskAt.current = Infinity
     }
     pending.current = true
     setBusy(true)
@@ -143,7 +135,56 @@ export default function App() {
   useEffect(() => {
     const instance = new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' })
     worker.current = instance
+    let writer: Worker | null = null
+    const connectWriter = () => {
+      if (writer) return
+      writer = new Worker(new URL('./storage/byte-worker.ts', import.meta.url), { type: 'module' })
+      const channel = new MessageChannel()
+      writer.postMessage({ port: channel.port1 }, [channel.port1])
+      instance.postMessage({ type: 'storage-port', port: channel.port2 } satisfies WorkerRequest, [
+        channel.port2,
+      ])
+      writer.onerror = () => {
+        instance.postMessage({ type: 'storage-error' } satisfies WorkerRequest)
+        writer?.terminate()
+        writer = null
+      }
+    }
+    ensureSaveWorker.current = connectWriter
+    connectWriter()
     instance.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+      if (data.type === 'startup-error') {
+        setStartupError(data.message)
+        return
+      }
+      if (data.type === 'storage') {
+        if (data.state === 'saving') setSavedAt('Saving…')
+        else if (data.state === 'restored') setSavedAt('Autosave restored')
+        else if (data.state === 'error') {
+          setSavedAt('Autosave will retry')
+          setRestoreWarning(data.message ?? 'Autosave failed.')
+        } else {
+          setSavedAt(
+            `Saved ${dateLabel({ month: data.month!, startYear: data.startYear! })} · ${data.source === 'disk' ? 'local disk' : 'browser database'}`,
+          )
+          setRestoreWarning(
+            data.message
+              ? `${data.message} A backup was saved to ${data.source === 'disk' ? 'local disk' : 'this browser'}; the other copy will retry.`
+              : null,
+          )
+        }
+        return
+      }
+      if (data.type === 'exported') {
+        const url = URL.createObjectURL(data.blob),
+          a = document.createElement('a')
+        a.href = url
+        a.download = data.filename
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+        notify('World exported, including history and the random state for exact continuation.')
+        return
+      }
       if (data.type === 'storyteller') {
         setStoryteller(narrativeProjection(data.status))
         return
@@ -181,7 +222,6 @@ export default function App() {
       const snapshot: World = { ...data.world, cells }
       setMapKey(data.mapKey)
       setWorld(presentWorld(snapshot))
-      currentWorld.current = snapshot
       if (data.message) notify(data.message)
     }
     instance.onerror = () => {
@@ -190,64 +230,33 @@ export default function App() {
       setRunning(false)
       notify('The simulation worker stopped. Reload to restore your latest autosave.', true)
     }
-    const storage = new AutosaveClient()
-    const queue = new LatestSaveQueue(
-      (snapshot) => {
-        setSavedAt('Saving…')
-        return storage.save(snapshot)
-      },
-      (result) => {
-        if (result.error) {
-          setSavedAt('Autosave will retry')
-          setRestoreWarning(result.error)
-        } else {
-          lastSavedWorld.current = result.world
-          retryDiskAt.current = result.source === 'browser' ? Date.now() + 15000 : Infinity
-          setSavedAt(
-            `Saved ${dateLabel(result.world)} · ${result.source === 'disk' ? 'local disk' : 'browser database'}`,
-          )
-          setRestoreWarning(null)
-        }
-      },
-    )
-    saveQueue.current = queue
-    const restore = async () => {
+    const restore = () => {
       setStartupError(null)
       let legacy: string | null = null
       try {
         legacy = localStorage.getItem(LEGACY_SAVE_KEY)
       } catch {
-        /* A disk or database save can still restore. */
+        /* Other replicas can restore. */
       }
-      try {
-        const saved = await storage.restore(legacy)
-        if (worker.current !== instance) return
-        if (saved.world) {
-          send({ type: 'load', world: saved.world })
-          setSavedAt('Autosave restored')
-        } else send({ type: 'generate', seed: 'A world unwritten' })
-      } catch (error) {
-        if (worker.current === instance)
-          setStartupError(
-            error instanceof Error
-              ? error.message
-              : 'Could not restore the saved world. Existing saves have been kept.',
-          )
-      }
+      instance.postMessage({ type: 'restore', legacy } satisfies WorkerRequest)
     }
     retryRestore.current = () => {
       void restore()
     }
     void restore()
     return () => {
-      queue.reset()
-      storage.dispose()
+      writer?.terminate()
+      ensureSaveWorker.current = null
       instance.terminate()
       worker.current = null
-      saveQueue.current = null
       retryRestore.current = null
     }
   }, [notify, send])
+
+  // Acknowledge only after React commits, so busy painting cannot queue old worlds.
+  useEffect(() => {
+    if (world) worker.current?.postMessage({ type: 'snapshot-ack', mapKey } satisfies WorkerRequest)
+  }, [world, mapKey])
 
   useEffect(() => {
     worker.current?.postMessage({ type: 'playback', running, speed } satisfies WorkerRequest)
@@ -260,14 +269,13 @@ export default function App() {
   }, [world, region, nation])
   useEffect(() => {
     const persist = () => {
-      const latest = currentWorld.current
-      if (latest && (latest !== lastSavedWorld.current || Date.now() >= retryDiskAt.current))
-        void saveQueue.current?.enqueue(latest)
+      ensureSaveWorker.current?.()
+      worker.current?.postMessage({ type: 'save' } satisfies WorkerRequest)
     }
     const visibility = () => {
       if (document.visibilityState === 'hidden') persist()
     }
-    const interval = window.setInterval(persist, 2000)
+    const interval = window.setInterval(persist, 15000)
     window.addEventListener('pagehide', persist)
     document.addEventListener('visibilitychange', visibility)
     return () => {
@@ -385,26 +393,16 @@ export default function App() {
     setOverviewOpen(false)
   }
   const focusRegion = (id: number) => setFocus({ region: id, key: Date.now() })
-  const exportWorld = () => {
-    const snapshot = currentWorld.current
-    if (!snapshot) return
-    const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot)], { type: 'application/json' })),
-      a = document.createElement('a')
-    a.href = url
-    a.download = `uchrony-${snapshot.seed.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 50)}-${snapshot.startYear + Math.floor(snapshot.month / 12)}.json`
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    notify('World exported, including history and the random state for exact continuation.')
-  }
+  const exportWorld = () => worker.current?.postMessage({ type: 'export' } satisfies WorkerRequest)
   const importWorld = async (file: File) => {
     try {
-      if (file.size > MAX_SAVE_BYTES) throw new Error('Choose a world save smaller than 128 MiB.')
-      const restored = parseSave(await file.text())
+      if (file.size > MAX_SAVE_BYTES)
+        throw new Error(`Choose a world save smaller than ${MAX_SAVE_BYTES / 1024 / 1024} MiB.`)
       setRunning(false)
       setNation(0)
       setRegion(null)
       setOrderedArmy(null)
-      send({ type: 'load', world: restored })
+      send({ type: 'import', file })
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Could not read that world save.', true)
     }
@@ -520,7 +518,8 @@ export default function App() {
                   <button
                     className="text-button"
                     onClick={() => {
-                      if (currentWorld.current) void saveQueue.current?.enqueue(currentWorld.current)
+                      ensureSaveWorker.current?.()
+                      worker.current?.postMessage({ type: 'save', force: true } satisfies WorkerRequest)
                     }}
                   >
                     Retry save
@@ -606,7 +605,7 @@ export default function App() {
                 }}
               >
                 <CircleHelp size={16} />
-                Model & controls
+                About &amp; mathematics
               </button>
               <p>Fictional world · Experimental simulation</p>
             </div>
@@ -1076,93 +1075,76 @@ export default function App() {
               </div>
             )}
           </form>
-        ) : (
+        ) : modal === 'help' ? (
           <>
             <CompassIcon />
-            <h2 id="dialog-title">A world of consequences.</h2>
+            <h2 id="dialog-title">About &amp; mathematics</h2>
             <p>
               Uchrony is a local, deterministic world-history sandbox. Let states govern themselves, or
               intervene in any one of them.
             </p>
-            <div className="help-steps">
-              <div>
-                <Play size={18} />
+            <ModelMathematics />
+            <details className="model-controls">
+              <summary>Playing and controlling the world</summary>
+              <div className="help-steps">
+                <div>
+                  <Play size={18} />
+                  <span>
+                    <strong>Set history in motion</strong>Play advances monthly ticks. Speed changes pacing;
+                    +1 year advances twelve months while paused.
+                  </span>
+                </div>
+                <div>
+                  <Search size={18} />
+                  <span>
+                    <strong>Follow a place or a system</strong>Select a state, click a province, or change the
+                    map layer. Every number comes from the same simulation.
+                  </span>
+                </div>
+                <div>
+                  <Settings2 size={18} />
+                  <span>
+                    <strong>Change the conditions</strong>Adjust budgets, develop provinces, fund research,
+                    negotiate treaties, recruit armies, or introduce local shocks.
+                  </span>
+                </div>
+                <div>
+                  <Download size={18} />
+                  <span>
+                    <strong>Keep an alternate history</strong>Autosaves stay on this computer. Export a world
+                    to preserve its geography, history, and exact random state.
+                  </span>
+                </div>
+              </div>
+              <div className="keyboard-guide">
                 <span>
-                  <strong>Set history in motion</strong>Play advances monthly ticks. Speed changes pacing; +1
-                  year advances twelve months while paused.
+                  <kbd>Space</kbd>Play / pause
+                </span>
+                <span>
+                  <kbd>1–4</kbd>Speed
+                </span>
+                <span>
+                  <kbd>L</kbd>Map layer
+                </span>
+                <span>
+                  <kbd>/</kbd>Find state
+                </span>
+                <span>
+                  <kbd>Esc</kbd>Clear selection
                 </span>
               </div>
-              <div>
-                <Search size={18} />
-                <span>
-                  <strong>Follow a place or a system</strong>Select a state, click a province, or change the
-                  map layer. Every number comes from the same simulation.
-                </span>
-              </div>
-              <div>
-                <Settings2 size={18} />
-                <span>
-                  <strong>Change the conditions</strong>Adjust budgets, develop provinces, fund research,
-                  negotiate treaties, recruit armies, or introduce local shocks.
-                </span>
-              </div>
-              <div>
-                <Download size={18} />
-                <span>
-                  <strong>Keep an alternate history</strong>Autosaves stay on this computer. Export a world to
-                  preserve its geography, history, and exact random state.
-                </span>
-              </div>
-            </div>
-            <details open>
-              <summary>What the model simulates</summary>
-              <p>
-                Community age cohorts, cultures, languages, beliefs and loyalties; births, deaths, and
-                migration; eight goods and three manufacturing chains; shared transport capacity; taxation and
-                spending; six technology fields; diplomatic relationships; and provincial warfare with supply,
-                morale, terrain, and casualties.
-              </p>
+              <a
+                href="https://youtu.be/aobeydG8Sd4"
+                target="_blank"
+                rel="noreferrer"
+                className="reference-link"
+              >
+                Inspired by the Fantasy Map Simulator timelapse
+                <ArrowUpRight size={13} />
+              </a>
             </details>
-            <details>
-              <summary>Model boundaries</summary>
-              <p>
-                This is an experimental aggregate model, not a calibrated historical forecast. Provinces
-                represent populations rather than individual people. Trade settles within a month through
-                public inventories; animated dots visualize completed monthly flows. Armies and fleets use
-                aggregate monthly operations. State agents and historical generation use language models, with
-                authority and resource constraints enforced by the simulation. Technology has six levels per
-                field. Real geography, individual firms, ship-by-ship tactics, and historical calibration are
-                not implemented.
-              </p>
-            </details>
-            <div className="keyboard-guide">
-              <span>
-                <kbd>Space</kbd>Play / pause
-              </span>
-              <span>
-                <kbd>1–4</kbd>Speed
-              </span>
-              <span>
-                <kbd>L</kbd>Map layer
-              </span>
-              <span>
-                <kbd>/</kbd>Find state
-              </span>
-              <span>
-                <kbd>Esc</kbd>Clear selection
-              </span>
-            </div>
-            <a
-              href="https://youtu.be/aobeydG8Sd4"
-              target="_blank"
-              rel="noreferrer"
-              className="reference-link"
-            >
-              Inspired by the Fantasy Map Simulator timelapse
-              <ArrowUpRight size={13} />
-            </a>
           </>
-        )}
+        ) : null}
       </dialog>
     </div>
   )

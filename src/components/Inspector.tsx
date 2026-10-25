@@ -1,3 +1,6 @@
+import { DistrictEconomies } from './DistrictEconomies'
+import { spatialState } from '../sim/spatial'
+import { MacroAccounts } from './EconomicAccounts'
 import { StateAdvisor } from './StateAdvisor'
 import { StateSecurity } from './StateSecurity'
 import { IntelligenceOffice } from './IntelligenceOffice'
@@ -385,12 +388,7 @@ export function Inspector({
                     detail={`${regions.length} provinces`}
                   />
                   <Metric icon={Coins} label="Treasury" value={money(n.treasury)} detail="crowns" />
-                  <Metric
-                    icon={Factory}
-                    label="Monthly output"
-                    value={money(n.gdp)}
-                    detail="crowns / month"
-                  />
+                  <Metric icon={Factory} label="Monthly GDP" value={money(n.gdp)} detail="crowns / month" />
                   <Metric
                     icon={Shield}
                     label="Armed forces"
@@ -511,7 +509,7 @@ export function Inspector({
         {tab === 'economy' && (
           <>
             <div className="metrics-grid">
-              <Metric icon={Factory} label="Monthly output" value={money(n.gdp)} />
+              <Metric icon={Factory} label="Monthly GDP" value={money(n.gdp)} />
               <Metric icon={Coins} label="Treasury" value={money(n.treasury)} />
             </div>
             <div className="data-row">
@@ -526,6 +524,7 @@ export function Inspector({
               <span>Public debt</span>
               <b className={n.debt > 0 ? 'negative' : ''}>{money(n.debt)}</b>
             </div>
+            <MacroAccounts world={w} nation={n.id} />
             <SectionTitle aside={<span className="subtle">tonnes / month</span>}>Goods ledger</SectionTitle>
             <table className="goods-table">
               <thead>
@@ -1117,6 +1116,17 @@ function Province({
         <Metric icon={Users} label="Population" value={compact(population(r))} />
         <Metric icon={Factory} label="Output / month" value={money(r.gdp)} />
       </div>
+      <div className="data-row">
+        <span>Settlements</span>
+        <b>
+          {spatialState(world).settlements.filter((s) => s.region === r.id).length || 'Dispersed countryside'}
+        </b>
+      </div>
+      <div className="data-row">
+        <span>Adaptive districts</span>
+        <b>{spatialState(world).districts.filter((d) => d.region === r.id).length}</b>
+      </div>
+      <DistrictEconomies world={world} province={r.id} />
       <Meter label="Food needs met" value={r.foodCoverage} />
       <Meter label="Other needs met" value={r.materialCoverage ?? 1} />
       <Meter label="Public health" value={r.health} />
@@ -1128,7 +1138,7 @@ function Province({
         <b>{signed(r.migration)}</b>
       </div>
       <div className="data-row">
-        <span>Food reserves</span>
+        <span>{world.localEconomy ? 'Administrative depot food' : 'Food reserves'}</span>
         <b>{(r.stocks.food / Math.max(1, population(r) * 0.025)).toFixed(1)} months</b>
       </div>
       <PopulationIdentities world={world} nation={r.nation} region={r.id} />

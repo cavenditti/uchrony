@@ -1,3 +1,6 @@
+import type { EconomicStratum } from './economic-types'
+/** [absolute birth month, female people, male people]. Sparse, exact birthdays. */
+export type BirthCohort = [number, number, number]
 export type AgeCohort = 'children' | 'adults' | 'elders'
 export type Cohorts = Record<AgeCohort, number>
 export type IdentityAxis = 'culture' | 'language' | 'belief' | 'movement'
@@ -14,6 +17,11 @@ export interface IdentityDefinition {
 }
 /** A joint identity/age population, with changing social conditions rather than innate traits. */
 export interface PopulationCommunity {
+  /** Resident district; independent of political and cultural identity. */
+  locality?: number
+  stratum?: EconomicStratum
+  ageCohorts?: BirthCohort[]
+  ageMonth?: number
   culture: number
   language: number
   belief: number

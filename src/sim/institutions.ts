@@ -1,3 +1,5 @@
+import { transfer, governmentAccount } from './ledger'
+import { purchasePublicLabor } from './macroeconomy'
 import { clamp, population, relation, type World, type Region } from './types'
 import type { DiplomaticClause, DiplomaticOffer, Visibility } from './statecraft-types'
 export const INSTITUTION_POWERS = ['defense', 'trade', 'research', 'taxation', 'foreignPolicy'] as const
@@ -195,8 +197,13 @@ export function applyInstitutionTerm(w: World, term: DiplomaticClause, offer: Di
     }
     if (organization.members.length < 2) {
       const beneficiary = organization.members[0] ?? term.from
-      w.nations[beneficiary].treasury += organization.treasury
-      organization.treasury = 0
+      transfer(
+        w,
+        `institution:${organization.id}`,
+        governmentAccount(beneficiary),
+        organization.treasury,
+        'institution dissolution',
+      )
       organization.status = 'dissolved'
     }
   }
@@ -211,8 +218,7 @@ export function transferInstitutionMembership(w: World, from: number, to: number
   for (const o of w.institutions?.organizations ?? []) {
     o.members = [...new Set(o.members.map((id) => (id === from ? to : id)))]
     if (o.status === 'active' && o.members.length < 2) {
-      w.nations[to].treasury += o.treasury
-      o.treasury = 0
+      transfer(w, `institution:${o.id}`, governmentAccount(to), o.treasury, 'institution succession')
       o.status = 'dissolved'
     }
   }
@@ -227,8 +233,14 @@ export function allocateProvincialTaxes(w: World, nation: number, gross: number)
   for (const r of own)
     if (r.delegation) {
       const d = r.delegation
-      d.income = d.powers.includes('taxation') ? gross * (r.gdp / output) * d.autonomy : 0
-      d.treasury += d.income
+      d.income = d.powers.includes('taxation') ? gross * (Math.max(0, r.gdp) / output) * d.autonomy : 0
+      d.income = transfer(
+        w,
+        governmentAccount(nation),
+        `province:${r.id}`,
+        d.income,
+        'provincial tax retention',
+      )
       retained += d.income
     }
   return retained
@@ -244,7 +256,7 @@ export function advanceInstitutions(w: World) {
     if (r.delegation) {
       const d = r.delegation
       d.budget = Math.min(d.treasury, d.income * 0.85 + d.treasury * 0.01)
-      d.treasury -= d.budget
+      d.budget = purchasePublicLabor(w, r, `province:${r.id}`, d.budget, 'provincial services')
       if (d.powers.includes('policing'))
         r.unrest = clamp(
           r.unrest -
@@ -261,17 +273,22 @@ export function advanceInstitutions(w: World) {
       active = former.filter((id) => w.regions.some((r) => r.nation === id))
     o.members = active
     if (active.length < 2) {
-      if (active[0] !== undefined) w.nations[active[0]].treasury += o.treasury
-      else if (former[0] !== undefined) w.nations[former[0]].treasury += o.treasury
-      o.treasury = 0
+      const beneficiary = active[0] ?? former[0]
+      if (beneficiary !== undefined)
+        transfer(
+          w,
+          `institution:${o.id}`,
+          governmentAccount(beneficiary),
+          o.treasury,
+          'institution dissolution',
+        )
       o.status = 'dissolved'
       continue
     }
     for (const id of active) {
       const n = w.nations[id],
         paid = Math.min(Math.max(0, n.treasury), n.income * o.charter.contribution)
-      n.treasury -= paid
-      o.treasury += paid
+      transfer(w, governmentAccount(n.id), `institution:${o.id}`, paid, 'institution contribution')
       o.income += paid
     }
     if (o.charter.powers.includes('defense')) {
@@ -281,8 +298,7 @@ export function advanceInstitutions(w: World) {
       const budget = Math.min(o.treasury, o.income * 0.8)
       for (const id of recipients) {
         const grant = budget / recipients.length
-        w.nations[id].treasury += grant
-        o.treasury -= grant
+        transfer(w, `institution:${o.id}`, governmentAccount(id), grant, 'institution defense grant')
         o.grants += grant
       }
     }

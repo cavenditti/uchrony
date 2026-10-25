@@ -204,8 +204,10 @@ test('paused-world advice schedules a cheap review without bypassing rate limits
   const originalSelf = Object.getOwnPropertyDescriptor(globalThis, 'self')
   const worker = {
     onmessage: (_: { data: WorkerRequest }) => {},
-    postMessage: (message: WorkerResponse) => {
+    postMessage: (message: WorkerResponse): void => {
       outputs.push(message)
+      if (message.type === 'world')
+        worker.onmessage({ data: { type: 'snapshot-ack', mapKey: message.mapKey } })
     },
   }
   Object.defineProperty(globalThis, 'self', { value: worker, configurable: true })

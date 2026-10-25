@@ -5,37 +5,318 @@ Uchrony's model is deliberately inspectable. These are implemented rules, not cl
 ## Resolution and units
 
 - Time advances by one month per tick, beginning in January 1720. The starting year is a fictional scenario convention, not a historical dataset.
-- New browser worlds default to 448 × 288 hexes, about 1,400 provinces, and 32 states. The new-world dialog also offers Regional (112 × 72 / ~180 provinces) and Continental (224 × 144 / ~560 provinces), with 4–48 starting states. Disconnected islands can add provinces. Hexes retain their physical size; greater dimensions add actual travel distance rather than merely refining the same extent. Hexes carry geography; provinces carry economic and demographic state. Existing saves retain their dimensions. Direct `generateWorld` calls default to Regional for compatibility with existing callers and small fixtures; the worker explicitly selects the browser default.
+- New browser worlds default to 448 × 288 hexes, about 1,400 provinces, and 32 states. The new-world dialog also offers Regional (112 × 72 / ~180 provinces) and Continental (224 × 144 / ~560 provinces), with 4–48 starting states. Disconnected islands can add provinces. Hexes retain their physical size; greater dimensions add actual travel distance rather than merely refining the same extent. Hexes carry fixed physical geography. Adaptive districts own resident populations and markets; provinces remain administrative jurisdictions and aggregate their districts. On the first monthly step, a legacy or newly generated provincial opening balance sheet is conservatively allocated into districts. Existing saves retain their dimensions. Direct `generateWorld` calls default to Regional for compatibility with existing callers and small fixtures; the worker explicitly selects the browser default.
 - Population values are people. Stocks and flows are tonnes. Treasury, budget, and the internal `gdp` field are thousands of fictional crowns; the UI expands them into crowns.
-- The UI calls `gdp` **monthly output**: it is the gross value of goods produced, not an economically calibrated value-added GDP measure.
+- The UI reports GDP for the modeled economy, reconciled by production, expenditure and income. It includes goods, trade margins, freight, public services and construction. Reference-price goods output remains a separate quantity indicator. These are synthetic national accounts, not an empirically calibrated national GDP series; housing, imputed financial services and many real-world service industries are outside the model.
 - The map scale assumes four kilometers per internal map coordinate unit. It is a fictional spatial convention and updates with zoom.
 - Generating the same seed with the same settings on the same model version produces the same world. The PRNG state is part of every save.
 
+## Money and balance sheets
+
+Index t denotes a month, r a resident market district (a province before local initialization), s an economic stratum, f a firm, g a good, b a bank and a a customer account. Monetary quantities are thousands of crowns; prices are crowns per tonne. Divide price × tonnes by 1,000 for payments. Labor is full-time-equivalent person-months.
+
+```text
+payment = min(requested payment, payer deposits)
+closing deposits[a] = opening deposits[a] + receipts − payments + creation − destruction
+sum(customer deposit changes) = deposits created − deposits destroyed
+bank assets = reserves + loan claims
+bank liabilities and equity = customer deposits + central-bank advances + equity
+central-bank assets = advances to banks
+central-bank liabilities and equity = bank reserves + central-bank equity
+closing goods = opening goods + production + explicit injections
+                − intermediate use − final use − spoilage − destruction
+```
+
+Households, firms, district wholesalers, governments, provincial administrations and institutions hold deposits. Three banks share one currency and central bank. Payments between banks transfer reserves; payments inside one bank reassign its deposit liabilities. Every customer balance and bank balance sheet is checked each month. The journal keeps the latest 1,024 entries and complete monthly net changes, including separately identified creation and destruction. Military inventories are included in goods accounting.
+
+Opening deposits and bank equity have matching reserve assets. The initial reserve endowment is matched by negative opening central-bank equity; it is an explicit initial condition, not an invented government bond or current income. The former credit pool becomes opening bank equity when an older economic save is upgraded. Existing loans become opening bank assets, with matching opening equity and unchanged borrower liabilities. There is no foreign currency, external rest-of-world sector or asset exchange. Household cash remains with its family stratum after death; an empty stratum transfers its estate to a surviving local stratum.
+
+## Deposit-creating banks and monetary policy
+
+```text
+new credit = min(request, borrower limit − outstanding debt,
+                 max(0, bank equity / 0.10 − bank loan assets))
+origination: borrower deposit +L; borrower debt +L;
+             bank loan asset +L; bank deposit liability +L
+principal repayment: deposit −R; debt −R; bank loan asset −R; deposit liability −R
+interest paid: customer deposit −J; bank deposit liability −J; bank equity +J
+bank dividend: recipient deposit +D; bank deposit liability +D; bank equity −D
+loan write-down: borrower debt −W; bank loan asset −W; bank equity −W
+```
+
+Lending creates deposits rather than transferring an existing pool. Banks require 10% equity against loan assets. Firms can borrow up to max(1, four months of forecast sales, 30 × physical capacity); wholesalers up to max(1, six months of local subsistence sales); governments up to max(1,000, 24 × measured monthly GDP). These are synthetic underwriting rules. Interest is fixed at origination at the policy rate plus 0.15% per month. Additional borrowing on an existing facility retains that facility's rate. Scheduled principal repayment is 1.5% per month, bounded by cash after interest.
+
+Twelve consecutive months of unpaid interest trigger a 65% principal write-down. Full interest payment resets the counter. Sovereign restructuring reduces legitimacy by four and stability by three. Financial default does not destroy physical inventories or capital. Firms in persistent distress liquidate: available cash repays creditors first, unrecovered loans are written down, remaining goods and equipment transfer to local shared capacity, and residual cash belongs to owners.
+
+A solvent bank can obtain central-bank reserves for an outgoing settlement, limited to 95% of its loan assets less existing advances. This creates both reserves and a central-bank claim, without increasing commercial-bank equity. Advances pay the policy rate; excess reserves above 10% of deposits repay them. An insolvent bank wipes out existing ownership and converts enough deposit claims into equity to restore the 10% loan-capital target, bounded by outstanding deposits. Conversion is proportional across depositors, who receive explicit ownership shares. It destroys deposits and is reported separately; there is no free recapitalization or deposit guarantee. If deposit conversion is exhausted, any remaining central-bank claim is written down with a matching loss in central-bank equity. This recognizes a creditor loss; it issues no new deposits. Bank income is interest received less central-bank charges and credit losses. Up to 65% of positive monthly income can be distributed, subject to a 12.5% loan-capital buffer; losses reduce both income and equity. Enterprise liquidations after bank settlement enter the next settlement’s retained capital constraint.
+
+```text
+annualized observed inflation = 12 × log(basket index[t−1] / basket index[t−2])
+desired monthly policy rate = clamp(0.0015 + 0.15 × (inflation−0.02)/12
+                                   − 0.002 × unemployment, 0, 0.012)
+policy rate += 0.05 × (desired rate − policy rate)
+```
+
+This is a smoothed Taylor-style response, not an estimated central-bank reaction function. The model omits deposit interest, reserve remuneration, interbank unsecured loans, bond trading, deposit insurance and imputed financial-service output. Loan interest is property income, excluded from GDP; no financial-service charge is inferred from the interest spread.
+
+## Demographic equations
+
+A birth cohort is (absolute birth month, female count, male count). Age in years is (t − birth month)/12. Broad display ages are derived from that date; there are no memoryless fractions moving between three age pools.
+
+```text
+age < 1: annual hazard h = 0.055
+ages 1–14: annual hazard h = 0.002
+ages 15+: h = 0.0015 + 0.00018 × exp(0.085 × max(0, age−30))
+adjusted hazard = [h × (1.5−health) + shortage × vulnerability] × mortality effect
+vulnerability = 0.18 before age 5; 0.22 from age 65; 0.10 otherwise
+monthly death probability = 1 − exp(−adjusted hazard / 12)
+expected deaths = cohort count × monthly death probability
+expected births = sum(females in age band × annual fertility / 12)
+                  × (1−0.5 literacy) × (1−0.2 urbanization)
+                  × (1−0.8 food shortage) × historical fertility effect
+```
+
+Annual fertility coefficients for ages 15–19, 20–24, 25–29, 30–34, 35–39, 40–44 and 45–49 are 0.018, 0.115, 0.145, 0.120, 0.075, 0.025 and 0.003 births per woman. The female newborn share is 0.488. Maximum modeled age is 110; remaining members die at that boundary. Expected fractional counts use floor(x) plus a seeded Bernoulli draw with probability x−floor(x), not a full individual-level binomial model. These coefficients describe a synthetic scenario and are not fitted UN estimates.
+
+## Strata, labor and wages
+
+Every cultural/language/belief/political community can contain smallholders, laborers, artisans, professionals and owners. Each district-stratum has pooled cash, income, taxes, transfers, purchases and employment. Strata do not confer cultural or ethnic abilities. They represent economic roles with wage multipliers 0.90, 1.00, 1.25, 1.70 and 0.80 respectively; owners also receive dividends. When initializing enterprises, an inhabited district starts with min(3, ceil(population / 10,000)) independently financed firms and one dormant slot. Empty districts start without firms. Existing firms in legacy saves keep their identities and sites. Subsequent boundary changes never create firms. Firms have separate deposits, credit, inventories, productivity, wage offers, markups, employment, capital and construction projects. A district wholesaler connects firms to household, public and interdistrict demand. A reopened slot increments its generation; newly financed enterprises receive new persistent IDs.
+
+```text
+participation(age) = 0 below 18; 0.60 at 18–24; 0.78 at 25–59;
+                    0.50 at 60–64; 0.15 at 65–69; 0 from 70
+labor force = sum(cohort count × participation × (0.6+0.4 health))
+forecast[f,g,t] = 0.82 forecast[f,g,t−1] + 0.18 observed sales[f,g,t−1]
+product demand = max(forecast, local subsistence/input orders / active firms)
+product plan = max(0, demand + 0.25 × (2 × demand − own stock))
+required labor share[g] = base share[g] × clamp(plan[g] / benchmark output[g], 0, 4)
+utilization = clamp(sum(required shares), 0.05, 0.98)
+product labor mix = required shares / sum(required shares)
+desired jobs = local labor force / active firms × utilization × (1−0.5 devastation)
+wage *= exp(clamp(0.015 × (utilization−0.90) + 0.35 × local monthly inflation,
+                  −0.03, 0.03))
+funding fraction = min(1, firm deposits / requested wage bill)
+```
+
+Firms offer wages in descending order and hire from the remaining local labor pool; equal offers use persistent firm ID. Hired workers retain the stratum proportions of that remaining pool. Wage bills are funded before output is produced. Available credit can cover a shortfall; insufficient credit means fewer paid jobs. Private, public and construction jobs share one labor-force ceiling. Public services are valued at actual labor cost. Their reference-price output uses the base wage 0.0015 times the skill multiplier, so a wage-price rise alone does not create real output. Unemployment is one minus employed labor divided by participating labor, rather than one minus employment divided by the entire population.
+
+Slow occupational mobility uses probability 0.0005 × opportunity per month: urban smallholders can become laborers; literate laborers artisans; sufficiently literate artisans professionals; wealthy professionals owners. Severe deprivation can push artisans, professionals or owners back into laboring work. Exact age/sex profiles and proportional cash move together. This is a reduced-form family-group transition model, not individual schooling, inheritance or occupational licensing.
+
+## Household choice and deprivation
+
+Let γ[g] be the subsistence quantity, p[g] the price in thousands of crowns per tonne and B the cash-constrained monthly budget. The discretionary shares β are food 0.50, timber 0.08, stone 0.02, iron 0.01, coal 0.08, tools 0.10, textiles 0.20, arms 0.01, summing to one.
+
+```text
+subsistence cost S = sum(p[g] × γ[g])
+disposable income Y = wages + dividends + freight receipts + transfers − taxes
+B = min(cash, max(S, 0.85 × max(0,Y) + 0.05 × max(0,cash−3S)))
+desired quantity[g] = γ[g] + β[g] × (B−S) / p[g]     when B ≥ S
+delivered quantity = min(desired quantity, available stock, remaining cash / price)
+```
+
+Above subsistence this is the linear expenditure system associated with Stone–Geary preferences. When B < S the usual subsistence utility has no feasible solution: the implementation explicitly switches to priority rationing, purchasing food first, then timber, stone, iron, coal, tools, textiles and arms. Scarce goods are allocated in the fixed stratum order shown above; this ordering is an explicit rationing assumption, not competitive market clearing. Unspent money remains with households.
+
+For each good, households compare available local wholesaler and firm offers in ascending price order. The demand calculation uses the cheapest currently available offer; actual purchases respect each seller's stock, the household's remaining budget and its deposits. Direct firm purchases transfer payment to that firm and withdraw its inventory, without requiring wholesaler credit. A wholesaler's financing failure therefore cannot alone prevent a funded household from buying locally available food. The published district quote updates to the quantity-weighted price of actual household purchases where sales occur.
+
+Food coverage is min(1, delivered food / subsistence food), separately for each stratum. Material coverage weights fulfillment of tools 35%, textiles 25%, timber 15%, stone 10%, coal 10% and iron 5%. Regional coverage is weighted by people. Mortality uses the household stratum's food shortage, so plentiful aggregate stocks cannot protect households unable to buy food. Wealth is a display index clamp(log(1+1,000 × cash/person)/log(21),0,1); actual cash, not that index, constrains purchases.
+
+## Input-output production and prices
+
+Raw production is constrained by paid labor, geography and technology; agricultural labor has diminishing returns as specified under Production and carrying capacity. Manufacturing uses fixed input coefficients, a Leontief quantity constraint:
+
+```text
+Q planned[j] = labor-capital capacity for industry j
+Q actual[j] = min(Q planned[j], min over inputs i of available input[i] / recipe[i,j])
+input order target[i] = household reserve[i] + 2 × sum(recipe[i,j] × Q planned[j])
+unit replacement cost = allocated wage bill / planned units + input recipe cost
+quote target = max(0.01, replacement cost × (1+markup))
+firm price *= exp(clamp(log(target/current price), −0.06, 0.06))
+wholesale order = max(0, household reserve + planned input reserve
+                         + one month of household needs for export − market stock)
+expected monthly sales S = max(1, household need, wholesaler sales forecast)
+target stock T = household reserve + planned input reserve + export buffer
+retail markup = 0.04 + (max(0,T−S) × spoilage rate + T × financing rate) / S
+retail quote = (1 + retail markup) × weighted acquisition price, when purchases occur
+```
+
+Firms allocate labor by product. Surplus arms cannot, by itself, cancel food jobs. Benchmark output uses each firm's technology, geography, productivity and capital at its share of the local labor force; product labor requirements are then normalized. All hiring still needs wages and bank capacity. Manufacturing also needs cash to purchase inputs. Planned output is recorded before shortages reduce actual output, preserving material orders when an input runs out.
+
+The wholesaler purchases the cheapest available firm offers first, with stable ID tie-breaking and no overdraft. Retail carrying costs use monthly spoilage rates of 3.5% for food, 0.6% for timber/textiles and 0.1% for other goods, and the principal-weighted rate on outstanding wholesaler loans. With no debt, the current policy rate plus the lending spread is the financing opportunity cost. The additional 4% is a trading margin. This avoids systematically pricing below the cost of holding the modeled reserve. Unsold firm inventories persist and spoil. Firm markups fall 0.002 when inventories exceed two forecast months and rise 0.001 otherwise, bounded between 4% and 30%. Firm price adjustment is limited to six log-percentage points per month, with a 0.01 nominal floor. An inactive market retains its quote. These are behavioral disequilibrium rules, not a solved competitive equilibrium; rationing and unemployment can persist.
+
+Purchases between regions settle at the seller's quoted price. The buyer also pays any import tariff to its government and a freight fee to the origin laborer account. District freight fee per tonne is seller price × route effort × 0.002. Price, transport effort, domestic preference and relationship persistence rank supplier contacts. Buyer cash and remaining physical corridor capacity bound delivery. The freight service uses the existing abstract transport sector and does not separately hire carrier workers; its receipts enter mixed income and service output. Freight and tariffs enter the destination inventory acquisition value.
+
+## Investment, profits and enterprise succession
+
+```text
+private capital after wear = capital × (1−0.0015)
+shared capacity after wear = capacity × (1−0.0015) × (1−0.002 devastation)
+desired new firm capacity = max(0, jobs / desired jobs − 0.75) × 0.025
+                            + capital × 0.0015
+construction inputs per unit = 300 t timber + 400 t stone + 40 t tools
+construction labor per unit = 1,000 artisan person-months
+actual construction = min(desired, input availability, unused artisan labor,
+                          25% of firm cash / full material-and-labor cost)
+```
+
+Firms buy construction materials and pay actual artisan wages with ordinary withholding. Own-account construction is valued at those costs, recorded as fixed investment and queued for six months before productive use. Materials are intermediate consumption of the construction activity; the finished capital is output. This prevents counting materials twice in GDP. Public industrial construction also takes six months; existing other construction commands retain their paid immediate-development abstraction. Shared regional capacity supplements each firm's own capital, so operating firms retain their local land and infrastructure environment.
+
+The tax/distribution base is cash sales less operating payroll, settled input purchases and interest. Only positive cash surplus is taxed. Firms distribute up to 45% of positive after-tax surplus, bounded by available deposits; wholesalers distribute 20%. This is a cash-basis tax rule, distinct from national-account accrual surplus. Capital expenditure is capitalized, and inventory holding gains are not taxed by this rule.
+
+Firms unable to fund 5% of desired employment, or holding less than one payroll while making operating losses, accumulate distress. The distress score rises by one in each such month and falls by one, to a minimum of zero, in each recovery month. Reaching eighteen triggers liquidation. In districts with more than 500 residents, entry is considered annually at staggered district dates, or monthly when no active enterprise remains. Owners must hold twice the seed subscription, max(1, civilian population × 0.00015), and the active-firm count must be below the population-dependent target described under Local specialization. Entry transfers existing owner deposits, creates no free capital and retains a new generation number. Initial and entrant productivity differences use the world seed, never culture or ethnicity.
+
+## National accounts and measurement
+
+Three separately accumulated views must agree for every state and the whole world:
+
+```text
+GDP production = gross output − intermediate consumption + product taxes
+GDP expenditure = household consumption + government consumption
+                  + gross fixed investment + inventory transaction changes
+                  + exports − imports
+GDP income = paid gross wages + gross operating surplus + mixed income + product taxes
+business accrual surplus = operating receipts − operating purchases − wages
+                           + own-account capital output + inventory transaction changes
+inventory holding gains = closing inventory value − opening value
+                          − inventory transaction flows − other asset changes
+```
+
+The income account is built from each business's receipts, expenses, wages, construction and inventory movements; it is not assigned the difference required to make GDP balance. Every inventory entry and withdrawal has a quantity and transaction value. A separate closing physical snapshot detects missing movements. Sales from wholesalers contribute the selling margin above replacement cost, rather than the full value of resold goods. Firms' own output is valued at their contemporaneous quote. Withdrawals use the latest recorded acquisition/replacement values, carried across months until a new quote arrives. A retailer’s selling markup is not written into the cost of unsold stock; it becomes trade output on sale. Revaluation of existing stock is a holding gain, excluded from all three GDP measures.
+
+Government inventory purchases are recorded when acquired, and military food/ammunition become government consumption when used. Government nonmarket output is measured by paid labor and used supplies. Materials incorporated into paid recruitment, repairs or construction are intermediate inputs to those services. Requisition, estates, liquidation gifts and observer shocks are explicit in-kind transfers or other asset changes; they are not newly produced goods. Normal spoilage is an operating inventory loss. Exceptional destruction is an other-volume change. Foreign grants funded on behalf of an importing wholesaler are recorded as purchases settled by a third party, with a capital transfer financing the recipient.
+
+Exports and imports are recorded at the bilateral transaction value, including cross-border freight where applicable. Freight is self-employed output/mixed income; import tariffs are product taxes. Internal trade cancels in national consolidation and world exports equal world imports. Income/profit taxes, welfare, loan proceeds, principal, interest, dividends, bank bail-ins and financial write-downs are excluded from production expenditure. Territorial attribution is frozen at the beginning of each month, so a mid-month conquest does not move already-recorded output between countries.
+
+```text
+reference-price goods output = sum((physical output − industrial inputs) × initial prices)
+reference-price public services = paid public labor × initial wage by skill
+basket index = current subsistence basket cost / its cost at initial prices
+unemployment = 1 − employed labor / participating labor
+```
+
+The reference-price output indicator is narrower than the reconciled nominal GDP measure: it does not deflate every service and margin or provide a chain-linked real GDP series. The basket index uses current needs weights; it is not a fixed-weight CPI. Grouped income Gini uses district-stratum per-person disposable income: 1 − sum(n[j] × (C[j−1]+C[j]))/(N×Y), for sorted groups, counts n, total people N, total income Y and cumulative income C. Zero aggregate income displays zero; inequality inside a pooled stratum is unobserved.
+
+Reconciliation is enforced every month with scale-aware floating-point tolerances, separately from deposit, bank and physical-goods identities. No statistical discrepancy is used as a balancing plug. Full reconciliation applies to the sectors represented here; it does not imply complete SNA sector coverage or empirical predictive validity.
+
+## Economic and demographic foundations
+
+The model uses standard forms with explicit synthetic behavioral coefficients. References establish the modeling approaches, not empirical validation of this world:
+
+- [United Nations World Population Prospects 2024 methodology: cohort-component projections](https://population.un.org/wpp/assets/Files/WPP2024_Methodology-Report_Final.pdf)
+- [Caiani and colleagues: agent-based, stock-flow-consistent macroeconomics](https://business.columbia.edu/sites/default/files-efs/imce-uploads/Joseph_Stiglitz/Agent%20based-stock%20flow.pdf)
+- [IMF working paper: linear expenditure system](https://www.imf.org/external/pubs/ft/wp/2003/wp03204.pdf)
+- [OECD: national accounts and value added](https://www.oecd.org/en/data/insights/data-explainers/2024/03/annual-national-accounts-frequently-asked-questions.html)
+- [Bank of England: Money creation in the modern economy](https://www.bankofengland.co.uk/quarterly-bulletin/2014/q1/money-creation-in-the-modern-economy)
+- [Eurostat–OECD Compilation Guide on Inventories: transaction flows and holding gains](https://unstats.un.org/Unsd/nationalaccount/docs/3017071e.pdf)
+
 ## Geography and cartography
 
-Generator 2 uses separated continental nuclei with seeded domain warping and angular coastline variation, plus smaller offshore islands. An ocean frame keeps land away from the map boundary. Curved ridge fields create mountain belts. Latitude, elevation, moisture noise, and a simple dry-latitude/rain-shadow term choose biomes. This is synthetic terrain generation, not plate tectonics or an atmospheric simulation.
+Generator 3 uses separated continental nuclei with seeded domain warping and angular coastline variation, plus smaller offshore islands. An ocean frame keeps land away from the map boundary. Curved ridge fields have spatially varying strength, broken passes and separate upland blocks, creating uneven mountain belts. Latitude, elevation, moisture noise, and a simple dry-latitude/rain-shadow term choose biomes. This is synthetic terrain generation, not plate tectonics or an atmospheric simulation.
 
 A priority flood removes drainage sinks by minimally raising their elevations. Each land cell stores a lower, adjacent downstream cell. Runoff accumulates in reverse drainage order; visible rivers begin at 12 runoff units and continue to the sea. Rivers increase local moisture and add a small contribution to provincial fertility. These runoff units are relative catchment weights, not measured cubic meters per second. River flow is geographic and does not yet change with monthly rainfall.
 
-Provinces grow with positive terrain costs, preserving connected land ownership. Centers prefer positions near each province's centroid, with a preference for lower ground and rivers. Starting capitals are spread over substantial landmasses rather than tiny offshore rocks. State expansion follows the province graph; unclaimed offshore provinces join the closest capital. None of these rules constrain later military conquests.
+Each land cell has a geographic habitat score and a correlated settlement-attraction field. Wet lowlands, rivers and coasts are favored; mountains, tundra and deserts support much less settlement. These are geography-based synthetic starting conditions, unrelated to ethnicity or culture.
+
+```text
+habitat = clamp(terrain suitability × (0.65 + 0.5 moisture) + 0.15 river)
+terrain suitability = 0.90 plains, 0.64 forest, 0.38 hills,
+                      0.035 mountains, 0.045 desert, 0.025 tundra
+attraction = clamp(habitat × (0.12 + 0.88 basin_noise²) + 0.12 coast + 0.10 river)
+settlement weight = habitat × (0.5 + 4 attraction²)
+initial cell population weight = settlement weight
+world initial civilian endowment ≈ 3,000 × land cell count
+initial province population = world endowment × province weight / world weight
+province seed priority = distance_to_nearest_seed² × (0.04 + 4 attraction³) × seeded jitter
+```
+
+Density-weighted seeds make prosperous basins more finely divided and inhospitable expanses coarser. Provinces grow with positive terrain costs, preserving connected land ownership. Their administrative anchors favor accessible settlement locations near their centroids; an anchor is not automatically a town. Capitals favor populated regions on substantial landmasses, with geographic separation. State expansion follows the province graph; unclaimed offshore provinces join the closest capital. None of these rules constrain later military conquests. Initial urbanization, infrastructure, literacy and industrial capital follow the population-weighted attraction score rather than independent uniform draws. The population prior includes a rural base so that attraction does not put most people into tiny provinces beyond their starting food-supply capacity. Before capital-city overrides, industrial and infrastructure indices are rescaled (with a 1.2 ceiling) to population-weighted means of 0.47 and 0.50. This redistributes the opening endowment while keeping its aggregate scale comparable to the preceding generator; it is not new investment or a payment during simulation. Rounding the three initial age totals can change a province's endowment by one person; subsequent cohort accounting is exact. Initial military personnel are drawn from these civilians.
+
+Resources are sampled across every land cell. Their potential is area-averaged into the opening provinces and then each active district. Forest cover governs timber; uplands concentrate stone. Iron and coal occur in separate smooth, thresholded fields:
+
+```text
+raw iron = max(0, noise(9x,9y) − 0.58)² × (0.4 + 2 elevation)
+raw coal = max(0, noise(6x,6y) − 0.57)² × max(0.1, 1 − elevation)
+resource potential = raw field × target world mean / actual world mean
+```
+
+Coordinates x,y are normalized to the map extent; fields use distinct saved-seed salts. World-average potential is normalized to 0.80 for timber, 0.45 for stone, 0.35 for iron and 0.45 for coal when the raw field is nonzero. Normalization leaves all zero deposits at zero. These are synthetic resource basins, not geological survey data. When district simulation initializes, each cell receives natural reserves of 150,000 tonnes times its stone, iron or coal potential, and 5,000 tonnes times its timber potential. These are unextracted endowments, separate from owned goods inventories. Mineral extraction depletes them; local extraction potential falls in proportion to remaining reserves. Standing timber regrows by 0.2% of the gap to its land-use-adjusted capacity per month; built land reduces that capacity by up to 80%. Splitting a district cannot reset these cell-level stocks.
+
+### Resident districts and conservative refinement
+
+Every active quadtree leaf is clipped into connected land within one administrative province. Each resulting district is an actual simulation unit: it has dated age/sex/identity/stratum cohorts, household deposits, a merchant balance sheet, local goods stocks and quotes, infrastructure, soil fertility, natural resource access, resident firms and capital projects. Households consume only offers in their district. Firms hire locally, pay actual wages and buy locally available inputs. Shortages and prices can differ across two districts in the same province. Trade is required to bring goods across their boundary.
+
+```text
+pressure(node) = sum(city residents / 8,000 + industrial employment / 2,500)
+industrial employment = firm employment × shares in tools, textiles, arms, iron and coal
+split when pressure > 1 and span > one terrain cell
+retain an existing split while pressure > 0.55; otherwise merge
+```
+
+The terrain grid is the minimum spatial resolution; refinement does not create new land. Conservation at remeshing does not establish resolution-independent economic outcomes; a formal mesh-convergence study remains outstanding. Proposals use actual cell residents and firm locations. Reorganization happens before opening a new monthly ledger, independently of zoom. Every province's administrative depot retains its identity and location. Political borders still determine jurisdiction; a city can extend across several provinces without annexing them.
+
+The initial location prior retains dispersed rural residents and concentrated settlements. Concentrated population is round(province population × urban share). New centers require 1,200 × max(1, √(province cell count)/2) concentrated residents; opening sites are spaced at least three grid coordinates apart, with rank weights (rank + 1)^−1.15 and an initial maximum of eight per province. These limits apply only to initialization. Rural weights are habitat², excluding habitat below 0.06 when alternatives exist. The subsequent city system has no eight-center limit.
+
+Boundary changes use a finite-volume remap over intersecting old and new cell sets:
+
+```text
+N[old → new] = sum(existing residents in cells belonging to both units)
+sum(new district people) = sum(old district people)
+Q[new,g] = sum(old goods allocated over each intersection)
+K[new] = sum(allocated shared equipment and unfinished projects)
+carrying price[new,g] = sum(quantity transferred × old carrying price) / new quantity
+```
+
+Opening stratum proportions are allocated first; joint identity groups occupy compact portions rather than being replicated across every destination. Each birth-month/sex bin is integer-apportioned with recipient census totals as hard capacities. No birthday, person, identity or economic stratum is invented or rounded away. Household deposits follow the actual relocated stratum counts; merchant deposits and inventories follow resident shares, with area shares for an empty source. The final recipient receives each floating-point stock residual. Cash moves through the existing transaction ledger. Household and merchant loan portions retain their original contract, lender, rate, origination date and arrears. Portions of the same original claim reunite on merger; unrelated contracts remain distinct. Bank and firm ownership shares follow their household beneficiaries. Shared equipment and project costs are additive. At the next monthly opening, a retired district with exactly zero cash, equipment, projects and outstanding claims becomes a compact lineage record; nonzero balances are never discarded. Finite mineral reserves remain attached to their physical cells.
+
+Firms retain their IDs, cash, inventory, debt, equipment, projects and geographic sites. Only their containing district changes. Opening enterprises and later entries must be financed from existing merchant or owner funds. A boundary change itself produces no goods, writes off no loan, creates no deposit and contributes no GDP. Inventory relocation is a matched asset transfer at carrying value, so remeshing cannot manufacture holding gains.
+
+The authoritative civilian census is serialized once, as province communities tagged with their resident district. District views reference those groups. Province statistics aggregate them; governments, recruitment and sovereignty use the administrative layer. Provincial material orders draw from the **physical administrative depot**, not from a frictionless sum of distant inventories. Other local markets can supply that depot only by paid freight. Public services and welfare are funded across the actual local households. Province-wide road, soil and damage interventions pass through to local conditions. Save validation rejects inconsistent district ownership, population, stocks, natural reserves, sites and financial records.
+
+### Specialization, agglomeration and evolving cities
+
+District labor plans respond to local demand and available inputs. The baseline occupational allocation is reweighted by soil suitability, local extraction potential and urbanization, normalized to sum to one. An agricultural establishment gives its food weight a factor of three; a mining establishment applies that factor to extraction, and an industrial establishment applies it to manufactures. All enterprises still adjust product-level hiring to observed sales and unfilled household/input requirements; specialization is not a permission to produce without workers or materials.
+
+Legacy equipment indices are treated as extensive stocks. Local manufacturing uses equipment intensity, opening province population divided by current district population (denominator at least 500), multiplied by allocated equipment. This prevents a numerical subdivision alone from dividing the equipment available per worker. Manufacturing also receives a bounded external-economy multiplier:
+
+```text
+agglomeration = min(1.4, 1 + 0.04 × log(1 + district people / cells / 1,000))
+entry target = min(24, max(2, ceil(sqrt(district population / 15,000))))
+```
+
+In districts with more than 500 residents, entry is evaluated annually at staggered district dates, or monthly when no active firm remains, and requires the owner to hold at least twice the required subscription. Subscription itself transfers money to the enterprise. Construction remains funded, material-constrained and delayed. Industrial and mining districts are classified from actual sector employment; agricultural districts reflect food employment and soil suitability. This is an agent-based spatial model with synthetic coefficients, **not** a solved or calibrated Krugman general equilibrium. The importance of market access, transport costs and increasing returns is motivated by [Krugman's economic-geography model](https://www.nber.org/papers/w3275).
+
+A fragmented city retains its identity at its surviving nucleus, or in the largest surviving overlap by resident population if that nucleus disappears; a dormant name can revive at its retained nucleus. Cities are connected built-up footprints, independent of province and district boundaries. Population remains in districts and dated cohorts; city membership is a geographic classification, not another copy of those people. The cell resident distribution persists across refinement. Within a coarse district, monthly relocation toward jobs and existing development is limited to 0.3% of its population, with each departing cell subject to the same proportional limit:
+
+```text
+site appeal = log(1 + 2 manufacturing jobs + 6,000 built fraction)
+              + 2 habitat − 1.5 log(1 + cell residents / 8,000)
+demanded built fraction = clamp((residents + 2 manufacturing jobs) / 48,000)
+target built fraction = clamp(demand + 0.15 × adjacent built fraction × min(1,residents/1,000))
+built change per month = clamp(target − existing, −0.003, +0.006)
+```
+
+The synthetic full-build capacity is 48,000 residents plus job-equivalents per terrain cell. At the opening rural prior of about 3,000 residents per cell, ordinary farming density alone stays below the urban entry threshold. Historical opening settlements begin with at least 0.25 built fraction and subsequently evolve under the same growth and decay rule. Habitat below 0.06 limits the built target to 10% of demand. A cell enters a city footprint at built fraction 0.24 with at least 300 residents; an existing footprint remains down to 0.12. Contiguous cells join. Synthetic size labels are village below 8,000 residents, town below 40,000, and city at 40,000 or more. There is no maximum city population or footprint size. Built land is a slow land-use response, not a separately traded housing asset; the model does not yet price land rent or construction of individual dwellings.
+
+City IDs, founding dates, parent centers and aliases persist. Coalescing centers retain the older center's identity (then larger population and ID break ties); absorbed centers remain in the record. Comparable centers can acquire a compound name after at least five years since the retained name last changed. If the original nucleus leaves the footprint, the label moves to the most populated surviving cell. An empty footprint retains its historical record. Newly formed centers receive deterministic geographic names. District names reflect their city or economic use. These mechanisms evolve toponyms without renaming whole populations or cultures.
+
+Migration still uses simultaneous household plans, local earnings, employment, food access and social affinity. District neighbors and observed sea shipments supply destinations. Local choices subtract crowding, 0.04 × log(1 + population/(cells × 12,000)), and a travel penalty of grid distance × 0.002/(1 + destination infrastructure). Movers carry their deposits, proportional debts and ownership shares; their birth cohorts move exactly and nobody moves twice in one month. There is not yet a separate daily commuting market. City footprints therefore describe built settlements, not OECD functional urban areas; those also include commuting zones, as explained by the [OECD methodology](https://www.oecd.org/en/data/datasets/oecd-definition-of-cities-and-functional-urban-areas.html).
+
+The recursive hierarchy follows [Samet's quadtree survey](https://cs.umd.edu/~hjs/pubs/SameCSUR84-ocr.pdf). Quadtree pressure thresholds, geographic units, natural reserve sizes, agglomeration strength, travel penalties and land-use rates are synthetic assumptions requiring sensitivity testing and calibration. Conservation establishes accounting consistency, not historical realism or numerical convergence across resolutions.
 
 Rendering extracts shared polygon topology from the hex grid, applies bounded shared-vertex offsets, and smooths the land silhouette. Interpolated terrain and slope lighting are cached independently of economic updates. Borders and quantitative fills read current simulation state. City and state labels use screen-space collision checks; ocean labels use open-water clearance. Hit testing follows province polygons, and wheel zoom preserves the geographic location under the pointer. The smoothed shore is a small visual approximation of the underlying boundary; it does not change simulation adjacency.
 
-The version-1 save envelope remains supported. New saves carry `generatorVersion: 2` and optional per-cell drainage fields; older exports without those fields remain valid and keep their saved terrain. New generation is reproducible within this generator version. Changed neighbor traversal and geography may produce different future histories than an older application build; same-build core continuation remains deterministic when supplied the same external historical inputs.
+The version-1 save envelope remains supported. New saves carry `generatorVersion: 3`, optional per-cell landscape and drainage fields, and the adaptive spatial state; older exports without those fields remain valid and keep their saved terrain, people and resources. Their map derives settlement detail without mutating the save. The first monthly step initializes resident district accounts conservatively from their saved provincial state; no new money or people are awarded during conversion. Existing provincial terrain and administrative identities remain intact. Use New world to obtain the new physical resource and population distribution. New generation is reproducible within this generator version. Changed neighbor traversal and geography may produce different future histories than an older application build; same-build core continuation remains deterministic when supplied the same external historical inputs.
 
 ## Monthly order
 
-1. Increment the month; reset population-flow counters.
-2. Change annual growing conditions, evaluate potential independence movements, apply historical developments, update state character and process diplomatic commitments.
-3. Allocate civilian labor and produce raw and manufactured goods.
-4. Clear shortages through capacity-limited domestic and international shipments.
-5. Consume household and maintenance goods; apply spoilage/storage limits.
-6. Collect taxes, allocate spending, service debt, and handle insolvency.
-7. Update community services, health, literacy, contentment, aging, births, deaths, troop retirement, migration, identity diffusion, and development.
-8. Generate research and apply completed discoveries.
-9. Update diplomatic relations and autonomous government decisions.
-10. Supply armies, train troops, apply attrition, move, fight, occupy, and retreat.
-11. Recompute national/world totals and record history.
+1. Initialize local districts if absent; conservatively apply the current refinement proposal. Advance dated age cohorts and start money, goods and population ledgers.
+2. Apply climate, historical effects, political pressure, leadership changes and diplomatic obligations.
+3. Depreciate capital, complete construction, update sales expectations, hire and pay workers, withhold income tax, produce goods and quote replacement-cost prices.
+4. Operate fleets and clear paid, capacity-limited domestic and international shipments.
+5. Fund welfare and public-service employment; households purchase goods; remaining inventories spoil.
+6. Operate institutions, intelligence and security. Update health, education, births, deaths, retirement, migration, occupational mobility and identity diffusion.
+7. Accumulate research; update diplomacy and autonomous decisions; supply, move, reinforce and fight with military formations.
+8. Settle interest and principal, recognize credit losses, levy profit taxes, distribute dividends, commission affordable capital projects, resolve distressed enterprises and update the policy rate.
+9. Reconcile money, bank balance sheets, physical goods and all three GDP measures. Update built land, city footprints and names; aggregate district, provincial and national statistics and record history.
 
 Changing a policy affects subsequent ticks. Building a provincial improvement and sandbox interventions change state immediately and influence the next tick. A march order records a destination; movement occurs on subsequent ticks.
 
@@ -48,13 +329,15 @@ people after tick = people before tick + births - deaths
 people = civilian children + civilian adults + civilian elders + living soldiers + naval crews
 ```
 
-Recruitment transfers adults into an army. Migration transfers each age cohort between provinces. Surrendered or disbanded troops return to civilian life. Military and civilian deaths both enter the world death ledger. Territory transfers and independence do not create people.
+Recruitment transfers adults into an army. Migration transfers exact age cohorts between districts, including across provincial borders. Surrendered or disbanded troops return to civilian life. Military and civilian deaths both enter the world death ledger. Territory transfers and independence do not create people.
 
 Each province contains joint population communities, rather than independent identity percentages. A community has age cohorts, cultural belonging, mother tongue, belief, political outlook and preferred civic allegiance. Culture and language registries begin from geographic communities that cross political borders. No culture or belief receives innate fertility, productivity or military coefficients. States have separate institutional identities; recognizing one changes policy, without relabeling residents.
 
-Children age into adulthood over an 18-year timescale; adults become elders over a 47-year timescale. Each community has its own health, literacy, living standard, urbanization, contentment, grievance, loyalty, rootedness and displacement burden. Material conditions, education, services, policy access and historical effects change these attributes. Birth rates depend on adult numbers, literacy, food, urbanization and living standards. Cohort mortality responds to health and shortages. Saved census randomness provides unbiased integer rounding so small communities can still age, reproduce and die. Soldiers retain community profiles, suffer natural mortality, and retire into civilian elder cohorts.
+Age is measured from each cohort's absolute birth month. A cohort contains female and male counts; children become adults at month 216 and adults become elders at month 780. Recruitment, migration, identity changes and demobilization preserve these exact birth dates and sex counts. Legacy saves distribute their recorded broad age totals deterministically across single-year ages, with a declining elderly distribution; this preserves the census without inventing a known past. New births create a cohort at the actual current month.
 
-Migration balances safety, food, infrastructure, health, contentment, diaspora connections, exclusion, cultural prestige and historical migration appeal against rootedness and border friction. Destinations are adjacent provinces or endpoints of actual sea trade. A passenger-capacity proxy permits at most 0.15 people per tonne of delivered maritime freight in each direction; it is not a separately simulated passenger fleet or a shared freight/passenger capacity ledger. Closed borders suppress ordinary international movement, while a small refugee leakage remains. Domestic migration ignores national border policy. Severe devastation, hunger and exclusion can displace people. All departures are subtracted before arrivals, so newly arrived people cannot move again in the same month. Age and identity travel with migrants; displacement and old allegiances persist and gradually adjust.
+Mortality uses monthly survival probabilities derived from annual age-specific hazards. Fertility uses women aged 15–49 in seven five-year bands. Health, shortages, literacy, urbanization and historical effects modify outcomes. Seeded stochastic rounding preserves expected counts without requiring whole populations of individual agents. The exact equations and synthetic coefficients appear below.
+
+Migration balances safety, food, infrastructure, health, contentment, diaspora connections, exclusion, cultural prestige and historical migration appeal against rootedness and border friction. Destinations are adjacent districts or endpoints of actual sea trade. A passenger-capacity proxy permits at most 0.15 people per tonne of delivered maritime freight in each direction; it is not a separately simulated passenger fleet or a shared freight/passenger capacity ledger. Closed borders suppress ordinary international movement, while a small refugee leakage remains. Domestic migration ignores national border policy. Severe devastation, hunger and exclusion can displace people. All departures are subtracted before arrivals, so newly arrived people cannot move again in the same month. Age, identity and a proportional share of the source stratum’s cash travel with migrants; expected employment and food-deflated wages contribute to destination appeal; displacement and old allegiances persist and gradually adjust.
 
 ### Identity formation and diffusion
 
@@ -66,7 +349,7 @@ Civic, pluralist and heritage citizenship; local, multilingual and common-langua
 
 The Population and province inspectors expose identity distributions, community conditions and monthly flows. Culture, language and belief map layers show the largest community per province; provinces remain internally mixed. Save validation requires community ages to sum exactly to each province census and troop profiles to sum to army strength. When allegiance changes make two joint identity keys equal, canonicalization sums their integer age counts and averages social conditions by people, retaining all individuals. Restore/autosave may recover an equivalent duplicate representation only after every profile and the declared census totals pass validation. Disk checksums are verified against original bytes before this in-memory recovery; the source checkpoint is preserved. Legacy saves receive a deterministic geographic census without adding or removing people; this initializes a plausible composition rather than reconstructing an unrecorded past.
 
-These remain aggregate communities, not individual biographies or households. Sex, marriage, explicit family descent, household assets, text inventories and calibrated fertility schedules are not simulated. Long-run performance and social balance for the expanded census are awaiting the consolidated validation pass.
+These remain aggregate communities, not individual biographies or families. Household accounts are pooled by district and economic stratum. Marriage, explicit family descent, within-stratum asset inequality and empirically calibrated fertility schedules are not simulated.
 
 ## State character and leadership
 
@@ -103,19 +386,19 @@ International pressures create concrete competing frontier claims, resource-conc
 
 ## Production and carrying capacity
 
-Potential labor is 73% of adults, modified by health. Labor utilization depends on infrastructure, national stability, and devastation. Farm share depends on urbanization and production priority. Extraction and manufacturing divide the remaining labor.
+Potential labor comes from exact age-specific participation and health. Competing firms hire only workers whose wage bill they can fund from deposits or bank credit. Product-specific sales expectations and inventories determine desired employment; devastation reduces it. Public employment and construction use remaining labor, preventing double employment. Urbanization and production priority set benchmark sector shares; firms adapt their actual mix to each product’s planned demand, as specified under Strata, labor and wages.
 
 Farm output has diminishing returns to labor and a land-based upper bound:
 
 ```text
-arable capacity = province hex count × 1,800 × (0.35 + 0.65 × fertility)
+arable capacity = district hex count × 1,800 × (0.35 + 0.65 × fertility)
 effective farm labor = capacity × (1 - exp(-farm workers / capacity))
 food output = effective farm labor × (0.105 + 0.125 × fertility) × abundance × technology × season × climate × efficiency
 ```
 
 This prevents adding people from creating unlimited farmland. Agricultural investment and research increase supportable population. Seasonal output varies by ±23%; annual climate varies from 0.82 to 1.16 of baseline. Industrial technology, literacy, and damage influence overall production efficiency.
 
-Timber, stone, iron, and coal throughput depends on allocated workers, resource abundance and the province's resource richness. New worlds distribute iron and coal through separate spatially correlated geological fields with thresholds for workable deposits; some provinces have none, others have concentrated sources. Existing saves retain their recorded deposits. Scarce industrial inputs constrain manufacturing and create reasons for access agreements, leverage and conflict. Richness currently does not deplete. Industrial capacity constrains manufacturing. Recipe inputs are removed from stocks before outputs are credited:
+Timber, stone, iron, and coal throughput depends on allocated workers, resource abundance and the district's remaining resource richness. New worlds distribute iron and coal through separate spatially correlated geological fields with thresholds for workable deposits; some provinces have none, others have concentrated sources. Legacy provinces receive local natural endowments on conversion. Scarce industrial inputs constrain manufacturing and create reasons for access agreements, leverage and conflict. Local richness declines with remaining natural reserves; timber regenerates slowly, while minerals do not. Industrial capacity constrains manufacturing. Recipe inputs are removed from stocks before outputs are credited:
 
 | Output, 1 tonne | Inputs                                    |
 | --------------- | ----------------------------------------- |
@@ -125,48 +408,34 @@ Timber, stone, iron, and coal throughput depends on allocated workers, resource 
 
 These recipes are economic abstractions; timber in the textile recipe stands in for fibrous raw material. Factories can only produce the amount supported by the scarcest input. Military priority increases arms output; agricultural and industrial priorities alter labor allocation.
 
-Food demand starts at 25 kg per person per month, scaled by `0.95 + 0.15 × urbanization`. Other household/maintenance requirements use `MONTHLY_NEED`, scaled by `0.65 + 1.3 × urbanization + 0.3 × infrastructure + 0.3 × industry`; iron/coal use one quarter of their base rate and household arms use 15%. Reserves cover 2.4 months of household food demand or three months of other household demand, plus two months of current manufacturing recipe inputs. This avoids treating all raw industrial demand as household consumption while still retaining inputs for workshops. Prices vary between 0.55× and 3× base prices according to stocks relative to target reserves.
+Food demand starts at 25 kg per person per month, scaled by `0.95 + 0.15 × urbanization`. Other household/maintenance requirements use `MONTHLY_NEED`, scaled by `0.65 + 1.3 × urbanization + 0.3 × infrastructure + 0.3 × industry`; iron/coal use one quarter of their base rate and household arms use 15%. Reserves cover 2.4 months of household food demand or three months of other household demand, plus two months of planned manufacturing recipe inputs, computed before input constraints. A stockout therefore does not erase the demand needed to restart a factory. This avoids treating all raw industrial demand as household consumption while still retaining inputs for workshops. Firm quotes adjust toward replacement cost plus a bounded inventory-responsive markup, as specified under Input-output production and prices. Adjustment has a bounded monthly rate and a strictly positive numerical floor; there is no hard nominal-price ceiling.
 
-The inspector reports a material-coverage index in addition to food coverage. It weights tools (35%), textiles (25%), timber (15%), stone (10%), coal (10%) and iron (5%) household/maintenance fulfillment. Previous-month coverage scales effective labor by `0.75 + 0.25 × coverage`; shortages also lower health/contentment targets and erode infrastructure modestly below 70% fulfillment. These are synthetic dependencies, not calibrated empirical elasticities.
+Households purchase a subsistence basket plus discretionary goods subject to cash. Food coverage and material coverage are calculated separately for each economic stratum and then population-weighted. Below the subsistence budget, food has priority. Other-good coverage uses the material weights listed under Household choice and deprivation. Coverage affects health, contentment and mortality; low material coverage erodes infrastructure.
 
-Remaining food loses 3.5% monthly to storage/spoilage, timber and textiles lose 0.6%, and other stocks lose 0.1%. Stored quantities are capped at 20× target reserves; excess is discarded. The ledger's “Used” column reports consumption and manufacturing inputs, not storage losses.
+Remaining food loses 3.5% monthly to storage/spoilage, timber and textiles 0.6%, and other stocks 0.1%. There is no arbitrary inventory cap. All spoilage is recorded separately from use. The goods identity includes firm and wholesale inventories, army stores and fleet stores; shipments are transfers rather than consumption.
 
 ## Goods routes
 
-The physical transport network is deterministic. Harbor locations and connection pairs are cached for the world's immutable geography; the tile paths between them can develop with traffic. Within each province, a shortest-cost road tree connects its settlement to border crossings and its harbor. Terrain difficulty, elevation changes, and river crossings raise road effort. Neighboring provinces join at the least-cost reachable border; roads cannot cross water or an unrelated third province.
-
-Each coastal province selects a shore reachable from its settlement, preferring the largest connected water body and then the cheapest road access. Shipping paths visit adjacent water hexes between those harbors, with a small preference for clearance from shore. Disconnected water bodies cannot gain a direct sea link. The graph includes a minimum-cost connectivity backbone, the three cheapest shipping connections at each harbor, and crossings to its two nearest other landmasses. This avoids both a dense all-to-all graph and a single artificial crossing for an entire continent. Inland access remains a road leg; each sea transfer has a fixed handling cost.
-
-Monthly route costs sum the effort of the tiles actually traversed. Plains, forests, hills, mountains, desert and tundra have base road difficulties of 1, 1.5, 2, 5, 1.8 and 2, respectively. Slope and river crossings add effort; local infrastructure and logistics research lower friction, while devastation raises it. Shipping has a lower distance cost than overland haulage. Infrastructure and logistics increase road/port capacity; devastation and difficult road terrain reduce it. Open-water capacity is 16,000 tonnes per segment per month before the familiarity bonus. These are synthetic coefficients, not geographic freight estimates.
-
-Successful deliveries reinforce **undirected adjacent tile segments** shared by every route. This is inspired by the positive feedback in [Dorigo, Maniezzo and Colorni's Ant System (1996)](https://pubmed.ncbi.nlm.nih.gov/18263004/). It is a deterministic reinforcement heuristic, not a stochastic ant-colony search or a proof of global optimality. The signal represents commercial familiarity, coordination and economies of established traffic; it does not construct free roads or spend government funds.
-
-For each fulfilled journey, the useful-flow reward is delivered tonnes divided by its total **unreinforced** travel effort, including port handling. A longer or more difficult detour earns less reward. A revisited segment receives that journey's reward only once, although every traversal consumes capacity. Rewards from different journeys accumulate on shared segments. No order, remembered supplier relationship, army movement or decorative particle deposits a reward without a completed civilian shipment.
+Local market clearing runs on a district network. Neighboring districts connect through shortest paths over their actual adjacent land cells; the border itself supplies no road or free transport. Surveyed provincial trunk roads and maritime corridors remain available as long-distance links, with explicit last-mile paths to the local markets. Sea corridors use connected water, physical harbors and naval passage rules. A land trunk cannot bypass a hostile border. Foreign purchases observe war closures, treaty preferences, shared institutional trade arrangements and import tariffs. Contractual public deliveries also consume goods, treasury funds and physical route capacity.
 
 ```text
-signal = 1 - exp(-sum(useful-flow rewards) / 30)
-familiarity next = 0.975 × familiarity + 0.10 × (1 - familiarity) × signal
-smoothed traffic next = 0.80 × smoothed traffic + 0.20 × actual traversing tonnes
-capacity = terrain/infrastructure/technology allowance × (1 + 0.80 × familiarity)
-effective tile cost = unreinforced cost × (1 - 0.70 × familiarity)
-                      × (1 + min(8, 1.5 × (smoothed traffic / capacity)^2))
+land effort = average terrain difficulty + 12 × elevation difference + river-crossing penalty
+terrain difficulty = plains 1, forest 1.5, hills 2, mountains 5, desert 1.8, tundra 2
+local road capacity ∝ (1,000 + 6,000 infrastructure) × (1 + 0.25 logistics)
+                     × (1 − 0.6 devastation) / sqrt(terrain effort)
+freight cost per tonne = seller quote / 1,000 × route effort × 0.002
+affordable tonnes = buyer deposits / (unit goods price × (1 + tariff) + unit freight)
+shipped tonnes = min(order, exportable stocks, affordable tonnes,
+                     every shared segment's remaining capacity / traversal count)
 ```
 
-The familiarity discount draws nearby routes into useful shared trunks. It remains bounded: difficult terrain, longer journeys, and port handling still matter. Congestion works against unlimited convergence. Unused familiarity loses 2.5% monthly (about a 27-month half-life); negligible traces are pruned. Road, harbor and open-water capacity is shared across **different province connections**, all goods and both travel directions. Backtracking consumes the same segment again. This can leave some demand unmet even when the abstract province graph remains connected. Supplier selection uses past smoothed congestion; there is no within-month global multicommodity optimizer or residual-capacity detour search.
+Local infrastructure and damage determine segment capacities. The same physical edge budget is shared by all goods, all competing paths and opposite directions. Repeated traversal consumes capacity repeatedly. Only actual paid transfers move inventories; no district receives a copy of another's stock. Freight is income to transport households, and tariffs settle to the importing government. Domestic and international goods, service margins, freight, inventories and taxes continue to reconcile through independent GDP accounts.
 
-Every three months the planner evaluates alternatives using learned costs. An adopted tile path holds for at least 12 months; ordinary cost replanning then requires savings above 5%. A second consolidation pass lets equally established parallel routes share a physical trunk. It processes longer paths first with deterministic endpoint tie breaks, and searches only within three traversable tiles of each candidate leg. Only segments with recorded smoothed freight can attract another path. A merge must add at least 12 shared edges and contain a continuous shared stretch of at least 12 edges. A 40% reuse credit must improve the planning score by more than 5%; this credit never changes actual freight prices, capacity, or learning. Additional travel is capped at six edges, 15% unreinforced effort and 30% current learned/congested effort, allowing short unfamiliar feeders while rejecting costly detours. Land legs remain within their endpoint provinces; shipping stays on connected water and retains both harbor shore tiles and harbor water tiles. Opposing shipments share the same trunk and capacity.
+District merchants search by physical route effort up to 8 + 5 × infrastructure + 2 × logistics technology. The horizon is spatial, not a fixed count of neighboring districts; subdividing a city does not consume an arbitrary supplier-slot allowance. Affordable offers rank by delivered costs. Orders cover household reserves and planned manufacturing inputs. Food orders clear first, followed by other goods. Credit can finance inventory subject to the existing bank capital and borrower limits. Quotes adjust toward delivered acquisition cost with a 4% trading margin, bounded to a 6% monthly logarithmic change per shipment.
 
-Consolidation respects the same 12-month minimum path age. Only an actual geometry change resets its adoption date. Plans, adoption dates and familiarity are saved explicitly: loading a world neither resets the learned network nor triggers an early replan. Old saves without this state start learning from their next actual shipments. There are no persistent civilian fleets, port construction levels, or navigable-river freight.
+Corridors learn from actual traffic. Familiarity gains 0.1 × sqrt(current tonnage/base capacity), loses 2.5% per month when unused, and can reduce route effort by up to 70%. Capacity increases by up to 80% with familiarity. Smoothed traffic adjusts by 20% toward current tonnage; congestion adds up to eight times uncongested effort through 1.5 × (traffic/capacity)². Trunk planning retains its quarterly review, minimum twelve-month path tenure and 5% improvement rule. All district shipments, including those inside a province, contribute to physical corridor learning. The province-route API is only a display and diplomatic summary; the district shipment log records actual endpoints and cell paths.
 
-Buyers with shortages seek reachable sellers with surplus. Domestic sources receive a preference. New routes use shortest-cost searches, while an established path stays in use until another path is more than 25% cheaper in current transport effort, or an old connection becomes unavailable. Every shipment consumes the capacity shared by its path's edges for that month; later goods and shipments see the remaining capacity. Food is processed first.
-
-Trade has inertia at the supplier and route levels. Per-good supplier shares are remembered in saved `tradeLanes`. Competitive incumbent suppliers retain their share of a buyer's current order. When a competitor offers more than a 25% transport-cost advantage (after domestic preference), 12% of the incumbent's share is released each month; actual unmet orders then go to the cheapest eligible suppliers. For a constant order, a displaced incumbent's share typically follows 100%, 88%, 77.44%, and so on. A new supplier can enter alongside existing suppliers; there is no fixed five-supplier cutoff.
-
-Established buyers replenish small reserve shortfalls, and their suppliers can ship surplus above their own target without waiting for the 10% entry buffer. This avoids alternate months of large orders and no trade. Unused per-good remembered flow decays by 12% per month and is discarded below 0.1 tonnes; an entirely idle relationship expires after 18 months. These values are sourcing preferences, not stocks, contracts, or goods in transit. Only actual, affordable shipments enter the ledger or map. War removes hostile relationships, unavailable suppliers and full connections cannot fulfill reservations, and buyers with less than one month's household food skip supplier reservations entirely. Closed physical paths are replaced immediately when another path is available. Save/load preserves inertia; older saves initialize it from their last actual shipments.
-
-International trades transfer treasury funds from buyer to seller. Domestic transfers use public stocks without a treasury payment. Buyers retain a minimum treasury reserve. Tariffs reduce cross-border shipment quantity and affordability; trade agreements and alliances remove that friction. There is no separate tariff-revenue ledger because inventories and payments represent a public allocation abstraction.
-
-War closes hostile border edges and prohibits direct trade between the belligerents. Ships do not have persistent positions or voyage delays. The map merges shared physical segments, displays road and shipping legs separately, marks active harbors, and highlights the selected state's or province's imports and exports. Line width uses a square-root scale of combined monthly tonnage. Symbolic particles indicate actual shipment directions at a constant screen speed; they are presentation-only. The shipment ledger lists each cargo, total path distance (using the atlas scale), and harbor names. Older saves without physical route geometry load normally and regenerate routes on the next tick.
+Goods are delivered within the monthly clearing interval. There are no persistent private cargo agents, separate journey-duration queues or globally optimized multicommodity allocation. Failed or saturated routes can leave demand unmet. A finite spatial search horizon and greedy clearing are explicit behavioral assumptions, not proof of optimal allocation. Military movement still uses the administrative province graph and its own access/supply phase.
 
 ## Historical causation and generated events
 
@@ -247,17 +516,17 @@ Payments, territory, state creation and mergers execute as one transaction after
 
 A recurring goods clause is a real logistical obligation, prioritized before ordinary market clearing and sharing the same tile and connection capacity. It draws on actual surplus, reserves, reachable buyers and real carriage; promises do not teleport or create goods. Payments for goods are separate agreed terms. Tribute transfers available treasury funds monthly and records shortfalls. Research cooperation shares bounded knowledge subject to the source's funding. Secret trade/access/alliance rights affect the relevant mechanics without automatically becoming public treaty labels. Term expiration and obligation shortfalls are retained for subsequent negotiation. Guarantees and political promises inform agent strategy; they do not automatically spawn armies or declare a new war.
 
-Model responses are checked against current ownership and assets, and outstanding requests are canceled when a different world is generated or loaded. The worker owns playback timing and yields after short slices (one expensive month may exceed the slice budget). World snapshots are coalesced to two per second above 12×, and five per second otherwise; pause flushes the latest world. Pending external requests do not gate ticks. The requested pace is a CPU-bounded target, not a guarantee of sixty months per second for arbitrarily large worlds. Background snapshots do not acknowledge unrelated commands. Autosaves independently coalesce current snapshots every two seconds. The full regression, longevity and adversarial-agent qualification remains deferred during the ongoing feature iteration.
+Model responses are checked against current ownership and assets, and outstanding requests are canceled when a different world is generated or loaded. The worker owns playback timing and yields after short slices (one expensive month may exceed the slice budget). World snapshots are coalesced to two per second above 12×, and five per second otherwise; pause flushes the latest world. Pending external requests do not gate ticks. The requested pace is a CPU-bounded target, not a guarantee of sixty months per second for arbitrarily large worlds. Background snapshots do not acknowledge unrelated commands. Autosaves independently coalesce current snapshots every two seconds. The repository validation record distinguishes completed core regressions and endurance scenarios from unqualified live-provider and adversarial-agent behavior.
 
 ## Government and insolvency
 
-Collected taxes depend on monthly output, tax rate, administrative technology, and stability. Tax rates range from 5% to 55%. Excessive tax burdens reduce contentment.
+Income taxes are withheld from actual private and public wage payments. Positive producer cash operating surplus is taxed after credit service. The collected rate is the policy tax rate times collection capacity: clamp((0.6 + 0.045 × governance technology) × (0.5 + stability/200) × tax-effect multiplier, 0, 1). This preserves governance, leadership and historical effects without collecting more than the statutory rate or inventing receipts. Domestic and international goods purchases transfer buyer funds to a seller; import tariffs transfer funds to the destination treasury. No output-derived tax revenue is minted.
 
-Welfare, education, military, and research sliders are relative spending weights, not literal percentages. Administration and infrastructure keep weights of 12 and 18. The service budget follows a baseline service floor and a revenue-based target, constrained by current revenue and a limited monthly draw from treasury.
+Welfare, education, military and research sliders are relative weights. Administration and infrastructure retain weights 12 and 18. The desired monthly envelope is max(0.95 × tax receipts, 0.00002 × civilian population) + 0.02 × max(0, treasury − 12 × tax receipts), funded by treasury and available credit. The reserve rule releases 2% of cash above a twelve-month revenue buffer; it prevents perpetual hoarding of public surpluses without spending unavailable funds. Welfare transfers cash to households, with a need weighting and an owner weight of 0.1. Public-service allocations buy available labor; an appropriation alone supplies no service. Reported budgets are actual delivered amounts. Provincial services use the same labor and settlement constraints.
 
-Welfare improves health and contentment; education improves literacy; research funds knowledge; infrastructure funding offsets deterioration. Military funding improves training and morale. Field army upkeep and debt interest are additional expenses.
+Welfare can improve purchases and health/contentment only when paid. Existing service-response equations use actual funded education, infrastructure, research and military provision. Military goods, recruitment, diplomacy and other government expenses settle to counterpart accounts.
 
-If expenses exceed treasury plus revenue, the difference becomes debt. Debt incurs 0.3% monthly interest. States with treasury reserves repay debt. Debt beyond the greater of 1,000k crowns or 24 months of gross output triggers restructuring: debt is reduced to 35% of that limit, legitimacy falls by 12, stability falls by 10, and the chronicle records the default. Fiscal surpluses gradually restore legitimacy.
+Commercial-bank lending, amortization, restructuring and bank resolution follow the balance-sheet rules above. Welfare remains limited by actual treasury deposits and approved borrowing; a policy appropriation alone creates no household income or service.
 
 ## Research
 
@@ -291,7 +560,7 @@ Winning a battle establishes occupation rather than instant social integration. 
 
 Armies carry food and arms rather than drawing unlimited provisions from their current province. They aim to carry three months of food and four months of arms, consuming 34 kg food and 0.5 kg arms per soldier per month, with further arms expenditure in battles. Supply depots are existing provincial inventories: the capital, or sufficiently developed, undamaged infrastructure/industry hubs. Sources must be owned; transit requires sovereign, allied or negotiated military access. Hostile territory breaks a line. Distance, unrest and devastation reduce throughput. Supply uses actual physical road/sea paths and the capacity left after civilian freight; shipments are recorded and visible on the military map. Loading transfers real goods into carried inventories. These stores must be included in goods accounting. Supplies remain an aggregate monthly logistics flow rather than individually simulated wagons or ships' manifests.
 
-Reserves buffer interrupted deliveries. Sustained shortage reduces morale, increases attrition, and eventually encourages desertion. Soldiers retain their population identities, mother tongue and civic allegiances. Shared language helps coordination; loyalty, pay, fatigue and provision affect cohesion and behavior, without innate cultural combat coefficients. Deserters return to local civilian communities instead of disappearing or being counted as deaths. Severe disaffection can cause temporary refusal of orders. Dead troops enter the death ledger, and surrendered forces return to the civilian census; detailed prisoner-of-war camps are not simulated.
+Reserves buffer interrupted deliveries. Sustained shortage reduces morale, increases attrition, and eventually encourages desertion. Soldiers retain their population identities, mother tongue and civic allegiances. Shared language helps coordination; loyalty, funded defense support, fatigue and provision affect cohesion and behavior, without innate cultural combat coefficients. The existing payroll support proxy is clamp(delivered military-service budget / max(1, military personnel × 0.008), 0, 1); this expenditure pays civilian defense-service workers. Separate soldier bank accounts and individual military wages are not represented. Deserters return to local civilian communities instead of disappearing or being counted as deaths. Severe disaffection can cause temporary refusal of orders. Dead troops enter the death ledger, and surrendered forces return to the civilian census; detailed prisoner-of-war camps are not simulated.
 
 Army standing orders select marching, recovery or entrenchment. Terrain-weighted road effort, logistics technology, cohesion, fatigue and supply determine progress; movement is no longer a guaranteed province per month. March orders follow land only. Defensive preparation takes time and is lost on movement. Mountains multiply defense by 1.8; hills/forests by 1.3, with additional river-crossing and amphibious penalties. Battles use real field forces and local levies: raising a levy removes adults and arms from the province. Casualties, retreats, occupation damage and collateral civilian deaths change the actual population ledger. Conquest preserves identities and allegiances; civilian treatment changes grievance and cooperation. A requisition order may divert up to a quarter of monthly local household food needs when ordinary provision fails, increasing local grievance, unrest and damage. No free civilian provisions are created.
 
@@ -305,7 +574,7 @@ A state with military funding/conscription but no surviving land formation can r
 
 ### Fleets and sea control
 
-Navies contain warships and transports, crews, hull condition, morale, provisions, arms and a water-cell position. Commissioning at an owned harbor consumes treasury, timber, iron, tools, armament and local adult crews. New worlds attempt to fund one starter fleet per coastal state from existing resources; legacy saves acquire no free ships or people. Construction is currently an immediate investment abstraction. A state may operate eight fleets, with commissions limited to 16 ships. A warship needs 90 crew and a transport 30. Crew recruitment, aging, retirement, losses, demobilization, state mergers and population identities share the military census. Ongoing fiscal upkeep, supplies, hull wear and paid repairs limit operation. Allied/negotiated port access allows resupply and repair services; foreign provisions and repair services are paid, and replacement crews are recruited only at owned ports.
+Navies contain warships and transports, crews, hull condition, morale, provisions, arms and a water-cell position. Commissioning at an owned harbor consumes treasury, timber, iron, tools, armament and local adult crews. New worlds attempt to fund one starter fleet per coastal state from existing resources; legacy saves acquire no free ships or people. Construction is currently an immediate investment abstraction. A state may operate eight fleets, with commissions limited to 16 ships. A warship needs 90 crew and a transport 30. Crew recruitment, aging, retirement, losses, demobilization, state mergers and population identities share the military census. Purchased supplies, hull wear and paid repairs limit operation. Allied/negotiated port access allows resupply and repair services; foreign provisions and repair services are paid, and replacement crews are recruited only at owned ports.
 
 Courses use connected adjacent water cells, with movement constrained by supply, crew availability, hull and logistics technology. Missions include patrol, escort, blockade, troop transport and return. Nearby hostile fleets fight using ship mix, hull, ammunition, crew readiness, supply, morale, command effects and technology. Damage, lost ships, crew deaths and lost passenger capacity have physical consequences. There are no tactical gun arcs, individual hull classes, weather fronts or rescue simulation; fleet combat is aggregate.
 
@@ -323,7 +592,7 @@ An organized coalition can found a regional state, join an adjacent successor wi
 
 ## Persistence and performance boundaries
 
-The worker owns mutable simulation state. The UI receives snapshots and sends typed commands. Save validation checks dimensions, collections, identifiers, population, stocks, policies, diplomacy, armies, routes, events, and history before accepting an import. Imports support worlds up to 128 MiB.
+The worker owns mutable simulation state. The UI receives snapshots and sends typed commands. Save validation checks dimensions, collections, identifiers, population, stocks, policies, diplomacy, armies, routes, events, and history before accepting an import. Imports support worlds up to 384 MiB. Exact dated cohorts and economic accounts increase checkpoint size; earlier provincial-model checkpoints reached about 126 MB after one year. Resident districts add records and require separate capacity qualification.
 
 Recent history retains monthly points for ten years and annual points before that. The chronicle retains the latest 240 events; event identifiers continue increasing. Autosave checks for changes every two seconds and flushes when the page becomes hidden. A separate save worker performs validation, serialization and I/O so saving does not halt simulation ticks. One write runs at a time; intermediate pending snapshots coalesce into the newest one. A replaced world cannot receive stale save-success notifications. Tab closure may interrupt its final asynchronous flush; the last completed checkpoint remains authoritative.
 
@@ -333,11 +602,11 @@ The old browser save remains intact and is read as a legacy fallback. `/save-rec
 
 The deterministic core is reproducible for the same build, starting save, commands and recorded external historical inputs; future LLM outputs are not guaranteed to repeat. Rendering frame rate never changes random state. Background tab throttling changes wall-clock playback pace; it does not simulate elapsed real time while closed.
 
-Meaningful future additions include finite mineral reserves, firms and households, occupations, investment completion times, individual convoy voyages, ship classes and naval weather, detailed prisoners/rescue, formal war goals, and empirical calibration.
+Meaningful future additions include subsurface exploration and ore grades, individual households, bank choice and deposit interest, exchange rates, asset markets, individual convoy voyages, ship classes and naval weather, detailed prisoners/rescue, formal war goals, and empirical calibration.
 
 ## Computation and scheduling
 
-Migration evaluates simultaneous plans using per-province culture, language and belief marginals instead of rescanning every destination community for each sort comparison. Corridors use compact undirected hex-edge indices; phase profiles share physical link costs and capacities across military views. Supply and movement graphs are shared per state within the army phase and invalidated on ownership changes. Maritime replanning stops once the required destination ports have settled shortest paths, and plans still inside their minimum adoption period avoid redundant replanning. Provincial shortest paths use a heap. Tariff preferences are prepared once per market-clearing phase; civilian and military traffic still share actual physical capacities. These are computational changes, not coarse time steps: demographic, production, consumption, research, obligations and military effects continue monthly.
+Migration evaluates simultaneous plans using per-district culture, language and belief marginals instead of rescanning every destination community for each sort comparison. Corridors use compact undirected hex-edge indices; phase profiles share physical link costs and capacities across military views. Supply and movement graphs are shared per state within the army phase and invalidated on ownership changes. Maritime replanning stops once the required destination ports have settled shortest paths, and plans still inside their minimum adoption period avoid redundant replanning. Provincial shortest paths use a heap. Tariff preferences are prepared once per market-clearing phase; civilian and military traffic still share actual physical capacities. These are computational changes, not coarse time steps: demographic, production, consumption, research, obligations and military effects continue monthly.
 
 ### World-scale geography and markets
 
@@ -345,6 +614,11 @@ Province road trees occupy disjoint cells and share one map-sized distance/prede
 
 Large-world initial populations scale with province land area. Initial standing forces recruit 0.2% of each state's civilians where available (minimum target 3,000), drawing actual adults from its provinces. Regional generation preserves its original initialization. No personnel are added outside the population ledger.
 
-Monthly trade caches demand targets, border access, supplier rankings and established paths across goods. Only considered orders reconstruct new journeys; exhausted paths are rejected for the remainder of that month. Above 300 provinces, provincial merchants consider a finite number of new supplier contacts per good each month: 16 plus infrastructure × 16 and logistics level × 8, rounded. Existing supplier relationships remain eligible beyond this search allowance. Suppliers are ranked by transport effort with the existing domestic preference, so nearby and efficient sea connections shape regional markets; a scarce good may still have a distant specialist as its closest available supplier. Contracts continue to use their explicit delivery rules. Naval control is evaluated against a phase-local diplomatic view, and land-only links skip naval calculations.
+Monthly local trade caches demand targets, physical access and supplier paths across goods. Purchase credit is requested only after available seller stock and remaining shared transport capacity limit the executable order; a blocked shipment cannot create a new loan. Only considered orders reconstruct new journeys; exhausted paths are rejected for the remainder of that month. In the legacy provincial market routine (before district simulation), above 300 provinces merchants consider a finite number of new supplier contacts per good each month: 16 plus infrastructure × 16 and logistics level × 8, rounded. Existing supplier relationships remain eligible beyond this search allowance. Suppliers are ranked by transport effort with the existing domestic preference, so nearby and efficient sea connections shape regional markets; a scarce good may still have a distant specialist as its closest available supplier. Contracts continue to use their explicit delivery rules. Naval control is evaluated against a phase-local diplomatic view, and land-only links skip naval calculations.
 
 The atlas caps its terrain raster's longest side at 2,400 pixels and paints exact boundaries into a viewport-sized cache. Relief, rivers, labels, picking and all thematic layers retain world coordinates. Rivers below the current visual scale disappear at overview distance. Geography fingerprints are computed when the worker generates or restores a world; subsequent messages omit the immutable cells, and the UI reunites them with each dynamic snapshot before saving or exporting.
+
+
+### Lossless census storage
+
+Resident economies retain exact dated cohorts in memory. Save files store repeated community field names once in a versioned schema table and preserve each community’s original field order and values. They encode each cohort list as a versioned base64 sequence of unsigned variable-length integers: the row count, zigzag-encoded changes in birth month, and exact female/male counts. Decoding restores the original tuple order and every integer before ordinary census/account validation. There is no age averaging, cohort truncation or rounding. Earlier tuple-array saves remain readable. Checksums cover the saved representation, and imported malformed, truncated, excessive-length or overflowing encoded cohorts are rejected. Each province census and the two local accounting registries are then stored as independent standard gzip/base64 blocks with declared decoded lengths and CRC checks. Decompression uses bounded output buffers; malformed lengths, checksums and unsupported formats fail before model validation. This avoids a single enormous world JSON string. Earlier uncompressed and census-only saves remain readable. The 384 MiB file limit is unchanged; lossless compression makes room for district accounts and demographic detail.

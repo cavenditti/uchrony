@@ -1,3 +1,7 @@
+import { unpackWorldSave } from './save-codec'
+import { validateDistrictEconomy } from './district-persistence'
+import { validateEconomy } from './economic-persistence'
+import { validateSpatial } from './spatial-persistence'
 import { MAX_ARMIES } from './military-limits'
 import { MAX_MAP_CELLS, MAX_PROVINCES } from './scale'
 import { validateInstitutions } from './institutions'
@@ -37,8 +41,9 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   if (!object(value)) fail('expected an object')
   const w = value as unknown as World
   walk(w)
+  if (w.viewOnly) fail('display snapshots cannot be restored')
   if (w.version !== 1) fail('unsupported version; this app supports version 1')
-  if (w.generatorVersion !== undefined && ![1, 2].includes(w.generatorVersion))
+  if (w.generatorVersion !== undefined && ![1, 2, 3].includes(w.generatorVersion))
     fail('unsupported geography generator')
   if (
     typeof w.seed !== 'string' ||
@@ -134,6 +139,11 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     for (const key of ['stocks', 'production', 'consumption', 'prices'] as const)
       if (!object(r[key]) || GOODS.some((g) => !number(r[key][g]))) fail(`invalid ${key}`)
     if (
+      r.plannedProduction !== undefined &&
+      (!object(r.plannedProduction) || GOODS.some((g) => !number(r.plannedProduction![g])))
+    )
+      fail('invalid planned production')
+    if (
       !object(r.deposits) ||
       ['timber', 'stone', 'iron', 'coal'].some((g) => !number(r.deposits[g as keyof typeof r.deposits]))
     )
@@ -154,7 +164,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       'devastation',
       'gdp',
     ] as const)
-      if (!number(r[key])) fail(`invalid province ${key}`)
+      if (!number(r[key], key === 'gdp' ? -1e14 : 0)) fail(`invalid province ${key}`)
     if (!number(r.migration, -1e14, 1e14)) fail('invalid migration')
   }
   if (seenCells.size !== w.cells.filter((c) => c.terrain !== 'water').length)
@@ -221,7 +231,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       'manpower',
       'casualties',
     ] as const)
-      if (!number(n[key])) fail(`invalid state ${key}`)
+      if (!number(n[key], key === 'gdp' ? -1e14 : 0)) fail(`invalid state ${key}`)
   }
   if (!Array.isArray(w.relations) || w.relations.length !== (w.nations.length * (w.nations.length - 1)) / 2)
     fail('incomplete diplomacy table')
@@ -266,9 +276,16 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       fail('invalid army')
     armyIds.add(a.id)
   }
-  const validateLegs = (from: number, to: number, legs: RouteLeg[], maxLegs = w.regions.length * 3) => {
+  const validateLegs = (
+    from: number,
+    to: number,
+    legs: RouteLeg[],
+    maxLegs = w.regions.length * 3,
+    fromCell = w.regions[from].center,
+    toCell = w.regions[to].center,
+  ) => {
     if (!Array.isArray(legs) || legs.length < 1 || legs.length > maxLegs) fail('invalid freight legs')
-    let last = w.regions[from].center
+    let last = fromCell
     for (const leg of legs) {
       if (
         !object(leg) ||
@@ -291,7 +308,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       if (leg.mode === 'sea' && leg.cells.length < 3) fail('shipping path needs water')
       last = leg.cells[leg.cells.length - 1]
     }
-    if (last !== w.regions[to].center) fail('freight endpoints do not match shipment')
+    if (last !== toCell) fail('freight endpoints do not match shipment')
   }
   if (!Array.isArray(w.routes) || w.routes.length > 20000) fail('invalid routes')
   for (const r of w.routes) {
@@ -312,7 +329,13 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     )
       fail('invalid trade route')
     if (r.legs !== undefined) {
-      validateLegs(r.from, r.to, r.legs)
+      if (r.fromDistrict !== undefined || r.toDistrict !== undefined) {
+        const a = w.localEconomy?.units[r.fromDistrict!],
+          b = w.localEconomy?.units[r.toDistrict!]
+        if (!a || !b || a.province !== r.from || b.province !== r.to)
+          fail('invalid district freight endpoints')
+        validateLegs(r.from, r.to, r.legs, w.cells.length, a!.center, b!.center)
+      } else validateLegs(r.from, r.to, r.legs)
       if (
         r.sea !== r.legs.some((leg) => leg.mode === 'sea') ||
         r.path[0] !== r.from ||
@@ -441,14 +464,16 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   for (const h of w.history) {
     if (
       !object(h) ||
-      !['month', 'population', 'gdp', 'trade', 'wars', 'food'].every((k) => number(h[k as keyof typeof h])) ||
+      !['month', 'population', 'gdp', 'trade', 'wars', 'food'].every((k) =>
+        number(h[k as keyof typeof h], k === 'gdp' ? -1e14 : 0),
+      ) ||
       !Array.isArray(h.nations) ||
       h.nations.some(
         (n) =>
           !object(n) ||
           !nationId(n.id) ||
           !number(n.population) ||
-          !number(n.gdp) ||
+          !number(n.gdp, -1e14) ||
           !number(n.territory) ||
           !number(n.treasury),
       )
@@ -458,15 +483,19 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   if (
     !object(w.totals) ||
     ['population', 'gdp', 'trade', 'wars', 'births', 'deaths', 'migration'].some(
-      (k) => !number(w.totals[k as keyof typeof w.totals]),
+      (k) => !number(w.totals[k as keyof typeof w.totals], k === 'gdp' ? -1e14 : 0),
     )
   )
     fail('invalid totals')
+  validateDistrictEconomy(w)
+  validateEconomy(w)
+  validateSpatial(w)
   return w
 }
 
 /** Recover only duplicate representation, after validating every profile and all declared age/troop totals. */
 export function restoreWorld(value: unknown): World {
+  value = unpackWorldSave(value)
   // Recover only machine-roundoff at natural bounds; real negatives and broken transport links still fail.
   const source = value as World
   let adjusted: World | undefined
@@ -549,7 +578,9 @@ export function restoreWorld(value: unknown): World {
 
 export function parseSave(text: string): World {
   if (text.length > MAX_SAVE_BYTES)
-    throw new Error('This save is too large. Choose an Uchrony save smaller than 128 MiB.')
+    throw new Error(
+      `This save is too large. Choose an Uchrony save smaller than ${MAX_SAVE_BYTES / 1024 / 1024} MiB.`,
+    )
   let value: unknown
   try {
     value = JSON.parse(text)

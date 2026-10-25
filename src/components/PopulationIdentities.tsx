@@ -1,8 +1,10 @@
+import { censusOf, mergeCensuses, censusDistribution } from '../sim/view-snapshot'
+import { EconomicAccounts } from './EconomicAccounts'
 import { useState } from 'react'
 import { allForces } from '../sim/forces'
 import type { World } from '../sim/types'
 import type { IdentityAxis } from '../sim/population-types'
-import { communityKey, communitySize, identityDistribution } from '../sim/population'
+import { communityKey, communitySize } from '../sim/population'
 import { identityColor } from '../map/identity'
 
 const count = (n: number) =>
@@ -28,30 +30,22 @@ export function PopulationIdentities({
   const provinces = world.regions.filter((r) =>
     region === undefined ? r.nation === nation : r.id === region,
   )
-  const groups = [
-    ...provinces.flatMap((r) => r.communities ?? []),
-    ...(region === undefined
-      ? allForces(world)
-          .filter((a) => a.nation === nation)
-          .flatMap((a) => a.communities ?? [])
-      : []),
+  const holders = [
+    ...provinces,
+    ...(region === undefined ? allForces(world).filter((a) => a.nation === nation) : []),
   ]
-  if (!world.demography || !groups.length)
+  const census = mergeCensuses(holders.map((holder) => censusOf(holder, world.month)))
+  if (!world.demography || !census.groups)
     return <p className="panel-note">The community census will be available when the simulation advances.</p>
   const name = (id: number) => world.demography!.identities[id]?.name ?? 'Unrecorded'
-  const total = groups.reduce((sum, g) => sum + communitySize(g), 0)
+  const total = census.total
   const weighted = (key: 'loyalty' | 'displacement' | 'grievance') =>
-    groups.reduce((sum, g) => sum + communitySize(g) * g[key], 0) / Math.max(1, total)
+    census.weighted[key] / Math.max(1, total)
   const officialLanguage = world.nations[nation].identity?.language
   const fluent =
-    groups.reduce(
-      (sum, g) =>
-        sum +
-        communitySize(g) *
-          (g.language === officialLanguage ? 1 : g.knownLanguage === officialLanguage ? g.fluency : 0),
-      0,
-    ) / Math.max(1, total)
-  const entries = identityDistribution(groups, axis)
+    (officialLanguage === undefined ? 0 : (census.fluent[officialLanguage] ?? 0)) / Math.max(1, total)
+  const entries = censusDistribution(census, axis)
+  const ageSex = census.ageSex
   const visible = entries.slice(0, 8)
   const other = entries.slice(8).reduce((sum, e) => sum + e.count, 0)
   const flows = provinces.reduce(
@@ -64,6 +58,36 @@ export function PopulationIdentities({
   )
   return (
     <section className="population-identities" aria-label="Population identities">
+      <EconomicAccounts world={world} nation={nation} region={region} />
+      {census.hasAges && (
+        <details className="age-sex-census">
+          <summary>Age and sex census</summary>
+          <p className="panel-note">
+            Five-year display bands, derived from exact birth months. The state census includes serving
+            soldiers and naval crews.
+          </p>
+          <table className="goods-table">
+            <thead>
+              <tr>
+                <th>Age</th>
+                <th>Female</th>
+                <th>Male</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ageSex
+                .filter((row) => row.female + row.male > 0)
+                .map((row) => (
+                  <tr key={row.age}>
+                    <th>{row.age}</th>
+                    <td>{row.female.toLocaleString()}</td>
+                    <td>{row.male.toLocaleString()}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </details>
+      )}
       <h4>Communities &amp; identity</h4>
       <p className="panel-note">
         Cultural belonging, language, belief, and political outlook evolve separately. People can share a
@@ -140,7 +164,7 @@ export function PopulationIdentities({
           The twelve largest joint communities are shown. Counts include serving soldiers in the state census.
           Displacement measures the lasting burden of uprooting.
         </p>
-        {[...groups]
+        {census.largest
           .sort((a, b) => communitySize(b) - communitySize(a))
           .slice(0, 12)
           .map((g, i) => (

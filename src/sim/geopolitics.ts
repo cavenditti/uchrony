@@ -1,3 +1,5 @@
+import { marketStore, armyStore, recordGift, recordUse } from './national-accounts'
+import { publicExpense } from './ledger'
 import { MAX_ARMIES } from './military-limits'
 import {
   intelligenceService,
@@ -91,7 +93,8 @@ function mobilize(world: World, n: Nation, province: number, limit: number) {
     )
   if (amount < 100 || world.armies.length >= MAX_ARMIES) return
   const communities = takeCivilianAdults(world, r, amount)
-  n.treasury -= amount * 0.2
+  publicExpense(world, n.id, amount * 0.2, 'mobilization', r.id)
+  recordUse(world, marketStore(r.id), 'arms', amount * 0.012)
   r.stocks.arms -= amount * 0.012
   r.consumption.arms += amount * 0.012
   r.stocks.food -= amount * 0.06
@@ -111,6 +114,7 @@ function mobilize(world: World, n: Nation, province: number, limit: number) {
   }
   world.armies.push(army)
   ensureWarfare(world)
+  recordGift(world, marketStore(r.id), armyStore(army.id), 'food', amount * 0.06)
   army.operations!.food = amount * 0.06
   army.operations!.stance = 'entrench'
   warEvent(
@@ -173,8 +177,7 @@ export function advanceGeopolitics(world: World) {
       cost = population(r) * 0.0003,
       n = world.nations[r.nation],
       paid = Math.min(Math.max(0, n.treasury), cost)
-    n.treasury -= paid
-    n.spending += paid
+    publicExpense(world, n.id, paid, 'occupation administration', r.id)
     occupation.resistance = clamp(
       occupation.resistance +
         (local < demand ? 0.015 : -0.006) +

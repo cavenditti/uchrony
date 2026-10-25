@@ -1,3 +1,12 @@
+import { SnapshotMailbox } from './snapshot-mailbox'
+import { viewSnapshot } from './view-snapshot'
+import { WorldStorage } from '../storage/world-storage'
+import { worldBlob } from '../storage/json-blob'
+import { browserBackend, diskBackend } from '../storage/backends'
+import { restoreSave } from '../storage/autosave'
+import { parseSave } from './persistence'
+import { MAX_SAVE_BYTES } from '../storage/save-types'
+import { ByteStorageClient } from '../storage/byte-client'
 import { pendingAdvice, submitAdvice, withdrawAdvice } from './advisors'
 import { geographyKey } from '../map/geometry'
 import { DEFAULT_WORLD_SCALE, WORLD_SCALES } from './scale'
@@ -72,23 +81,32 @@ function agentStatus() {
     },
   })
 }
+let revision = 0
+const backends = [diskBackend(), browserBackend()]
+const byteStorage = new ByteStorageClient()
+const storage = new WorldStorage([byteStorage.backend('disk'), byteStorage.backend('browser')], (status) =>
+  send({ type: 'storage', ...status }),
+)
+const mailbox = new SnapshotMailbox((message, acknowledgement) => {
+  if (!world) return
+  const dynamic = viewSnapshot(world)
+  send({
+    type: 'world',
+    world: geographyPublished ? dynamic : { ...dynamic, cells: world.cells },
+    mapKey,
+    message,
+    acknowledgement,
+  })
+  geographyPublished = true
+})
 function publish(message?: string, acknowledgement = false) {
   if (acknowledgement) {
     clearTimeout(backgroundPublish)
     backgroundPublish = undefined
   }
   if (world) {
-    // The immutable terrain travels once per generated/restored world. Dynamic
-    // snapshots reuse it in the UI and still form complete exports/autosaves.
-    const { cells, ...dynamic } = world
-    send({
-      type: 'world',
-      world: geographyPublished ? dynamic : { ...dynamic, cells },
-      mapKey,
-      message,
-      acknowledgement,
-    })
-    geographyPublished = true
+    revision++
+    mailbox.publish(message, acknowledgement)
   }
 }
 async function connection() {
@@ -125,6 +143,8 @@ const playback = new Playback(
 )
 function reset() {
   geographyPublished = false
+  mailbox.reset()
+  storage.reset()
   playback.stop()
   for (const job of jobs.values()) job.controller.abort()
   jobs.clear()
@@ -358,10 +378,54 @@ function schedule() {
     )
   }
 }
-self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
+self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
   try {
-    if (data.type === 'playback') {
-      if (world && data.running) playback.start(data.speed)
+    if (data.type === 'storage-port') {
+      byteStorage.connect(data.port)
+      return
+    }
+    if (data.type === 'storage-error') {
+      byteStorage.disconnect()
+      return
+    }
+    if (data.type === 'snapshot-ack') {
+      if (data.mapKey === mapKey) mailbox.acknowledge()
+      return
+    }
+    if (data.type === 'save') {
+      if (world) void storage.save(world, revision, data.force)
+      return
+    }
+    if (data.type === 'export') {
+      if (world)
+        send({
+          type: 'exported',
+          blob: worldBlob(world),
+          filename: `uchrony-${world.seed.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 50)}-${world.startYear + Math.floor(world.month / 12)}.json`,
+        })
+      return
+    }
+    if (data.type === 'restore') {
+      try {
+        const saved = await restoreSave(backends, data.legacy)
+        data = saved.world
+          ? { type: 'load', world: saved.world }
+          : { type: 'generate', seed: 'A world unwritten' }
+        if (saved.world) send({ type: 'storage', state: 'restored' })
+      } catch (error) {
+        send({
+          type: 'startup-error',
+          message: error instanceof Error ? error.message : 'The saved world could not be restored.',
+        })
+        return
+      }
+    } else if (data.type === 'import') {
+      if (data.file.size > MAX_SAVE_BYTES) throw new Error('The world exceeds the supported save size.')
+      data = { type: 'load', world: parseSave(await data.file.text()) }
+    }
+    const action = data
+    if (action.type === 'playback') {
+      if (world && action.running) playback.start(action.speed)
       else {
         playback.stop()
         publish()
@@ -369,14 +433,14 @@ self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
       return
     }
     let message: string | undefined
-    if (data.type === 'generate') {
+    if (action.type === 'generate') {
       reset()
-      const scale = data.scale ?? DEFAULT_WORLD_SCALE
+      const scale = action.scale ?? DEFAULT_WORLD_SCALE
       world = generateWorld(
-        data.seed,
-        data.continents,
-        data.nations ?? WORLD_SCALES[scale].states,
-        data.settings,
+        action.seed,
+        action.continents,
+        action.nations ?? WORLD_SCALES[scale].states,
+        action.settings,
         scale,
       )
       mapKey = geographyKey(world.cells)
@@ -385,8 +449,8 @@ self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
       ensureStatecraft(world)
       summarize(world)
       void connection().then(schedule)
-    } else if (data.type === 'load') {
-      const restored = restoreWorld(data.world)
+    } else if (action.type === 'load') {
+      const restored = restoreWorld(action.world)
       reset()
       world = restored
       mapKey = geographyKey(world.cells)
@@ -397,43 +461,43 @@ self.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
       ensureIntelligence(world)
       message = 'World restored. Simulation is paused.'
       void connection().then(schedule)
-    } else if (data.type === 'step') {
+    } else if (action.type === 'step') {
       if (!world) throw new Error('Generate a world first.')
-      for (let i = 0; i < Math.min(120, Math.max(1, Math.floor(data.count))); i++) tick(world)
-    } else if (data.type === 'command') {
+      for (let i = 0; i < Math.min(120, Math.max(1, Math.floor(action.count))); i++) tick(world)
+    } else if (action.type === 'command') {
       if (!world) throw new Error('Generate a world first.')
-      message = applyCommand(world, data.command)
+      message = applyCommand(world, action.command)
       summarize(world, false)
-    } else if (data.type === 'retry-history') {
+    } else if (action.type === 'retry-history') {
       retryAt.clear()
       lastLaunch.clear()
       nextBackgroundAt = 0
       agentError = ''
       void connection().then(schedule)
-    } else if (data.type === 'advise' || data.type === 'withdraw-advice') {
+    } else if (action.type === 'advise' || action.type === 'withdraw-advice') {
       if (!world) throw new Error('No government is available yet.')
-      const agent = ensureStatecraft(world).agents.find((entry) => entry.nation === data.nation)
+      const agent = ensureStatecraft(world).agents.find((entry) => entry.nation === action.nation)
       if (!agent) throw new Error('That government could not be found.')
-      if (data.type === 'advise') {
-        submitAdvice(world, agent, data.text)
-        decisionSignals.delete(data.nation)
+      if (action.type === 'advise') {
+        submitAdvice(world, agent, action.text)
+        decisionSignals.delete(action.nation)
         message = 'Suggestion sent privately. The government will weigh it at its next assessment.'
       } else {
-        withdrawAdvice(world, agent, data.advice)
+        withdrawAdvice(world, agent, action.advice)
         message = 'Undelivered suggestion withdrawn.'
       }
-    } else if (data.type === 'agent-strategy') {
-      const agent = world?.statecraft?.agents.find((entry) => entry.nation === data.nation)
+    } else if (action.type === 'agent-strategy') {
+      const agent = world?.statecraft?.agents.find((entry) => entry.nation === action.nation)
       if (agent) {
         agent.escalation = 'Strategic review requested by the observer.'
         agent.nextDecision = world!.month
-        retryAt.delete(`state:${data.nation}`)
-        lastStrategy.delete(data.nation)
-        lastLaunch.delete(`state:${data.nation}`)
+        retryAt.delete(`state:${action.nation}`)
+        lastStrategy.delete(action.nation)
+        lastLaunch.delete(`state:${action.nation}`)
       }
-    } else if (data.type === 'event-details') {
+    } else if (action.type === 'event-details') {
       const current = world,
-        event = current?.events.find((entry) => entry.id === data.event)
+        event = current?.events.find((entry) => entry.id === action.event)
       if (current && event && !event.expandedAccount) {
         if (!connected)
           send({

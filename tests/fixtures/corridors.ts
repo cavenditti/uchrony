@@ -43,7 +43,7 @@ export function corridorWorld(rows: string[]): World {
     month: 0,
     routes: [],
     relations: [],
-    nations: [{ technologies: { logistics: 0 }, treasury: 1e9, policies: { tariff: 0 } }],
+    nations: [{ id: 0, income: 0, technologies: { logistics: 0 }, treasury: 1e9, policies: { tariff: 0 } }],
   } as unknown as World
 }
 

@@ -1,3 +1,4 @@
+import { districtDensityScale } from '../sim/spatial'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
@@ -14,14 +15,19 @@ import {
   Handshake,
   ArrowUpRight,
   ScanSearch,
+  Mountain,
+  Map as MapIcon,
+  Orbit,
 } from 'lucide-react'
+import type { ReliefMap } from '../map/relief'
+import { resizeCanvas } from '../map/render-budget'
 import { HEX } from '../sim/hex'
 import { contains, zoomAt } from '../map/geometry'
 import { buildAtlas, drawAtlas, drawPlaceLabels, terrainColors } from '../map/renderer'
 import { freightOverlay, drawFreight } from '../map/trade'
 import { population, type World, type Layer } from '../sim/types'
 import { dominantIdentity, identityAxis, identityColor } from '../map/identity'
-import { identityDistribution } from '../sim/population'
+import { censusOf, mergeCensuses, censusDistribution } from '../sim/view-snapshot'
 import { drawWarfare } from '../map/warfare'
 import { compact, type Tab } from './Inspector'
 
@@ -77,6 +83,13 @@ export function WorldMap({
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null),
     holderRef = useRef<HTMLDivElement>(null)
+  const reliefCanvasRef = useRef<HTMLCanvasElement>(null)
+  const reliefRef = useRef<ReliefMap | null>(null)
+  const [presentation, setPresentation] = useState<'relief' | 'atlas'>('relief')
+  const [tilt, setTilt] = useState(true)
+  const [reliefReady, setReliefReady] = useState<string | null>(null)
+  const [reliefError, setReliefError] = useState(false)
+  const isRelief = presentation === 'relief' && reliefReady === mapKey
   const baseRef = useRef<HTMLCanvasElement | null>(null),
     frame = useRef(0)
   const [size, setSize] = useState({ w: 900, h: 680 }),
@@ -107,22 +120,20 @@ export function WorldMap({
     return () => window.removeEventListener('pointerdown', close)
   }, [])
   const axis = identityAxis(layer)
-  const dominant = axis ? new Set(world.regions.map((r) => dominantIdentity(r, axis))) : new Set<number>()
-  const identityLegend = axis
-    ? identityDistribution(
-        world.regions.flatMap((r) => r.communities ?? []),
-        axis,
-      )
-        .filter((entry) => dominant.has(entry.id))
-        .slice(0, 6)
-    : []
-  const maxPopulationDensity = Math.max(...world.regions.map((r) => population(r) / r.cells.length))
+  const identityLegend = useMemo(() => {
+    if (!axis) return []
+    const dominant = new Set(world.regions.map((r) => dominantIdentity(r, axis)))
+    return censusDistribution(mergeCensuses(world.regions.map((r) => censusOf(r, world.month))), axis)
+      .filter((entry) => dominant.has(entry.id))
+      .slice(0, 6)
+  }, [world, axis])
+  const populationScale = useMemo(() => districtDensityScale(world), [world])
   const quantitativeLegend =
     layer === 'population'
       ? {
-          label: 'People per hex · square-root scale',
+          label: 'District people / cell · log scale',
           colors: '#c7d1a4, #3a7661',
-          ticks: [0, maxPopulationDensity / 4, maxPopulationDensity].map((n) =>
+          ticks: [0, populationScale.midpoint, populationScale.maximum].map((n) =>
             Math.round(n).toLocaleString(),
           ),
         }
@@ -135,10 +146,17 @@ export function WorldMap({
   const atlas = useMemo(() => buildAtlas(world), [mapKey])
   const mapW = world.width * Math.sqrt(3) * HEX,
     mapH = world.height * HEX * 1.5
-  const fit = Math.min(size.w / mapW, size.h / mapH) * 0.98
+  const verticalFactor = isRelief && tilt ? Math.sin(Math.PI * 0.29) : 1
+  const fit = Math.min(size.w / mapW, size.h / (mapH * verticalFactor)) * 0.94
   const scale = fit * view.zoom,
     offsetX = (size.w - mapW * scale) / 2 + view.x,
     offsetY = (size.h - mapH * scale) / 2 + view.y
+  // Only content changes invalidate the world-space overlay. Tooltip position,
+  // pan, tilt and label loading require a redraw, never another texture upload.
+  const overlayRevision = useMemo(
+    () => ({}),
+    [world, layer, nation, region, showRoutes, showArmies, running, scale, hover?.id, atlas],
+  )
   const transforms = useRef({ scale, offsetX, offsetY })
   transforms.current = { scale, offsetX, offsetY }
   const reset = useCallback(() => setView({ zoom: 1, x: 0, y: 0 }), [])
@@ -200,26 +218,81 @@ export function WorldMap({
     setView({
       zoom,
       x: (mapW / 2 - cx) * fit * zoom + area.x + area.w / 2 - size.w / 2,
-      y: (mapH / 2 - cy) * fit * zoom + area.y + area.h / 2 - size.h / 2,
+      y: (mapH / 2 - cy) * fit * zoom * verticalFactor + area.y + area.h / 2 - size.h / 2,
     })
     // Focus is an explicit command, not a camera reset on each simulation tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus])
 
   useEffect(() => {
-    const base = document.createElement('canvas')
+    let active = true
+    setReliefReady(null)
+    setReliefError(false)
+    const canvas = reliefCanvasRef.current!
+    const lost = (event: Event) => {
+      event.preventDefault()
+      setReliefReady(null)
+      setReliefError(true)
+      setPresentation('atlas')
+    }
+    canvas.addEventListener('webglcontextlost', lost)
+    void import('../map/relief')
+      .then(({ ReliefMap }) => {
+        if (!active) return
+        try {
+          reliefRef.current = new ReliefMap(canvas, world, atlas)
+          setReliefReady(mapKey)
+        } catch (error) {
+          console.warn('3D map unavailable; using the atlas.', error)
+          setReliefError(true)
+          setPresentation('atlas')
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setReliefError(true)
+          setPresentation('atlas')
+        }
+      })
+    return () => {
+      active = false
+      canvas.removeEventListener('webglcontextlost', lost)
+      reliefRef.current?.dispose()
+      reliefRef.current = null
+    }
+  }, [atlas])
+
+  useEffect(() => {
+    if (!isRelief || !reliefRef.current) return
+    reliefRef.current.setCamera({ w: size.w, h: size.h, scale, x: view.x, y: view.y, tilt })
+  }, [isRelief, size, scale, view.x, view.y, tilt])
+
+  useEffect(() => {
+    if (isRelief) reliefRef.current?.paint(world, layer, scale)
+  }, [world, layer, scale, isRelief])
+
+  useEffect(() => {
+    if (isRelief) {
+      // Release the full viewport bitmap retained from the loading fallback.
+      if (baseRef.current) {
+        resizeCanvas(baseRef.current, 1, 1)
+        baseRef.current = null
+      }
+      return
+    }
+    const base = baseRef.current ?? document.createElement('canvas')
     // Cache the visible viewport, never a giant full-world bitmap. Province
     // geometry is repainted at display resolution when the camera changes.
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    base.width = Math.ceil(size.w * dpr)
-    base.height = Math.ceil(size.h * dpr)
+    resizeCanvas(base, size.w * dpr, size.h * dpr)
     const ctx = base.getContext('2d')!
-    ctx.scale(dpr, dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, size.w, size.h)
     ctx.translate(offsetX, offsetY)
     ctx.scale(scale, scale)
     drawAtlas(ctx, atlas, world, layer, scale)
     baseRef.current = base
-  }, [world, layer, size.w, size.h, offsetX, offsetY, atlas, scale])
+  }, [world, layer, size.w, size.h, offsetX, offsetY, atlas, scale, isRelief])
 
   const [fontReady, setFontReady] = useState(false)
   useEffect(() => {
@@ -236,49 +309,97 @@ export function WorldMap({
     const canvas = canvasRef.current
     if (!canvas) return
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    canvas.width = size.w * dpr
-    canvas.height = size.h * dpr
+    resizeCanvas(canvas, size.w * dpr, size.h * dpr)
     const ctx = canvas.getContext('2d')!
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let lastAnimatedFrame = -Infinity
     const draw = (time: number) => {
+      if (isRelief && !reliefRef.current) return
+      // Freight motion is the only reason to repaint an unchanged camera.
+      // Keep it at 30 fps on high-refresh/Retina screens. A camera, selection,
+      // or world update starts a fresh effect and still paints immediately.
+      if (time - lastAnimatedFrame < 1000 / 30) {
+        frame.current = requestAnimationFrame(draw)
+        return
+      }
+      lastAnimatedFrame = time
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, size.w, size.h)
-      ctx.fillStyle = '#243f49'
-      ctx.fillRect(0, 0, size.w, size.h)
-      if (baseRef.current) ctx.drawImage(baseRef.current, 0, 0, size.w, size.h)
+      if (!isRelief) {
+        ctx.fillStyle = '#163e4d'
+        ctx.fillRect(0, 0, size.w, size.h)
+        if (baseRef.current) ctx.drawImage(baseRef.current, 0, 0, size.w, size.h)
+      }
       ctx.save()
       ctx.translate(offsetX, offsetY)
       ctx.scale(scale, scale)
-      if (showRoutes || layer === 'trade')
-        drawFreight(ctx, world, freight, scale, time, layer === 'trade', running && !reduced)
-      ctx.save()
-      ctx.clip(atlas.land, 'evenodd')
-      ctx.strokeStyle = '#f4e8bd'
-      ctx.lineWidth = 1.7 / scale
-      if (region !== null) {
-        ctx.stroke(atlas.provinces[region])
-      } else {
-        ctx.beginPath()
-        for (const e of atlas.geometry.edges) {
-          const left = world.regions[e.left].nation === nation
-          const right = world.regions[e.right].nation === nation
-          if (left !== right) {
-            ctx.moveTo(e.a.x, e.a.y)
-            ctx.lineTo(e.b.x, e.b.y)
+      const drawOverlay = (ctx: CanvasRenderingContext2D) => {
+        if (showRoutes || layer === 'trade')
+          drawFreight(ctx, world, freight, scale, time, layer === 'trade', running && !reduced)
+        ctx.save()
+        ctx.clip(atlas.land, 'evenodd')
+        ctx.strokeStyle = '#f4e8bd'
+        ctx.lineWidth = 1.7 / scale
+        if (region !== null) {
+          ctx.stroke(atlas.provinces[region])
+        } else {
+          ctx.beginPath()
+          for (const e of atlas.geometry.edges) {
+            const left = world.regions[e.left].nation === nation
+            const right = world.regions[e.right].nation === nation
+            if (left !== right) {
+              ctx.moveTo(e.a.x, e.a.y)
+              ctx.lineTo(e.b.x, e.b.y)
+            }
           }
+          for (const e of atlas.geometry.shores)
+            if (world.regions[e.left].nation === nation) {
+              ctx.moveTo(e.a.x, e.a.y)
+              ctx.lineTo(e.b.x, e.b.y)
+            }
+          ctx.stroke()
         }
-        for (const e of atlas.geometry.shores)
-          if (world.regions[e.left].nation === nation) {
-            ctx.moveTo(e.a.x, e.a.y)
-            ctx.lineTo(e.b.x, e.b.y)
+        if (hover && hover.id !== region) {
+          ctx.fillStyle = '#f5efd72b'
+          ctx.fill(atlas.provinces[hover.id], 'evenodd')
+        }
+        ctx.restore()
+        if (showArmies || layer === 'military') drawWarfare(ctx, world, nation)
+        if (showArmies || layer === 'military')
+          for (const a of world.armies.filter((a) => a.operations?.embarkedOn == null)) {
+            const c = world.cells[world.regions[a.region].center]
+            const x = c.x - 12,
+              y = c.y + 14
+            ctx.fillStyle = '#24343a'
+            ctx.strokeStyle = world.nations[a.nation].color
+            ctx.lineWidth = 1.5
+            ctx.fillRect(x - 10, y - 7, 30, 15)
+            ctx.strokeRect(x - 10, y - 7, 30, 15)
+            ctx.font = '8px system-ui'
+            ctx.textAlign = 'center'
+            ctx.fillStyle = '#f0e9d8'
+            ctx.fillText(`${(a.soldiers / 1000).toFixed(1)}k`, x + 5, y + 3)
+            if (a.target !== null) {
+              ctx.strokeStyle = '#a2463bbb'
+              ctx.lineWidth = 1.3
+              ctx.setLineDash([4, 4])
+              ctx.beginPath()
+              ctx.moveTo(c.x, c.y)
+              for (const id of a.operations?.march ?? []) ctx.lineTo(world.cells[id].x, world.cells[id].y)
+              ctx.stroke()
+              ctx.setLineDash([])
+            }
           }
-        ctx.stroke()
       }
-      if (hover && hover.id !== region) {
-        ctx.fillStyle = '#f5efd72b'
-        ctx.fill(atlas.provinces[hover.id], 'evenodd')
-      }
-      ctx.restore()
+      if (isRelief) {
+        reliefRef.current!.paintOverlay(
+          drawOverlay,
+          time,
+          overlayRevision,
+          running && !reduced && (showRoutes || layer === 'trade'),
+        )
+        reliefRef.current!.render()
+      } else drawOverlay(ctx)
       drawPlaceLabels(
         ctx,
         atlas,
@@ -287,33 +408,13 @@ export function WorldMap({
         scale,
         { x: offsetX, y: offsetY, w: size.w, h: size.h },
         nation,
+        isRelief
+          ? (x, y) => {
+              const p = reliefRef.current!.project(x, y)
+              return { x: (p.x - offsetX) / scale, y: (p.y - offsetY) / scale }
+            }
+          : undefined,
       )
-      if (showArmies || layer === 'military') drawWarfare(ctx, world, nation)
-      if (showArmies || layer === 'military')
-        for (const a of world.armies.filter((a) => a.operations?.embarkedOn == null)) {
-          const c = world.cells[world.regions[a.region].center]
-          const x = c.x - 12,
-            y = c.y + 14
-          ctx.fillStyle = '#24343a'
-          ctx.strokeStyle = world.nations[a.nation].color
-          ctx.lineWidth = 1.5
-          ctx.fillRect(x - 10, y - 7, 30, 15)
-          ctx.strokeRect(x - 10, y - 7, 30, 15)
-          ctx.font = '8px system-ui'
-          ctx.textAlign = 'center'
-          ctx.fillStyle = '#f0e9d8'
-          ctx.fillText(`${(a.soldiers / 1000).toFixed(1)}k`, x + 5, y + 3)
-          if (a.target !== null) {
-            ctx.strokeStyle = '#a2463bbb'
-            ctx.lineWidth = 1.3
-            ctx.setLineDash([4, 4])
-            ctx.beginPath()
-            ctx.moveTo(c.x, c.y)
-            for (const id of a.operations?.march ?? []) ctx.lineTo(world.cells[id].x, world.cells[id].y)
-            ctx.stroke()
-            ctx.setLineDash([])
-          }
-        }
       ctx.restore()
       if (running && !reduced && (showRoutes || layer === 'trade'))
         frame.current = requestAnimationFrame(draw)
@@ -338,13 +439,22 @@ export function WorldMap({
     atlas,
     fontReady,
     freight,
+    overlayRevision,
+    isRelief,
+    tilt,
   ])
 
   const locate = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect(),
       { scale, offsetX, offsetY } = transforms.current
-    const x = (clientX - rect.left - offsetX) / scale,
-      y = (clientY - rect.top - offsetY) / scale
+    const surface = isRelief
+      ? reliefRef.current!.locate(clientX - rect.left, clientY - rect.top)
+      : {
+          x: (clientX - rect.left - offsetX) / scale,
+          y: (clientY - rect.top - offsetY) / scale,
+        }
+    if (!surface) return null
+    const { x, y } = surface
     // Hit-test the rendered province polygons, including islands and holes.
     for (let id = 0; id < atlas.geometry.provinces.length; id++) {
       const b = atlas.geometry.bounds[id]
@@ -373,7 +483,13 @@ export function WorldMap({
   }, [size])
 
   return (
-    <div className="map-canvas-wrap" data-layer={layer} ref={holderRef}>
+    <div
+      className="map-canvas-wrap"
+      data-layer={layer}
+      data-presentation={isRelief ? 'relief' : 'atlas'}
+      ref={holderRef}
+    >
+      <canvas ref={reliefCanvasRef} className="relief-canvas" aria-hidden="true" />
       <canvas
         ref={canvasRef}
         className="world-canvas"
@@ -460,13 +576,15 @@ export function WorldMap({
             return
           }
           if (drag.current) {
-            const dx = e.clientX - drag.current.x,
+            const { vx, vy } = drag.current,
+              dx = e.clientX - drag.current.x,
               dy = e.clientY - drag.current.y
             if (Math.hypot(dx, dy) > 4) {
               drag.current.moved = true
               setPicked(null)
             }
-            setView((v) => ({ ...v, x: drag.current!.vx + dx, y: drag.current!.vy + dy }))
+            // A queued update may run after pointerup clears the drag ref.
+            setView((v) => ({ ...v, x: vx + dx, y: vy + dy }))
           } else setHover(locate(e.clientX, e.clientY))
         }}
         onPointerUp={(e) => {
@@ -631,6 +749,47 @@ export function WorldMap({
         <span />
         <small>{Math.round(((65 / scale) * 4) / 10) * 10} km</small>
       </div>
+      <div className="map-view-switch" role="group" aria-label="Map presentation">
+        <button
+          aria-pressed={presentation === 'relief'}
+          disabled={reliefError || reliefReady !== mapKey}
+          title={reliefError ? '3D graphics unavailable on this device' : 'Three-dimensional landscape'}
+          onClick={() => {
+            setPresentation('relief')
+            setPicked(null)
+          }}
+        >
+          <Mountain size={15} /> 3D
+        </button>
+        <button
+          aria-pressed={presentation === 'atlas'}
+          title="Flat cartographic view"
+          onClick={() => {
+            setPresentation('atlas')
+            setPicked(null)
+          }}
+        >
+          <MapIcon size={15} /> Atlas
+        </button>
+        {isRelief && (
+          <button
+            aria-label={tilt ? 'View from above' : 'Tilt the landscape'}
+            aria-pressed={tilt}
+            title={tilt ? 'View from above' : 'Tilt the landscape'}
+            onClick={() => {
+              setTilt((v) => !v)
+              setPicked(null)
+            }}
+          >
+            <Orbit size={16} />
+          </button>
+        )}
+      </div>
+      {reliefError && (
+        <div className="map-render-note" role="status">
+          3D unavailable · Atlas view active
+        </div>
+      )}
       <div className="zoom-controls">
         <button aria-label="Zoom in" title="Zoom in" onClick={() => zoom(1.25)}>
           <Plus size={17} />
@@ -698,7 +857,11 @@ export function WorldMap({
               onClick={() => {
                 const c = world.cells[world.regions[picked.id].center],
                   zoom = Math.max(3, world.width / 45)
-                setView({ zoom, x: (mapW / 2 - c.x) * fit * zoom, y: (mapH / 2 - c.y) * fit * zoom })
+                setView({
+                  zoom,
+                  x: (mapW / 2 - c.x) * fit * zoom,
+                  y: (mapH / 2 - c.y) * fit * zoom * verticalFactor,
+                })
                 setPicked(null)
               }}
             >

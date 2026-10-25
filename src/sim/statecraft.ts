@@ -1,3 +1,5 @@
+import { publicTransfer, transferDebt } from './ledger'
+import { clonePopulationHolders } from './population-clone'
 import { advisorContext, validateAdviceReplies, deliverAdvice } from './advisors'
 import {
   validateInstitutionTerm,
@@ -708,8 +710,7 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
       for (const id of term.regions) transferProvince(world, id, from, to)
       const funding = term.amount
       if (founder.treasury < funding) throw new Error('The founder cannot fund the new state as agreed.')
-      founder.treasury -= funding
-      nation.treasury += funding
+      publicTransfer(world, founder.id, nation.id, funding, 'state founding')
     } else if (term.kind === 'cede') {
       for (const id of term.regions) transferProvince(world, id, from, to)
     } else if (term.kind === 'merge') {
@@ -718,10 +719,8 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
       for (const region of world.regions.filter((entry) => entry.nation === from))
         transferProvince(world, region.id, from, to)
       for (const army of allForces(world)) if (army.nation === from) army.nation = to
-      world.nations[to].treasury += world.nations[from].treasury
-      world.nations[from].treasury = 0
-      world.nations[to].debt += world.nations[from].debt
-      world.nations[from].debt = 0
+      publicTransfer(world, from, to, world.nations[from].treasury, 'state merger')
+      transferDebt(world, from, to)
       if (term.text.trim()) {
         world.nations[to].name = term.text
         world.nations[to].shortName = term.text.slice(0, 40)
@@ -729,8 +728,7 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
     } else if (term.kind === 'payment') {
       if (world.nations[from].treasury < term.amount)
         throw new Error('A signatory no longer has the promised funds.')
-      world.nations[from].treasury -= term.amount
-      world.nations[to].treasury += term.amount
+      publicTransfer(world, from, to, term.amount, 'diplomatic payment')
     } else if (['trade', 'alliance', 'peace', 'war'].includes(term.kind)) {
       const rel = relation(world, from, to)
       if (!rel) throw new Error('A diplomatic counterpart no longer exists.')
@@ -812,11 +810,17 @@ export function acceptRefereeDecision(
         const trial: World = {
           ...world,
           intelligence: territorial ? structuredClone(world.intelligence) : world.intelligence,
-          institutions: structuredClone(world.institutions),
-          nations: structuredClone(world.nations),
-          regions: territorial ? structuredClone(world.regions) : world.regions,
-          relations: structuredClone(world.relations),
-          armies: territorial ? structuredClone(world.armies) : world.armies.map((army) => ({ ...army })),
+          institutions: territorial ? structuredClone(world.institutions) : world.institutions,
+          // Ordinary terms only change treasury scalars, relation scalars and army targets.
+          // Territorial terms still need isolated nested records for normalization.
+          nations: territorial ? structuredClone(world.nations) : world.nations.map((n) => ({ ...n })),
+          regions: territorial ? clonePopulationHolders(world.regions) : world.regions,
+          relations: territorial
+            ? structuredClone(world.relations)
+            : world.relations.map((r) => ({ ...r })),
+          armies: territorial
+            ? clonePopulationHolders(world.armies)
+            : world.armies.map((army) => ({ ...army })),
           warfare: territorial ? structuredClone(world.warfare) : world.warfare,
           historical: territorial ? structuredClone(world.historical) : world.historical,
           events: [...world.events],
@@ -976,8 +980,7 @@ export function advanceStatecraft(world: World) {
     if (!alive(world, term.from) || !alive(world, term.to)) continue
     if (term.kind === 'tribute') {
       const amount = Math.min(world.nations[term.from].treasury, term.amount)
-      world.nations[term.from].treasury -= amount
-      world.nations[term.to].treasury += amount
+      publicTransfer(world, term.from, term.to, amount, 'recurring diplomatic payment')
       if (amount + 1e-6 < term.amount) {
         offer.breaches++
         if (offer.breaches % 3 === 1) notifyParties(world, offer, `Obligation shortfall: ${offer.title}`)

@@ -16,6 +16,7 @@ import { hashSeed } from '../src/sim/random'
 import { generateWorld } from '../src/sim/generate'
 import { ensureStatecraft, stateAgentContext } from '../src/sim/statecraft'
 import { validateWorld } from '../src/sim/persistence'
+import { validateStatecraft } from '../src/sim/statecraft-persistence'
 import { intelligenceService } from '../src/sim/intelligence'
 
 function offer(
@@ -64,6 +65,21 @@ function render(text: string, offers: DiplomaticOffer[], nation = 0, confidentia
     }),
   )
 }
+
+test('large diplomatic ledgers retain valid signed records while keeping bounded imports', () => {
+  const w = generateWorld('Diplomatic capacity', 3, 8, undefined, 'regional')
+  w.nations = Array.from({ length: 64 }, (_, id) => ({ ...w.nations[id % 8], id }))
+  const state = ensureStatecraft(w)
+  state.offers = Array.from({ length: 4315 }, (_, i) =>
+    offer(i + 1, `Active record ${i + 1}`, { status: 'proposed' }),
+  )
+  state.nextId = 10000
+  validateStatecraft(w)
+  state.offers[0].digest = 'corrupted signature'
+  assert.throws(() => validateStatecraft(w), /Invalid statecraft save/)
+  state.offers = Array.from({ length: 8065 }, (_, i) => offer(i + 1))
+  assert.throws(() => validateStatecraft(w), /invalid collections/)
+})
 
 test('canonical and legacy references preserve surrounding prose and ordinary numbers', () => {
   const text =

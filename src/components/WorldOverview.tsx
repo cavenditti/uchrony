@@ -94,6 +94,9 @@ export function WorldOverview({
         color: n.color,
         people: n.population,
         output: n.gdp,
+        realOutput: world.economy?.national[n.id]?.realOutput ?? 0,
+        unemployment: world.economy?.national[n.id]?.unemployment ?? 0,
+        inequality: world.economy?.national[n.id]?.inequality ?? 0,
         perHead: (n.gdp * 1000) / Math.max(1, n.population),
         treasury: n.treasury,
         debt: n.debt,
@@ -129,7 +132,10 @@ export function WorldOverview({
   type Column = { key: keyof Row; label: string; format?: (value: number) => string }
   const columns: Record<string, Column[]> = {
     economy: [
-      { key: 'output', label: 'Monthly output, k' },
+      { key: 'output', label: 'Value added, k' },
+      { key: 'realOutput', label: 'Real output, k' },
+      { key: 'unemployment', label: 'Unemployment', format: percent },
+      { key: 'inequality', label: 'Income Gini', format: (value) => value.toFixed(3) },
       { key: 'perHead', label: 'Output / person' },
       { key: 'treasury', label: 'Treasury, k' },
       { key: 'debt', label: 'Debt, k' },

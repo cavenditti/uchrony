@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>Endurance checkpoint inspection</title>
+  <h1>Endurance checkpoint inspection</h1>
+  <p>Read-only export of this test origin's browser checkpoint. Pause the simulation and wait for both saves first.</p>
+  <button id="download">Download browser checkpoint</button>
+  <output id="status" aria-live="polite">Ready</output>
+  <script type="module">
+    document.querySelector('#download').onclick = async () => {
+      const status = document.querySelector('#status')
+      try {
+        const db = await new Promise((resolve, reject) => {
+          const request = indexedDB.open('uchrony-saves', 1)
+          request.onupgradeneeded = () => request.transaction.abort()
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+        const blob = await new Promise((resolve, reject) => {
+          const request = db.transaction('worlds', 'readonly').objectStore('worlds').get('current')
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+        db.close()
+        if (!(blob instanceof Blob)) throw new Error('Expected the current byte-format checkpoint.')
+        const header = await blob.slice(0, 160).text()
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = 'uchrony-browser-checkpoint.json'
+        link.click()
+        setTimeout(() => URL.revokeObjectURL(link.href), 10000)
+        status.textContent = JSON.stringify({ bytes: blob.size, savedAt: Number(header.match(/"savedAt":(\d+)/)?.[1]) })
+      } catch (error) {
+        status.textContent = `Failed: ${error.message}`
+      }
+    }
+  </script>
+</html>

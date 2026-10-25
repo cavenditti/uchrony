@@ -1,4 +1,5 @@
-import { noise } from './random'
+import { seedLandscape, settlementWeight } from './landscape'
+import { refreshSpatial } from './spatial'
 import { WORLD_SCALES, worldScale, type WorldScale } from './scale'
 import { DEFAULT_SETTINGS, validateSettings, type SimulationSettings } from './settings'
 import { ensureWarfare, commissionFleet, portAt } from './navy'
@@ -170,6 +171,7 @@ export function generateWorld(
     rand = () => random(rng)
   const { width, height } = extent
   const cells = generateGeography(seed, continents, width, height)
+  seedLandscape(cells, width, height, seed)
   const land = cells.filter((c) => c.terrain !== 'water')
   const seeds: Cell[] = [land[Math.floor(rand() * land.length)]]
   const minDistances = new Float64Array(cells.length).fill(Infinity)
@@ -180,7 +182,7 @@ export function generateWorld(
       max = -1
     for (const c of land) {
       minDistances[c.id] = Math.min(minDistances[c.id], (c.x - last.x) ** 2 + (c.y - last.y) ** 2)
-      const d = minDistances[c.id] * (0.85 + rand() * 0.3)
+      const d = minDistances[c.id] * (0.04 + c.landscape!.attraction ** 3 * 4) * (0.85 + rand() * 0.3)
       if (d > max) {
         max = d
         best = c
@@ -227,12 +229,15 @@ export function generateWorld(
     }
   const provinceCells: Cell[][] = seeds.map(() => [])
   for (const c of land) provinceCells[c.region].push(c)
+  const densityScale = (land.length * 3000) / land.reduce((sum, c) => sum + settlementWeight(c), 0)
   const regions: Region[] = seeds.map((c, id) => {
     const regionCells = provinceCells[id]
     const cx = regionCells.reduce((s, x) => s + x.x, 0) / regionCells.length
     const cy = regionCells.reduce((s, x) => s + x.y, 0) / regionCells.length
     const score = (x: Cell) =>
-      Math.hypot(x.x - cx, x.y - cy) + Math.max(0, x.elevation - 0.2) * 45 - (x.river ? 4 : 0)
+      Math.hypot(x.x - cx, x.y - cy) * 0.3 +
+      Math.max(0, x.elevation - 0.2) * 45 -
+      x.landscape!.attraction * 70
     c = regionCells.reduce((best, x) => (score(x) < score(best) ? x : best))
 
     const fertility = clamp(
@@ -250,9 +255,17 @@ export function generateWorld(
         0,
       ) / regionCells.length,
     )
-    const size =
-      (28000 + rand() * 60000) *
-      (scale === 'regional' ? Math.sqrt(regionCells.length / 18) : regionCells.length / 18)
+    const size = regionCells.reduce((sum, c) => sum + settlementWeight(c), 0) * densityScale
+    const attraction =
+      regionCells.reduce((sum, c) => sum + c.landscape!.attraction * settlementWeight(c), 0) /
+      Math.max(
+        1e-9,
+        regionCells.reduce((sum, c) => sum + settlementWeight(c), 0),
+      )
+    const deposits = { timber: 0, stone: 0, iron: 0, coal: 0 }
+    for (const good of ['timber', 'stone', 'iron', 'coal'] as const)
+      deposits[good] =
+        regionCells.reduce((sum, c) => sum + c.landscape!.resources[good], 0) / regionCells.length
     const stocks = inventory()
     stocks.food = size * 0.026 * (2 + rand() * 2)
     stocks.timber = size * 0.02
@@ -273,29 +286,18 @@ export function generateWorld(
       coastal: false,
       terrain: c.terrain,
       fertility,
-      deposits: {
-        timber: 0.25 + c.moisture,
-        stone: 0.2 + c.elevation,
-        iron:
-          Math.max(0, noise(c.x / 90, c.y / 90, hashSeed(`${seed}:iron`)) - 0.38) ** 2 *
-          (1 + c.elevation) *
-          9,
-        coal:
-          Math.max(0, noise(c.x / 80, c.y / 80, hashSeed(`${seed}:coal`)) - 0.4) ** 2 *
-          (1.5 - c.elevation * 0.4) *
-          10,
-      },
+      deposits,
       population: {
         children: Math.round(size * 0.29),
         adults: Math.round(size * 0.62),
         elders: Math.round(size * 0.09),
       },
-      urban: 0.12 + rand() * 0.38,
-      literacy: 0.22 + rand() * 0.3,
+      urban: 0.012 + attraction ** 2 * 0.65,
+      literacy: 0.12 + attraction * 0.45,
       health: 0.65 + rand() * 0.2,
       happiness: 0.65 + rand() * 0.17,
-      infrastructure: 0.3 + rand() * 0.35,
-      industry: 0.22 + rand() * 0.5,
+      infrastructure: 0.08 + attraction ** 1.5 * 0.75,
+      industry: 0.025 + attraction ** 2 * 0.9,
       stocks,
       production: inventory(),
       consumption: inventory(),
@@ -319,6 +321,24 @@ export function generateWorld(
       }
     r.neighbors = [...adjacent]
   }
+  // Uneven placement redistributes the opening endowment; it should not also
+  // silently erase most of the world's industrial or transport capacity.
+  for (const [field, target] of [
+    ['industry', 0.47],
+    ['infrastructure', 0.5],
+  ] as const) {
+    const people = regions.reduce((sum, r) => sum + population(r), 0)
+    let low = 0,
+      high = 64
+    for (let iteration = 0; iteration < 40; iteration++) {
+      const scale = (low + high) / 2
+      const mean =
+        regions.reduce((sum, r) => sum + population(r) * Math.min(1.2, r[field] * scale), 0) / people
+      if (mean < target) low = scale
+      else high = scale
+    }
+    for (const r of regions) r[field] = Math.min(1.2, (r[field] * (low + high)) / 2)
+  }
   const landmassSize = new Uint32Array(cells.length)
   for (const c of land)
     if (!landmassSize[c.id]) {
@@ -335,7 +355,7 @@ export function generateWorld(
         landmassSize[id] = group.length
       })
     }
-  const capitals: Region[] = [regions.reduce((a, b) => (a.cells.length > b.cells.length ? a : b))]
+  const capitals: Region[] = [regions.reduce((a, b) => (population(a) > population(b) ? a : b))]
   while (capitals.length < nationCount) {
     const candidates = regions.filter(
       (r) => !capitals.includes(r) && r.cells.length > 4 && landmassSize[r.center] >= 200,
@@ -348,8 +368,9 @@ export function generateWorld(
       const d = Math.min(
         ...capitals.map((cap) => Math.hypot(c.x - cells[cap.center].x, c.y - cells[cap.center].y)),
       )
-      if (d > max) {
-        max = d
+      const score = d * (0.25 + Math.sqrt(population(r) / Math.max(1, r.cells.length)) / 100)
+      if (score > max) {
+        max = score
         best = r
       }
     }
@@ -415,7 +436,7 @@ export function generateWorld(
   })
   const world: World = {
     version: 1,
-    generatorVersion: 2,
+    generatorVersion: 3,
     simulation: { ...settings },
     seed,
     rng: rng.rng,
@@ -517,5 +538,6 @@ export function generateWorld(
   }
   world.totals.population = world.nations.reduce((sum, n) => sum + n.population, 0)
   ensureIntelligence(world)
+  refreshSpatial(world)
   return world
 }

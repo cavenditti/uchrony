@@ -1,3 +1,19 @@
+import { relocateHouseholdClaims } from './district-finance'
+import { economicRegions, economicRegion } from './local-units'
+import { marketStore, armyStore, fleetStore, recordGift } from './national-accounts'
+import {
+  ensureAges,
+  mergeAges,
+  extractAges,
+  cohortDeaths,
+  cohortBirths,
+  expectedInteger,
+} from './age-cohorts'
+import { STRATA, type EconomicStratum } from './economic-types'
+import { stratumPeople, householdAccount, transfer } from './ledger'
+import { MODEL_PARAMETERS } from './model-parameters'
+import { apportion } from './allocation'
+export { apportion } from './allocation'
 import { hashSeed, random } from './random'
 import { allForces } from './forces'
 import type { Fleet } from './military-types'
@@ -26,14 +42,9 @@ const SOCIAL = [
   'fluency',
 ] as const
 export const communitySize = (group: PopulationCommunity) =>
-  AGES.reduce((sum, age) => sum + group.population[age], 0)
+  group.population.children + group.population.adults + group.population.elders
 export const communityKey = (group: PopulationCommunity) =>
-  `${group.culture}:${group.language}:${group.belief}:${group.movement}:${group.allegiance}`
-/** Unbiased rounding keeps small minorities aging and dying, using the saved census RNG. */
-const expectedPeople = (world: World, value: number) => {
-  const whole = Math.floor(Math.max(0, value))
-  return whole + (random(world.demography!) < value - whole ? 1 : 0)
-}
+  `${group.culture}:${group.language}:${group.belief}:${group.movement}:${group.allegiance}:${group.stratum ?? 'laborer'}${group.locality === undefined ? '' : ':local:' + group.locality}`
 export function emptyDynamics(): PopulationDynamics {
   return {
     immigrants: 0,
@@ -51,45 +62,6 @@ export function emptyDynamics(): PopulationDynamics {
     lastCulture: 0,
     lastLanguage: 0,
   }
-}
-/** Integer apportionment with explicit capacities; no people disappear in rounding. */
-export function apportion(total: number, weights: number[], limits = weights.map(() => Infinity)) {
-  const result = weights.map(() => 0)
-  let left = Math.min(
-    Math.max(0, Math.floor(total)),
-    limits.reduce((sum, limit) => sum + limit, 0),
-  )
-  while (left > 0) {
-    const active = weights
-        .map((weight, index) => ({ index, weight: Math.max(0, weight) }))
-        .filter(({ index }) => result[index] < limits[index]),
-      sum = active.reduce((value, item) => value + item.weight, 0)
-    if (!active.length) break
-    const shares = active.map(({ index, weight }) => ({
-      index,
-      exact: left * (sum ? weight / sum : 1 / active.length),
-    }))
-    let granted = 0
-    for (const share of shares) {
-      const amount = Math.min(limits[share.index] - result[share.index], Math.floor(share.exact))
-      result[share.index] += amount
-      granted += amount
-    }
-    left -= granted
-    if (left <= 0) break
-    shares.sort(
-      (a, b) => b.exact - Math.floor(b.exact) - (a.exact - Math.floor(a.exact)) || a.index - b.index,
-    )
-    let remainder = 0
-    for (const { index } of shares)
-      if (left && result[index] < limits[index]) {
-        result[index]++
-        left--
-        remainder++
-      }
-    if (!remainder && !granted) break
-  }
-  return result
 }
 export function registerIdentity(
   world: World,
@@ -135,18 +107,31 @@ export function rollupPopulation(region: Region) {
     region.happiness =
       region.communities.reduce((sum, group) => sum + group.contentment * communitySize(group), 0) / total
 }
-export function addCommunity(groups: PopulationCommunity[], incoming: PopulationCommunity) {
+export function communityIndex(groups: PopulationCommunity[]) {
+  const index = new Map<string, PopulationCommunity>()
+  for (const group of groups) if (!index.has(communityKey(group))) index.set(communityKey(group), group)
+  return index
+}
+export function addCommunity(
+  groups: PopulationCommunity[],
+  incoming: PopulationCommunity,
+  index?: Map<string, PopulationCommunity>,
+) {
   const count = communitySize(incoming)
   if (!count) return
-  const existing = groups.find((group) => communityKey(group) === communityKey(incoming))
+  const key = communityKey(incoming)
+  const existing = index ? index.get(key) : groups.find((group) => communityKey(group) === key)
   if (!existing) {
-    groups.push(structuredClone(incoming))
+    const added = structuredClone(incoming)
+    groups.push(added)
+    index?.set(key, added)
     return
   }
   const size = communitySize(existing)
   for (const field of SOCIAL)
     existing[field] = (existing[field] * size + incoming[field] * count) / (size + count)
-  for (const age of AGES) existing.population[age] += incoming.population[age]
+  if (existing.ageCohorts || incoming.ageCohorts) mergeAges(existing, incoming)
+  else for (const age of AGES) existing.population[age] += incoming.population[age]
 }
 /** Equal identities may converge after allegiance changes; combine their actual people and weighted conditions. */
 export function coalesceCommunities(groups: PopulationCommunity[]) {
@@ -163,11 +148,13 @@ export function coalesceCommunities(groups: PopulationCommunity[]) {
     const size = communitySize(existing)
     for (const field of SOCIAL)
       existing[field] = (existing[field] * size + group[field] * count) / (size + count)
-    for (const age of AGES) existing.population[age] += group.population[age]
+    if (existing.ageCohorts || group.ageCohorts) mergeAges(existing, group)
+    else for (const age of AGES) existing.population[age] += group.population[age]
   }
   return [...indexed.values()]
 }
 function copyPopulation(group: PopulationCommunity, counts: Cohorts): PopulationCommunity {
+  if (group.ageCohorts) return extractAges(structuredClone(group), counts)
   return { ...group, population: { ...counts } }
 }
 function seedGroup(
@@ -193,7 +180,15 @@ function seedGroup(
     fluency: 1,
   }
 }
+const preparedCensus = new WeakMap<World, number>()
 export function ensurePopulation(world: World) {
+  if (
+    world.demography &&
+    preparedCensus.get(world) === world.month &&
+    world.nations.every((n) => !!n.identity) &&
+    allForces(world).every((f) => !!f.communities)
+  )
+    return
   const initializing = !world.demography
   if (!world.demography) {
     world.demography = {
@@ -344,13 +339,41 @@ export function ensurePopulation(world: World) {
         .map((group, index) => copyPopulation(group, { children: 0, adults: counts[index], elders: 0 }))
         .filter((group) => communitySize(group) > 0)
     }
+  const initialize = (groups: PopulationCommunity[], urban: number) => {
+    const result: PopulationCommunity[] = []
+    for (const group of groups) {
+      ensureAges(group, world.month)
+      if (group.stratum) {
+        result.push(group)
+        continue
+      }
+      const weights = [0.5 - urban * 0.4, 0.28, 0.1 + urban * 0.1, 0.06 + urban * 0.25, 0.06 + urban * 0.05]
+      const parts = AGES.map((age) => apportion(group.population[age], weights))
+      for (let i = 0; i < STRATA.length; i++) {
+        const part = extractAges(group, { children: parts[0][i], adults: parts[1][i], elders: parts[2][i] })
+        if (communitySize(part)) result.push({ ...part, stratum: STRATA[i] })
+      }
+    }
+    return result
+  }
+  for (const r of world.regions) {
+    r.communities = initialize(r.communities!, r.urban)
+    rollupPopulation(r)
+  }
+  for (const force of allForces(world))
+    force.communities = initialize(force.communities!, world.regions[force.region].urban)
+  preparedCensus.set(world, world.month)
 }
-export function discrimination(world: World, region: Region, group: PopulationCommunity) {
+export function discrimination(
+  world: World,
+  region: Region,
+  group: PopulationCommunity,
+  protection = (world.historical?.societies.find((society) => society.nation === region.nation)?.pluralism ??
+    50) / 100,
+) {
   const nation = world.nations[region.nation],
     identity = nation.identity!,
-    policies = nation.policies,
-    protection =
-      (world.historical?.societies.find((society) => society.nation === nation.id)?.pluralism ?? 50) / 100
+    policies = nation.policies
   return (
     clamp(
       (policies.citizenship === 'heritage' && group.culture !== identity.culture ? 0.35 : 0) +
@@ -394,6 +417,9 @@ export function updateCommunityDemography(world: World, region: Region) {
     education = effectMultiplier(world, 'education', nation.id, region.id)
   region.births = 0
   region.deaths = 0
+  const openingStrata = Object.fromEntries(
+    STRATA.map((s) => [s, stratumPeople(world, region.id, s)]),
+  ) as Record<EconomicStratum, number>
   for (const group of region.communities!) {
     if (group.host !== region.nation) {
       group.loyalty *= group.allegiance === region.nation ? 1 : 0.65
@@ -418,17 +444,11 @@ export function updateCommunityDemography(world: World, region: Region) {
       0,
       0.995,
     )
-    group.wealth = clamp(
-      group.wealth +
-        (0.2 +
-          region.industry * 0.2 +
-          region.foodCoverage * 0.2 -
-          nation.policies.tax * 0.003 -
-          region.devastation * 0.25 -
-          exclusion * 0.15 -
-          group.wealth) *
-          0.015,
-    )
+    const household = world.economy?.households[region.id]?.[group.stratum ?? 'laborer']
+    if (household) {
+      const people = openingStrata[group.stratum ?? 'laborer']
+      group.wealth = clamp(Math.log1p((household.cash / Math.max(1, people)) * 1000) / Math.log(21))
+    }
     group.urban = clamp(
       group.urban + (clamp(region.industry * 0.5, 0.03, 0.92) - group.urban) * 0.001,
       0.01,
@@ -467,52 +487,41 @@ export function updateCommunityDemography(world: World, region: Region) {
     )
     group.displacement = Math.max(0, group.displacement - 0.004)
     group.rootedness = clamp(group.rootedness + 0.002 * (1 - region.devastation))
-    const births = expectedPeople(
-        world,
-        group.population.adults *
-          0.0032 *
-          (1 - group.literacy * 0.3) *
-          (1 - shortage * 0.7) *
-          (1 - group.urban * 0.12) *
-          clamp(0.9 + group.wealth * 0.2, 0.8, 1.15) *
-          fertility,
-      ),
-      deaths = {
-        children: Math.min(
-          group.population.children,
-          expectedPeople(
-            world,
-            group.population.children *
-              (0.0005 * (1.35 - group.health * 0.65) + shortage * 0.012) *
-              mortality,
-          ),
-        ),
-        adults: Math.min(
-          group.population.adults,
-          expectedPeople(
-            world,
-            group.population.adults * (0.0005 * (1.35 - group.health * 0.65) + shortage * 0.007) * mortality,
-          ),
-        ),
-        elders: Math.min(
-          group.population.elders,
-          expectedPeople(
-            world,
-            group.population.elders * (0.007 * (1.35 - group.health * 0.65) + shortage * 0.018) * mortality,
-          ),
-        ),
-      },
-      mature = expectedPeople(world, (group.population.children - deaths.children) / (18 * 12)),
-      retire = expectedPeople(world, (group.population.adults - deaths.adults) / (47 * 12))
-    group.population.children += births - deaths.children - mature
-    group.population.adults += mature - deaths.adults - retire
-    group.population.elders += retire - deaths.elders
+    const deprivation = 1 - (household?.foodCoverage ?? 1 - shortage)
+    const deaths = cohortDeaths(group, world.month, world.demography!, deprivation, mortality)
+    const births = cohortBirths(group, world.month, world.demography!, deprivation, fertility)
     region.births += births
-    region.deaths += deaths.children + deaths.adults + deaths.elders
+    region.deaths += deaths
   }
   world.totals.births += region.births
   world.totals.deaths += region.deaths
   rollupPopulation(region)
+}
+
+/** Province-level military transfers must update both views of the same census immediately. */
+function settleCivilianCensus(world: World, region: Region) {
+  rollupPopulation(region)
+  if (!world.localEconomy || world.regions[region.id] !== region) return
+  const units = world.localEconomy.units
+  const local = new Map<number, PopulationCommunity[]>()
+  for (const group of region.communities!) {
+    const id =
+      group.locality !== undefined &&
+      units[group.locality]?.retired === undefined &&
+      units[group.locality]?.province === region.id
+        ? group.locality
+        : region.id
+    group.locality = id
+    const groups = local.get(id) ?? []
+    groups.push(group)
+    local.set(id, groups)
+  }
+  for (const id of world.localEconomy.active) {
+    const unit = units[id]
+    if (unit.province !== region.id) continue
+    unit.communities = local.get(id) ?? []
+    rollupPopulation(unit)
+  }
 }
 
 export function takeCivilianAdults(
@@ -531,11 +540,10 @@ export function takeCivilianAdults(
     taken: PopulationCommunity[] = []
   groups.forEach((group, index) => {
     if (counts[index]) {
-      group.population.adults -= counts[index]
-      taken.push(copyPopulation(group, { children: 0, adults: counts[index], elders: 0 }))
+      taken.push(extractAges(group, { children: 0, adults: counts[index], elders: 0 }))
     }
   })
-  rollupPopulation(region)
+  settleCivilianCensus(world, region)
   return taken
 }
 export function removeCivilianAdults(world: World, region: Region, amount: number) {
@@ -545,8 +553,14 @@ export function removeCivilianAdults(world: World, region: Region, amount: numbe
     region.communities!.map((group) => group.population.adults),
     region.communities!.map((group) => group.population.adults),
   )
-  region.communities!.forEach((group, index) => (group.population.adults -= counts[index]))
-  rollupPopulation(region)
+  region.communities!.forEach((group, index) => {
+    extractAges(group, { children: 0, adults: counts[index], elders: 0 })
+    // The caller records provincial/world casualties; keep the resident district
+    // counter too so a later provincial rollup cannot erase reported combat deaths.
+    if (world.localEconomy && world.regions[region.id] === region)
+      world.localEconomy.units[group.locality ?? region.id].deaths += counts[index]
+  })
+  settleCivilianCensus(world, region)
 }
 export function removeSoldiers(world: World, army: Army, amount: number) {
   ensurePopulation(world)
@@ -558,7 +572,7 @@ export function removeSoldiers(world: World, army: Army, amount: number) {
       AGES.map((age) => group.population[age]),
       AGES.map((age) => group.population[age]),
     )
-    AGES.forEach((age, i) => (group.population[age] -= removed[i]))
+    extractAges(group, { children: removed[0], adults: removed[1], elders: removed[2] })
   })
   army.communities = groups.filter((group) => communitySize(group) > 0)
   army.soldiers -= counts.reduce((sum, count) => sum + count, 0)
@@ -567,6 +581,7 @@ export function returnArmyPeople(world: World, army: Army, region: Region) {
   ensurePopulation(world)
   for (const source of army.communities!) {
     const group = structuredClone(source)
+    if (world.localEconomy) group.locality = region.id
     group.host = region.nation
     if (group.allegiance !== region.nation) group.loyalty *= 0.75
     addCommunity(region.communities!, group)
@@ -575,18 +590,22 @@ export function returnArmyPeople(world: World, army: Army, region: Region) {
   army.soldiers = 0
   if ('warships' in army) {
     const fleet = army as Fleet
+    recordGift(world, fleetStore(fleet.id), marketStore(region.id), 'food', fleet.food)
+    recordGift(world, fleetStore(fleet.id), marketStore(region.id), 'arms', fleet.arms)
     region.stocks.food += fleet.food
     region.stocks.arms += fleet.arms
     fleet.food = 0
     fleet.arms = 0
   }
   if (army.operations) {
+    recordGift(world, armyStore(army.id), marketStore(region.id), 'food', army.operations.food)
+    recordGift(world, armyStore(army.id), marketStore(region.id), 'arms', army.operations.arms)
     region.stocks.food += army.operations.food
     region.stocks.arms += army.operations.arms
     army.operations.food = 0
     army.operations.arms = 0
   }
-  rollupPopulation(region)
+  settleCivilianCensus(world, region)
 }
 export function releaseSoldiers(world: World, army: Army, region: Region, amount: number) {
   ensurePopulation(world)
@@ -598,17 +617,18 @@ export function releaseSoldiers(world: World, army: Army, region: Region, amount
       AGES.map((age) => g.population[age]),
       AGES.map((age) => g.population[age]),
     )
-    const person = copyPopulation(g, { children: moved[0], adults: moved[1], elders: moved[2] })
+    const person = extractAges(g, { children: moved[0], adults: moved[1], elders: moved[2] })
+    if (world.localEconomy) person.locality = region.id
     person.host = region.nation
     person.rootedness *= 0.5
-    AGES.forEach((age) => (g.population[age] -= person.population[age]))
     addCommunity(region.communities!, person)
   })
   army.soldiers -= counts.reduce((sum, count) => sum + count, 0)
   army.communities = groups.filter((g) => communitySize(g))
-  rollupPopulation(region)
+  settleCivilianCensus(world, region)
 }
 export function ageMilitaryPopulation(world: World) {
+  const homes = new Set<Region>()
   for (const army of allForces(world)) {
     army.communities = coalesceCommunities(army.communities!)
     const home = world.regions[world.nations[army.nation].capital]
@@ -633,53 +653,70 @@ export function ageMilitaryPopulation(world: World) {
       group.loyalty = clamp(
         group.loyalty + (0.3 + army.supply * 0.25 + nation.legitimacy / 400 - group.loyalty) * 0.008,
       )
-      const deaths = Math.min(
-          group.population.adults,
-          expectedPeople(world, group.population.adults * 0.0004 * (1.3 - group.health * 0.6)),
-        ),
-        retired = expectedPeople(world, (group.population.adults - deaths) / (47 * 12))
-      group.population.adults -= deaths + retired
+      const deaths = cohortDeaths(group, world.month, world.demography!, Math.max(0, 1 - army.supply) * 0.3)
+      const retired = group.population.elders
       army.soldiers -= deaths + retired
       army.casualties += deaths
       world.nations[army.nation].casualties += deaths
       world.totals.deaths += deaths
-      if (retired)
-        addCommunity(home.communities!, copyPopulation(group, { children: 0, adults: 0, elders: retired }))
+      if (retired) {
+        const incoming = extractAges(group, { children: 0, adults: 0, elders: retired })
+        if (world.localEconomy) incoming.locality = home.id
+        addCommunity(home.communities!, incoming)
+      }
     }
     army.communities = army.communities!.filter((group) => communitySize(group) > 0)
-    rollupPopulation(home)
+    homes.add(home)
   }
+  // Retirement transfers alter communities immediately; aggregate each home once after all arrivals.
+  for (const home of homes) settleCivilianCensus(world, home)
 }
 
 export function migrateCommunities(world: World) {
   // Plans are simultaneous: destination communities stay unchanged until every household has chosen.
   // Marginals give the same affinity as scanning every destination group for every comparison.
-  const destinations = world.regions.map((region) => {
-    const language = new Map<number, number>(),
-      belief = new Map<number, number>(),
-      culture = new Map<number, number>()
-    for (const group of region.communities!) {
-      const size = communitySize(group)
-      for (const [axis, counts] of [
-        ['language', language],
-        ['belief', belief],
-        ['culture', culture],
-      ] as const)
-        counts.set(group[axis], (counts.get(group[axis]) ?? 0) + size)
-    }
-    return {
-      language,
-      belief,
-      culture,
-      people: Math.max(1, population(region)),
-      attraction: effectValue(world, 'migrationAttraction', region.nation, region.id) * 0.2,
-      prestige:
-        (world.historical?.societies.find((society) => society.nation === region.nation)?.prestige ?? 0) /
-        3000,
-    }
-  })
+  const destinations = Object.fromEntries(
+    economicRegions(world).map((region) => {
+      const language = new Map<number, number>(),
+        belief = new Map<number, number>(),
+        culture = new Map<number, number>()
+      for (const group of region.communities!) {
+        const size = communitySize(group)
+        for (const [axis, counts] of [
+          ['language', language],
+          ['belief', belief],
+          ['culture', culture],
+        ] as const)
+          counts.set(group[axis], (counts.get(group[axis]) ?? 0) + size)
+      }
+      return [
+        region.id,
+        {
+          strata: Object.fromEntries(STRATA.map((s) => [s, stratumPeople(world, region.id, s)])) as Record<
+            EconomicStratum,
+            number
+          >,
+          language,
+          belief,
+          culture,
+          people: Math.max(1, population(region)),
+          protection:
+            (world.historical?.societies.find((society) => society.nation === region.nation)?.pluralism ??
+              50) / 100,
+          attraction: effectValue(world, 'migrationAttraction', region.nation, region.id) * 0.2,
+          prestige:
+            (world.historical?.societies.find((society) => society.nation === region.nation)?.prestige ?? 0) /
+            3000,
+        },
+      ] as const
+    }),
+  )
   const sea = new Map<number, Map<number, number>>()
-  for (const route of world.routes)
+  for (const route of world.localEconomy
+    ? world.localEconomy.shipments
+        .filter((s) => s.legs.some((l) => l.mode === 'sea'))
+        .map((s) => ({ from: s.from, to: s.to, volume: s.quantity, sea: true }))
+    : world.routes)
     if (route.sea) {
       for (const [from, to] of [
         [route.from, route.to],
@@ -695,15 +732,28 @@ export function migrateCommunities(world: World) {
     source: PopulationCommunity
     counts: Cohorts
     refugee: boolean
+    incoming?: PopulationCommunity
+    assets: number
   }[] = []
-  for (const region of world.regions)
+  const candidatesByRegion = Object.fromEntries(
+    economicRegions(world).map(
+      (region) =>
+        [
+          region.id,
+          [...new Set([...region.neighbors, ...(sea.get(region.id)?.keys() ?? [])])]
+            .map((id) => economicRegion(world, id))
+            .filter((to) => to && to.id !== region.id),
+        ] as const,
+    ),
+  )
+  for (const region of economicRegions(world))
     for (const group of region.communities!) {
       const size = communitySize(group)
       if (!size) continue
       const pressure = clamp(
           region.devastation * 0.75 +
             Math.max(0, 0.8 - region.foodCoverage) * 0.8 +
-            discrimination(world, region, group) * 0.35,
+            discrimination(world, region, group, destinations[region.id].protection) * 0.35,
         ),
         refugee = pressure > 0.17,
         appeal = (to: Region) => {
@@ -718,26 +768,40 @@ export function migrateCommunities(world: World) {
             to.health * 0.2 +
             to.foodCoverage * 0.2 +
             to.infrastructure * 0.1 +
-            compatible * 0.12 +
+            economicAppeal(world, to, group.stratum ?? 'laborer') +
+            compatible * 0.12 -
+            (world.localEconomy
+              ? 0.04 * Math.log1p(population(to) / Math.max(1, to.cells.length * 12000)) +
+                (Math.hypot(
+                  world.cells[to.center].q - world.cells[region.center].q,
+                  world.cells[to.center].r - world.cells[region.center].r,
+                ) *
+                  0.002) /
+                  (1 + to.infrastructure)
+              : 0) +
             destination.attraction +
             destination.prestige -
             to.devastation * 0.6 -
-            discrimination(world, to, group) * 0.3
+            discrimination(world, to, group, destination.protection) * 0.3
           )
-        },
-        candidates = [...new Set([...region.neighbors, ...(sea.get(region.id)?.keys() ?? [])])]
-          .map((id) => world.regions[id])
-          .filter(
-            (to) =>
-              to.id !== region.id &&
-              (to.nation === region.nation ||
-                refugee ||
-                (world.nations[region.nation].policies.migration !== 'closed' &&
-                  world.nations[to.nation].policies.migration !== 'closed' &&
-                  relation(world, region.nation, to.nation)?.treaty !== 'war')),
-          )
-          .sort((a, b) => appeal(b) - appeal(a) || a.id - b.id),
-        to = candidates[0]
+        }
+      let to: Region | undefined,
+        bestAppeal = -Infinity
+      for (const candidate of candidatesByRegion[region.id]) {
+        if (!(
+          candidate.nation === region.nation ||
+          refugee ||
+          (world.nations[region.nation].policies.migration !== 'closed' &&
+            world.nations[candidate.nation].policies.migration !== 'closed' &&
+            relation(world, region.nation, candidate.nation)?.treaty !== 'war')
+        ))
+          continue
+        const value = appeal(candidate)
+        if (value > bestAppeal || (value === bestAppeal && candidate.id < to!.id)) {
+          to = candidate
+          bestAppeal = value
+        }
+      }
       if (!to) continue
       const border =
           to.nation === region.nation
@@ -749,7 +813,7 @@ export function migrateCommunities(world: World) {
               : world.nations[to.nation].policies.migration === 'controlled'
                 ? 0.3
                 : 0.7,
-        rate = clamp((appeal(to) - appeal(region) - 0.025) * 0.012 + pressure * 0.01, 0, 0.018) * border,
+        rate = clamp((bestAppeal - appeal(region) - 0.025) * 0.012 + pressure * 0.01, 0, 0.018) * border,
         wanted = Math.floor(size * rate * (1 - group.rootedness * 0.4)),
         maritime = !region.neighbors.includes(to.id),
         capacity = maritime ? (sea.get(region.id)?.get(to.id) ?? 0) : Infinity,
@@ -766,15 +830,32 @@ export function migrateCommunities(world: World) {
         source: group,
         counts: { children: allocation[0], adults: allocation[1], elders: allocation[2] },
         refugee,
+        assets:
+          ((world.economy?.households[region.id][group.stratum ?? 'laborer'].cash ?? 0) * amount) /
+          Math.max(1, destinations[region.id].strata[group.stratum ?? 'laborer']),
       })
       if (maritime) sea.get(region.id)!.set(to.id, capacity - amount)
     }
+  relocateHouseholdClaims(
+    world,
+    plans.map((p) => ({
+      from: householdAccount(p.from.id, p.source.stratum ?? 'laborer'),
+      to: householdAccount(p.to.id, p.source.stratum ?? 'laborer'),
+      fraction:
+        (p.counts.children + p.counts.adults + p.counts.elders) /
+        Math.max(1, destinations[p.from.id].strata[p.source.stratum ?? 'laborer']),
+    })),
+  )
   // Subtract every departure before arrivals: no newly arrived person moves twice this month.
-  for (const plan of plans) for (const age of AGES) plan.source.population[age] -= plan.counts[age]
+  for (const plan of plans) plan.incoming = extractAges(plan.source, plan.counts)
+  const arrivalIndexes = Object.fromEntries(
+    economicRegions(world).map((r) => [r.id, communityIndex(r.communities!)]),
+  )
   for (const plan of plans) {
-    const incoming = copyPopulation(plan.source, plan.counts),
+    const incoming = plan.incoming!,
       amount = communitySize(incoming),
       language = world.nations[plan.to.nation].identity!.language
+    if (world.localEconomy) incoming.locality = plan.to.id
     incoming.host = plan.to.nation
     incoming.rootedness *= 0.65
     if (plan.refugee) incoming.displacement = 1
@@ -784,7 +865,15 @@ export function migrateCommunities(world: World) {
       incoming.knownLanguage = language
       incoming.fluency = incoming.language === language ? 1 : 0.05
     }
-    addCommunity(plan.to.communities!, incoming)
+    if (world.economy)
+      transfer(
+        world,
+        householdAccount(plan.from.id, incoming.stratum ?? 'laborer'),
+        householdAccount(plan.to.id, incoming.stratum ?? 'laborer'),
+        plan.assets,
+        'migrant household assets',
+      )
+    addCommunity(plan.to.communities!, incoming, arrivalIndexes[plan.to.id])
     plan.from.migration -= amount
     plan.to.migration += amount
     world.totals.migration += amount
@@ -792,15 +881,18 @@ export function migrateCommunities(world: World) {
     plan.to.populationDynamics!.immigrants += amount
     if (plan.refugee) plan.to.populationDynamics!.refugees += amount
   }
-  for (const region of world.regions) rollupPopulation(region)
+  for (const region of economicRegions(world)) rollupPopulation(region)
 }
 
 export function splitCommunity(
   region: Region,
   source: PopulationCommunity,
-  changes: Partial<Pick<PopulationCommunity, 'culture' | 'language' | 'belief' | 'movement' | 'allegiance'>>,
+  changes: Partial<
+    Pick<PopulationCommunity, 'culture' | 'language' | 'belief' | 'movement' | 'allegiance' | 'stratum'>
+  >,
   rate: number,
   ageFactors = [1, 1, 1],
+  index?: Map<string, PopulationCommunity>,
 ) {
   const counts = { children: 0, adults: 0, elders: 0 }
   AGES.forEach((age, index) => {
@@ -808,9 +900,76 @@ export function splitCommunity(
       source.population[age],
       Math.floor(source.population[age] * clamp(rate * ageFactors[index], 0, 0.15)),
     )
-    source.population[age] -= counts[age]
   })
   const moved = counts.children + counts.adults + counts.elders
-  if (moved) addCommunity(region.communities!, { ...source, ...changes, population: counts })
+  if (moved) addCommunity(region.communities!, { ...extractAges(source, counts), ...changes }, index)
   return moved
+}
+
+function economicAppeal(world: World, region: Region, stratum: EconomicStratum) {
+  const e = world.economy
+  if (!e) return 0
+  const h = e.households[region.id][stratum],
+    f = e.producers[region.id]
+  const employment = h.laborForce ? Math.min(1, h.employed / h.laborForce) : 0
+  const realWage = f.wage / Math.max(0.01, region.prices.food / 14)
+  return employment * 0.12 + Math.min(0.08, realWage * 20)
+}
+
+/** Slow family-group occupational mobility, independently of cultural identity. */
+export function advanceEconomicStrata(world: World) {
+  const e = world.economy
+  if (!e) return
+  for (const r of economicRegions(world)) {
+    const index = communityIndex(r.communities!)
+    const opening = Object.fromEntries(
+      STRATA.map((s) => [s, { people: stratumPeople(world, r.id, s), cash: e.households[r.id][s].cash }]),
+    ) as Record<EconomicStratum, { people: number; cash: number }>
+    for (const g of [...r.communities!]) {
+      const from = g.stratum ?? 'laborer',
+        h = e.households[r.id][from],
+        size = communitySize(g)
+      const cashPerPerson = opening[from].cash / Math.max(1, opening[from].people)
+      let to: EconomicStratum = from,
+        opportunity = 0
+      if (h.foodCoverage < 0.6 && from !== 'laborer' && from !== 'smallholder') {
+        to = 'laborer'
+        opportunity = 1 - h.foodCoverage
+      } else if (from === 'smallholder' && r.urban > 0.15) {
+        to = 'laborer'
+        opportunity = r.urban
+      } else if (from === 'laborer' && g.literacy > 0.2) {
+        to = 'artisan'
+        opportunity = g.literacy * r.industry
+      } else if (from === 'artisan' && g.literacy > 0.55) {
+        to = 'professional'
+        opportunity = g.literacy
+      } else if (from === 'professional' && cashPerPerson > 0.02) {
+        to = 'owner'
+        opportunity = Math.min(1, cashPerPerson / 0.1)
+      }
+      if (to === from || !size) continue
+      const amount = Math.min(
+        size,
+        expectedInteger(world, size * MODEL_PARAMETERS.mobilityMonthly * clamp(opportunity)),
+      )
+      if (!amount) continue
+      const parts = apportion(
+        amount,
+        AGES.map((age) => g.population[age]),
+        AGES.map((age) => g.population[age]),
+      )
+      const moved = extractAges(g, { children: parts[0], adults: parts[1], elders: parts[2] })
+      moved.stratum = to
+      addCommunity(r.communities!, moved, index)
+      transfer(
+        world,
+        householdAccount(r.id, from),
+        householdAccount(r.id, to),
+        cashPerPerson * amount,
+        'occupational mobility assets',
+      )
+    }
+    rollupPopulation(r)
+  }
 }

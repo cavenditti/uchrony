@@ -5,9 +5,13 @@ import { tick, applyCommand, summarize } from '../src/sim/engine'
 import { produce, trade, transportGraph } from '../src/sim/economy'
 import { parseSave, validateWorld } from '../src/sim/persistence'
 import { GOODS, population, relation, type World } from '../src/sim/types'
+import { allForces } from '../src/sim/forces'
+import { balances, borrow, transfer, beginLedgerMonth } from '../src/sim/ledger'
+import { settleCredit } from '../src/sim/macroeconomy'
+import { ensureFirms, firmCapacity, regionalFirms } from '../src/sim/firms'
 
 const totalPeople = (w: World) =>
-  w.regions.reduce((sum, r) => sum + population(r), 0) + w.armies.reduce((sum, a) => sum + a.soldiers, 0)
+  w.regions.reduce((sum, r) => sum + population(r), 0) + allForces(w).reduce((sum, a) => sum + a.soldiers, 0)
 const sumGoods = (w: World, good: (typeof GOODS)[number]) =>
   w.regions.reduce((sum, r) => sum + r.stocks[good], 0)
 
@@ -63,18 +67,18 @@ test('recruiting transfers working-age civilians into the military and charges r
   assert(r.population.adults < adults)
 })
 
-test('trade conserves goods and treasury and respects shared edge capacity', () => {
+test('trade conserves goods and total account balances and respects shared edge capacity', () => {
   const w = generateWorld('trade-ledger')
   const buyer = w.regions[0],
     seller = w.regions[buyer.neighbors[0]]
   buyer.stocks.food = 0
   seller.stocks.food = population(seller) * 0.5
   const goods = GOODS.map((g) => sumGoods(w, g)),
-    treasury = w.nations.reduce((s, n) => s + n.treasury, 0)
+    treasury = Object.values(balances(w)).reduce((s, value) => s + value, 0)
   const graph = transportGraph(w)
   trade(w)
   GOODS.forEach((g, i) => assert(Math.abs(sumGoods(w, g) - goods[i]) < 0.00001, g))
-  assert(Math.abs(w.nations.reduce((s, n) => s + n.treasury, 0) - treasury) < 0.00001)
+  assert(Math.abs(Object.values(balances(w)).reduce((s, value) => s + value, 0) - treasury) < 0.00001)
   const used = new Map<string, number>(),
     caps = new Map<string, number>()
   const key = (a: number, b: number) => `${Math.min(a, b)}-${Math.max(a, b)}`
@@ -116,9 +120,14 @@ test('research eventually unlocks implemented technology effects', () => {
   const w = generateWorld('science')
   applyCommand(w, { type: 'research', nation: 0, field: 'agriculture' })
   applyCommand(w, { type: 'policy', nation: 0, key: 'research', value: 80 })
-  for (let i = 0; i < 120; i++) tick(w)
+  let researchReported = false
+  for (let i = 0; i < 120; i++) {
+    tick(w)
+    // The bounded live chronicle can evict a breakthrough before this ten-year run ends.
+    researchReported ||= w.events.some((e) => e.type === 'research')
+  }
   assert(w.nations[0].technologies.agriculture > 0)
-  assert(w.events.some((e) => e.type === 'research'))
+  assert(researchReported)
 })
 
 test('save and restore continue the same random stream without divergence', () => {
@@ -174,22 +183,28 @@ test('a prolonged simulation retains finite nonnegative state and valid save str
 test('agricultural output is bounded by land even when population grows without bound', () => {
   const w = generateWorld('land-capacity'),
     r = w.regions[0]
-  r.population.adults = 1e8
-  produce(w)
-  const first = r.production.food
-  r.population.adults *= 10
-  produce(w)
-  assert(Math.abs(r.production.food - first) < 0.001)
-  assert(r.foodCoverage <= 1)
+  ensureFirms(w)
+  const firms = regionalFirms(w, r.id).filter((f) => f.active)
+  // Hold financial and product-demand constraints fixed to isolate physical carrying capacity.
+  const output = (jobs: number) =>
+    firms.reduce((sum, f) => {
+      f.employment = jobs / firms.length
+      return sum + firmCapacity(w, r, f, firms.length).q.food
+    }, 0)
+  const first = output(1e8)
+  assert(first > 0)
+  assert(Math.abs(output(1e9) - first) < 0.001)
 })
 
 test('sovereign insolvency restructures debt instead of compounding beyond save limits', () => {
   const w = generateWorld('debt-crisis'),
     n = w.nations[0]
-  n.debt = 1e10
-  n.treasury = 0
-  tick(w)
-  assert(n.debt <= Math.max(1000, n.gdp * 24))
+  beginLedgerMonth(w)
+  borrow(w, `government:${n.id}`, 1000, 1000)
+  transfer(w, `government:${n.id}`, `producer:${n.capital}`, n.treasury, 'exhausted public funds')
+  w.economy!.credit.loans.find((l) => l.borrower === `government:${n.id}`)!.arrears = 11
+  settleCredit(w)
+  assert.equal(n.debt, 350)
   assert(w.events.some((e) => e.title.includes('restructures its debt') && e.nation === n.id))
   assert(n.legitimacy < 72)
   validateWorld(w)

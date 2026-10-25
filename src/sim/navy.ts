@@ -1,3 +1,5 @@
+import { marketStore, armyStore, fleetStore, recordGift, recordUse } from './national-accounts'
+import { publicExpense, publicGoods } from './ledger'
 import { clamp, population, relation, type Army, type World } from './types'
 import type { Fleet } from './military-types'
 import { neighbors } from './hex'
@@ -135,7 +137,14 @@ export function commissionFleet(
     )
   ensurePopulation(w)
   const communities = takeCivilianAdults(w, r, crew)
-  n.treasury -= cost
+  publicExpense(w, n.id, cost, 'ship construction', r.id)
+  for (const [good, amount] of [
+    ['timber', timber],
+    ['iron', iron],
+    ['arms', arms],
+    ['tools', tools],
+  ] as const)
+    recordUse(w, marketStore(r.id), good, amount)
   r.stocks.timber -= timber
   r.stocks.iron -= iron
   r.stocks.arms -= arms
@@ -201,6 +210,17 @@ export function orderFleet(w: World, id: number, target: number, mission: Fleet[
   for (const army of w.armies.filter((a) => f.embarked.includes(a.id))) army.target = target
   return 'Naval orders recorded. Ships sail and consume provisions on subsequent months.'
 }
+/** Shared eligibility for the automatic planner and explicit embarkation orders. */
+export function canEmbarkArmy(w: World, army: Army, fleet: Fleet) {
+  const aboard = w.armies.filter((a) => fleet.embarked.includes(a.id)).reduce((sum, a) => sum + a.soldiers, 0)
+  return (
+    army.nation === fleet.nation &&
+    army.operations?.embarkedOn === null &&
+    portAt(w, army.region)?.water === fleet.cell &&
+    friendlyPort(w, fleet.nation, army.region) &&
+    aboard + army.soldiers <= transportSeats(fleet)
+  )
+}
 export function embarkArmy(w: World, armyId: number, fleetId: number) {
   ensureWarfare(w)
   const a = w.armies.find((a) => a.id === armyId),
@@ -233,6 +253,7 @@ export function disembark(w: World, army: Army, fleet: Fleet, region: number) {
 }
 export function militaryDeaths(w: World, force: Army, amount: number) {
   const losses = Math.min(force.soldiers, Math.max(0, Math.floor(amount)))
+  if (!losses) return
   removeSoldiers(w, force, losses)
   force.casualties += losses
   w.nations[force.nation].casualties += losses
@@ -243,6 +264,8 @@ export function advanceNavy(w: World) {
   for (const f of state.fleets) {
     if (!w.regions.some((r) => r.nation === f.nation)) {
       const home = w.regions[f.region]
+      recordGift(w, fleetStore(f.id), marketStore(home.id), 'food', f.food)
+      recordGift(w, fleetStore(f.id), marketStore(home.id), 'arms', f.arms)
       home.stocks.food += f.food
       home.stocks.arms += f.arms
       f.food = 0
@@ -262,27 +285,20 @@ export function advanceNavy(w: World) {
     f.hull = Math.max(0.05, f.hull - (dock ? 0.001 : 0.003))
     if (dock) {
       const r = w.regions[dock.region]
-      const foreign = r.nation !== f.nation,
-        foodPrice = r.prices.food / 1000,
+      const foodPrice = r.prices.food / 1000,
         armsPrice = r.prices.arms / 1000
       const load = Math.min(
         Math.max(0, r.stocks.food - population(r) * 0.025),
         Math.max(0, f.soldiers * 0.034 * 4 - f.food),
-        foreign ? Math.max(0, n.treasury) / Math.max(0.001, foodPrice) : Infinity,
+        Math.max(0, n.treasury) / Math.max(0.001, foodPrice),
       )
-      if (foreign) {
-        n.treasury -= load * foodPrice
-        w.nations[r.nation].treasury += load * foodPrice
-      }
+      publicGoods(w, n.id, r.id, 'food', load, fleetStore(f.id), foodPrice)
       const ammunition = Math.min(
         r.stocks.arms,
         Math.max(0, (f.warships + 1) * 0.8 * 3 - f.arms),
-        foreign ? Math.max(0, n.treasury) / Math.max(0.001, armsPrice) : Infinity,
+        Math.max(0, n.treasury) / Math.max(0.001, armsPrice),
       )
-      if (foreign) {
-        n.treasury -= ammunition * armsPrice
-        w.nations[r.nation].treasury += ammunition * armsPrice
-      }
+      publicGoods(w, n.id, r.id, 'arms', ammunition, fleetStore(f.id), armsPrice)
       f.food += load
       f.arms += ammunition
       r.stocks.food -= load
@@ -299,24 +315,26 @@ export function advanceNavy(w: World) {
         ),
       )
       f.hull += repair
+      for (const [good, amount] of [
+        ['timber', repair * 60],
+        ['iron', repair * 15],
+        ['tools', repair * 4],
+      ] as const)
+        recordUse(w, marketStore(r.id), good, amount)
       r.stocks.timber -= repair * 60
       r.stocks.iron -= repair * 15
       r.stocks.tools -= repair * 4
-      n.treasury -= repair * 150
+      publicExpense(w, n.id, repair * 150, 'naval repairs', r.id)
       r.consumption.timber += repair * 60
       r.consumption.iron += repair * 15
       r.consumption.tools += repair * 4
-      if (foreign) w.nations[r.nation].treasury += repair * 150
       for (const a of aboard) {
         const loaded = Math.min(
           Math.max(0, r.stocks.food - population(r) * 0.025),
           Math.max(0, a.soldiers * 0.034 * 3 - a.operations!.food),
-          foreign ? Math.max(0, n.treasury) / Math.max(0.001, foodPrice) : Infinity,
+          Math.max(0, n.treasury) / Math.max(0.001, foodPrice),
         )
-        if (foreign) {
-          n.treasury -= loaded * foodPrice
-          w.nations[r.nation].treasury += loaded * foodPrice
-        }
+        publicGoods(w, n.id, r.id, 'food', loaded, armyStore(a.id), foodPrice)
         a.operations!.food += loaded
         r.stocks.food -= loaded
       }
@@ -332,11 +350,12 @@ export function advanceNavy(w: World) {
         const people = takeCivilianAdults(w, r, replacements)
         for (const g of people) addCommunity(f.communities!, g)
         f.soldiers += replacements
-        n.treasury -= replacements * 0.2
+        publicExpense(w, n.id, replacements * 0.2, 'naval recruitment', r.id)
       }
     }
     const need = f.soldiers * 0.034,
       eaten = Math.min(f.food, need)
+    recordUse(w, fleetStore(f.id), 'food', eaten, 'government')
     f.food -= eaten
     f.supply = eaten / Math.max(0.001, need)
     w.regions[f.region].consumption.food += eaten
@@ -405,6 +424,7 @@ export function advanceNavy(w: World) {
         [b, pa, pb],
       ] as [Fleet, number, number][]) {
         const ammunition = Math.min(f.arms, f.warships * 0.25)
+        recordUse(w, fleetStore(f.id), 'arms', ammunition, 'government')
         f.arms -= ammunition
         w.regions[f.region].consumption.arms += ammunition
         const damage = Math.min(0.55, (enemy / Math.max(0.5, own)) * (0.07 + random(w) * 0.08))
@@ -436,6 +456,8 @@ export function advanceNavy(w: World) {
         excess -= lost
       }
     if ((!f.warships && !f.transports) || !f.soldiers) {
+      recordUse(w, fleetStore(f.id), 'food', f.food, 'other')
+      recordUse(w, fleetStore(f.id), 'arms', f.arms, 'other')
       w.regions[f.region].consumption.food += f.food
       w.regions[f.region].consumption.arms += f.arms
       militaryDeaths(w, f, f.soldiers)

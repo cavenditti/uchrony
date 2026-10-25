@@ -4,7 +4,7 @@ A living atlas of people, resources, trade, and competing futures.
 
 Uchrony is a local world-history simulation inspired by [Aprento's Fantasy Map Simulator timelapse](https://youtu.be/aobeydG8Sd4). Generate a world, let its governments act autonomously, or intervene in any state. Population, production, transport, policy, research, and warfare share one simulation state.
 
-This is an experimental aggregate simulation, not a calibrated historical model. It implements the interconnected systems below; it does not yet model individual households or firms, real-world geography, or ship-by-ship naval tactics.
+This is an experimental aggregate simulation, not a calibrated historical model. It implements the interconnected systems below; it does not yet model individual households, real-world geography, or ship-by-ship naval tactics.
 
 ## Run
 
@@ -37,7 +37,7 @@ npm run test:trade-corridors # Isolate convergence and inertia on parallel cross
 1. **Play** in the floating clock advances monthly ticks. Choose 1×, 4×, 12×, or 60×. While paused, step one month; the clock’s menu also advances one year.
 2. **States** opens a searchable, collapsible faction drawer. Choosing a state frames its territory and opens its dossier. Click a province for contextual shortcuts to people, trade, forces, diplomacy, and its full dossier.
 3. **Explore** opens the Population, Economy, Diplomacy, Military, Research, Government, and Chronicle views. Dossiers can expand for detailed work or close to leave the map clear. On phones, they become sheets above the clock.
-4. The **map-layer picker** contains thematic layers and trade-route/army overlays. **Map key** reveals the legend. Drag to pan, scroll or pinch to zoom, and double-click to zoom into a place. With the map focused, arrow keys pan, +/− zoom, Home fits the world, and Enter opens a selected province’s dossier.
+4. The **map-layer picker** contains thematic layers and trade-route/army overlays. **Map key** reveals the legend. Drag to pan, scroll or pinch to zoom, and double-click to zoom into a place. With the map focused, arrow keys pan, +/− zoom, Home fits the world, and Enter opens a selected province’s dossier. The map starts in **3D** with the **Terrain** layer; switch to **Atlas** for the flat view, or use **View from above** to change the 3D angle. See [map rendering](docs/MAP_RENDERING.md) for controls, fallback behavior, and current visual limits.
 5. **World** opens nonmodal diplomacy matrices, comparison tables, and shared institutions. **Chronicle** opens historical records directly.
 6. The header’s **world menu** contains export, import, generation, simulation conditions, and help. **Activity and saving** contains background model status, saving details, and retry controls. Background generation has no persistent banner; saving failures still raise a notification and a visible warning.
 
@@ -76,7 +76,7 @@ Keyboard shortcuts: **Space** play/pause, **1–4** speed, **L** cycle layers, *
 ## Model and architecture
 
 The formulas, units, approximations, and monthly order are documented in [docs/MODEL.md](docs/MODEL.md).
-The tested workflows, regression coverage, and 1,080-year run are recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
+Validation is recorded in [docs/VALIDATION.md](docs/VALIDATION.md), with resident-district checks separated from historical provincial-model results. The earlier three 200-year provincial scenarios lost 93–95% of their population. Those runs predate resident district economies and do not qualify the new model; accounting checks do not establish empirical calibration.
 
 ```text
 src/sim/types.ts        Shared state, commands, and worker messages
@@ -84,7 +84,10 @@ src/sim/random.ts       Seed hashing, PRNG, geographic noise
 src/sim/geography.ts    Continental relief, climate, and drainage
 src/sim/generate.ts     Terrain-aware provinces, states, and initial armies
 src/map/               Shared polygon geometry, relief rendering, and label placement
-src/sim/economy.ts      Production, trade allocation, consumption
+src/sim/economy.ts      Paid production and capacity-constrained trade
+src/sim/macroeconomy.ts Household demand, labor, credit, investment and national accounts
+src/sim/ledger.ts       Cash counterparties, settlement, claims and reconciliation
+src/sim/age-cohorts.ts  Exact birth-month/sex cohorts, fertility and survival
 src/sim/transport.ts    Terrain roads, fixed harbors, persistent shipping paths
 src/sim/corridors.ts    Useful-flow reinforcement, evaporation, congestion and tile capacity
 src/sim/trade-memory.ts Persistent supplier shares and route switching thresholds
@@ -111,17 +114,19 @@ The UI uses React, TypeScript, Vite, Canvas, Lucide icons, and self-hosted Alegr
 
 The geography setting selects one, two, three, or five major landmasses, with smaller offshore islands. Province and initial state expansion account for terrain costs. Mountain belts, moisture, latitude, and drainage influence the map; rivers collect runoff and reach the sea, with a small fertility benefit along their course.
 
+New worlds use correlated resource basins and uneven population density. Productive river valleys and coasts attract more people and finer provinces; remote terrain forms larger, sparsely settled regions. Provinces can have several settlements or dispersed countryside without a town. An adaptive quadtree refines population and industrial districts as activity grows, coarsens them as it declines, and preserves every provincial population and economic account. The population layer shows district density; towns and cities have different map symbols and 3D footprints. Resident populations, firms, resource extraction, hiring, consumption and transport now operate in the adaptive districts. Taxes settle to their jurisdiction; military orders remain provincial. Full formulas and limitations are in **About → Mathematics** and [MODEL.md](docs/MODEL.md).
+
 The atlas traces shared province boundaries, smooths shorelines, blends terrain shading, and places labels with collision checks. Province divisions and smaller place names become visible as you zoom. New worlds default to a 448 × 288 simulation grid, sixteen times the original area. Hexes retain their physical size, so distances, supply journeys and regional markets grow with the geography. Regional and Continental sizes remain available in the new-world dialog, and existing saves keep their original map. Terrain rasters have a bounded resolution; exact province geometry renders into the visible viewport and the atlas supports 32× zoom. Static geography is transferred from the simulation worker once per generated/restored world rather than with every monthly update.
 
 Existing saved worlds retain their geography and load normally. Use **New world** to see the revised generator. New worlds with an old seed now differ from the original generator; exports retain their complete map and generator version.
 
-The trade layer shows actual monthly freight on shared roads and shipping lanes. Roads use low-cost terrain paths; ships follow connected water between reachable coastal harbors. The selected state's or province's imports and exports are emphasized. Width represents summed tonnage in both directions, and moving dots indicate direction. The economy panel lists cargo, distance, and harbors. Trade relationships persist through minor cost changes: established paths require a 20% cost improvement to switch, while better suppliers gain traffic gradually. War and urgent shortages override supplier inertia; the memory survives save/load. Old saved shipments without physical paths become visible again after advancing one month.
+The trade layer shows actual monthly freight on shared roads and shipping lanes. Roads use low-cost terrain paths; ships follow connected water between reachable coastal harbors. The selected state's or province's imports and exports are emphasized. Width represents summed tonnage in both directions, and moving dots indicate direction. The economy panel lists cargo, distance, and harbors. Surveyed trunk paths retain their minimum tenure and replanning thresholds. District buyers search by physical travel effort and compare paid delivered costs; all shipments share the same physical bottlenecks. Old saved shipments without physical paths become visible again after advancing one month.
 
 ## Scope and next extensions
 
-The present model operates at provincial and monthly resolution. Trade dots visualize monthly deliveries rather than persistent vehicles. States administer a public-inventory economy rather than separate firms and household markets. Mineral richness is renewable throughput, not a finite geological reserve. Port links are geographic approximations. Alliances grant access but do not automatically draw allies into war. The independent-region mechanic is simple and requires sustained severe unrest.
+The economy and population operate in adaptive districts at monthly resolution, with stable administrative provinces. Trade dots visualize monthly deliveries rather than persistent vehicles. Five economic strata own household cash accounts; competing firms pay wages, buy inputs and sell through regional wholesalers or directly to households, with every payment reconciled in the transaction ledger. Public transfers and services require funding. Firms use fixed input recipes, product-specific labor plans, cost-based prices and delayed capital investment. Commercial banks create deposits against loan claims, settle across reserves and recognize credit losses. Production, expenditure and income GDP reconcile independently, including inventory flows, trade margins, freight and public services. Mineral reserves deplete with extraction; standing timber regrows toward its land-use-dependent capacity. Port links are geographic approximations. Alliances grant access but do not automatically draw allies into war. The independent-region mechanic is simple and requires sustained severe unrest.
 
-Natural next extensions are real geography imports, more granular professions and markets, persistent freight and supply lines, separate naval forces, treaty terms and war goals, a larger technology graph, and historical calibration. None is represented as implemented in this build.
+Further extensions include real geography imports, individual households, finite mineral reserves, bank choice and deposit interest, exchange rates, individual freight and naval voyages, detailed war goals, and historical calibration. None is represented as implemented in this build.
 
 Browser-local saves belong to the current origin and browser profile. Export important worlds. A suspended or closed tab does not continue simulating; a changed model version is not guaranteed to reproduce a previous build's future.
 
@@ -132,3 +137,8 @@ Open **Simulation conditions** (the sliders icon in the header) to set destabili
 ### Standing forces and loss of authority
 
 Funded armies replace retirees and losses from actual local civilian cohorts, equipment and provisions. The inspector shows the standing establishment and monthly replacements. **Protection and authority** in government/military views reports vulnerable provinces, organized challengers and conditional warnings before control can be lost. Sustained insecurity and unrest can lead to secession, government replacement or control by a capable foreign force already present. These developments run locally and do not wait for a model response.
+
+The **About & mathematics** popup under the World menu presents the complete model reference, searchable by mechanism, with equations, parameter values, assumptions and primary sources. Population inspectors show economic strata and an age/sex census; Economy shows modeled value added, reference-price output, unemployment, consumption, investment and grouped income inequality.
+
+
+Resident districts now run local populations, household accounts, firms, resource extraction and markets. Quadtree boundaries adapt to urban and industrial activity; conservative reorganization preserves people, inventories, deposits, loan claims and equipment. Paid transport connects local markets. Connected built-up footprints grow, shrink and merge, keeping earlier city names and ancestry. The province inspector exposes local market accounts and inventories, while About & mathematics documents the rules and limits. Provinces remain administrative jurisdictions; military operations still use their graph. Existing provincial worlds convert on their first monthly step. These mechanisms are synthetic and require calibration; see [the model](docs/MODEL.md) and [validation](docs/VALIDATION.md).

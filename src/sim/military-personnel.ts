@@ -1,3 +1,5 @@
+import { marketStore, armyStore, recordGift, recordUse } from './national-accounts'
+import { publicExpense } from './ledger'
 import { MAX_ARMIES } from './military-limits'
 import { addCommunity, takeCivilianAdults, coalesceCommunities } from './population'
 import { clamp, population, type Army, type World } from './types'
@@ -30,8 +32,9 @@ export function reinforceArmies(world: World) {
         )[0]
       if (source && nation.treasury >= 20 && (remaining.get(nation.id) ?? 0) >= 20) {
         const communities = takeCivilianAdults(world, source, 100)
-        nation.treasury -= 20
+        publicExpense(world, nation.id, 20, 'military cadre', source.id)
         remaining.set(nation.id, remaining.get(nation.id)! - 20)
+        recordUse(world, marketStore(source.id), 'arms', 1.2)
         source.stocks.arms -= 1.2
         source.consumption.arms += 1.2
         const army: Army = {
@@ -50,6 +53,7 @@ export function reinforceArmies(world: World) {
         }
         world.armies.push(army)
         ensureWarfare(world)
+        recordGift(world, marketStore(source.id), armyStore(army.id), 'food', 4)
         source.stocks.food -= 4
         army.operations!.food = 4
         warEvent(
@@ -106,8 +110,10 @@ export function reinforceArmies(world: World) {
     army.soldiers += recruits
     army.replacements = recruits
     army.experience = (army.experience * before + 0.02 * recruits) / army.soldiers
-    n.treasury -= recruits * 0.2
+    publicExpense(world, n.id, recruits * 0.2, 'military recruitment', r.id)
     remaining.set(n.id, remaining.get(n.id)! - recruits * 0.2)
+    recordUse(world, marketStore(r.id), 'arms', recruits * 0.012)
+    recordGift(world, marketStore(r.id), armyStore(army.id), 'food', recruits * 0.04)
     r.stocks.arms -= recruits * 0.012
     r.consumption.arms += recruits * 0.012
     r.stocks.food -= recruits * 0.04

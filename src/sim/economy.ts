@@ -1,4 +1,9 @@
-import { simulationSettings } from './settings'
+import { economicRegions } from './local-units'
+import { tradeDistricts } from './district-transport'
+import { marketStore } from './national-accounts'
+import { ensureEconomy, balance, producerAccount, publicGoods } from './ledger'
+import { finishProduction, consumeHouseholds, recordTrade } from './macroeconomy'
+import { ensureFirms, produceFirms } from './firms'
 import { MinHeap } from './heap'
 import { seaPassageView } from './naval-control'
 import {
@@ -6,7 +11,6 @@ import {
   inventory,
   population,
   relation,
-  clamp,
   type World,
   type Region,
   type Good,
@@ -16,7 +20,6 @@ import {
 } from './types'
 
 import { agreementTerms } from './agreements'
-import { effectMultiplier } from './effects'
 import { transportNetwork, reverseLegs, refreshTransport } from './transport'
 import {
   corridorCost,
@@ -64,7 +67,7 @@ export function householdNeed(r: Region, good: Good) {
   return population(r) * MONTHLY_NEED[good] * livingStandard * allocation
 }
 export function reserveTarget(r: Region, good: Good) {
-  const p = r.production,
+  const p = r.plannedProduction ?? r.production,
     inputs =
       good === 'iron'
         ? p.tools * 0.65 + p.arms * 0.9
@@ -81,86 +84,12 @@ export function reserveTarget(r: Region, good: Good) {
 }
 
 export function produce(world: World) {
-  const abundance = simulationSettings(world).abundance
-  for (const r of world.regions) {
-    const n = world.nations[r.nation],
-      pop = population(r),
-      p = n.policies,
-      tech = n.technologies
-    r.production = inventory()
-    r.consumption = inventory()
+  ensureFirms(world)
+  for (const r of economicRegions(world)) {
+    for (const g of GOODS) if (!r.prices[g]) r.prices[g] = BASE_PRICE[g]
     r.migration = 0
-    const labor = r.population.adults * 0.73 * (0.6 + r.health * 0.4)
-    const utilization = clamp(
-      0.58 + r.infrastructure * 0.2 + n.stability / 500 - r.devastation * 0.4,
-      0.15,
-      0.96,
-    )
-    const workers = labor * utilization * (0.75 + 0.25 * (r.materialCoverage ?? 1))
-    r.employed = workers
-    const efficiency = (1 + r.literacy * 0.35 + tech.industry * 0.13) * (1 - r.devastation * 0.55)
-    const farmShare = clamp(
-      0.58 - r.urban * 0.18 + (p.priority === 'agriculture' ? 0.15 : p.priority === 'industry' ? -0.1 : 0),
-      0.3,
-      0.78,
-    )
-    const season = 1 + Math.sin((((world.month % 12) - 4) / 12) * Math.PI * 2) * 0.23
-    const arableCapacity = Math.max(1, r.cells.length * 1800 * (0.35 + r.fertility * 0.65))
-    const effectiveFarmLabor = arableCapacity * (1 - Math.exp((-workers * farmShare) / arableCapacity))
-    const farm =
-      effectiveFarmLabor *
-      (0.105 + r.fertility * 0.125) *
-      abundance *
-      (1 + tech.agriculture * 0.19) *
-      season *
-      world.climate *
-      efficiency *
-      effectMultiplier(world, 'harvest', n.id, r.id)
-    const industrial = (1 - farmShare) / 0.52
-    const raw = (g: Good, amount: number) => {
-      if (['timber', 'stone', 'iron', 'coal'].includes(g))
-        amount *= abundance * effectMultiplier(world, 'extraction', n.id, r.id)
-      r.production[g] = amount
-      r.stocks[g] += amount
-    }
-    raw('food', farm)
-    raw('timber', workers * 0.11 * 0.13 * r.deposits.timber * efficiency * industrial)
-    raw('stone', workers * 0.08 * 0.12 * r.deposits.stone * efficiency * industrial)
-    raw('iron', workers * 0.075 * 0.07 * r.deposits.iron * efficiency * industrial)
-    raw('coal', workers * 0.065 * 0.1 * r.deposits.coal * efficiency * industrial)
-    const manufacture = (good: Good, potential: number, recipe: Partial<Inventory>) => {
-      let amount = potential
-      for (const [input, rate] of Object.entries(recipe))
-        amount = Math.min(amount, r.stocks[input as Good] / rate)
-      amount = Math.max(0, amount)
-      for (const [input, rate] of Object.entries(recipe)) {
-        r.stocks[input as Good] -= amount * rate
-        r.consumption[input as Good] += amount * rate
-      }
-      raw(good, amount)
-    }
-    // Farming and extraction use explicit shares; the remaining 36.5% of
-    // non-farm labor works in manufacturing. The recipe rates include its
-    // allocation among toolmakers, textile workers, and arms makers.
-    const factory =
-      workers *
-      (1 - farmShare) *
-      (1 - 0.33 / 0.52) *
-      r.industry *
-      efficiency *
-      effectMultiplier(world, 'manufacturing', n.id, r.id)
-    manufacture('tools', factory * (0.007 / 0.19), { iron: 0.65, coal: 0.3, timber: 0.25 })
-    manufacture('textiles', factory * (0.013 / 0.19), { timber: 0.3, food: 0.12 })
-    manufacture('arms', factory * (0.0025 / 0.19) * (p.priority === 'military' ? 2 : 1), {
-      iron: 0.9,
-      coal: 0.5,
-      tools: 0.3,
-    })
-    for (const g of GOODS) {
-      r.prices[g] = BASE_PRICE[g] * clamp(reserveTarget(r, g) / Math.max(1, r.stocks[g]), 0.55, 3)
-    }
-    r.gdp = GOODS.reduce((sum, g) => sum + r.production[g] * r.prices[g], 0) / 1000
-    if (!pop) r.gdp = 0
+    produceFirms(world, r)
+    finishProduction(world, r)
   }
 }
 
@@ -277,6 +206,8 @@ export function pathTo(previous: Int32Array, from: number, to: number): number[]
 }
 
 export function trade(world: World) {
+  if (world.localEconomy) return tradeDistricts(world)
+  ensureEconomy(world)
   // Demand targets do not change while goods change hands this month.
   const targets = Object.fromEntries(
     GOODS.map((good) => [good, world.regions.map((r) => reserveTarget(r, good))]),
@@ -346,12 +277,14 @@ export function trade(world: World) {
           edgeKeys = path.slice(1).map((to, i) => key(path[i], to))
         let amount = Math.min(
           owed,
+          world.nations[term.from].treasury / Math.max(1e-9, seller.prices[good] / 1000),
           seller.stocks[good] - target(seller, good),
           Math.max(0, target(buyer, good) * 4 - buyer.stocks[good]),
           ...edgeKeys.map((edge) => capacity.get(edge) ?? 0),
         )
         for (const [index, count] of usage) amount = Math.min(amount, physicalCapacity[index] / count)
         if (amount < 0.1) continue
+        publicGoods(world, term.from, seller.id, good, amount, marketStore(buyer.id))
         seller.stocks[good] -= amount
         buyer.stocks[good] += amount
         owed -= amount
@@ -437,16 +370,23 @@ export function trade(world: World) {
               16 + buyer.infrastructure * 16 + world.nations[buyer.nation].technologies.logistics * 8,
             )
       let newcomers = 0
-      const candidates = markets.get(buyer.id)!.filter((candidate) => {
-        const prior = candidate.flow?.[g] ?? 0
-        if (
-          plans.get(candidate.id)?.blocked ||
-          candidate.seller.stocks[g] <= target(candidate.seller, g) * (prior >= 0.1 ? 1 : 1.1)
-        )
-          return false
-        if (prior >= 0.1) return true
-        return newcomers++ < contacts
-      })
+      const candidates = markets
+        .get(buyer.id)!
+        .map((candidate) => ({
+          ...candidate,
+          score: candidate.score * (candidate.seller.prices[g] / BASE_PRICE[g]),
+        }))
+        .sort((a, b) => a.score - b.score || a.seller.id - b.seller.id)
+        .filter((candidate) => {
+          const prior = candidate.flow?.[g] ?? 0
+          if (
+            plans.get(candidate.id)?.blocked ||
+            candidate.seller.stocks[g] <= target(candidate.seller, g) * (prior >= 0.1 ? 1 : 1.1)
+          )
+            return false
+          if (prior >= 0.1) return true
+          return newcomers++ < contacts
+        })
       if (!candidates.length) continue
       const transfer = (candidate: (typeof candidates)[number], requested: number) => {
         const { seller } = candidate
@@ -476,9 +416,9 @@ export function trade(world: World) {
           return
         }
         const international = seller.nation !== buyer.nation
-        const nBuyer = world.nations[buyer.nation],
-          nSeller = world.nations[seller.nation]
-        const unitPrice = (buyer.prices[g] + seller.prices[g]) / 2 / 1000
+        const nBuyer = world.nations[buyer.nation]
+        const unitPrice = seller.prices[g] / 1000
+        const freightRate = Math.min(0.5, plan.cost * 0.001) * unitPrice
         const agreement = treaty(buyer.nation, seller.nation)
         const tariff =
           international &&
@@ -487,17 +427,12 @@ export function trade(world: World) {
           !preferences.has(`${buyer.nation}:${seller.nation}`)
             ? nBuyer.policies.tariff / 100
             : 0
-        const affordable = international
-          ? Math.max(0, nBuyer.treasury - 200) / (unitPrice * (1 + tariff))
-          : Infinity
-        // Tariffs are border friction in this public-inventory abstraction;
-        // a trade treaty removes the reduction in cross-border throughput.
-        const amount =
-          Math.max(
-            0,
-            Math.min(requested, needed, seller.stocks[g] - target(seller, g), available, affordable),
-          ) /
-          (1 + tariff)
+        const affordable =
+          balance(world, producerAccount(buyer.id)) / Math.max(1e-12, unitPrice * (1 + tariff) + freightRate)
+        const amount = Math.max(
+          0,
+          Math.min(requested, needed, seller.stocks[g] - target(seller, g), available, affordable),
+        )
         if (amount < 0.1) return
         seller.stocks[g] -= amount
         buyer.stocks[g] += amount
@@ -505,10 +440,7 @@ export function trade(world: World) {
         edgeKeys.forEach((k) => capacity.set(k, capacity.get(k)! - amount))
         for (const [index, count] of usage) physicalCapacity[index] -= amount * count
         const value = amount * unitPrice
-        if (international) {
-          nBuyer.treasury -= value
-          nSeller.treasury += value
-        }
+        recordTrade(world, seller.id, buyer.id, g, amount, unitPrice, amount * freightRate, tariff)
         const id = `${seller.id}-${buyer.id}`,
           existing = routes.get(id)
         if (existing) {
@@ -561,30 +493,5 @@ export function trade(world: World) {
 }
 
 export function consume(world: World) {
-  for (const r of world.regions) {
-    let materialCoverage = 0
-    const weights: Partial<Inventory> = {
-      tools: 0.35,
-      textiles: 0.25,
-      timber: 0.15,
-      stone: 0.1,
-      iron: 0.05,
-      coal: 0.1,
-    }
-    for (const g of GOODS) {
-      // Inputs consumed by factories have already been accounted for; these are household and maintenance demands.
-      const need = householdNeed(r, g)
-      const actual = Math.min(r.stocks[g], need)
-      r.stocks[g] -= actual
-      r.consumption[g] += actual
-      const coverage = need > 0 ? actual / need : 1
-      if (g === 'food') r.foodCoverage = coverage
-      materialCoverage += (weights[g] ?? 0) * coverage
-      const decay = g === 'food' ? 0.035 : g === 'timber' || g === 'textiles' ? 0.006 : 0.001
-      r.stocks[g] = Math.min(r.stocks[g] * (1 - decay), Math.max(1, reserveTarget(r, g)) * 20)
-    }
-    r.materialCoverage = clamp(materialCoverage)
-    if (r.materialCoverage < 0.7)
-      r.infrastructure = Math.max(0.05, r.infrastructure - (0.7 - r.materialCoverage) * 0.002)
-  }
+  consumeHouseholds(world)
 }

@@ -1,3 +1,5 @@
+import type { PopulationCensus } from './view-snapshot'
+import type { EconomicSystem } from './economic-types'
 import type { WorldScale } from './scale'
 import type { InstitutionalState, ProvincialDelegation, Charter } from './institutions'
 import type { IntelligenceState, IntelligencePriority } from './intelligence'
@@ -44,6 +46,7 @@ export type Layer =
   | 'military'
 
 export interface Cell {
+  landscape?: import('./landscape').Landscape
   id: number
   q: number
   r: number
@@ -58,12 +61,16 @@ export interface Cell {
   riverFlow?: number
 }
 export interface Region {
+  /** Present only on a local simulation district. */
+  province?: number
+  capitalReference?: number
   delegation?: ProvincialDelegation
   occupation?: Occupation
   id: number
   name: string
   nation: number
   culture: number
+  census?: PopulationCensus
   communities?: PopulationCommunity[]
   populationDynamics?: PopulationDynamics
   center: number
@@ -82,6 +89,7 @@ export interface Region {
   industry: number
   stocks: Inventory
   production: Inventory
+  plannedProduction?: Inventory
   consumption: Inventory
   prices: Inventory
   foodCoverage: number
@@ -167,6 +175,7 @@ export interface Army {
   supply: number
   experience: number
   casualties: number
+  census?: PopulationCensus
   communities?: PopulationCommunity[]
 }
 export interface RouteLeg {
@@ -174,6 +183,8 @@ export interface RouteLeg {
   cells: number[]
 }
 export interface Route {
+  fromDistrict?: number
+  toDistrict?: number
   id: string
   from: number
   to: number
@@ -228,6 +239,10 @@ export interface HistoryPoint {
   nations: { id: number; population: number; gdp: number; territory: number; treasury: number }[]
 }
 export interface World {
+  localEconomy?: import('./district-types').DistrictEconomy
+  spatial?: import('./spatial').SpatialState
+  viewOnly?: true
+  economy?: EconomicSystem
   version: 1
   simulation?: SimulationSettings
   institutions?: InstitutionalState
@@ -329,12 +344,31 @@ export type WorkerRequest =
   | { type: 'playback'; running: boolean; speed: number }
   | { type: 'command'; command: Command }
   | { type: 'load'; world: unknown }
+  | { type: 'restore'; legacy: string | null }
+  | { type: 'import'; file: Blob }
+  | { type: 'export' }
+  | { type: 'save'; force?: boolean }
+  | { type: 'storage-port'; port: MessagePort }
+  | { type: 'storage-error' }
+  | { type: 'snapshot-ack'; mapKey: string }
   | { type: 'retry-history' }
   | { type: 'advise'; nation: number; text: string }
   | { type: 'withdraw-advice'; nation: number; advice: number }
   | { type: 'agent-strategy'; nation: number }
   | { type: 'event-details'; event: number }
 export type WorkerResponse =
+  | {
+      type: 'storage'
+      state: 'saving' | 'saved' | 'error' | 'restored'
+      month?: number
+      startYear?: number
+      source?: string
+      message?: string
+      bytes?: number
+      replicas?: string[]
+    }
+  | { type: 'startup-error'; message: string }
+  | { type: 'exported'; blob: Blob; filename: string }
   | {
       type: 'world'
       world: Omit<World, 'cells'> & { cells?: Cell[] }
@@ -351,7 +385,35 @@ export const inventory = (value = 0): Inventory =>
   Object.fromEntries(GOODS.map((g) => [g, value])) as Inventory
 export const population = (r: Region) => r.population.children + r.population.adults + r.population.elders
 export const clamp = (n: number, min = 0, max = 1) => Math.min(max, Math.max(min, n))
-export const relation = (world: World, a: number, b: number) =>
-  world.relations.find((r) => r.a === Math.min(a, b) && r.b === Math.max(a, b))
+const relationIndices = new WeakMap<Relation[], { length: number; pairs: Map<string, number> }>()
+/** Cache positions, not objects: treaty edits and replacement records remain immediately visible. */
+export function relation(world: World, a: number, b: number) {
+  const low = Math.min(a, b),
+    high = Math.max(a, b),
+    records = world.relations
+  let index = relationIndices.get(records)
+  if (!index || records.length < index.length) {
+    index = { length: 0, pairs: new Map() }
+    relationIndices.set(records, index)
+  }
+  for (let i = index.length; i < records.length; i++) {
+    const r = records[i],
+      key = `${r.a}:${r.b}`
+    if (!index.pairs.has(key)) index.pairs.set(key, i)
+  }
+  index.length = records.length
+  const key = `${low}:${high}`,
+    position = index.pairs.get(key)
+  const found = position === undefined ? undefined : records[position]
+  if (found?.a === low && found.b === high) return found
+  // Imports replace the array; this fallback also tolerates in-place sorting or changed endpoints.
+  const refreshed = records.findIndex((r) => r.a === low && r.b === high)
+  if (refreshed < 0) {
+    index.pairs.delete(key)
+    return undefined
+  }
+  index.pairs.set(key, refreshed)
+  return records[refreshed]
+}
 export const dateLabel = (world: Pick<World, 'month' | 'startYear'>) =>
   `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][world.month % 12]} ${world.startYear + Math.floor(world.month / 12)}`

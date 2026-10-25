@@ -1,3 +1,4 @@
+import { endowTreasury } from './fixtures/endowment'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createElement } from 'react'
@@ -68,7 +69,7 @@ test('changing hidden foreign armies, fleets, treasury, research, reserves and p
   const { w, target } = fixture('knowledge-leak-check'),
     before = stateAgentContext(w, 0, true)
   const n = w.nations[target]
-  n.treasury = 987654321
+  endowTreasury(w, n.id, 987654321)
   n.population *= 3
   n.stability = 1
   n.legitimacy = 2
@@ -99,7 +100,7 @@ test('local strategy uses the same recorded intelligence instead of secretly con
     a.soldiers *= 100
     a.morale = 0.001
   }
-  altered.nations[target].treasury = 0
+  endowTreasury(altered, target, 0)
   assert.equal(perceivedPower(w, 0, target), perceivedPower(altered, 0, target))
   advanceGeopolitics(w)
   advanceGeopolitics(altered)
@@ -119,7 +120,7 @@ test('funding develops focused networks over time and consumes actual treasury w
     n = w.nations[0],
     before = structuredClone(s.dossiers.find((d) => d.nation === target)!)
   n.income = 1000
-  n.treasury = 100000
+  endowTreasury(w, n.id, 100000)
   const money = n.treasury,
     people = w.totals.population
   configureIntelligence(w, 0, 0.1, 'military', target)
@@ -144,7 +145,7 @@ test('funding develops focused networks over time and consumes actual treasury w
 
 test('an unfunded appropriation buys neither network access nor trained collection capacity', () => {
   const { w, s, target } = fixture('unfunded-reporting')
-  w.nations[0].treasury = 0
+  endowTreasury(w, 0, 0)
   w.nations[0].income = 1000
   configureIntelligence(w, 0, 0.15, 'politics', target)
   months(w, 18)
@@ -240,7 +241,7 @@ test('counterintelligence reduces the quality of an equally funded rival network
   const { w, target } = fixture('counterintelligence'),
     n = w.nations[0]
   n.income = 1000
-  n.treasury = 100000
+  endowTreasury(w, n.id, 100000)
   configureIntelligence(w, 0, 0.15, 'military', target)
   const closed = structuredClone(w),
     opposing = intelligenceService(closed, target)
@@ -248,7 +249,7 @@ test('counterintelligence reduces the quality of an equally funded rival network
   opposing.capacity = 0.9
   opposing.budgetShare = 0.15
   closed.nations[target].income = 1000
-  closed.nations[target].treasury = 100000
+  endowTreasury(closed, target, 100000)
   months(w, 24)
   months(closed, 24)
   const read = (x: World) =>

@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
+import { beginEconomyMonth } from '../src/sim/macroeconomy'
+import { produce } from '../src/sim/economy'
 import { applyCommand } from '../src/sim/engine'
 import { ensureStatecraft, settleConventionalOffers, submitStandingOffer } from '../src/sim/statecraft'
 import {
@@ -161,6 +163,8 @@ test('provincial charters retain only their tax share, fund services and cannot 
   const w = generateWorld('provincial-charter'),
     r = w.regions[w.nations[0].capital]
   ensureStatecraft(w)
+  beginEconomyMonth(w)
+  produce(w)
   applyCommand(w, {
     type: 'devolution',
     nation: 0,

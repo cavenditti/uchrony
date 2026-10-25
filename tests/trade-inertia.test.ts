@@ -1,7 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
-import { trade, reserveTarget, shortestPaths, pathTo, transportGraph, type Graph } from '../src/sim/economy'
+import {
+  trade,
+  reserveTarget,
+  shortestPaths,
+  pathTo,
+  transportGraph,
+  BASE_PRICE,
+  type Graph,
+} from '../src/sim/economy'
 import { establishedPath, TRADE_INERTIA } from '../src/sim/trade-memory'
 import { parseSave, validateWorld } from '../src/sim/persistence'
 import { GOODS, inventory, relation, type Good, type World } from '../src/sim/types'
@@ -19,6 +27,7 @@ function fixture() {
   assert(far)
   const path = (seller: number) => pathTo(paths.previous, buyer.id, seller).reverse()
   const reset = (good: Good = 'coal', need = 100, supplierIds = [near.id, far.id]) => {
+    for (const r of world.regions) r.prices = { ...BASE_PRICE }
     for (const r of world.regions) for (const g of GOODS) r.stocks[g] = reserveTarget(r, g)
     buyer.stocks[good] -= need
     for (const id of supplierIds) world.regions[id].stocks[good] += 10000

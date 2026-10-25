@@ -1962,7 +1962,58 @@ select {
   margin: 0;
 }
 .help-dialog {
-  width: 620px;
+  width: 780px;
+}
+.help-dialog .model-mathematics {
+  font-size: 14px;
+}
+.help-dialog .model-mathematics details p,
+.help-dialog .model-mathematics li {
+  font-size: 13px;
+  padding-top: 0;
+  line-height: 1.7;
+}
+.help-dialog .model-mathematics summary {
+  font-size: 15px;
+}
+.model-mathematics summary,
+.model-controls summary,
+.economic-accounts summary,
+.district-economies summary,
+.age-sex-census summary {
+  display: list-item;
+  list-style-type: disclosure-closed;
+  margin-left: 1.1em;
+}
+.model-mathematics details[open] > summary,
+.model-controls[open] > summary,
+.economic-accounts[open] > summary,
+.economic-accounts details[open] > summary,
+.district-economies[open] > summary,
+.district-economies details[open] > summary,
+.age-sex-census[open] > summary {
+  list-style-type: disclosure-open;
+}
+.model-mathematics summary::-webkit-details-marker,
+.model-controls summary::-webkit-details-marker,
+.economic-accounts summary::-webkit-details-marker,
+.district-economies summary::-webkit-details-marker,
+.age-sex-census summary::-webkit-details-marker {
+  display: revert;
+}
+.model-mathematics summary::marker,
+.model-controls summary::marker,
+.economic-accounts summary::marker,
+.district-economies summary::marker,
+.age-sex-census summary::marker {
+  content: normal;
+}
+.help-dialog .dialog-close {
+  position: sticky;
+  float: right;
+  top: 0;
+  z-index: 2;
+  background: #22343a;
 }
 .help-steps {
   display: flex;
@@ -4657,5 +4708,260 @@ select option {
 .adviser-response strong {
   color: var(--accent);
   font-size: 11px;
+  font-weight: 500;
+}
+
+/* The landscape is the canvas; operational controls retain the cabinet palette. */
+.relief-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  visibility: hidden;
+}
+[data-presentation='relief'] .relief-canvas {
+  visibility: visible;
+}
+.world-canvas {
+  position: relative;
+}
+.map-view-switch {
+  position: absolute;
+  right: 18px;
+  bottom: 132px;
+  display: flex;
+  background: #202e34;
+  border: 1px solid #536d70;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.map-view-switch button {
+  min-height: 36px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #cad6d4;
+  font-size: 12px;
+}
+.map-view-switch button + button {
+  border-left: 1px solid #536d70;
+}
+.map-view-switch button[aria-pressed='true'] {
+  color: #edce91;
+  background: #34443f;
+}
+.map-view-switch button:hover:not(:disabled) {
+  background: #3d514d;
+}
+.map-view-switch button:focus-visible {
+  outline-offset: -3px;
+}
+.map-render-note {
+  position: absolute;
+  right: 18px;
+  bottom: 177px;
+  font-size: 11px;
+  color: #e6e7dd;
+  background: #202e34;
+  padding: 7px 10px;
+  border-radius: 4px;
+}
+@media (max-width: 760px) {
+  .atlas-shell .map-legend {
+    top: 64px;
+    bottom: auto;
+  }
+  .map-view-switch {
+    right: 12px;
+    bottom: 200px;
+  }
+  .map-view-switch button {
+    min-height: 40px;
+    padding: 9px;
+  }
+  .map-render-note {
+    right: 12px;
+    bottom: 248px;
+    max-width: 190px;
+  }
+}
+.model-mathematics {
+  margin-block: 1.5rem;
+}
+.model-mathematics p,
+.model-mathematics li {
+  max-width: 72ch;
+  line-height: 1.65;
+}
+.model-mathematics a {
+  color: #e8c98b;
+  text-underline-offset: 0.2em;
+  overflow-wrap: anywhere;
+}
+.model-mathematics h4 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1.05rem;
+}
+.model-search {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: 1.4rem 0.5rem;
+}
+.model-search input {
+  width: 100%;
+  min-height: 44px;
+}
+.model-result-count {
+  font-size: 0.8rem;
+}
+.model-topics details {
+  border-top: 1px solid #48545a;
+  padding-block: 0.85rem;
+}
+.model-topics summary,
+.model-controls summary {
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding-block: 0.25rem;
+}
+.model-mathematics pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.65;
+  padding: 1rem;
+  background: #111b20;
+  color: #e9d8b7;
+  border-radius: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.model-mathematics code {
+  overflow-wrap: anywhere;
+  color: #e9d8b7;
+}
+.model-table {
+  overflow-x: auto;
+}
+.model-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.model-table th,
+.model-table td {
+  padding: 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid #48545a;
+  vertical-align: top;
+}
+.model-parameters div,
+.stratum-accounts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.4rem;
+}
+.model-parameters dd,
+.stratum-accounts dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.economic-accounts {
+  margin-bottom: 1.8rem;
+}
+.economic-accounts details {
+  border-top: 1px solid var(--line, #48545a);
+  padding-block: 0.6rem;
+}
+.economic-accounts summary {
+  cursor: pointer;
+  line-height: 1.6;
+}
+.economic-accounts summary span {
+  float: right;
+  font-variant-numeric: tabular-nums;
+}
+.stratum-accounts {
+  font-size: 0.8rem;
+}
+.macro-accounts {
+  margin-block: 1rem 1.5rem;
+}
+.model-mathematics :focus-visible,
+.economic-accounts :focus-visible {
+  outline: 2px solid #e8c98b;
+  outline-offset: 4px;
+}
+.model-mathematics ::selection {
+  color: #111b20;
+  background: #e8c98b;
+}
+@media (max-width: 540px) {
+  .model-parameters div {
+    display: block;
+  }
+  .model-parameters dd {
+    text-align: left;
+    margin-top: 0.25rem;
+  }
+  .model-mathematics pre {
+    padding: 0.75rem;
+  }
+}
+
+/* Local markets extend the existing ruled province dossier. */
+.district-economies {
+  margin: 16px 0;
+  border-block: 1px solid var(--line);
+  padding: 10px 0;
+}
+.district-economies > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.district-economies > summary span {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  padding-left: 16px;
+}
+.district-selector {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+.district-selector select {
+  width: 100%;
+  min-width: 0;
+}
+.district-goods {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.district-goods caption {
+  text-align: left;
+  padding-bottom: 8px;
+  color: var(--muted);
+}
+.district-goods th,
+.district-goods td {
+  text-align: right;
+  padding: 6px 3px;
+  border-bottom: 1px solid var(--line);
+}
+.district-goods th:first-child {
+  text-align: left;
+}
+.district-goods thead th {
+  color: var(--muted);
   font-weight: 500;
 }

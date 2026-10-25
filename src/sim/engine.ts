@@ -1,3 +1,16 @@
+import { economicRegions, provinceId } from './local-units'
+import {
+  ensureDistrictEconomy,
+  linkDistrictPeople,
+  aggregateDistricts,
+  remeshDistricts,
+  refreshEndowment,
+} from './districts'
+import { evolveCities } from './cities'
+import { refreshSpatial, buildSpatial } from './spatial'
+import { inventoryFlow, marketStore, recordUse, reconcileGDP } from './national-accounts'
+import { beginEconomyMonth, fundGovernment, finishEconomyMonth } from './macroeconomy'
+import { publicExpense } from './ledger'
 import { MAX_ARMIES } from './military-limits'
 import {
   allocateProvincialTaxes,
@@ -19,7 +32,7 @@ import { advanceSovereignty } from './sovereignty'
 import { reinforceArmies } from './military-personnel'
 import { advancePressures } from './pressures'
 import { validateSettings } from './settings'
-import { allForces, militaryPeople } from './forces'
+import { militaryPeople } from './forces'
 import { advanceArmies, landGraph } from './military'
 import { advanceNavy, ensureWarfare, commissionFleet, orderFleet, embarkArmy } from './navy'
 import {
@@ -46,6 +59,7 @@ import {
   takeCivilianAdults,
   ageMilitaryPopulation,
   migrateCommunities,
+  advanceEconomicStrata,
 } from './population'
 import { beginPopulationMonth, evolveIdentities } from './identities'
 import { advanceCharacters, characterPolicyTargets, characterResearch } from './character'
@@ -118,6 +132,8 @@ export function event(
 }
 
 function fiscalPolicy(w: World) {
+  for (const n of w.nations) n.income -= allocateProvincialTaxes(w, n.id, n.income)
+  fundGovernment(w)
   for (const n of w.nations) {
     const regions = nationRegions(w, n.id)
     n.population = regions.reduce((s, r) => s + population(r), 0) + militaryPeople(w, n.id)
@@ -127,64 +143,7 @@ function fiscalPolicy(w: World) {
       n.spending = 0
       continue
     }
-    n.income =
-      ((n.gdp * n.policies.tax) / 100) *
-      (0.6 + n.technologies.governance * 0.045) *
-      (n.stability / 200 + 0.5) *
-      effectMultiplier(w, 'taxIncome', n.id)
-    const grossIncome = n.income
-    n.income -= allocateProvincialTaxes(w, n.id, n.income)
-    const revenue = n.income
-    // A service floor can create a deficit at low tax rates; healthy states
-    // otherwise retain a reserve instead of structurally overspending forever.
-    const desiredServices = Math.max(n.gdp * 0.09 * (revenue / Math.max(0.001, grossIncome)), revenue * 0.85)
-    const available = Math.min(desiredServices, revenue + Math.max(0, n.treasury) * 0.01)
-    const weights = {
-      welfare: n.policies.welfare,
-      education: n.policies.education,
-      military: n.policies.military,
-      research: n.policies.research,
-      administration: 12,
-      infrastructure: 18,
-    }
-    const sum = Object.values(weights).reduce((a, b) => a + b, 0)
-    for (const k of Object.keys(weights) as (keyof typeof weights)[])
-      n.budget[k] = (available * weights[k]) / sum
-    const armyUpkeep =
-      allForces(w)
-        .filter((a) => a.nation === n.id)
-        .reduce((s, a) => s + a.soldiers * 0.008, 0) +
-      (w.warfare?.fleets
-        .filter((f) => f.nation === n.id)
-        .reduce((sum, f) => sum + f.warships * 12 + f.transports * 5, 0) ?? 0)
-    n.spending = Object.values(n.budget).reduce((a, b) => a + b, 0) + armyUpkeep + n.debt * 0.003
-    n.treasury += revenue - n.spending
-    if (n.treasury < 0) {
-      n.debt += -n.treasury
-      n.treasury = 0
-      n.legitimacy = clamp(n.legitimacy - 0.4, 0, 100)
-    }
-    if (n.treasury > 500 && n.debt > 0) {
-      const repayment = Math.min(n.debt, n.treasury * 0.02)
-      n.debt -= repayment
-      n.treasury -= repayment
-    }
-    const debtLimit = Math.max(1000, n.gdp * 24)
-    if (n.debt > debtLimit) {
-      const writtenOff = n.debt - debtLimit * 0.35
-      n.debt = debtLimit * 0.35
-      n.legitimacy = clamp(n.legitimacy - 12, 0, 100)
-      n.stability = clamp(n.stability - 10, 5, 99)
-      event(
-        w,
-        'economy',
-        `${n.shortName} restructures its debt`,
-        `${Math.round(writtenOff).toLocaleString()}k crowns of unsustainable debt are written off. The default damages legitimacy and public stability.`,
-        n.id,
-      )
-    } else if (revenue > n.spending) {
-      n.legitimacy = clamp(n.legitimacy + 0.04, 0, 100)
-    }
+    // Income was collected from wages and transactions, never minted from output.
     const civilians = regions.reduce((s, r) => s + population(r), 0)
     n.foodCoverage = regions.reduce((s, r) => s + r.foodCoverage * population(r), 0) / Math.max(1, civilians)
     n.manpower = regions.reduce((s, r) => s + r.population.adults * 0.08, 0)
@@ -199,13 +158,13 @@ function fiscalPolicy(w: World) {
 
 function demographics(w: World) {
   ensurePopulation(w)
-  for (const r of w.regions) {
+  for (const r of economicRegions(w)) {
     const n = w.nations[r.nation],
       pop = population(r)
     const services =
       (n.budget.welfare / Math.max(1, n.population / 10000)) * effectMultiplier(w, 'healthcare', n.id, r.id)
     const school =
-      provincialServiceBudget(r, 'education') / Math.max(1, pop / 10000) +
+      provincialServiceBudget(w.regions[provinceId(r)], 'education') / Math.max(1, pop / 10000) +
       (n.budget.education / Math.max(1, n.population / 10000)) * effectMultiplier(w, 'education', n.id, r.id)
     const healthTarget = clamp(
       0.44 +
@@ -223,7 +182,7 @@ function demographics(w: World) {
     )
     const happinessTarget = clamp(
       0.6 +
-        n.policies.welfare * 0.003 -
+        Math.min(0.24, (n.budget.welfare / Math.max(1, n.population)) * 100) -
         Math.max(0, n.policies.tax - 20) * 0.006 +
         r.health * 0.2 -
         (1 - r.foodCoverage) * 0.55 -
@@ -246,18 +205,11 @@ function demographics(w: World) {
     updateCommunityDemography(w, r)
     const investment =
       n.budget.infrastructure / Math.max(1, n.population / 10000) +
-      provincialServiceBudget(r, 'infrastructure') / Math.max(1, pop / 10000)
+      provincialServiceBudget(w.regions[provinceId(r)], 'infrastructure') / Math.max(1, pop / 10000)
     r.infrastructure = clamp(
       r.infrastructure + investment * 0.00012 - 0.0007 - r.devastation * 0.0007,
       0.08,
       1.5,
-    )
-    r.industry = clamp(
-      r.industry +
-        (n.policies.priority === 'industry' ? 0.0008 : 0.00015) * r.infrastructure -
-        r.devastation * 0.0004,
-      0.05,
-      1.7,
     )
     r.urban = clamp(r.urban + (r.industry * 0.5 - r.urban) * 0.001, 0.03, 0.92)
     r.devastation = clamp(r.devastation - 0.008)
@@ -268,12 +220,18 @@ function demographics(w: World) {
         `Food shortage in ${r.name}`,
         `Households receive ${Math.round(r.foodCoverage * 100)}% of their food requirement. Mortality and migration are rising.`,
         r.nation,
-        r.id,
+        provinceId(r),
       )
   }
+  aggregateDistricts(w)
   ageMilitaryPopulation(w)
+  linkDistrictPeople(w)
   migrateCommunities(w)
+  advanceEconomicStrata(w)
+  aggregateDistricts(w)
   evolveIdentities(w)
+  linkDistrictPeople(w)
+  aggregateDistricts(w)
 }
 
 function science(w: World) {
@@ -317,17 +275,22 @@ export function bordering(w: World, a: number, b: number) {
 }
 
 function diplomacy(w: World) {
-  const alive = new Set(w.regions.map((region) => region.nation))
+  const alive = new Set(w.regions.map((region) => region.nation)),
+    exchanges = new Set<string>()
+  for (const route of w.routes)
+    if (route.international) {
+      const a = w.regions[route.from].nation,
+        b = w.regions[route.to].nation
+      exchanges.add(a < b ? `${a}:${b}` : `${b}:${a}`)
+    }
   for (const rel of w.relations) {
     if (!alive.has(rel.a) || !alive.has(rel.b)) continue
     const a = w.nations[rel.a],
       b = w.nations[rel.b]
-    const exchange = w.routes.some(
-      (r) =>
-        r.international &&
-        [a.id, b.id].includes(w.regions[r.from].nation) &&
-        [a.id, b.id].includes(w.regions[r.to].nation),
-    )
+    const exchange =
+      exchanges.has(a.id < b.id ? `${a.id}:${b.id}` : `${b.id}:${a.id}`) ||
+      exchanges.has(`${a.id}:${a.id}`) ||
+      exchanges.has(`${b.id}:${b.id}`)
     rel.opinion = clamp(rel.opinion + (exchange ? 0.15 : -0.015) - rel.grievance * 0.001, -100, 100)
     rel.grievance = Math.max(0, rel.grievance - 0.08)
     if (rel.treaty === 'war') {
@@ -451,8 +414,10 @@ function recruit(w: World, n: Nation, r: Region): string {
   if (soldiers < 500) return 'Not enough adult recruits in this province.'
   if (n.treasury < cost || r.stocks.arms < soldiers * 0.012)
     return 'Recruitment needs treasury funds and locally available arms.'
-  n.treasury -= cost
+  publicExpense(w, n.id, cost, 'public recruitment', r.id)
+  recordUse(w, marketStore(r.id), 'arms', soldiers * 0.012)
   r.stocks.arms -= soldiers * 0.012
+  r.consumption.arms += soldiers * 0.012
   const communities = takeCivilianAdults(w, r, soldiers)
   w.armies.push({
     communities,
@@ -504,7 +469,9 @@ export function summarize(w: World, record = true) {
   for (const n of w.nations) {
     const regions = nationRegions(w, n.id)
     n.population = regions.reduce((s, r) => s + population(r), 0) + militaryPeople(w, n.id)
-    n.gdp = regions.reduce((s, r) => s + r.gdp, 0)
+    n.gdp = w.economy?.accounts?.complete
+      ? (w.economy.accounts.nations[n.id]?.productionGDP ?? 0)
+      : regions.reduce((s, r) => s + r.gdp, 0)
   }
   w.totals.population = w.nations.reduce((s, n) => s + n.population, 0)
   w.totals.gdp = w.nations.reduce((s, n) => s + n.gdp, 0)
@@ -537,33 +504,51 @@ export function summarize(w: World, record = true) {
 }
 
 export function tick(w: World): World {
+  ensurePopulation(w)
+  const converting = !w.localEconomy
+  ensureDistrictEconomy(w)
+  if (converting) evolveCities(w, true)
+  const proposed = buildSpatial(w)
+  remeshDistricts(w, proposed.districts)
   w.month++
   w.totals.births = 0
   w.totals.deaths = 0
   w.totals.migration = 0
   ensureWarfare(w)
   beginPopulationMonth(w)
+  beginEconomyMonth(w)
+  aggregateDistricts(w)
   worldEvents(w)
   advanceHistory(w)
   advancePressures(w)
   advanceCharacters(w)
   if (w.statecraft) advanceStatecraft(w)
+  linkDistrictPeople(w)
+  for (const id of w.localEconomy!.active) refreshEndowment(w, w.localEconomy!.units[id], false)
   produce(w)
+  aggregateDistricts(w)
   advanceNavy(w)
   trade(w)
-  consume(w)
   fiscalPolicy(w)
+  consume(w)
+  aggregateDistricts(w)
   advanceDiplomaticOffices(w)
   advanceInstitutions(w)
   advanceIntelligence(w)
   advanceGeopolitics(w)
+  linkDistrictPeople(w)
   demographics(w)
   science(w)
   diplomacy(w)
   advanceArmies(w)
   reinforceArmies(w)
   advanceSovereignty(w)
+  linkDistrictPeople(w)
+  finishEconomyMonth(w)
+  evolveCities(w)
+  aggregateDistricts(w)
   summarize(w)
+  refreshSpatial(w)
   return w
 }
 
@@ -601,6 +586,23 @@ function proposeTreaty(w: World, from: number, to: number, kind: 'trade' | 'alli
   return 'The proposal is dispatched. Consent, diplomatic preparation and review are required before it takes effect.'
 }
 export function applyCommand(w: World, command: Command): string {
+  if (w.localEconomy) {
+    linkDistrictPeople(w)
+    aggregateDistricts(w)
+  }
+  const result = executeCommand(w, command)
+  if (w.localEconomy) {
+    linkDistrictPeople(w)
+    aggregateDistricts(w)
+  }
+  if (w.economy?.accounts) {
+    reconcileGDP(w)
+    summarize(w, false)
+  }
+  refreshSpatial(w)
+  return result
+}
+function executeCommand(w: World, command: Command): string {
   if (command.type === 'intelligence') {
     configureIntelligence(w, command.nation, command.budgetShare, command.priority, command.focus)
     return 'Intelligence priorities updated. Reports improve through funded collection over time.'
@@ -722,11 +724,16 @@ export function applyCommand(w: World, command: Command): string {
             ? r.infrastructure >= 1.5
             : r.literacy >= 0.99
     if (maxed) return 'This province has reached the development limit for this investment.'
-    n.treasury -= cost
+    publicExpense(w, n.id, cost, 'public construction', r.id)
+    recordUse(w, marketStore(r.id), 'timber', 50)
+    recordUse(w, marketStore(r.id), 'stone', 70)
     r.stocks.timber -= 50
     r.stocks.stone -= 70
+    r.consumption.timber += 50
+    r.consumption.stone += 70
     if (command.building === 'farm') r.fertility = Math.min(1.2, r.fertility + 0.12)
-    if (command.building === 'industry') r.industry = Math.min(1.7, r.industry + 0.18)
+    if (command.building === 'industry')
+      w.economy!.producers[r.id].projects.push({ remaining: 6, capital: 0.18, cost })
     if (command.building === 'road') r.infrastructure = Math.min(1.5, r.infrastructure + 0.2)
     if (command.building === 'school') {
       r.literacy = Math.min(0.99, r.literacy + 0.08)
@@ -746,14 +753,20 @@ export function applyCommand(w: World, command: Command): string {
     const r = w.regions[command.region]
     if (!r) throw new Error('That province does not exist.')
     if (command.disaster === 'drought') {
+      if (w.economy?.goods) w.economy.goods.destruction.food += r.stocks.food * 0.82
+      inventoryFlow(w, marketStore(r.id), 'food', -r.stocks.food * 0.82, undefined, true)
       r.stocks.food *= 0.18
       r.devastation = clamp(r.devastation + 0.45)
     } else if (command.disaster === 'epidemic') {
       r.health = clamp(r.health - 0.4)
       for (const group of r.communities ?? []) group.health = clamp(group.health - 0.4)
       r.devastation = clamp(r.devastation + 0.15)
-    } else if (command.disaster === 'abundance') r.stocks.food += population(r) * 0.08
-    else throw new Error('Unknown intervention.')
+    } else if (command.disaster === 'abundance') {
+      const added = population(r) * 0.08
+      inventoryFlow(w, marketStore(r.id), 'food', added, undefined, true)
+      r.stocks.food += added
+      if (w.economy?.goods) w.economy.goods.injections.food += added
+    } else throw new Error('Unknown intervention.')
     event(
       w,
       'world',
@@ -835,7 +848,7 @@ export function applyCommand(w: World, command: Command): string {
     if (command.action === 'improve') {
       if (n.treasury < 150) return 'A diplomatic mission costs 150k crowns.'
       if (rel.treaty === 'war') return 'Negotiate peace before sending a diplomatic mission.'
-      n.treasury -= 150
+      publicExpense(w, n.id, 150, 'diplomatic mission')
       rel.opinion = clamp(rel.opinion + 12, -100, 100)
       return `Relations with ${other.shortName} improved by 12.`
     }

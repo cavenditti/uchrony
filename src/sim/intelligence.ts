@@ -1,4 +1,5 @@
-import { clamp, relation, type World } from './types'
+import { publicExpense } from './ledger'
+import { clamp, relation, type World, type Region, type Relation } from './types'
 import { hashSeed, random } from './random'
 import type { DiplomaticOffer } from './statecraft-types'
 
@@ -97,10 +98,15 @@ function dossier(w: World, s: IntelligenceService, nation: number) {
   }
   return d
 }
-function chartProvince(w: World, s: IntelligenceService, id: number) {
+function chartProvince(
+  w: World,
+  s: IntelligenceService,
+  id: number,
+  chart?: Map<number, IntelligenceService['chart'][number]>,
+) {
   const r = w.regions[id]
   if (!r) return
-  const old = s.chart.find((p) => p.id === id)
+  const old = chart ? chart.get(id) : s.chart.find((p) => p.id === id)
   if (old && old.nation !== r.nation && r.nation !== s.nation) dossier(w, s, r.nation)!.expansion += 1
   const entry = {
     id,
@@ -112,11 +118,17 @@ function chartProvince(w: World, s: IntelligenceService, id: number) {
     month: w.month,
   }
   if (old) Object.assign(old, entry)
-  else s.chart.push(entry)
+  else {
+    s.chart.push(entry)
+    chart?.set(id, entry)
+  }
   if (r.nation !== s.nation) dossier(w, s, r.nation)
 }
-function localSight(w: World, s: IntelligenceService) {
-  const provinces = new Set(owns(w, s.nation).flatMap((r) => [r.id, ...r.neighbors]))
+function localSight(w: World, s: IntelligenceService, view?: ReportingView) {
+  const chart = new Map(s.chart.map((p) => [p.id, p])),
+    provinces = new Set(
+      (view?.owned.get(s.nation) ?? owns(w, s.nation)).flatMap((r) => [r.id, ...r.neighbors]),
+    )
   for (const a of w.armies.filter((a) => a.nation === s.nation)) {
     provinces.add(a.region)
     for (const id of w.regions[a.region].neighbors) provinces.add(id)
@@ -133,7 +145,7 @@ function localSight(w: World, s: IntelligenceService) {
         ),
     ))
       provinces.add(r.id)
-  for (const id of provinces) chartProvince(w, s, id)
+  for (const id of provinces) chartProvince(w, s, id, chart)
   s.sightings = s.sightings.filter((r) => !provinces.has(r.region) && w.month - r.month <= 12)
   const groups = new Map<string, { region: number; nation: number; strength: number }>()
   for (const a of w.armies)
@@ -152,14 +164,14 @@ function localSight(w: World, s: IntelligenceService) {
         'field patrols',
       ]).values.strength,
     })
-  for (const rel of w.relations)
+  for (const rel of view?.contacts.get(s.nation) ?? w.relations)
     if ((rel.a === s.nation || rel.b === s.nation) && rel.treaty !== 'neutral')
       dossier(w, s, rel.a === s.nation ? rel.b : rel.a)
   for (const route of w.routes) {
     const a = w.regions[route.from],
       b = w.regions[route.to]
     if (a?.nation === s.nation || b?.nation === s.nation) {
-      for (const id of route.path) chartProvince(w, s, id)
+      for (const id of route.path) chartProvince(w, s, id, chart)
     }
   }
   for (const message of w.statecraft?.messages ?? [])
@@ -201,20 +213,54 @@ function report(
   )
   return { month: w.month, confidence, sources, values: estimates }
 }
-function collect(w: World, s: IntelligenceService, d: Dossier, bootstrap = false) {
+// Rebuilt for each intelligence phase: ownership and routes stay fixed while reports are collected.
+// Service references stay live because spending can change later services' observable balances.
+const pairKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`)
+function reportingView(w: World) {
+  const owned = new Map<number, Region[]>(),
+    borders = new Set<string>(),
+    trade = new Set<string>()
+  const contacts = new Map<number, Relation[]>()
+  for (const r of w.regions) {
+    const list = owned.get(r.nation) ?? []
+    list.push(r)
+    owned.set(r.nation, list)
+    for (const id of r.neighbors) borders.add(pairKey(r.nation, w.regions[id].nation))
+  }
+  for (const r of w.routes) trade.add(pairKey(w.regions[r.from].nation, w.regions[r.to].nation))
+  for (const r of w.relations)
+    for (const id of [r.a, r.b]) {
+      const list = contacts.get(id) ?? []
+      list.push(r)
+      contacts.set(id, list)
+    }
+  return {
+    owned,
+    borders,
+    trade,
+    contacts,
+    services: new Map(w.intelligence!.services.map((s) => [s.nation, s])),
+  }
+}
+type ReportingView = ReturnType<typeof reportingView>
+function collect(w: World, s: IntelligenceService, d: Dossier, bootstrap = false, view?: ReportingView) {
   const n = w.nations[d.nation],
-    own = owns(w, s.nation),
-    foreign = owns(w, d.nation)
+    own = view?.owned.get(s.nation) ?? owns(w, s.nation),
+    foreign = view?.owned.get(d.nation) ?? owns(w, d.nation)
   if (!n || !foreign.length) return // Old reports survive an unobserved collapse.
-  const border = own.some((r) => r.neighbors.some((id) => w.regions[id].nation === n.id)),
-    trading = w.routes.some(
-      (r) =>
-        [w.regions[r.from]?.nation, w.regions[r.to]?.nation].includes(s.nation) &&
-        [w.regions[r.from]?.nation, w.regions[r.to]?.nation].includes(n.id),
-    ),
+  const border = view
+      ? view.borders.has(pairKey(s.nation, n.id))
+      : own.some((r) => r.neighbors.some((id) => w.regions[id].nation === n.id)),
+    trading = view
+      ? view.trade.has(pairKey(s.nation, n.id))
+      : w.routes.some(
+          (r) =>
+            [w.regions[r.from]?.nation, w.regions[r.to]?.nation].includes(s.nation) &&
+            [w.regions[r.from]?.nation, w.regions[r.to]?.nation].includes(n.id),
+        ),
     ally = hasDefense(w, s.nation, n.id),
     focused = s.focus === n.id,
-    opposition = w.intelligence?.services.find((x) => x.nation === n.id),
+    opposition = view?.services.get(n.id) ?? w.intelligence?.services.find((x) => x.nation === n.id),
     counter = opposition?.priority === 'counterintelligence' ? opposition.capacity * 0.3 : 0,
     access = Math.max(0, d.access - counter),
     sources = [
@@ -233,10 +279,10 @@ function collect(w: World, s: IntelligenceService, d: Dossier, bootstrap = false
     ),
     cadence = bootstrap ? 1 : focused && s.spent > 0 ? 3 : 6,
     due = (domain: IntelligenceReport | undefined, offset: number) =>
-      !domain || (!bootstrap && w.month - domain.month >= cadence + offset),
-    visible = new Set(s.chart.filter((p) => p.month >= w.month - 1).map((p) => p.id))
+      !domain || (!bootstrap && w.month - domain.month >= cadence + offset)
   if (due(d.military, s.priority === 'military' ? -1 : 1)) {
-    const formations = w.armies.filter((a) => a.nation === n.id),
+    const visible = new Set(s.chart.filter((p) => p.month >= w.month - 1).map((p) => p.id)),
+      formations = w.armies.filter((a) => a.nation === n.id),
       observed = formations.filter((a) => visible.has(a.region)),
       informed = ally || access > 0.25,
       scouts = observed.reduce((sum, a) => sum + a.soldiers, 0),
@@ -372,7 +418,8 @@ export function configureIntelligence(
   s.focus = focus
 }
 export function advanceIntelligence(w: World) {
-  const state = ensureIntelligence(w)
+  const state = ensureIntelligence(w),
+    view = reportingView(w)
   for (const s of state.services) {
     if (s.lastMonth >= w.month) continue
     s.lastMonth = w.month
@@ -380,13 +427,12 @@ export function advanceIntelligence(w: World) {
     const n = w.nations[s.nation]
     if (!owns(w, n.id).length) continue
     s.spent = Math.min(Math.max(0, n.treasury), Math.max(0, n.income) * s.budgetShare)
-    n.treasury -= s.spent
-    n.spending += s.spent
+    publicExpense(w, n.id, s.spent, 'intelligence services')
     s.totalSpent += s.spent
     const scale = Math.max(1, n.population / 100000),
       funded = clamp(s.spent / scale, 0, 2)
     s.capacity = clamp(s.capacity + funded * 0.012 - (s.spent > 0 ? 0.001 : 0.008), 0, 0.95)
-    localSight(w, s)
+    localSight(w, s, view)
     // Slow cartography: adjacent reported territory, or a funded focus, never the full world.
     if (s.spent > 0 && w.month % 3 === s.nation % 3) {
       const known = new Set(s.chart.map((p) => p.id)),
@@ -401,7 +447,7 @@ export function advanceIntelligence(w: World) {
       d.access = clamp(d.access + funded * 0.025 * attention - (s.spent > 0 ? 0.001 : 0.01), 0, 0.9)
       d.expansion *= 0.98
       const oldPower = d.military?.values.effectivePower.estimate
-      collect(w, s, d)
+      collect(w, s, d, false, view)
       if (
         oldPower !== undefined &&
         d.military?.month === w.month &&
@@ -420,38 +466,40 @@ export function advanceIntelligence(w: World) {
         s.dossiers.filter((d) => w.month - (d.lastContact ?? d.discovered) <= 3).map((d) => d.nation),
       ),
       delay = 2 + Math.round((1 - s.capacity) * 4)
-    for (const rel of w.relations)
-      if (
-        rel.a !== s.nation &&
-        rel.b !== s.nation &&
-        known.has(rel.a) &&
-        known.has(rel.b) &&
-        w.month - rel.since >= delay &&
-        w.month % 3 === s.nation % 3
-      ) {
-        const old = s.relations.find((r) => r.a === rel.a && r.b === rel.b),
-          entry = {
-            a: rel.a,
-            b: rel.b,
-            treaty: rel.treaty,
-            since: rel.since,
-            ...(rel.aggressor === undefined ? {} : { aggressor: rel.aggressor }),
-            month: w.month,
-          }
+    const knownRelations = new Map(s.relations.map((r) => [`${r.a}:${r.b}`, r]))
+    if (w.month % 3 === s.nation % 3)
+      for (const rel of w.relations)
         if (
-          rel.treaty === 'war' &&
-          rel.aggressor !== undefined &&
-          (!old || old.treaty !== 'war' || old.since !== rel.since)
+          rel.a !== s.nation &&
+          rel.b !== s.nation &&
+          known.has(rel.a) &&
+          known.has(rel.b) &&
+          w.month - rel.since >= delay &&
+          w.month % 3 === s.nation % 3
         ) {
-          const stance = relation(w, s.nation, rel.aggressor)
-          if (stance && stance.treaty !== 'war') {
-            stance.opinion = clamp(stance.opinion - 8, -100, 100)
-            stance.grievance = clamp(stance.grievance + 8, 0, 100)
+          const old = knownRelations.get(`${rel.a}:${rel.b}`),
+            entry = {
+              a: rel.a,
+              b: rel.b,
+              treaty: rel.treaty,
+              since: rel.since,
+              ...(rel.aggressor === undefined ? {} : { aggressor: rel.aggressor }),
+              month: w.month,
+            }
+          if (
+            rel.treaty === 'war' &&
+            rel.aggressor !== undefined &&
+            (!old || old.treaty !== 'war' || old.since !== rel.since)
+          ) {
+            const stance = relation(w, s.nation, rel.aggressor)
+            if (stance && stance.treaty !== 'war') {
+              stance.opinion = clamp(stance.opinion - 8, -100, 100)
+              stance.grievance = clamp(stance.grievance + 8, 0, 100)
+            }
           }
+          if (old) Object.assign(old, entry)
+          else s.relations.push(entry)
         }
-        if (old) Object.assign(old, entry)
-        else s.relations.push(entry)
-      }
     for (const offer of w.statecraft?.offers ?? [])
       if (
         offer.visibility === 'public' &&

@@ -1,0 +1,21 @@
+#root {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.stress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+}
+.stress-header button {
+  white-space: nowrap;
+}
+.stress-map {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}

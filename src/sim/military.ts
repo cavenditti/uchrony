@@ -1,3 +1,13 @@
+import { publicGoods } from './ledger'
+import {
+  marketStore,
+  armyStore,
+  fleetStore,
+  recordGift,
+  recordUse,
+  recordRequisition,
+} from './national-accounts'
+import { BASE_PRICE } from './economy'
 import { MAX_ARMIES } from './military-limits'
 import { markOccupation } from './geopolitics'
 import { knownMap } from './intelligence'
@@ -5,7 +15,7 @@ import { clamp, population, relation, type Army, type World } from './types'
 import { transportGraph, shortestPaths, pathTo } from './economy'
 import { corridorProfile, corridorUsage } from './corridors'
 import { allForces, unitLoyalty } from './forces'
-import { diplomaticAccess } from './agreements'
+import { diplomaticAccessView } from './agreements'
 import {
   takeCivilianAdults,
   removeCivilianAdults,
@@ -21,28 +31,34 @@ import {
   portAt,
   disembark,
   embarkArmy,
+  canEmbarkArmy,
   orderFleet,
   waterPath,
 } from './navy'
 import { effectMultiplier } from './effects'
 import { random } from './random'
-import { seaPassageFactor } from './naval-control'
+import { seaPassageView } from './naval-control'
 
 export function landGraph(w: World, nation: number, profile = corridorProfile(w)) {
   return transportGraph(w, nation, profile).map((edges) => edges.filter((e) => !e.sea))
 }
-const accessible = (w: World, nation: number, region: number) =>
-  w.regions[region].nation === nation ||
-  relation(w, nation, w.regions[region].nation)?.treaty === 'alliance' ||
-  diplomaticAccess(w, nation, w.regions[region].nation)
-
 export function advanceArmies(w: World) {
+  // Movement can change owners, but diplomatic commitments stay fixed in this phase.
+  const passage = seaPassageView(w),
+    access = diplomaticAccessView(w),
+    accessible = (world: World, nation: number, region: number) =>
+      world.regions[region].nation === nation ||
+      relation(world, nation, world.regions[region].nation)?.treaty === 'alliance' ||
+      access(nation, world.regions[region].nation)
   const state = ensureWarfare(w),
     profile = corridorProfile(w),
     remaining = profile.capacity.slice()
   state.deliveries = []
   // Civilian freight and military supply compete for the same physical road/sea segments.
-  for (const route of w.routes)
+  const freight = w.localEconomy
+    ? w.localEconomy.shipments.map((s) => ({ legs: s.legs, volume: s.quantity }))
+    : w.routes
+  for (const route of freight)
     if (route.legs)
       for (const [index, count] of corridorUsage(profile, route.legs))
         remaining[index] = Math.max(0, remaining[index] - route.volume * count)
@@ -56,6 +72,24 @@ export function advanceArmies(w: World) {
     ]),
   )
   let owners = ''
+  const wars = new Set(w.relations.filter((r) => r.treaty === 'war').flatMap((r) => [r.a, r.b]))
+  const pathCache = new WeakMap<
+    ReturnType<typeof transportGraph>,
+    Map<number, ReturnType<typeof shortestPaths>>
+  >()
+  function pathsFrom(graph: ReturnType<typeof transportGraph>, from: number) {
+    let cache = pathCache.get(graph)
+    if (!cache) {
+      cache = new Map()
+      pathCache.set(graph, cache)
+    }
+    let paths = cache.get(from)
+    if (!paths) {
+      paths = shortestPaths(graph, from)
+      cache.set(from, paths)
+    }
+    return paths
+  }
   const supplyGraphs = new Map<number, ReturnType<typeof transportGraph>>(),
     landGraphs = new Map<number, ReturnType<typeof landGraph>>()
   function graphFor(nation: number, land: boolean) {
@@ -89,7 +123,7 @@ export function advanceArmies(w: World) {
     ops.source = null
     ops.line = []
     const graph = graphFor(army.nation, false)
-    const paths = shortestPaths(graph, army.region)
+    const paths = pathsFrom(graph, army.region)
     const sources = w.regions
       .filter(
         (r) =>
@@ -128,10 +162,24 @@ export function advanceArmies(w: World) {
           1,
         ),
         attenuation = Math.max(0.1, security) / (1 + distance / 160)
-      capacity *= attenuation * seaPassageFactor(w, army.nation, legs)
-      const food = Math.min(needFood, Math.max(0, source.stocks.food - population(source) * 0.025), capacity)
-      const arms = Math.min(needArms, source.stocks.arms, Math.max(0, capacity - food))
+      capacity *= attenuation * passage(army.nation, legs)
+      const foodPrice = (source.prices.food || BASE_PRICE.food) / 1000,
+        armsPrice = (source.prices.arms || BASE_PRICE.arms) / 1000
+      const food = Math.min(
+        needFood,
+        Math.max(0, source.stocks.food - population(source) * 0.025),
+        capacity,
+        n.treasury / foodPrice,
+      )
+      const arms = Math.min(
+        needArms,
+        source.stocks.arms,
+        Math.max(0, capacity - food),
+        Math.max(0, n.treasury - food * foodPrice) / armsPrice,
+      )
       if (food + arms < 0.01) continue
+      publicGoods(w, n.id, source.id, 'food', food, armyStore(army.id), foodPrice)
+      publicGoods(w, n.id, source.id, 'arms', arms, armyStore(army.id), armsPrice)
       source.stocks.food -= food
       source.stocks.arms -= arms
       ops.food += food
@@ -147,6 +195,7 @@ export function advanceArmies(w: World) {
     const need = army.soldiers * 0.034
     if (ops.food < need && ops.conduct === 'requisition' && accessible(w, army.nation, r.id)) {
       const taken = Math.min(r.stocks.food, need - ops.food, population(r) * 0.025 * 0.25)
+      recordGift(w, marketStore(r.id), armyStore(army.id), 'food', taken)
       r.stocks.food -= taken
       ops.food += taken
       const hardship = taken / Math.max(1, population(r) * 0.025)
@@ -161,6 +210,8 @@ export function advanceArmies(w: World) {
     const food = Math.min(ops.food, need),
       armsNeed = army.soldiers * 0.0005,
       arms = Math.min(ops.arms, armsNeed)
+    recordUse(w, armyStore(army.id), 'food', food, 'government')
+    recordUse(w, armyStore(army.id), 'arms', arms, 'government')
     ops.food -= food
     ops.arms -= arms
     r.consumption.food += food
@@ -265,6 +316,7 @@ export function advanceArmies(w: World) {
           experience: 0.05,
           casualties: 0,
         }
+        recordRequisition(w, next.id, 'arms', levy * 0.002)
         next.stocks.arms -= levy * 0.002
         next.consumption.arms += levy * 0.002
         w.armies.push(militia)
@@ -296,6 +348,7 @@ export function advanceArmies(w: World) {
       )
     for (const force of [army, ...defenders]) {
       const used = Math.min(force.operations!.arms, force.soldiers * 0.001)
+      recordUse(w, armyStore(force.id), 'arms', used, 'government')
       force.operations!.arms -= used
       w.regions[force.region].consumption.arms += used
     }
@@ -383,9 +436,11 @@ export function advanceArmies(w: World) {
       if (!fleet) continue
       const needed = a.soldiers * 0.034,
         fromFleet = Math.min(Math.max(0, fleet.food - fleet.soldiers * 0.034), Math.max(0, needed - ops.food))
+      recordGift(w, fleetStore(fleet.id), armyStore(a.id), 'food', fromFleet)
       fleet.food -= fromFleet
       ops.food += fromFleet
       const eaten = Math.min(ops.food, needed)
+      recordUse(w, armyStore(a.id), 'food', eaten, 'government')
       ops.food -= eaten
       a.supply = eaten / Math.max(0.001, needed)
       w.regions[fleet.region].consumption.food += eaten
@@ -401,13 +456,9 @@ export function advanceArmies(w: World) {
     }
     supply(a)
     if (engaged.has(a.id) || ops.disorder || a.soldiers < 50 || ops.stance !== 'march') continue
-    if (
-      a.target === null &&
-      !w.relations.some((rel) => rel.treaty === 'war' && (rel.a === a.nation || rel.b === a.nation))
-    )
-      continue
+    if (a.target === null && !wars.has(a.nation)) continue
     const graph = graphFor(a.nation, true),
-      paths = shortestPaths(graph, a.region)
+      paths = pathsFrom(graph, a.region)
     if (n.ai && a.target === null) {
       const chart = knownMap(w, n.id)
       const targets = chart
@@ -422,7 +473,8 @@ export function advanceArmies(w: World) {
             f.nation === a.nation &&
             f.cell === portAt(w, a.region)?.water &&
             !f.embarked.length &&
-            f.transports >= 4,
+            f.transports >= 4 &&
+            canEmbarkArmy(w, a, f),
         )
         const enemy = fleet
           ? chart.find(
@@ -461,6 +513,8 @@ export function advanceArmies(w: World) {
   }
   for (const a of w.armies.filter((a) => a.soldiers === 0)) {
     const r = w.regions[a.region]
+    recordUse(w, armyStore(a.id), 'food', a.operations!.food, 'other')
+    recordUse(w, armyStore(a.id), 'arms', a.operations!.arms, 'other')
     r.consumption.food += a.operations!.food
     r.consumption.arms += a.operations!.arms
     for (const f of state.fleets) f.embarked = f.embarked.filter((id) => id !== a.id)

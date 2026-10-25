@@ -46,6 +46,7 @@ function historicalValue(world: World, stat: ModifierStat, nation?: number, regi
   )
 }
 export function effectValue(world: World, stat: ModifierStat, nation?: number, region?: number) {
+  if (region !== undefined) region = world.localEconomy?.units[region]?.province ?? region
   const owner = nation ?? (region === undefined ? undefined : world.regions[region]?.nation)
   return (
     historicalValue(world, stat, nation, region) +

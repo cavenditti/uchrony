@@ -1,9 +1,19 @@
+import { endowTreasury } from './fixtures/endowment'
+import { extractAges } from '../src/sim/age-cohorts'
+import { balances } from '../src/sim/ledger'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
 import { tick, summarize } from '../src/sim/engine'
 import { ensureWarfare } from '../src/sim/navy'
-import { releaseSoldiers, ageMilitaryPopulation, rollupPopulation } from '../src/sim/population'
+import {
+  releaseSoldiers,
+  ageMilitaryPopulation,
+  rollupPopulation,
+  takeCivilianAdults,
+  addCommunity,
+  communitySize,
+} from '../src/sim/population'
 import { initializeEstablishments, reinforceArmies } from '../src/sim/military-personnel'
 import { advanceSovereignty, authoritySummary, ensureSovereignty } from '../src/sim/sovereignty'
 import { ensureStatecraft, stateAgentContext } from '../src/sim/statecraft'
@@ -12,13 +22,13 @@ import { allForces } from '../src/sim/forces'
 import { population, type World } from '../src/sim/types'
 const people = (w: World) =>
   w.regions.reduce((s, r) => s + population(r), 0) + allForces(w).reduce((s, a) => s + a.soldiers, 0)
-const funds = (w: World) => w.nations.reduce((s, n) => s + n.treasury, 0)
+const funds = (w: World) => Object.values(balances(w)).reduce((s, value) => s + value, 0)
 function funded() {
   const w = generateWorld('standing-replacements')
   ensureStatecraft(w)
   ensureWarfare(w)
   for (const n of w.nations) {
-    n.treasury = 100000
+    endowTreasury(w, n.id, 100000)
     n.budget.military = 500
     n.policies.military = 50
     n.policies.conscription = 3
@@ -85,7 +95,7 @@ test('replacement personnel require real funds, arms, food and local access', ()
   reinforceArmies(w)
   assert.equal(a.soldiers, 100)
   r.stocks.arms = 100
-  w.nations[a.nation].treasury = 0
+  endowTreasury(w, a.nation, 0)
   reinforceArmies(w)
   assert.equal(a.soldiers, 100)
   assert.equal(people(w), before)
@@ -117,12 +127,12 @@ function crisis() {
   }
   // Two distinct allegiances converge on the successor: both civilian and guard profiles must coalesce.
   const original = r.communities![0],
-    parallel = structuredClone(original)
+    parallel = extractAges(original, {
+      children: Math.floor(original.population.children / 3),
+      adults: Math.floor(original.population.adults / 3),
+      elders: Math.floor(original.population.elders / 3),
+    })
   parallel.allegiance = 1
-  for (const age of ['children', 'adults', 'elders'] as const) {
-    parallel.population[age] = Math.floor(original.population[age] / 3)
-    original.population[age] -= parallel.population[age]
-  }
   r.communities!.push(parallel)
   r.unrest = 95
   r.foodCoverage = 0.6
@@ -200,6 +210,14 @@ test('restored credible protection stops a pending organized challenge', () => {
   advanceSovereignty(w)
   assert.equal(report.stage, 'contested')
   const protector = w.armies.find((a) => a.nation === 1)!
+  // Uneven province sizes can produce an opposition larger than the opening guard.
+  // Make protection credible using actual civilians, rather than assuming a fixed guard suffices.
+  const source = w.regions
+    .filter((p) => p.nation === 1)
+    .sort((a, b) => b.population.adults - a.population.adults)[0]
+  const recruits = takeCivilianAdults(w, source, Math.max(0, report.mobilizable * 2 - protector.soldiers))
+  for (const group of recruits) addCommunity(protector.communities!, group)
+  protector.soldiers += recruits.reduce((sum, group) => sum + communitySize(group), 0)
   protector.nation = 0
   protector.region = r.id
   protector.supply = 1

@@ -1,4 +1,4 @@
-import { fractal, hashSeed, random } from './random'
+import { fractal, hashSeed, random, noise } from './random'
 import { clamp, type Cell, type Terrain } from './types'
 import { HEX, neighbors } from './hex'
 import { MinHeap } from './heap'
@@ -85,7 +85,15 @@ export function generateGeography(seed: string, continents: number, width: numbe
         Math.exp((-ridgeDistance * ridgeDistance) / 0.025) * Math.max(0, 1 - Math.abs(nearest.v) * 0.7)
       const ruggedness = fractal(x * 18, y * 18, noiseSeed + 20)
       let elevation = SEA_LEVEL + coastHeight
-      if (coastHeight > 0) elevation += ridge * 0.38 * clamp(coastHeight / 0.07) + ruggedness * 0.06
+      if (coastHeight > 0) {
+        // Broken ranges, upland blocks and low passes rather than one uniform spine.
+        const rangeStrength = 0.35 + noise(x * 8, y * 8, noiseSeed + 211) * 1.3
+        const pass = Math.exp(-(((nearest.v - Math.sin(nearest.m.phase) * 0.45) / 0.13) ** 2))
+        const plateau = Math.max(0, noise(x * 9, y * 9, noiseSeed + 307) - 0.62) * 0.7
+        elevation +=
+          (ridge * 0.42 * rangeStrength * (1 - pass * 0.8) + plateau) * clamp(coastHeight / 0.07) +
+          ruggedness * 0.06
+      }
       // Ocean frame: even a warped peninsula cannot be clipped by the world rectangle.
       const edge = Math.min(x, y, 1 - x, 1 - y)
       elevation -= 0.55 * Math.exp(-edge / 0.045)

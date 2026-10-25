@@ -1,3 +1,4 @@
+import { publicExpense } from './ledger'
 import { relation, type World } from './types'
 import type { DiplomaticClause, DiplomaticOffer, StateAgentPlan } from './statecraft-types'
 import { agreementTerms } from './agreements'
@@ -133,8 +134,7 @@ export function advanceDiplomaticOffices(w: World) {
     const burden = ongoingBurden(w, o.nation),
       due = fee(w, o.nation, burden * 0.04),
       paid = Math.min(Math.max(0, w.nations[o.nation].treasury), due)
-    w.nations[o.nation].treasury -= paid
-    w.nations[o.nation].spending += paid
+    publicExpense(w, o.nation, paid, 'diplomatic maintenance')
     const funding = due > 0 ? 0.25 + (0.75 * paid) / due : 1
     o.load = Math.max(
       0,
@@ -269,8 +269,7 @@ function debit(w: World, nation: number, weight: number, emergency: boolean) {
   if (!emergency && n.treasury < cash)
     deny(w, nation, 'The foreign office lacks funds for dispatches and negotiations.')
   const spent = Math.min(Math.max(0, n.treasury), cash)
-  n.treasury -= spent
-  n.spending += spent
+  publicExpense(w, n.id, spent, 'diplomatic dispatch')
   o.spent += spent
   o.totalSpent += spent
   o.load = load + weight

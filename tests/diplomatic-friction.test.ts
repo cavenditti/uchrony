@@ -1,3 +1,4 @@
+import { endowTreasury } from './fixtures/endowment'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createElement } from 'react'
@@ -31,7 +32,7 @@ function fresh(seed = 'diplomatic-friction') {
   ensureStatecraft(w)
   for (const r of w.relations) r.treaty = 'neutral'
   for (const n of w.nations) {
-    n.treasury = 10000
+    endowTreasury(w, n.id, 10000)
     n.budget.administration = 20
   }
   return w
@@ -343,7 +344,7 @@ test('unilateral military orders stay immediate and genuine peace talks have an 
   const first = submitStandingOffer(w, 0, draft('research', 2))
   assert(first)
   w.foreignOffices!.offices[0].load = 9
-  w.nations[0].treasury = 0
+  endowTreasury(w, 0, 0)
   const war = submitStandingOffer(w, 0, { ...draft('war'), parties: [0] })
   settleConventionalOffers(w)
   assert.equal(war.status, 'ratified')
@@ -368,7 +369,7 @@ test('maintaining agreements costs funds and slows recovery without silently can
   wait(w, 1)
   assert(o.spent > 0 && o.totalSpent > spent)
   assert(Math.abs(cash - w.nations[0].treasury - o.spent) < 1e-8)
-  w.nations[0].treasury = 0
+  endowTreasury(w, 0, 0)
   wait(w, 1)
   assert.equal(p.status, 'ratified')
   assert.equal(relation(w, 0, 1)!.treaty, 'trade')

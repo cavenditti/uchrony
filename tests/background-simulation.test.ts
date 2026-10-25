@@ -5,20 +5,25 @@ import type { WorkerRequest, WorkerResponse } from '../src/sim/types'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 test('pending external requests never gate months, local events or worker playback; speed does not flood requests', async (t) => {
+  // Test scheduler wall time independently of simulation CPU speed and concurrent test load.
+  const wallTime = Date.now()
+  t.mock.method(Date, 'now', () => wallTime)
   let configured = true
   const requests: string[] = [],
     snapshots: { month: number; local: number; terrain: boolean; mapKey: string }[] = [],
     errors: string[] = []
   const worker = {
     onmessage: (_message: { data: WorkerRequest }) => {},
-    postMessage: (message: WorkerResponse) => {
-      if (message.type === 'world')
+    postMessage: (message: WorkerResponse): void => {
+      if (message.type === 'world') {
         snapshots.push({
           month: message.world.month,
           terrain: !!message.world.cells,
           mapKey: message.mapKey,
           local: message.world.events.filter((event) => event.historical?.source === 'procedural').length,
         })
+        worker.onmessage({ data: { type: 'snapshot-ack', mapKey: message.mapKey } })
+      }
       if (message.type === 'error') errors.push(message.message)
     },
   }

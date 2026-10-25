@@ -33,7 +33,9 @@ export function validateStatecraft(world: World) {
     !Array.isArray(state.messages) ||
     state.messages.length > 360 ||
     !Array.isArray(state.offers) ||
-    state.offers.length > 4096 ||
+    // Active agreements and their cited ancestors cannot be discarded. The
+    // diplomatic graph grows with state pairs, not with the initial 32 states.
+    state.offers.length > Math.max(4096, world.nations.length * (world.nations.length - 1) * 2) ||
     !Array.isArray(state.rulings) ||
     state.rulings.length > 180 ||
     !Array.isArray(state.audit) ||

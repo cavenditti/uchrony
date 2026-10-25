@@ -1,15 +1,17 @@
-import type { WorldSave } from './save-types'
+import { MAX_SAVE_BYTES, type WorldSave } from './save-types'
+import { worldBlob } from './json-blob'
 
 export interface SaveBackend {
   name: 'disk' | 'browser'
   read(): Promise<WorldSave | null>
   write(save: WorldSave): Promise<void>
+  writeBlob?(blob: Blob): Promise<void>
 }
 export function diskBackend(): SaveBackend {
   let slot: string | undefined
-  const request = async (method: 'GET' | 'PUT', save?: WorldSave) => {
+  const request = async (method: 'GET' | 'PUT', save?: Blob) => {
     const controller = new AbortController(),
-      timeout = setTimeout(() => controller.abort(), 15000)
+      timeout = setTimeout(() => controller.abort(), 60000)
     try {
       const response = await fetch('/api/saves/current', {
         method,
@@ -19,7 +21,7 @@ export function diskBackend(): SaveBackend {
           ...(save ? { 'Content-Type': 'application/json' } : {}),
           ...(slot ? { 'X-Uchrony-Save-Slot': slot } : {}),
         },
-        ...(save ? { body: JSON.stringify(save) } : {}),
+        ...(save ? { body: save } : {}),
       })
       if (method === 'GET' && response.status === 404) return { save: null }
       if (!response.ok) throw new Error(`Local disk autosave returned HTTP ${response.status}.`)
@@ -32,11 +34,14 @@ export function diskBackend(): SaveBackend {
   }
   return {
     name: 'disk',
+    async writeBlob(blob) {
+      await request('PUT', blob)
+    },
     async read() {
       return (await request('GET')).save
     },
     async write(save) {
-      await request('PUT', save)
+      await request('PUT', worldBlob(save.world, save.savedAt))
     },
   }
 }
@@ -88,12 +93,12 @@ export function browserBackend(): SaveBackend {
     })
     return opening
   }
-  const transaction = async (write?: WorldSave) => {
+  const transaction = async (write?: Blob) => {
     const db = await database()
-    return new Promise<WorldSave | null>((resolve, reject) => {
+    return new Promise<WorldSave | Blob | null>((resolve, reject) => {
       const tx = db.transaction('worlds', write ? 'readwrite' : 'readonly'),
         store = tx.objectStore('worlds')
-      let result: WorldSave | null = null
+      let result: WorldSave | Blob | null = null
       const timer = setTimeout(() => {
         try {
           tx.abort()
@@ -101,8 +106,16 @@ export function browserBackend(): SaveBackend {
           /* It may have just committed. */
         }
         reject(new Error('The browser database transaction timed out.'))
-      }, 8000)
-      const request = write ? store.put(write, 'current') : store.get('current')
+      }, 60000)
+      let request: IDBRequest
+      try {
+        request = write ? store.put(write, 'current') : store.get('current')
+      } catch (error) {
+        clearTimeout(timer)
+        tx.abort()
+        reject(error)
+        return
+      }
       request.onsuccess = () => {
         if (!write) result = request.result ?? null
       }
@@ -122,9 +135,17 @@ export function browserBackend(): SaveBackend {
   }
   return {
     name: 'browser',
-    read: () => transaction(),
+    async read() {
+      const stored = await transaction()
+      if (!(stored instanceof Blob)) return stored // Existing object records remain readable.
+      if (stored.size > MAX_SAVE_BYTES) throw new Error('The browser save exceeds the supported size.')
+      return JSON.parse(await stored.text()) as WorldSave
+    },
+    async writeBlob(blob) {
+      await transaction(blob)
+    },
     async write(save) {
-      await transaction(save)
+      await transaction(worldBlob(save.world, save.savedAt))
     },
   }
 }

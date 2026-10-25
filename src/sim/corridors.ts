@@ -1,3 +1,4 @@
+import { economicRegions } from './local-units'
 import { effectMultiplier } from './effects'
 import { neighbors } from './hex'
 import type { Cell, CorridorTrace, RouteLeg, Terrain, World } from './types'
@@ -93,11 +94,11 @@ export function corridorProfile(world: World) {
     familiarity[i] = trace.familiarity
     traffic[i] = trace.traffic
   }
-  const provinces = world.regions.map((region) => {
+  const provinces = new Map(economicRegions(world).map((region) => {
     const tech = world.nations[region.nation].technologies.logistics,
       infra = region.infrastructure,
       damage = 1 - region.devastation * 0.6
-    return {
+    return [region.id, {
       friction:
         (((2 - infra) * (1 + region.devastation * 0.5)) / (1 + tech * 0.1)) *
         effectMultiplier(world, 'tradeCost', region.nation, region.id),
@@ -112,14 +113,16 @@ export function corridorProfile(world: World) {
         (1 + tech * 0.15) *
         damage *
         effectMultiplier(world, 'tradeCapacity', region.nation, region.id),
-    }
-  })
+    }] as const
+  }))
+  const cellUnit=new Int32Array(world.cells.length).fill(-1)
+  for(const r of economicRegions(world))for(const c of r.cells)cellUnit[c]=r.id
   const globalCost = effectMultiplier(world, 'tradeCost'),
     globalCapacity = effectMultiplier(world, 'tradeCapacity')
   geo.segments.forEach((segment, i) => {
     const { a, b, mode, effort } = segment,
-      pa = provinces[world.cells[a].region],
-      pb = provinces[world.cells[b].region],
+      pa = provinces.get(cellUnit[a])!,
+      pb = provinces.get(cellUnit[b])!,
       learning = familiarity[i]
     if (mode === 'land') {
       baseCost[i] = ((effort / 6) * (pa.friction + pb.friction)) / 2

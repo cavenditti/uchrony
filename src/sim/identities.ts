@@ -1,9 +1,11 @@
+import { economicRegions } from './local-units'
 import { random } from './random'
 import { allForces } from './forces'
 import { clamp, population, type Region, type World } from './types'
 import { effectMultiplier } from './effects'
 import {
   communitySize,
+  communityIndex,
   discrimination,
   ensurePopulation,
   identityDistribution,
@@ -38,7 +40,7 @@ function note(world: World, region: Region, title: string, detail: string) {
 
 export function beginPopulationMonth(world: World) {
   ensurePopulation(world)
-  for (const region of world.regions) {
+  for (const region of economicRegions(world)) {
     const metrics = region.populationDynamics!
     for (const field of [
       'immigrants',
@@ -139,7 +141,8 @@ export function evolveIdentities(world: World) {
   for (const identity of state.identities) identity.momentum *= 0.996
   for (const region of world.regions) {
     if (!population(region)) continue
-    const nation = world.nations[region.nation],
+    const index = communityIndex(region.communities!),
+      nation = world.nations[region.nation],
       official = nation.identity!,
       metrics = region.populationDynamics!,
       exposure = Object.fromEntries(AXES.map((axis) => [axis, new Map<number, number>()])) as Record<
@@ -204,7 +207,14 @@ export function evolveIdentities(world: World) {
       metrics.lastCulture = world.month
       for (const group of [...region.communities!])
         if (parents.includes(group.culture))
-          metrics.culturalChanges += splitCommunity(region, group, { culture: id }, 0.008, [2, 0.5, 0.1])
+          metrics.culturalChanges += splitCommunity(
+            region,
+            group,
+            { culture: id },
+            0.008,
+            [2, 0.5, 0.1],
+            index,
+          )
       note(
         world,
         region,
@@ -230,7 +240,14 @@ export function evolveIdentities(world: World) {
       metrics.lastLanguage = world.month
       for (const group of [...region.communities!])
         if (group.language === parent)
-          metrics.languageChanges += splitCommunity(region, group, { language: id }, 0.01, [2, 0.4, 0.1])
+          metrics.languageChanges += splitCommunity(
+            region,
+            group,
+            { language: id },
+            0.01,
+            [2, 0.4, 0.1],
+            index,
+          )
       note(
         world,
         region,
@@ -263,7 +280,7 @@ export function evolveIdentities(world: World) {
           (0.3 + group.urban) *
           (1 - group.rootedness * 0.75) *
           (nation.policies.citizenship === 'pluralist' ? 0.35 : 1)
-        metrics.culturalChanges += splitCommunity(region, group, { culture }, rate, [2, 0.5, 0.1])
+        metrics.culturalChanges += splitCommunity(region, group, { culture }, rate, [2, 0.5, 0.1], index)
       }
       const relatedNative =
         state.identities[language].parents.includes(group.language) ||
@@ -276,7 +293,7 @@ export function evolveIdentities(world: World) {
           0.0006 *
           (language === official.language ? group.fluency : 0.7) *
           (nation.policies.languagePolicy === 'common' ? 1.8 : 0.35)
-        metrics.languageChanges += splitCommunity(region, group, { language }, rate, [2.5, 0.35, 0.05])
+        metrics.languageChanges += splitCommunity(region, group, { language }, rate, [2.5, 0.35, 0.05], index)
       }
       if (belief !== group.belief) {
         const pressure = belief === official.belief && nation.policies.beliefPolicy === 'restricted' ? 1.8 : 1
@@ -286,6 +303,7 @@ export function evolveIdentities(world: World) {
           { belief },
           0.0007 * (0.5 + group.literacy + group.urban) * pressure * (1 - group.rootedness * 0.5),
           [1.5, 1, 0.3],
+          index,
         )
       }
       if (movement !== group.movement) {
@@ -306,6 +324,7 @@ export function evolveIdentities(world: World) {
           { movement },
           0.0014 * (0.3 + affinity),
           [0.8, 1.2, 0.4],
+          index,
         )
       }
       if (group.allegiance !== region.nation && group.loyalty > 0.65)
@@ -315,6 +334,7 @@ export function evolveIdentities(world: World) {
           { allegiance: region.nation },
           0.0015 * group.loyalty,
           [2, 0.8, 0.15],
+          index,
         )
       else if (group.allegiance !== -1 && group.grievance > 0.5 && group.loyalty < 0.4)
         metrics.politicalChanges += splitCommunity(
@@ -323,6 +343,7 @@ export function evolveIdentities(world: World) {
           { allegiance: -1 },
           0.0015 * group.grievance,
           [0.7, 1.2, 0.5],
+          index,
         )
     }
     rollupPopulation(region)

@@ -1,3 +1,4 @@
+import { transfer, governmentAccount, householdAccount, producerAccount } from './ledger'
 import { simulationSettings } from './settings'
 import { parseHistoryPatterns } from './history-repertoire'
 import { introduceCulturalLegacy, populationIdentitySummary } from './identities'
@@ -155,7 +156,23 @@ function applyChange(
       return
     }
     if (effect.stat === 'treasury') {
-      nation.treasury = Math.max(0, nation.treasury * (1 + effect.amount))
+      const amount = Math.abs(nation.treasury * effect.amount)
+      if (effect.amount >= 0)
+        transfer(
+          world,
+          producerAccount(nation.capital),
+          governmentAccount(nation.id),
+          amount,
+          'historical domestic transfer',
+        )
+      else
+        transfer(
+          world,
+          governmentAccount(nation.id),
+          householdAccount(nation.capital, 'laborer'),
+          Math.min(nation.treasury, amount),
+          'historical compensation',
+        )
       return
     }
     if (effect.stat === 'researchProgress' && effect.field) {

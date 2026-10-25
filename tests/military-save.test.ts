@@ -1,8 +1,9 @@
+import { endowTreasury } from './fixtures/endowment'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
 import { applyCommand } from '../src/sim/engine'
-import { ensureWarfare, commissionFleet, advanceNavy, embarkArmy } from '../src/sim/navy'
+import { ensureWarfare, commissionFleet, advanceNavy, embarkArmy, canEmbarkArmy } from '../src/sim/navy'
 import { restoreWorld, validateWorld } from '../src/sim/persistence'
 import { releaseSoldiers, takeCivilianAdults } from '../src/sim/population'
 import { transportNetwork } from '../src/sim/transport'
@@ -19,7 +20,7 @@ test('manual recruitment is immediately saveable, before the next simulation mon
   ensureWarfare(w)
   const r = w.regions[w.nations[0].capital],
     count = w.armies.length
-  w.nations[0].treasury = 10000
+  endowTreasury(w, 0, 10000)
   r.stocks.arms = 1000
   applyCommand(w, { type: 'recruit', nation: 0, region: r.id })
   assert.equal(w.armies.length, count + 1)
@@ -71,7 +72,7 @@ function fleetWorld() {
   ensureWarfare(w)
   const harbor = transportNetwork(w).harbors[0],
     r = w.regions[harbor.region]
-  w.nations[r.nation].treasury = 10000
+  endowTreasury(w, r.nation, 10000)
   for (const good of ['timber', 'iron', 'arms', 'tools', 'food'] as const) r.stocks[good] = 100000
   commissionFleet(w, r.nation, r.id, 1, 4)
   return { w, r, f: w.warfare!.fleets.at(-1)! }
@@ -89,6 +90,24 @@ test('fleet manifests drop armies that have dispersed before the naval phase', (
   validateWorld(w)
 })
 
+test('automatic embarkation eligibility rejects inaccessible ports and insufficient berths', () => {
+  const { w, r, f } = fleetWorld(),
+    a = w.armies.find((a) => a.nation === r.nation)!
+  a.region = r.id
+  assert(canEmbarkArmy(w, a, f))
+  const foreign = transportNetwork(w).harbors.find((h) => w.regions[h.region].nation !== r.nation)!
+  a.region = foreign.region
+  f.cell = foreign.water
+  relation(w, a.nation, w.regions[foreign.region].nation)!.treaty = 'neutral'
+  assert.equal(canEmbarkArmy(w, a, f), false)
+  assert.throws(() => embarkArmy(w, a.id, f.id), /accessible embarkation port/)
+  a.region = r.id
+  f.cell = transportNetwork(w).harbors.find((h) => h.region === r.id)!.water
+  f.hull = 0.001
+  assert.equal(canEmbarkArmy(w, a, f), false)
+  assert.throws(() => embarkArmy(w, a.id, f.id), /transport berths/)
+})
+
 test('an unaffordable allied-port purchase cannot give a fleet negative ammunition', () => {
   const { w, r, f } = fleetWorld()
   const foreign = transportNetwork(w).harbors.find((h) => w.regions[h.region].nation !== r.nation)!
@@ -97,7 +116,7 @@ test('an unaffordable allied-port purchase cannot give a fleet negative ammuniti
   f.cell = foreign.water
   f.region = host.id
   // Reproduce a rounding debt after a fully funded food purchase.
-  w.nations[r.nation].treasury = -Number.EPSILON
+  endowTreasury(w, r.nation, -Number.EPSILON)
   f.food = f.soldiers * 0.034 * 4
   f.arms = 0
   advanceNavy(w)
@@ -130,7 +149,7 @@ test('recruiting the 501st formation remains saveable and preserves people and m
   validateWorld(w)
   const before = people(w),
     ids = w.armies.map((a) => a.id)
-  w.nations[0].treasury = 100000
+  endowTreasury(w, 0, 100000)
   r.stocks.arms = 10000
   assert.match(applyCommand(w, { type: 'recruit', nation: 0, region: r.id }), /Recruited/)
   assert.equal(w.armies.length, 501)
@@ -166,7 +185,7 @@ test('a state can rebuild its funded standing cadre after the world passes 500 f
   const n = w.nations[1],
     source = w.regions[n.capital],
     before = people(w)
-  n.treasury = 100000
+  endowTreasury(w, n.id, 100000)
   n.budget.military = 1000
   n.policies.military = 20
   n.policies.conscription = 1

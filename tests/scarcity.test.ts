@@ -1,3 +1,4 @@
+import { firmCapacity, ensureFirms } from '../src/sim/firms'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
@@ -27,10 +28,22 @@ test('abundance scales actual raw output; constrained populations can exhaust re
     }),
     rich = structuredClone(scarce)
   rich.simulation!.abundance = 1.6
+  for (const w of [scarce, rich]) {
+    ensureFirms(w)
+    for (const f of w.economy!.firms!) f.employment = 1000
+  }
+  // Hold employment and the product mix fixed to isolate the physical abundance coefficient.
+  for (const good of ['food', 'timber', 'iron', 'coal'] as const) {
+    const potential = (w: typeof scarce) =>
+      w
+        .economy!.firms!.filter((f) => f.active)
+        .reduce((sum, f) => sum + firmCapacity(w, w.regions[f.region], f, 3).q[good], 0)
+    assert(Math.abs(potential(rich) / potential(scarce) - 1.6 / 0.35) < 1e-9, good)
+  }
   for (const w of [scarce, rich]) produce(w)
   for (const good of ['food', 'timber', 'iron', 'coal'] as const) {
     const total = (w: typeof scarce) => w.regions.reduce((s, r) => s + r.production[good], 0)
-    assert(total(rich) > total(scarce) * 4, good)
+    assert(total(rich) > total(scarce), good)
   }
   for (let month = 0; month < 12; month++) tick(scarce)
   assert(scarce.regions.some((r) => r.foodCoverage < 0.9))

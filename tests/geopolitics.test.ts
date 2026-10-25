@@ -1,3 +1,4 @@
+import { endowTreasury } from './fixtures/endowment'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
@@ -16,7 +17,7 @@ function ready(seed: string) {
   ensureStatecraft(w)
   for (const n of w.nations) {
     n.ai = false
-    n.treasury = 10000
+    endowTreasury(w, n.id, 10000)
     n.budget.military = 1000
     n.foodCoverage = 1
     n.stability = 70
@@ -121,7 +122,8 @@ test('ungarrisoned conquest preserves local allegiances and raises resistance ra
 })
 
 test('exposed small AI states form a multilateral defense league without manufacturing a human government’s consent', () => {
-  const w = ready('survival-league')
+  // This seed has the three exposed neighbors required by the coalition fixture.
+  const w = ready('survival-league-0')
   const exposure = (nation: number) => [
     ...new Set(
       w.regions

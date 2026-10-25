@@ -1,3 +1,5 @@
+import { recordRequisition } from './national-accounts'
+import { publicTransfer } from './ledger'
 import { MAX_ARMIES } from './military-limits'
 import { MAX_STATE_IDENTITIES } from './types'
 import { ensureStatecraft } from './statecraft'
@@ -151,8 +153,7 @@ function transferAuthority(world: World, report: ProvincialAuthority) {
           Math.max(0, former.treasury) * Math.min(0.2, share),
           Math.max(0, former.budget.administration) * 2,
         )
-  former.treasury -= funds
-  successor.treasury += funds
+  publicTransfer(world, former.id, successor.id, funds, 'state succession')
   r.nation = successor.id
   if (r.occupation?.former === successor.id) delete r.occupation
   if (world.regions[successor.capital].nation !== successor.id) successor.capital = r.id
@@ -167,14 +168,18 @@ function transferAuthority(world: World, report: ProvincialAuthority) {
       regular = Math.min(recruits, Math.floor(r.stocks.arms / 0.012)),
       improvised = recruits - regular,
       communities = takeCivilianAdults(world, r, recruits, (group) => group.movement === report.movement)
+    recordRequisition(world, r.id, 'arms', regular * 0.012)
     r.stocks.arms -= regular * 0.012
     r.consumption.arms += regular * 0.012
     const tools = Math.min(improvised, Math.floor(r.stocks.tools / 0.02)),
       timber = improvised - tools
+    recordRequisition(world, r.id, 'tools', tools * 0.02)
     r.stocks.tools -= tools * 0.02
     r.consumption.tools += tools * 0.02
-    r.stocks.timber = Math.max(0, r.stocks.timber - timber * 0.04)
-    r.consumption.timber += timber * 0.04
+    const timberUsed = Math.min(r.stocks.timber, timber * 0.04)
+    recordRequisition(world, r.id, 'timber', timberUsed)
+    r.stocks.timber -= timberUsed
+    r.consumption.timber += timberUsed
     for (const group of communities) {
       group.host = successor.id
       if (group.movement === report.movement) {
