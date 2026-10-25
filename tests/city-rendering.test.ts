@@ -7,6 +7,7 @@ import { TerrainPicker } from '../src/map/relief-picking'
 import { zoomAt } from '../src/map/geometry'
 import type { World } from '../src/sim/types'
 import type { Settlement } from '../src/sim/spatial'
+import { SceneryMotion } from '../src/map/scenery-motion'
 const width = 40,
   height = 40
 const world = {
@@ -80,6 +81,7 @@ test('coastal parcels and squares stay on land; empty ocean creates no town deta
   assert.equal(layout.buildings.length, 0)
   assert.equal(layout.streets.length, 0)
   assert.equal(layout.square.length, 0)
+  assert.equal(layout.gardens.length, 0)
 })
 
 test('city detail cache is bounded across a world tour and survives population-only updates', () => {
@@ -192,5 +194,29 @@ test('street organizations have different silhouettes and keep homes away from r
   assert(layout.buildings.every((b) => Math.abs(b.z - city.z) > radius + 1.4))
   assert(layout.streets.some((s) => s.width === 0.42))
   assert(layout.bridges.length <= 2)
+  assert(layout.gardens.length <= 12)
+  for (const g of layout.gardens)
+    assert(
+      Math.abs(g.z - city.z) > radius + Math.hypot(g.width, g.depth) / 2,
+      'garden parcels keep the river corridor open',
+    )
   for (const b of layout.bridges) assert((b.a.z - city.z) * (b.b.z - city.z) < 0)
+})
+
+test('scenery time freezes while disabled and resumes without hidden-tab catch-up', () => {
+  const motion = new SceneryMotion()
+  const uniform = motion.time
+  motion.advance(1000, true)
+  motion.advance(1050, true)
+  assert.equal(uniform.value, 0.05)
+  motion.advance(1100, false)
+  motion.advance(900000, false)
+  assert.equal(uniform.value, 0.05)
+  motion.advance(900100, true)
+  assert.equal(uniform.value, 0.05)
+  motion.advance(900150, true)
+  assert.equal(uniform.value, 0.1)
+  motion.advance(910000, true)
+  assert.equal(uniform.value, 0.2, 'a late frame has bounded movement')
+  assert.equal(motion.time, uniform, 'animation updates do not allocate replacement uniforms')
 })

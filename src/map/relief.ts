@@ -10,6 +10,7 @@ import { terrainHeight, reliefRandom } from './relief-field'
 import { terrainMaterial, oceanMaterial } from './landscape-material'
 import { forestSites } from './forest-sites'
 import { riverSurface } from './river-surface'
+import { SceneryMotion } from './scenery-motion'
 
 export type ReliefCamera = { w: number; h: number; scale: number; x: number; y: number; tilt: boolean }
 
@@ -27,6 +28,7 @@ export class ReliefMap {
   private textureCanvas = document.createElement('canvas')
   private scenery = new THREE.Group()
   private treeScale = { value: 1 }
+  private motion = new SceneryMotion()
   private sun = new THREE.DirectionalLight('#fff0d8', 2.65)
   private cities: CityScenery
   private raycaster = new THREE.Raycaster()
@@ -91,13 +93,18 @@ export class ReliefMap {
     const oceanGeometry = new THREE.PlaneGeometry(this.width, this.height)
     oceanGeometry.rotateX(-Math.PI / 2)
     oceanGeometry.translate(this.width / 2, -0.1, this.height / 2)
-    const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial(this.oceanTexture))
+    const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial(this.oceanTexture, this.motion.time))
     this.scene.add(ocean)
-    this.rivers = riverSurface(atlas.riverCurves, this.picker, {
-      texture: this.texture,
-      width: this.width,
-      height: this.height,
-    })
+    this.rivers = riverSurface(
+      atlas.riverCurves,
+      this.picker,
+      {
+        texture: this.texture,
+        width: this.width,
+        height: this.height,
+      },
+      this.motion.time,
+    )
     this.scene.add(this.rivers.mesh)
     const overlayMesh = new THREE.Mesh(
       geometry,
@@ -174,10 +181,11 @@ export class ReliefMap {
     )
     crowns.material.onBeforeCompile = (shader) => {
       shader.uniforms.townTreeScale = this.treeScale
-      shader.vertexShader = 'uniform float townTreeScale;\n' + shader.vertexShader
+      shader.uniforms.sceneryTime = this.motion.time
+      shader.vertexShader = 'uniform float townTreeScale;\nuniform float sceneryTime;\n' + shader.vertexShader
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
-        '#include <begin_vertex>\ntransformed *= townTreeScale;',
+        '#include <begin_vertex>\ntransformed *= townTreeScale;\ntransformed.x += sin(sceneryTime*1.3+dot(instanceMatrix[3].xz,vec2(0.31,0.17))+position.y)*max(0.0,position.y)*0.025*townTreeScale;',
       )
     }
     crowns.material.customProgramCacheKey = () => 'town-tree-scale-v1'
@@ -282,7 +290,13 @@ export class ReliefMap {
     return hit ? { x: hit.x, y: hit.z } : null
   }
 
-  render() {
+  pauseMotion() {
+    this.motion.advance(0, false)
+  }
+
+  render(time = 0, animated = false) {
+    this.motion.advance(time, animated)
+    this.cities.time.value = this.motion.time.value
     this.renderer.render(this.scene, this.camera)
   }
 

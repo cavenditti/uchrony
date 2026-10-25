@@ -38,3 +38,7 @@ The province context offers **Explore city**; deeper zoom reveals the layout and
 ## Water material refinement — 25 October 2026
 
 Lit 3D channels use deeper centers, shallow edges, restrained earth-colored banks and static ripple normals. Tributary joins soften bank accents; river mouths meet the retained land silhouette. Width changes follow discharge and share the same setback calculation with town plans. This extends the landscape's materials while preserving Atlas, cabinet-map controls, simulation boundaries and the existing resource limits; no additional water texture or animation loop is introduced.
+
+## Town materials and motion — 25 October 2026
+
+The next pass makes close town inspection richer through procedural masonry, roof tiles, timber accents, cobbles, civic details and planted plots. A gentle shared wind moves flags and foliage, while water ripples follow the running/paused state. This replaces the preceding static-ripple treatment without adding a new art direction or global interface tokens. Motion stops when paused, hidden or reduced motion is enabled; the same retained city limits and 30 fps ceiling govern the scene. Material and geometry costs, visual checks and their limits are recorded in [map rendering](../../docs/MAP_RENDERING.md#animated-scenery-and-town-materials--25-october-2026).

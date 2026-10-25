@@ -34,6 +34,7 @@ export type CityLayout = {
   bridges: { a: CityPoint; b: CityPoint; width: number }[]
   square: CityPoint[]
   trees: CityPoint[]
+  gardens: (CityPoint & { width: number; depth: number; angle: number })[]
   landmark: 'belfry' | 'dome' | 'keep'
   plaza: CityPoint
   angle: number
@@ -417,6 +418,31 @@ export function cityLayout(
       tone: random(key + 4),
     })
   }
+  const gardens: CityLayout['gardens'] = []
+  for (let i = 0; i < 32 && gardens.length < 12; i++) {
+    const a = i * 2.39996 + random(801) * 6,
+      distance = r * (0.8 + random(802 + i) * 0.3),
+      p = point(Math.cos(a) * distance, Math.sin(a) * distance),
+      width = 1.2 + random(850 + i) * 0.9,
+      depth = 1.6 + random(890 + i) * 1.0,
+      radius = Math.hypot(width, depth) / 2
+    if (!dry(p, radius + 1) || !roadClear(p, width, depth, -angle)) continue
+    if (buildings.some((b) => overlaps(p, width, depth, -angle, b))) continue
+    if (Math.hypot(p.x - plaza.x, p.z - plaza.z) < plazaSize + radius + 1) continue
+    if (
+      ![-1, 1].every((x) =>
+        [-1, 1].every((z) =>
+          dry(point(Math.cos(a) * distance + (x * width) / 2, Math.sin(a) * distance + (z * depth) / 2), 0.5),
+        ),
+      )
+    )
+      continue
+    if (
+      gardens.some((g) => Math.hypot(g.x - p.x, g.z - p.z) < radius + Math.hypot(g.width, g.depth) / 2 + 0.3)
+    )
+      continue
+    gardens.push({ ...p, width, depth, angle: -angle })
+  }
   return {
     city,
     pattern,
@@ -425,6 +451,7 @@ export function cityLayout(
     bridges,
     square,
     trees,
+    gardens,
     plaza,
     angle: -angle,
     landmark: (['belfry', 'dome', 'keep'] as const)[Math.floor(random(9) * 3) % 3],

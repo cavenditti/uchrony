@@ -90,6 +90,19 @@ export function WorldMap({
   const [tilt, setTilt] = useState(true)
   const [reliefReady, setReliefReady] = useState<string | null>(null)
   const [reliefError, setReliefError] = useState(false)
+  const [motionAllowed, setMotionAllowed] = useState(
+    () => !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setMotionAllowed(!document.hidden && !media.matches)
+    media.addEventListener('change', update)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      media.removeEventListener('change', update)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [])
   const isRelief = presentation === 'relief' && reliefReady === mapKey
   const baseRef = useRef<HTMLCanvasElement | null>(null),
     frame = useRef(0)
@@ -160,6 +173,8 @@ export function WorldMap({
   )
   const transforms = useRef({ scale, offsetX, offsetY })
   transforms.current = { scale, offsetX, offsetY }
+  const resizeMetrics = useRef({ fit, mapW, mapH, verticalFactor })
+  resizeMetrics.current = { fit, mapW, mapH, verticalFactor }
   const reset = useCallback(() => setView({ zoom: 1, x: 0, y: 0 }), [])
 
   useEffect(() => {
@@ -167,6 +182,15 @@ export function WorldMap({
     if (!holder) return
     const observer = new ResizeObserver((entries) => {
       const r = entries[0].contentRect
+      // Hidden panels can briefly report zero size. Preserve both the last
+      // usable canvas and the geographic center across genuine resizes.
+      if (r.width < 1 || r.height < 1) return
+      const previous = resizeMetrics.current
+      const nextFit =
+        Math.min(r.width / previous.mapW, r.height / (previous.mapH * previous.verticalFactor)) * 0.94
+      const ratio = nextFit / previous.fit
+      resizeMetrics.current = { ...previous, fit: nextFit }
+      setView((v) => ({ ...v, x: v.x * ratio, y: v.y * ratio }))
       setSize({ w: r.width, h: r.height })
     })
     observer.observe(holder)
@@ -319,18 +343,30 @@ export function WorldMap({
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     resizeCanvas(canvas, size.w * dpr, size.h * dpr)
     const ctx = canvas.getContext('2d')!
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduced = !motionAllowed
+    const moving = running && motionAllowed
+    const freightMoving = moving && (showRoutes || layer === 'trade') && world.routes.length > 0
     let lastAnimatedFrame = -Infinity
+    let painted = false
     const draw = (time: number) => {
       if (isRelief && !reliefRef.current) return
-      // Freight motion is the only reason to repaint an unchanged camera.
-      // Keep it at 30 fps on high-refresh/Retina screens. A camera, selection,
-      // or world update starts a fresh effect and still paints immediately.
+      if (document.hidden) {
+        reliefRef.current?.pauseMotion()
+        return
+      }
+      // Scenery and freight share a 30 fps ceiling. Camera/content changes still
+      // paint immediately; scenery-only frames retain the 2D labels and overlay.
       if (time - lastAnimatedFrame < 1000 / 30) {
         frame.current = requestAnimationFrame(draw)
         return
       }
       lastAnimatedFrame = time
+      if (painted && isRelief && !freightMoving) {
+        reliefRef.current!.render(time, moving)
+        if (moving) frame.current = requestAnimationFrame(draw)
+        return
+      }
+      painted = true
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, size.w, size.h)
       if (!isRelief) {
@@ -408,7 +444,7 @@ export function WorldMap({
           overlayRevision,
           running && !reduced && (showRoutes || layer === 'trade'),
         )
-        reliefRef.current!.render()
+        reliefRef.current!.render(time, moving)
       } else drawOverlay(ctx)
       drawPlaceLabels(
         ctx,
@@ -447,8 +483,7 @@ export function WorldMap({
         for (const f of world.warfare?.fleets ?? [])
           badge(f.cell, `Ships ${f.warships + f.transports}`, f.nation)
       }
-      if (running && !reduced && (showRoutes || layer === 'trade'))
-        frame.current = requestAnimationFrame(draw)
+      if (moving && (isRelief || freightMoving)) frame.current = requestAnimationFrame(draw)
     }
     frame.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(frame.current)
@@ -460,6 +495,7 @@ export function WorldMap({
     showRoutes,
     showArmies,
     running,
+    motionAllowed,
     size,
     scale,
     offsetX,
@@ -579,6 +615,7 @@ export function WorldMap({
       className="map-canvas-wrap"
       data-layer={layer}
       data-presentation={isRelief ? 'relief' : 'atlas'}
+      data-scenery-motion={isRelief && running && motionAllowed ? 'running' : 'still'}
       ref={holderRef}
     >
       <canvas ref={reliefCanvasRef} className="relief-canvas" aria-hidden="true" />

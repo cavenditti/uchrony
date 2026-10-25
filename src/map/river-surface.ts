@@ -10,6 +10,7 @@ export function riverSurface(
   curves: RiverCurve[],
   picker: TerrainPicker,
   coast?: { texture: THREE.Texture; width: number; height: number },
+  time = { value: 0 },
 ) {
   const incoming = new Map<number, number>()
   for (const curve of curves) incoming.set(curve.to, (incoming.get(curve.to) ?? 0) + 1)
@@ -94,6 +95,7 @@ export function riverSurface(
   if (coast) material.defines = { RIVER_COAST: 1 }
   material.customProgramCacheKey = () => `uchrony-vector-rivers-v2:${Boolean(coast)}`
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.sceneryTime = time
     shader.uniforms.riverMinimumFlow = minimumFlow
     shader.uniforms.riverBankColor = { value: new THREE.Color('#82896a') }
     if (coast) {
@@ -114,6 +116,7 @@ export function riverSurface(
       varying +
       `
       uniform float riverMinimumFlow;
+      uniform float sceneryTime;
       uniform vec3 riverBankColor;
       #ifdef RIVER_COAST
         uniform sampler2D riverLand;
@@ -157,7 +160,7 @@ export function riverSurface(
       '#include <normal_fragment_maps>',
       `#include <normal_fragment_maps>
       float detail = 1.0 - smoothstep(0.35, 1.5, length(fwidth(vRiverPosition.xz)));
-      vec2 p = vRiverPosition.xz * 0.9;
+      vec2 p = vRiverPosition.xz * 0.9 - sceneryTime * vec2(0.18,0.07);
       vec2 slope = vec2(
         surfaceNoise(p + vec2(0.2, 0.0)) - surfaceNoise(p - vec2(0.2, 0.0)),
         surfaceNoise(p + vec2(0.0, 0.2)) - surfaceNoise(p - vec2(0.0, 0.2))

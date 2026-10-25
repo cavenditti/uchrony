@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-25",
+  "status": "uncommitted",
+  "baseCommit": "dd76d90",
+  "scope": "Procedural city materials, model details, planted spaces and scenery animation; no simulation or save changes",
+  "tests": {
+    "targeted": 16,
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "buildWarning": "Existing chunks exceed 500 kB minified"
+  },
+  "cache": {
+    "syntheticTownTour": 20,
+    "maxVisible": 6,
+    "maxRetained": 12,
+    "retainedGeometryAndInstanceBytes": 2045404,
+    "excludes": "Shared shapes, materials, shadow target, terrain, driver allocations and total browser memory"
+  },
+  "browser": {
+    "cells": 129024,
+    "cityVisits": 5,
+    "drags": 10,
+    "zoomActions": 10,
+    "animationDuringTour": true,
+    "presentationTransitions": [
+      "3D to Atlas",
+      "Atlas to 3D"
+    ],
+    "viewports": [
+      [
+        1280,
+        720
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "resize": "City remained centered on phone-to-desktop resize after correction; zero-size observer updates are ignored",
+    "warningsAndErrors": [],
+    "pixelComparisons": {
+      "running": {
+        "changedPixels": 270469,
+        "pixels": 832000,
+        "files": [
+          ".impeccable/review/town-motion-final-a.jpg",
+          ".impeccable/review/town-motion-final-b.jpg"
+        ]
+      },
+      "paused": {
+        "changedPixels": 0,
+        "pixels": 832000,
+        "files": [
+          ".impeccable/review/town-paused-final-b.jpg",
+          ".impeccable/review/town-paused-final-c.jpg"
+        ]
+      }
+    },
+    "pixelComparisonRegion": "Below fixture header: 1280 x 650 pixels",
+    "reducedMotionAndHiddenTab": "Preference and visibility listeners implemented; disabled/resumed clock covered by unit test. OS preference change not exercised in browser.",
+    "simulationAndAutosave": "Not exercised; fixed-snapshot visual/interaction check",
+    "preliminaryEvidenceExcluded": "Initial zero-size frame and comparisons across different screenshot APIs excluded; final comparisons use the same API and final source revision.",
+    "captures": [
+      ".impeccable/review/town-paused-final-c.jpg",
+      ".impeccable/review/town-detail-mobile.jpg"
+    ]
+  },
+  "sha256": {
+    "src/components/WorldMap.tsx": "d2ee7c0ad82dd319f4e6002c80d8df4e075985e6383927aecfb9f56677e9bfc6",
+    "src/map/city-layout.ts": "b741da3e007c441e077e77e05b98b4bb242db3df1c497be21009588cf35da0b7",
+    "src/map/city-scenery.ts": "ab03b5b0a4f35ce6b5eda4d68e46d5c69439e02a963c26a0cc62829e4023d946",
+    "src/map/city-materials.ts": "68bf50c8780535e3302c5f2c9fd20410e540b1d3252dae49e2304ac2dfc79017",
+    "src/map/scenery-motion.ts": "06bd8aff3679df649b339f35e8163763d1a10a7a5f7d119c0ada669f8f7cdd7b",
+    "src/map/landscape-material.ts": "fd6e967a631dfcc24201235bd566af69f5bb62b96e39d7b30b86cdd268866884",
+    "src/map/relief.ts": "d439a317786eeeb1278901757b81089b2bb18a5261faf473bb27a3f978a8f0fd",
+    "src/map/river-surface.ts": "e677aef17b4ab6b2db710a9ee85c7d9f69b26e7fe8768d4fb110bc2a01ac95b0",
+    "tests/city-rendering.test.ts": "9809f23796fccfecbbb24e2099feeb31173dcb2c33cd26a3a6f6b970973d8a8a",
+    "tests/browser/map-stress.tsx": "03dd4dae762581a910a6104a5a63c4a07cdc1353eb7892fb39a9e8358469ac17"
+  }
+}

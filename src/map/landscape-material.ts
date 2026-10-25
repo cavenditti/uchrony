@@ -37,24 +37,26 @@ export function terrainMaterial(texture: THREE.Texture) {
   return material
 }
 
-/** Static wind ripples and grazing reflection: no additional textures, framebuffers, or animation loop. */
-export function oceanMaterial(texture: THREE.Texture) {
+/** Wind ripples share the scene clock and existing frame budget. */
+export function oceanMaterial(texture: THREE.Texture, time = { value: 0 }) {
   const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.58, metalness: 0.03 })
   material.customProgramCacheKey = () => 'uchrony-natural-water-v1'
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.sceneryTime = time
     shader.vertexShader = 'varying vec3 vSea;\n' + shader.vertexShader
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
       '#include <begin_vertex>\nvSea = position;',
     )
-    shader.fragmentShader = 'varying vec3 vSea;\n' + surfaceNoiseShader + '\n' + shader.fragmentShader
+    shader.fragmentShader =
+      'uniform float sceneryTime;\nvarying vec3 vSea;\n' + surfaceNoiseShader + '\n' + shader.fragmentShader
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
       `
       #include <normal_fragment_maps>
       float footprint = length(fwidth(vSea.xz));
       float ripple = 1.0-smoothstep(0.75,3.0,footprint);
-      vec2 p = vSea.xz * 0.12;
+      vec2 p = vSea.xz * 0.12 - sceneryTime * vec2(0.025,0.01);
       vec2 slope = vec2(
         surfaceNoise(p+vec2(0.4,0.0))-surfaceNoise(p-vec2(0.4,0.0)),
         surfaceNoise(p+vec2(0.0,0.4))-surfaceNoise(p-vec2(0.0,0.4))

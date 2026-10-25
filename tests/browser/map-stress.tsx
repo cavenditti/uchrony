@@ -46,7 +46,7 @@ function Fixture({ world }: { world: World }) {
             </select>
           </label>
         )}
-        <button onClick={() => setRunning((v) => !v)}>{running ? 'Pause freight' : 'Animate freight'}</button>
+        <button onClick={() => setRunning((v) => !v)}>{running ? 'Pause animation' : 'Animate world'}</button>
       </header>
       <main className="atlas-shell stress-map">
         <WorldMap
