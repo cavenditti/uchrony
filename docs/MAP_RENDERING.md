@@ -231,6 +231,12 @@ The previous renderer squeezed all housing capacity into its small visible build
 
 The renderer tests cover deterministic street traditions, generous house footprints, bounded height under extreme capacity, capacity-metadata conservation, river/land setbacks and retained scene limits. The isolated `urban-density.html` fixture exercises garden housing, an extreme-capacity center and an industrial neighborhood in the production renderer.
 
+### Connected neighborhood streets — 26 October 2026
+
+Market plans now develop around a through street with staggered, gently bent side lanes. Riverside plans use a single high street with short frontage lanes. This removes the disconnected decorative arcs, radial fan junctions and repeated parallel ladders; deliberately planned towns retain their ordered blocks. Small-town squares occupy less ground, and market housing follows street frontages rather than supplementary concentric rings.
+
+Paving uses continuous ribbons with shared edge vertices at bends and bounded corner extensions. Main streets, lanes and civic squares receive separate small surface offsets to prevent coplanar flicker. These changes remain deterministic presentation geometry; housing capacity, simulation state, save formats and the six-visible/twelve-cached town limits are unchanged. The focused regression suite checks connected lanes and a paving budget across 80 small-town plans, joined ribbon edges, duplicate samples, sharp corners, river setbacks and represented housing capacity.
+
 ## Living economic landscape — 26 October 2026
 
 The relief renderer now adds a world-aligned field mosaic and representative activity models from a compact economic tile projection. Farms, pasture, woods, timber yards, quarries, mines and workshops have different forms. Existing accessible coastal harbors receive quays, piers, warehouses and boats. Local climate changes crops, foliage and seasonal pigment. Transport routes show paths, gravel, paving or rails according to provincial investment. Thematic ground colors remain authoritative on data layers.

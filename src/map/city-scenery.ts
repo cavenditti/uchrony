@@ -8,6 +8,7 @@ import { TerrainPicker } from './relief-picking'
 import { architectureMaterial, townGroundMaterial, windMaterial } from './city-materials'
 import { illuminated } from './illuminated-palette'
 import { reliefRandom } from './relief-field'
+import { streetRibbon } from './street-geometry'
 
 const PALETTES = illuminated.cities
 const DETAIL_LIMIT = 6,
@@ -331,25 +332,10 @@ export class CityScenery {
         }
     }
     const stroke = (points: CityPoint[], width: number, color: THREE.Color, kind = 0) => {
-      for (let i = 1; i < points.length; i++) {
-        const a = points[i - 1],
-          b = points[i],
-          length = Math.hypot(b.x - a.x, b.z - a.z)
-        const dx = ((-(b.z - a.z) / length) * width) / 2,
-          dz = (((b.x - a.x) / length) * width) / 2
-        face(
-          [
-            { x: a.x + dx, z: a.z + dz },
-            { x: b.x + dx, z: b.z + dz },
-            { x: b.x - dx, z: b.z - dz },
-            { x: a.x - dx, z: a.z - dz },
-          ],
-          color,
-          kind,
-        )
-      }
+      for (const quad of streetRibbon(points, width)) face(quad, color, kind, kind === 0 ? 0.065 : 0.06)
     }
-    face(layout.square, paving)
+    // Slightly separate surfaces at junctions instead of coplanar z-fighting.
+    face(layout.square, paving, 0, 0.075)
     for (const street of layout.streets)
       stroke(
         street.points,

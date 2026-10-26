@@ -10,6 +10,7 @@ import type { Settlement } from '../src/sim/spatial'
 import { urbanForm } from '../src/map/urban-form'
 import { CELL_SIZE } from '../src/sim/grid'
 import { SceneryMotion } from '../src/map/scenery-motion'
+import { streetRibbon } from '../src/map/street-geometry'
 const width = 40,
   height = 40
 const world = {
@@ -65,13 +66,81 @@ test('town layouts are deterministic, distinct, and independent of monthly total
           .slice(1)
           .reduce((n, p, i) => n + Math.hypot(p.x - road.points[i].x, p.z - road.points[i].z), 0),
       0,
-    ) > 50,
+    ) > 30,
   )
   assert(
     layout.buildings.every(
       (b) => Number.isFinite(b.x + b.z + b.height) && Math.hypot(b.x - a.x, b.z - a.z) < a.radius,
     ),
   )
+})
+
+test('street ribbons share their bend edges without gaps, overlapping wedges, or acute spikes', () => {
+  const path = [
+    { x: 0, z: 0 },
+    { x: 4, z: 0 },
+    { x: 4, z: 4 },
+  ]
+  const quads = streetRibbon(path, 1)
+  assert.equal(quads.length, 2)
+  assert.deepEqual(quads[0][1], quads[1][0])
+  assert.deepEqual(quads[0][2], quads[1][3])
+  assert.deepEqual(quads[0][1], { x: 3.5, z: 0.5 })
+  assert.deepEqual(quads[0][2], { x: 4.5, z: -0.5 })
+  assert.deepEqual(streetRibbon([path[0], path[0], path[1], path[2]], 1), quads)
+  assert.deepEqual(streetRibbon([path[0], path[0]], 1), [])
+  const sharp = streetRibbon(
+    [
+      { x: 0, z: 0 },
+      { x: 4, z: 0 },
+      { x: 0, z: 0.01 },
+    ],
+    1,
+  )
+  for (const p of [sharp[0][1], sharp[0][2]]) {
+    assert(Number.isFinite(p.x + p.z))
+    assert(Math.hypot(p.x - 4, p.z) <= 1 + 1e-9)
+  }
+})
+
+test('small market and riverside neighborhoods have connected lanes instead of floating arcs or ladders', () => {
+  for (const streetPattern of ['market', 'spine'] as const) {
+    for (let seed = 0; seed < 40; seed++) {
+      const city = { ...describeCity(world, site), seed, radius: 8, streetPattern }
+      const layout = cityLayout(world, city)
+      assert(layout.buildings.length >= 6, 'lanes serve a readable neighborhood')
+      assert(layout.streets.length <= 5, 'small towns do not receive oversized road networks')
+      const reached = new Set([0])
+      for (let pass = 0; pass < layout.streets.length; pass++)
+        layout.streets.forEach((road, index) => {
+          if (reached.has(index)) return
+          for (const other of reached) {
+            const connected = road.points.some((p) =>
+              layout.streets[other].points.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < 0.51),
+            )
+            if (connected) reached.add(index)
+          }
+        })
+      assert.equal(
+        reached.size,
+        layout.streets.length,
+        `${streetPattern}:${seed}: every lane joins the network`,
+      )
+      const pavedArea =
+        layout.streets.reduce(
+          (sum, s) =>
+            sum +
+            s.width *
+              s.points
+                .slice(1)
+                .reduce((length, p, i) => length + Math.hypot(p.x - s.points[i].x, p.z - s.points[i].z), 0),
+          0,
+        ) +
+        (layout.square[1].x - layout.square[0].x) ** 2 +
+        (layout.square[1].z - layout.square[0].z) ** 2
+      assert(pavedArea / (Math.PI * city.radius ** 2) < 0.18, 'paving leaves space for homes and gardens')
+    }
+  }
 })
 
 test('coastal parcels and squares stay on land; empty ocean creates no town detail', () => {

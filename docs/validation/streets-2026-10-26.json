@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-26",
+  "scope": "Connected market and riverside streets, smaller neighborhood squares and continuous bend geometry",
+  "checks": {
+    "targetedTests": 20,
+    "passed": 20,
+    "seededSmallTownPlans": 80,
+    "allTestedLanesConnected": true,
+    "maxPavingBudgetFraction": 0.18,
+    "housingCapacityPreserved": true,
+    "productionBuild": "passed",
+    "format": "passed",
+    "diffCheck": "passed"
+  },
+  "browser": {
+    "name": "Google Chrome",
+    "version": 155,
+    "fixtureViewports": [
+      [
+        1440,
+        900
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "fullWorld": {
+      "cells": 129024,
+      "month": 8,
+      "location": "Aster Junford Cross, Greyport",
+      "scale": 36,
+      "viewport": [
+        1440,
+        900
+      ]
+    },
+    "renderingErrorsAfterSuccessfulImport": 0
+  },
+  "visualFindings": [
+    "Disconnected market arcs and radial junction fans removed",
+    "Riverside ladder pattern replaced by a high street and frontage lanes",
+    "Paving bends use shared vertices; small civic squares are less dominant",
+    "Planned blocks remain deliberately ordered"
+  ],
+  "evidence": {
+    "desktop": "/Users/carlo/Devel/personal/uchrony/.impeccable/review/streets-2026-10-26/desktop.png",
+    "mobile": "/Users/carlo/Devel/personal/uchrony/.impeccable/review/streets-2026-10-26/mobile.png",
+    "world": "/Users/carlo/Devel/personal/uchrony/.impeccable/review/streets-2026-10-26/world-streets-close.png",
+    "browser": "/Users/carlo/Devel/personal/uchrony/.impeccable/review/streets-2026-10-26/final-browser.json"
+  },
+  "limits": [
+    "Seed connectivity test uses flat dry geography; terrain and rivers can deliberately split streets.",
+    "Paving fraction is length times width plus square area, not polygon-union area.",
+    "Phone capture uses desktop Chrome viewport emulation, not phone hardware.",
+    "Full-world check is a paused visual inspection, not a throughput benchmark.",
+    "Two setup imports failed (mistyped filename, then internal save envelope); the extracted raw world imported successfully. No new rendering errors followed.",
+    "Prior evaluation findings about farm repetition, activity buildings in rivers and monthly simulation speed are outside this street fix.",
+    "Design detector only flagged existing literal scenery colors; this change adds no palette values."
+  ],
+  "sha256": {
+    "src/map/city-layout.ts": "1527aed80ec1901d58d37ea631a8762b30f1561198e6ba9d0b0bbb44a8a92bb6",
+    "src/map/city-scenery.ts": "7ce42c0783ff943abea4b773d58a6fbe5457dd111e33b076317e8a8acb21f9cd",
+    "src/map/street-geometry.ts": "aa1db5044dd595d70ff3d63ac537c76bfd355a56e12d9596c5cb5e9d66516f4a",
+    "tests/city-rendering.test.ts": "05c2da547dcd44aa87e1675002062238678c297471f4aae87e63e994ce9fb873"
+  }
+}

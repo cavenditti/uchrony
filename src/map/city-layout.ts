@@ -204,7 +204,7 @@ export function cityLayout(
     streets: CityLayout['streets'] = [],
     bridges: CityLayout['bridges'] = [],
     trees: CityPoint[] = []
-  const plazaSize = Math.min(3.1, r * 0.25)
+  const plazaSize = Math.min(3.1, r * (r < 10 ? 0.16 : 0.23))
   let plaza = point(0, 0),
     square: CityPoint[] = []
   const candidates: CityPoint[] = []
@@ -232,52 +232,53 @@ export function cityLayout(
       raw.push({ points: [point(i * 4.3, -r), point(i * 4.3, r)], width: i === 0 ? 1.15 : 0.52 })
     }
   } else if (pattern === 'market') {
-    const center = local(plaza),
-      arms = 3 + Math.floor(random(11) * 4),
-      phase = random(12) * Math.PI * 2
-    const bearings = Array.from(
-      { length: arms },
-      (_, i) => phase + (i * Math.PI * 2) / arms + (random(20 + i) - 0.5) * 0.45,
+    const center = local(plaza)
+    // A through street precedes the town. Side lanes join it at staggered
+    // junctions; no decorative arcs or spokes converge on the fountain.
+    const main = [-1, 0, 1].map((side) =>
+      side === 0 ? plaza : point(center.u + side * r * 0.9, center.v + (random(12 + side) - 0.5) * r * 0.38),
     )
-    for (let i = 0; i < arms; i++) {
-      const a = bearings[i],
-        reach = r * (0.65 + random(30 + i) * 0.35)
+    raw.push({ points: main, width: 0.92 })
+    const branches = r < 10 ? 3 : 5
+    for (let i = 0; i < branches; i++) {
+      const half = i % 2,
+        a = main[half],
+        b = main[half + 1],
+        fromCenter = 0.25 + random(30 + i) * 0.2,
+        t = half === 0 ? 1 - fromCenter : fromCenter,
+        junction = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t },
+        start = local(junction),
+        side = i % 3 === 0 ? -1 : 1,
+        reach = r * (0.42 + random(40 + i) * 0.25),
+        drift = (random(50 + i) - 0.5) * r * 0.3
       raw.push({
         points: [
-          plaza,
-          point(center.u + Math.cos(a + 0.15) * reach * 0.52, center.v + Math.sin(a + 0.15) * reach * 0.52),
-          point(center.u + Math.cos(a) * reach, center.v + Math.sin(a) * reach),
+          junction,
+          point(start.u + drift * 0.35, start.v + side * reach * 0.5),
+          point(start.u + drift, start.v + side * reach),
         ],
-        width: i === 0 ? 1.05 : 0.62,
+        width: 0.4 + random(60 + i) * 0.12,
       })
-    }
-    // Partial neighborhood lanes have different centers, extents, and connections.
-    // They never stamp two complete concentric rings onto every settlement.
-    const districts = 1 + Math.floor(random(21) * 3)
-    for (let d = 0; d < districts; d++) {
-      const start = bearings[d % arms],
-        span = Math.PI * (0.65 + random(50 + d) * 0.75),
-        radius = r * (0.4 + d * 0.15)
-      const cx = center.u + (random(61 + d) - 0.5) * r * 0.3,
-        cy = center.v + (random(66 + d) - 0.5) * r * 0.3
-      const points = Array.from({ length: 23 }, (_, i) => {
-        const a = start + (span * i) / 22,
-          rr = radius * (1 + 0.15 * Math.sin(a * 2 + random(19 + d) * 5))
-        return point(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr)
-      })
-      raw.push({ points, width: 0.44 })
     }
   } else {
-    for (const v of [-r * 0.3, 0, r * 0.3])
+    const center = local(plaza),
+      start = point(-r, center.v - 0.35),
+      end = point(r, center.v + 0.35)
+    raw.push({ points: [start, plaza, end], width: 0.92 })
+    // Riverside towns grow along one high street, with short lanes serving
+    // individual frontages rather than a repeated three-rail ladder.
+    for (let i = 0; i < 4; i++) {
+      const a = i < 2 ? start : plaza,
+        b = i < 2 ? plaza : end,
+        t = (i % 2 === 0 ? 0.3 : 0.7) + (random(70 + i) - 0.5) * 0.15,
+        junction = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t },
+        p = local(junction),
+        side = i % 2 ? -1 : 1
       raw.push({
-        points: [point(-r, v - 0.8), point(0, v + 0.4), point(r, v - 0.4)],
-        width: v === 0 ? 1.25 : 0.6,
+        points: [junction, point(p.u + (random(80 + i) - 0.5) * 1.4, p.v + side * r * 0.48)],
+        width: 0.42,
       })
-    for (let i = -2; i <= 2; i++)
-      raw.push({
-        points: [point(i * 4.8, -r * 0.7), point(i * 4.8 + 0.5, 0), point(i * 4.8 - 1, r * 0.7)],
-        width: i === 0 ? 0.9 : 0.5,
-      })
+    }
   }
   // Sample and clip streets; only major streets bridge a short river interval.
   for (const road of raw) {
@@ -368,19 +369,7 @@ export function cityLayout(
           }
     }
   }
-  if (pattern === 'market') {
-    for (let ring = 0, rr = plazaSize + 1.3; rr < r; rr += 1.9, ring++) {
-      const count = Math.floor((Math.PI * 2 * rr) / 1.65)
-      for (let i = 0; i < count; i++) {
-        const a = (i * Math.PI * 2) / count + ring * 0.14
-        lots.push({
-          p: { x: plaza.x + Math.cos(a) * rr, z: plaza.z + Math.sin(a) * rr },
-          a: -a - Math.PI / 2,
-          key: 30 + ring * 300 + i * 7,
-        })
-      }
-    }
-  } else if (pattern === 'planned') {
+  if (pattern === 'planned') {
     for (let row = -4; row <= 3; row++)
       for (let col = -4; col <= 3; col++)
         for (let j = 0; j < 4; j++)
@@ -389,7 +378,7 @@ export function cityLayout(
             a: -angle,
             key: 40 + (row + 4) * 173 + (col + 4) * 19 + j * 5,
           })
-  } else {
+  } else if (pattern === 'spine') {
     for (let row = -9; row <= 9; row++)
       for (let col = -9; col <= 9; col++)
         lots.push({
