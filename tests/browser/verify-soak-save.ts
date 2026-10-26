@@ -5,8 +5,9 @@ import { open, readFile, writeFile } from 'node:fs/promises'
 import assert from 'node:assert/strict'
 import { restoreWorld, validateWorld } from '../../src/sim/persistence'
 import { worldBlob } from '../../src/storage/json-blob'
+import { canonicalHash } from '../fixtures/world-hash'
 
-const [exportPath, browserPath, diskPath, resultPath] = process.argv.slice(2)
+const [exportPath, browserPath, diskPath, resultPath, recoveryPath] = process.argv.slice(2)
 assert(
   exportPath && browserPath && diskPath && resultPath,
   'Pass export, browser replica, disk replica, result',
@@ -45,15 +46,23 @@ async function replica(path: string, disk: boolean) {
 const browser = await replica(browserPath, false),
   disk = await replica(diskPath, true)
 assert.equal(browser.savedAt, disk.savedAt, 'Replicas are not the same checkpoint')
+// A tool restart can discard its disposable browser profile. If recovery was
+// needed, prove the recovered/exported world still equals the original end save.
+const recoveredFromEnduranceDisk = recoveryPath ? await replica(recoveryPath, true) : undefined
 const holders = [...world.regions, ...world.armies, ...(world.warfare?.fleets ?? [])]
 const result = {
   valid: true,
   replicasMatchExport: true,
   sha256: expected,
+  canonicalHash: canonicalHash(world),
   seed: world.seed,
   month: world.month,
   cells: world.cells.length,
   regions: world.regions.length,
+  activeLeaves: world.adaptive?.tree.leaves.length ?? 0,
+  sites: Object.keys(world.adaptive?.sites ?? {}).length,
+  activeFirms: world.economy?.firms?.filter((f) => f.active).length ?? 0,
+  householdPools: world.localEconomy?.active.length ?? world.regions.length,
   communities: holders.reduce((n, h) => n + (h.communities?.length ?? 0), 0),
   cohortTuples: holders.reduce(
     (n, h) => n + (h.communities ?? []).reduce((s, g) => s + (g.ageCohorts?.length ?? 0), 0),
@@ -61,6 +70,7 @@ const result = {
   ),
   browser,
   disk,
+  ...(recoveredFromEnduranceDisk ? { recoveredFromEnduranceDisk } : {}),
 }
 await writeFile(resultPath, JSON.stringify(result, null, 2) + '\n')
 console.log(result)

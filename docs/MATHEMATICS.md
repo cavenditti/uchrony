@@ -188,7 +188,7 @@ $n_j$ is group population, $C_j$ cumulative income, $N$ total people and $Y$ tot
 
 ## Local markets, transport and resources
 
-Households buy locally; firms hire locally. Cross-district purchases require paid transport. A shipment's landed unit cost is:
+Households buy locally; firms retain local jobs and can recruit accessible commuters. Cross-market purchases require paid transport. A shipment's landed unit cost is:
 
 $$
 p_{\mathrm{landed}}=p_{\mathrm{seller}}+\text{tariff}+0.002\,p_{\mathrm{seller}}\,\text{route effort}
@@ -198,21 +198,9 @@ Delivered quantity is bounded by seller stock, buyer cash and the remaining capa
 
 Mineral extraction depletes cell-level reserves. Timber regrows by 0.2% of the gap to its land-use-adjusted capacity each month. Resource abundance, geography and transport costs therefore shape specialization rather than granting every district identical opportunities.
 
-## Adaptive districts and urban concentration
+## Local markets and concentration
 
-Refinement pressure aggregates urban residents and industrial employment:
-
-$$
-P_{\mathrm{node}}=\sum\left(\frac{N_{\mathrm{urban}}}{8000}+\frac{E_{\mathrm{industrial}}}{2500}\right)
-$$
-
-A node splits above 1, down to a terrain cell. Existing splits persist above 0.55. Remeshing is conservative: people are integer-apportioned by actual resident locations; deposits, goods and debt portions follow their owners or source shares. Firms and mineral reserves retain physical sites. Merger reunites portions of the same loan contract.
-
-$$
-\sum_j X_j^{\mathrm{after}}=\sum_i X_i^{\mathrm{before}}
-$$
-
-This holds separately for people, each good, money and debt. Refinement itself adds no production. Manufacturing's external-economy multiplier is $\min(1.4,1+0.04\log(1+N/(1000A)))$, with $A$ terrain cells. Built land adjusts gradually to residents and jobs; connected built footprints form cities, preserve lineage and can merge without a maximum city size. Land rents and commuting are not modeled. Conservation does not establish convergence across spatial resolutions. [Krugman: increasing returns and economic geography](https://www.nber.org/papers/w3275).
+Persistent household pools and firms retain their own prices, inventories and contracts when the spatial tree or administrative borders change. Manufacturing's external-economy multiplier is $\min(1.4,1+0.04\log(1+N/(1000A)))$, with $A$ terrain cells. This bounded productivity assumption is distinct from the geometry of a municipality. Residential and productive capacity determine built activity; housing construction and commuting are described below. Land rents and mortgage markets remain unmodeled. [Krugman: increasing returns and economic geography](https://www.nber.org/papers/w3275).
 
 ## Historical benchmark and limits
 
@@ -224,4 +212,37 @@ $$
 
 $x$ is the output gap; $r^*$ the neutral real rate. A price equation links expected inflation, unemployment and oil costs. Parameters fit 1960–1969; 1970–1985 is a holdout, starting once from observed 1969Q4. Recorded policy rates and oil prices are conditional paths, not identified causal shocks. Other future outcomes are used only for scoring.
 
-**The first holdout fails historical qualification:** recorded-policy/energy replay has RMSE of 9.26 pp for growth, 24.31 pp for inflation and 10.85 pp for unemployment. It fails to beat the persistence/drift baseline. The earlier 200-year endurance result covers version 4, not the current version 5. Accounting consistency is distinct from stability or historical accuracy. [FRED source data](https://fred.stlouisfed.org/) · [Federal Reserve history: the 1973–74 oil shock](https://www.federalreservehistory.org/essays/oil-shock-of-1973-74).
+**The first holdout fails historical qualification:** recorded-policy/energy replay has RMSE of 9.26 pp for growth, 24.31 pp for inflation and 10.85 pp for unemployment. It fails to beat the persistence/drift baseline. The spatial version-5 qualification now includes three 200-year accounting runs, with final-source save/continuation checks. Populations fell 92–95%; food access and unemployment remain poor. These runs establish accounting consistency, not behavioral stability or historical accuracy. Full source boundaries and results are in the validation record. [FRED source data](https://fred.stlouisfed.org/) · [Federal Reserve history: the 1973–74 oil shock](https://www.federalreservehistory.org/essays/oil-shock-of-1973-74).
+
+## Adaptive space and administration
+
+The physical quadtree and legal jurisdictions are separate. Original terrain polygons are clipped into square leaves; neighboring leaf widths differ by at most 2:1. Legacy centers are explicitly assigned 1 km spacing. This synthetic scale is not a historical calibration.
+
+For additive stocks, restriction is $X_p=\sum_cX_c$. Accounts, contracts, firm identities and census cohorts remain in persistent closure records; refinement changes their spatial grouping, never their owners or balances. Because $f(\sum_iX_i)\ne\sum_i f(X_i)$ in general, heterogeneous household and firm records are retained rather than replaced with a mean agent.
+
+The refinement indicator is:
+
+$$
+\eta_n=\left(\frac{N_n}{12000}+\frac{J_n}{2500}\right)
+\min\left(1,\frac{s_n^2}{1000^2}\right)
++2\frac{\sigma(p)}{\bar p}+R_n.
+$$
+
+$N_n$ and $J_n$ are residents and paid jobs, $s_n$ is width in meters, and $R_n=1$ when a node wider than 4 km contains a river (zero otherwise). Refinement is reviewed every six months with 1/0.55 entry/exit thresholds and a twelve-month dwell period. The minimum-width setting is 125 m (128 m on the current power-of-two tree). These are declared numerical choices; camera position is absent. [AMReX conservation and coarse–fine interfaces](https://amrex-codes.github.io/amrex/docs_html/AmrCore.html#using-fluxregisters).
+
+Municipalities and provinces periodically compare local mergers, splits and boundary transfers. Monthly cost combines travel time valued at one quarter of the hourly wage, office staffing and increasing administrative workload. A reform requires 36 months of expected savings to exceed its paid reorganization labor. Geometry must remain complete, connected and within one sovereign state. Permanent legal references and past national accounts survive the change. Initial boundary proposals use legacy terrain polygons; computational leaves can be much smaller.
+
+## Housing, commuting and daily inspection
+
+Residential capacity changes through construction using timber, stone and available paid labor. A project settles its inputs and wages once, then completes after three months. Opening legacy capacity is an explicit initialization assumption, not GDP. Capacity is a physical limit; this version does not add landlord, rent or mortgage transactions.
+
+After local contracts, an unemployed worker pool searches accessible workplaces. Candidate weight is proportional to vacancies and wage and declines with travel time:
+
+$$
+\omega_{ij}=V_j w_j e^{-\tau_{ij}/30},\qquad
+A_{ij}=0.35 U_i\frac{\omega_{ij}}{\sum_k\omega_{ik}}.
+$$
+
+Time is in minutes. Cross-market search covers a six-kilometer neighborhood and requires a network journey of at most 90 minutes; within-market travel is currently approximated as ten minutes. Workplace vacancies and cash scale simultaneous offers before payroll settles. Domestic residence receives wages and pays income tax; production belongs to the workplace. No cross-border work permit is inferred. Paths respect terrain, damage, corridors and congestion. Rail and motor modes require both technology and infrastructure. Freight taking longer than a monthly interval remains owned inventory in transit until its arrival date. [UrbanSim buildings, jobs and households](https://www.urbansim.com/parcel-level), [MATSim activity and travel models](https://matsim.org/the-book/).
+
+A viewed day is a deterministic conditional sample of a saved month. Routine weights summarize paid jobs and other residents; a displayed person is not a persistent individual. Inspection never advances wages, births, consumption or the economic random stream. Persistent causal individuals remain phase 8.

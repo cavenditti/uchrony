@@ -1,4 +1,6 @@
+import { StringTable } from './string-table'
 import type { Route, World } from '../sim/types'
+import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
 
 export interface FreightSegment {
   a: number
@@ -22,7 +24,7 @@ export interface FreightCorridor {
 
 /** Every physical edge is painted once, even when many shipments share it. */
 export function freightOverlay(world: World, nation: number, region: number | null) {
-  const segments = new Map<string, FreightSegment>(),
+  const segments = new StringTable<FreightSegment>(),
     ports = new Map<number, { cell: number; volume: number; selected: number }>(),
     terminals = new Set(world.regions.map((r) => r.center))
   let legacy = false
@@ -71,7 +73,7 @@ export function freightOverlay(world: World, nation: number, region: number | nu
     }
   }
   const edges = [...segments.values()],
-    adjacent = new Map<string, number[]>()
+    adjacent = new StringTable<number[]>()
   for (const [i, edge] of edges.entries())
     for (const cell of [edge.a, edge.b]) {
       const key = `${edge.mode}-${cell}`,
@@ -79,7 +81,7 @@ export function freightOverlay(world: World, nation: number, region: number | nu
       links.push(i)
       adjacent.set(key, links)
     }
-  const visited = new Set<number>(),
+  const visited = new Uint8Array(edges.length),
     corridors: FreightCorridor[] = []
   const junction = (mode: string, cell: number) =>
     terminals.has(cell) || adjacent.get(`${mode}-${cell}`)!.length !== 2
@@ -97,8 +99,8 @@ export function freightOverlay(world: World, nation: number, region: number | nu
         selectedBackward: forward ? first.selectedBackward : first.selectedForward,
       }
     let cell = start
-    while (!visited.has(index)) {
-      visited.add(index)
+    while (!visited[index]) {
+      visited[index] = 1
       const edge = edges[index],
         next = edge.a === cell ? edge.b : edge.a,
         a = world.cells[cell],
@@ -108,17 +110,17 @@ export function freightOverlay(world: World, nation: number, region: number | nu
       corridor.lengths.push(corridor.distance)
       cell = next
       if (junction(edge.mode, cell)) break
-      index = adjacent.get(`${edge.mode}-${cell}`)!.find((id) => !visited.has(id)) ?? index
+      index = adjacent.get(`${edge.mode}-${cell}`)!.find((id) => !visited[id]) ?? index
     }
     corridors.push(corridor)
   }
   for (const [i, edge] of edges.entries()) {
-    if (visited.has(i)) continue
+    if (visited[i]) continue
     if (junction(edge.mode, edge.a)) walk(i, edge.a)
     else if (junction(edge.mode, edge.b)) walk(i, edge.b)
   }
   // Closed loops have no junction; they still carry and display freight.
-  for (const [i, edge] of edges.entries()) if (!visited.has(i)) walk(i, edge.a)
+  for (const [i, edge] of edges.entries()) if (!visited[i]) walk(i, edge.a)
   return { corridors, ports: [...ports.values()], legacy }
 }
 
@@ -132,14 +134,18 @@ export function pointAlong(world: World, corridor: FreightCorridor, distance: nu
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
 }
 
-export function routeDistance(world: World, route: Route) {
+export function routeDistance(world: World, route: Pick<Route, 'legs'>) {
   return route.legs?.reduce(
     (sum, leg) =>
       sum +
       leg.cells.slice(1).reduce((length, id, i) => {
         const a = world.cells[leg.cells[i]],
           b = world.cells[id]
-        return length + Math.hypot(b.x - a.x, b.y - a.y) * 4
+        return (
+          length +
+          (Math.hypot(b.x - a.x, b.y - a.y) * (world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT)) /
+            1000
+        )
       }, 0),
     0,
   )

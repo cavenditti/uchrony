@@ -1,3 +1,4 @@
+import { activeJurisdictions } from '../sim/jurisdictions'
 import { landscapeRasters } from './landscape-raster'
 import { riverCurves, riverPaths } from './rivers'
 import { spatialState, districtDensityScale } from '../sim/spatial'
@@ -73,6 +74,22 @@ function districtAtlas(world: World) {
     districtCache.set(world.cells, cached)
   }
   return cached
+}
+
+const administrationCache = new WeakMap<World['cells'], Map<string, { signature: string; edges: MapGeometry['edges'] }>>()
+function administrativeEdges(world: World, level: 'municipality' | 'province') {
+  if (!world.adaptive) return level === 'municipality' ? districtAtlas(world).edges : []
+  const records = activeJurisdictions(world, level)
+  const signature = `${world.adaptive.boundaries.length}:${records.map((j) => j.id).join('|')}`
+  let cache = administrationCache.get(world.cells)
+  if (!cache) { cache = new Map(); administrationCache.set(world.cells, cache) }
+  const prior = cache.get(level)
+  if (prior?.signature === signature) return prior.edges
+  const owners = new Int32Array(world.cells.length).fill(-1)
+  records.forEach((j, i) => j.cells.forEach((c) => { owners[c] = i }))
+  const geometry = buildGeometry(world.cells.map((c) => ({ ...c, region: owners[c.id] })), world.width, world.height, records.length)
+  cache.set(level, { signature, edges: geometry.edges })
+  return geometry.edges
 }
 
 export function buildAtlas(world: World): AtlasCache {
@@ -253,7 +270,7 @@ export function drawAtlasLinework(
   // Adaptive detail is clipped to real land; the quadtree itself is not a square overlay.
   if (layer !== 'terrain' && scale > 2.2) {
     ctx.beginPath()
-    for (const e of districtAtlas(world).edges) {
+    for (const e of administrativeEdges(world, 'municipality')) {
       ctx.moveTo(e.a.x, e.a.y)
       ctx.lineTo(e.b.x, e.b.y)
     }
@@ -264,7 +281,7 @@ export function drawAtlasLinework(
   // Province divisions reveal themselves as the observer zooms in.
   if (layer !== 'terrain' && scale > 0.7) {
     ctx.beginPath()
-    for (const e of cache.geometry.edges) {
+    for (const e of world.adaptive ? administrativeEdges(world, 'province') : cache.geometry.edges) {
       ctx.moveTo(e.a.x, e.a.y)
       ctx.lineTo(e.b.x, e.b.y)
     }

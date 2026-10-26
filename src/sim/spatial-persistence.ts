@@ -124,5 +124,11 @@ export function validateSpatial(w: World) {
     sites.add(p.cell)
     urban[p.region] -= p.population
   }
-  if (w.localEconomy ? urban.reduce((a, b) => a + b, 0) !== 0 : urban.some((x) => x !== 0)) fail()
+  if (!w.adaptive && (w.localEconomy ? urban.reduce((a, b) => a + b, 0) !== 0 : urban.some((x) => x !== 0))) fail()
+  if (w.adaptive) {
+    for (const settlement of s.settlements) {
+      const j = w.adaptive.jurisdictions[settlement.id]
+      if (!j || j.retired !== undefined || j.level !== 'municipality' || j.seat !== settlement.cell) fail()
+    }
+  }
 }

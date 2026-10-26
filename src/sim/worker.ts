@@ -1,3 +1,5 @@
+import { inspectWorld } from './inspection'
+import { OFF_POLICY, samePermission, type LlmPolicySnapshot } from './llm-policy'
 import { SnapshotMailbox } from './snapshot-mailbox'
 import { viewSnapshot } from './view-snapshot'
 import { WorldStorage } from '../storage/world-storage'
@@ -36,9 +38,12 @@ interface Job {
   role: Role
   nation: number
   since: number
+  generation: number
+  instance: string
   world: World
   controller: AbortController
 }
+let llmPolicy = { ...OFF_POLICY }
 let world: World | null = null,
   connected = false
 let models = {
@@ -81,6 +86,8 @@ function agentStatus() {
     },
   })
 }
+// Observer subscription never enters the canonical world or its random stream.
+let detailNation: number | null = null
 let revision = 0
 const backends = [diskBackend(), browserBackend()]
 const byteStorage = new ByteStorageClient()
@@ -89,7 +96,7 @@ const storage = new WorldStorage([byteStorage.backend('disk'), byteStorage.backe
 )
 const mailbox = new SnapshotMailbox((message, acknowledgement) => {
   if (!world) return
-  const dynamic = viewSnapshot(world)
+  const dynamic = viewSnapshot(world, detailNation)
   send({
     type: 'world',
     world: geographyPublished ? dynamic : { ...dynamic, cells: world.cells },
@@ -109,6 +116,44 @@ function publish(message?: string, acknowledgement = false) {
     mailbox.publish(message, acknowledgement)
   }
 }
+function applyLlmPolicy(policy: LlmPolicySnapshot, publishPolicy = true) {
+  if (policy.instance === llmPolicy.instance && policy.generation < llmPolicy.generation) return
+  const changed =
+    policy.instance !== llmPolicy.instance ||
+    policy.generation !== llmPolicy.generation ||
+    policy.enabled !== llmPolicy.enabled
+  llmPolicy = policy
+  if (!policy.enabled || changed) {
+    for (const job of jobs.values()) job.controller.abort()
+    for (const id of detailQueue.keys())
+      send({ type: 'event-detail', event: id, state: 'error', message: 'LLM assistance is off.' })
+    for (const job of jobs.values())
+      if (job.role === 'details')
+        send({
+          type: 'event-detail',
+          event: Number(job.key.split(':')[1]),
+          state: 'error',
+          message: 'Model permission changed.',
+        })
+    jobs.clear()
+    detailQueue.clear()
+    retryAt.clear()
+    agentError = ''
+    agentStatus()
+  }
+  if (publishPolicy) send({ type: 'llm-policy', policy })
+  if (!policy.enabled)
+    status('ready', 'LLM assistance is off. Native events and government decisions continue.')
+}
+const policyEvents = new EventSource('/api/history/policy-events')
+policyEvents.onmessage = (event) => {
+  applyLlmPolicy(JSON.parse(event.data))
+  if (llmPolicy.enabled) void connection().then(schedule)
+}
+policyEvents.onerror = () => {
+  // Fail closed when this worker can no longer observe the global switch.
+  applyLlmPolicy({ ...llmPolicy, enabled: false })
+}
 async function connection() {
   try {
     const response = await fetch('/api/history/status')
@@ -117,11 +162,14 @@ async function connection() {
     const config = await response.json()
     models = { ...models, ...config }
     connected = !!config.configured
+    applyLlmPolicy(config.policy ?? { ...OFF_POLICY, generation: llmPolicy.generation })
     status(
-      connected ? 'ready' : 'error',
-      connected
-        ? 'OpenRouter connected. Historical events and state deliberations run in the background.'
-        : 'Add OPENROUTER_API_KEY to .env, then retry. The local simulation is continuing.',
+      !llmPolicy.enabled || connected ? 'ready' : 'error',
+      !llmPolicy.enabled
+        ? 'LLM assistance is off. Native events and government decisions continue.'
+        : connected
+          ? 'OpenRouter connected. Historical events and state deliberations run in the background.'
+          : 'Add OPENROUTER_API_KEY to .env, then retry. The local simulation is continuing.',
     )
     agentStatus()
     return connected
@@ -167,8 +215,25 @@ async function launch(
   context: unknown,
   accept: (value: unknown, model: string) => void,
 ) {
-  if (!world || jobs.has(key) || jobs.size >= 4 || (retryAt.get(key) ?? 0) > Date.now()) return
-  const job: Job = { key, role, nation, since: world.month, world, controller: new AbortController() }
+  if (
+    !world ||
+    !samePermission(llmPolicy, llmPolicy.generation) ||
+    !connected ||
+    jobs.has(key) ||
+    jobs.size >= 4 ||
+    (retryAt.get(key) ?? 0) > Date.now()
+  )
+    return
+  const job: Job = {
+    key,
+    role,
+    nation,
+    since: world.month,
+    generation: llmPolicy.generation,
+    instance: llmPolicy.instance,
+    world,
+    controller: new AbortController(),
+  }
   jobs.set(key, job)
   lastLaunch.set(key, Date.now())
   if (role !== 'details') nextBackgroundAt = Date.now() + 5000
@@ -184,17 +249,45 @@ async function launch(
   try {
     let repair: unknown = undefined
     for (let attempt = 0; attempt < 2; attempt++) {
+      if (!samePermission(llmPolicy, job.generation, job.instance) || job.controller.signal.aborted) return
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context, repair }),
+        body: JSON.stringify({
+          context,
+          repair,
+          policyGeneration: job.generation,
+          policyInstance: job.instance,
+        }),
         signal: job.controller.signal,
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'The model request failed.')
-      if (world !== job.world || jobs.get(key) !== job) return
+      const permission = await fetch('/api/history/policy', { signal: job.controller.signal }).then((r) => {
+        if (!r.ok) throw new Error('Could not verify model permission.')
+        return r.json()
+      })
+      applyLlmPolicy(permission)
+      if (
+        world !== job.world ||
+        jobs.get(key) !== job ||
+        !samePermission(llmPolicy, job.generation, job.instance) ||
+        result.policyGeneration !== job.generation ||
+        result.policyInstance !== job.instance
+      )
+        return
       try {
         accept(result.proposal, result.model)
+        const provenance = (world.modelProvenance ??= {
+          accepted: 0,
+          lastMonth: world.month,
+          roles: {},
+          source: 'legacy-unknown',
+        })
+        provenance.accepted++
+        provenance.lastMonth = world.month
+        provenance.roles[role] = (provenance.roles[role] ?? 0) + 1
+        provenance.source = 'model-assisted'
         break
       } catch (error) {
         if (attempt === 1) throw error
@@ -243,7 +336,7 @@ async function launch(
   }
 }
 function schedule() {
-  if (!world || !connected) return
+  if (!world || !connected || !llmPolicy.enabled) return
   const current = world,
     now = Date.now(),
     eligible = (key: string, interval: number) =>
@@ -380,6 +473,38 @@ function schedule() {
 }
 self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
   try {
+    if (data.type === 'view-focus') {
+      detailNation = data.nation
+      if (world) mailbox.publish()
+      return
+    }
+    if (data.type === 'inspect') {
+      try {
+        if (!world) throw new Error('No world to inspect.')
+        send({ type: 'inspection', snapshot: inspectWorld(world, data.request) })
+      } catch (error) {
+        send({
+          type: 'inspection-error',
+          request: data.request.id,
+          message: error instanceof Error ? error.message : 'Inspection unavailable.',
+        })
+      }
+      return
+    }
+    if (data.type === 'llm-policy') {
+      if (!data.enabled) applyLlmPolicy({ ...llmPolicy, enabled: false }, false)
+      const response = await fetch('/api/history/policy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: data.enabled }),
+      })
+      const value = await response.json()
+      if (!response.ok) throw new Error(value.error || 'Could not change LLM assistance.')
+      applyLlmPolicy(value)
+      await connection()
+      schedule()
+      return
+    }
     if (data.type === 'storage-port') {
       byteStorage.connect(data.port)
       return
@@ -481,12 +606,15 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       if (action.type === 'advise') {
         submitAdvice(world, agent, action.text)
         decisionSignals.delete(action.nation)
-        message = 'Suggestion sent privately. The government will weigh it at its next assessment.'
+        message = llmPolicy.enabled
+          ? 'Suggestion sent privately. The government will weigh it at its next assessment.'
+          : 'Suggestion saved. Free-text advice awaits optional model review; native government decisions continue.'
       } else {
         withdrawAdvice(world, agent, action.advice)
         message = 'Undelivered suggestion withdrawn.'
       }
     } else if (action.type === 'agent-strategy') {
+      if (!llmPolicy.enabled) throw new Error('LLM assistance is off. Native government decisions continue.')
       const agent = world?.statecraft?.agents.find((entry) => entry.nation === action.nation)
       if (agent) {
         agent.escalation = 'Strategic review requested by the observer.'
@@ -499,12 +627,12 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       const current = world,
         event = current?.events.find((entry) => entry.id === action.event)
       if (current && event && !event.expandedAccount) {
-        if (!connected)
+        if (!connected || !llmPolicy.enabled)
           send({
             type: 'event-detail',
             event: event.id,
             state: 'error',
-            message: 'Connect OpenRouter to expand this historical account. The simulation is continuing.',
+            message: 'LLM assistance is off or unavailable. The native simulation continues.',
           })
         else {
           detailQueue.set(event.id, current)
@@ -519,10 +647,10 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     send({
       type: 'error',
       message: error instanceof Error ? error.message : 'The action could not complete.',
-      recoverable: data.type === 'advise' || data.type === 'withdraw-advice',
+      recoverable: ['advise', 'withdraw-advice', 'agent-strategy', 'llm-policy'].includes(data.type),
     })
   }
 }
-status('connecting', 'Connecting background model services…')
+status('ready', 'LLM assistance is off. Native simulation is available.')
 
 setInterval(schedule, 1000)

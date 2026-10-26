@@ -1,3 +1,4 @@
+import { globalLlmPolicy, type LlmPolicy } from './llm-policy'
 import { narrativeProjection } from '../src/sim/narrative'
 import { HISTORY_PATTERNS_SCHEMA } from '../src/sim/history-repertoire'
 import { loadEnv, type Plugin } from 'vite'
@@ -36,7 +37,11 @@ async function readBody(req: IncomingMessage) {
 }
 
 /** All model roles share server-side credentials, but never share a conversation. */
-export function storytellerMiddleware(mode = 'development') {
+export function storytellerMiddleware(
+  mode = 'development',
+  policy: LlmPolicy = globalLlmPolicy,
+  provider: typeof fetch = fetch,
+) {
   let active = 0
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const path = req.url?.split('?')[0]
@@ -50,8 +55,45 @@ export function storytellerMiddleware(mode = 'development') {
       decisionModel = env.OPENROUTER_DECISION_MODEL?.trim() || 'mistralai/ministral-8b-2512',
       strategyModel = env.OPENROUTER_STRATEGY_MODEL?.trim() || historyModel,
       refereeModel = env.OPENROUTER_REFEREE_MODEL?.trim() || strategyModel
+    if (path === '/api/history/policy' || path === '/api/history/policy-events') {
+      try {
+        if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) {
+          reply(res, 403, { error: 'Use the simulation origin.' })
+          return
+        }
+        if (path.endsWith('policy-events') && req.method === 'GET') {
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-store',
+            Connection: 'keep-alive',
+          })
+          const unsubscribe = policy.subscribe((value) => res.write(`data: ${JSON.stringify(value)}\n\n`))
+          const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000)
+          res.on('close', () => {
+            unsubscribe()
+            clearInterval(heartbeat)
+          })
+        } else if (req.method === 'GET') reply(res, 200, policy.snapshot())
+        else if (req.method === 'POST') {
+          const input = await readBody(req)
+          if (typeof input?.enabled !== 'boolean')
+            throw new Error('Specify whether LLM assistance is enabled.')
+          reply(res, 200, policy.set(input.enabled))
+        } else reply(res, 405, { error: 'Use GET or POST.' })
+      } catch (error) {
+        reply(res, 400, { error: error instanceof Error ? error.message : 'Invalid policy request.' })
+      }
+      return
+    }
     if (path.endsWith('/status') && req.method === 'GET') {
-      reply(res, 200, { configured: !!key, model: historyModel, decisionModel, strategyModel, refereeModel })
+      reply(res, 200, {
+        configured: !!key,
+        model: historyModel,
+        decisionModel,
+        strategyModel,
+        refereeModel,
+        policy: policy.snapshot(),
+      })
       return
     }
     const role =
@@ -83,6 +125,10 @@ export function storytellerMiddleware(mode = 'development') {
       reply(res, 403, { error: 'Invalid origin.' })
       return
     }
+    if (!policy.snapshot().enabled) {
+      reply(res, 403, { error: 'LLM assistance is off. The native simulation continues.' })
+      return
+    }
     if (!key) {
       reply(res, 503, { error: 'Add OPENROUTER_API_KEY to .env, then retry the model connection.' })
       return
@@ -101,7 +147,17 @@ export function storytellerMiddleware(mode = 'development') {
     try {
       const input = await readBody(req),
         body = role === 'referee' ? input : narrativeProjection(input),
-        context = body?.context
+        context = body?.context,
+        policyGeneration = input?.policyGeneration
+      if (
+        !Number.isSafeInteger(policyGeneration) ||
+        !policy.allowed(policyGeneration) ||
+        input?.policyInstance !== policy.snapshot().instance
+      ) {
+        reply(res, 409, { error: 'Model permission changed; this request is stale.' })
+        return
+      }
+      policy.begin(policyGeneration, controller)
       if (!context || typeof context !== 'object') {
         reply(res, 400, { error: 'Missing simulation context.' })
         return
@@ -169,43 +225,47 @@ export function storytellerMiddleware(mode = 'development') {
                 : role === 'referee'
                   ? 6500
                   : 5000
-      let response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-          'X-Title': 'Uchrony simulation',
-        },
-        body: JSON.stringify({
-          model,
-          temperature: role === 'referee' ? 0.25 : 0.65,
-          max_tokens: budget,
-          reasoning: { enabled: false },
-          messages,
-          response_format: {
-            type: 'json_schema',
-            json_schema: { name: `uchrony_${role}`, strict: true, schema },
+      let response = await policy.dispatch(policyGeneration, controller, () =>
+        provider('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'X-Title': 'Uchrony simulation',
           },
+          body: JSON.stringify({
+            model,
+            temperature: role === 'referee' ? 0.25 : 0.65,
+            max_tokens: budget,
+            reasoning: { enabled: false },
+            messages,
+            response_format: {
+              type: 'json_schema',
+              json_schema: { name: `uchrony_${role}`, strict: true, schema },
+            },
+          }),
         }),
-      })
+      )
       if (!response.ok) {
         const diagnostic = await response.text()
         if (response.status === 400 && /schema|response_format|structured/i.test(diagnostic))
-          response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            signal: controller.signal,
-            headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model,
-              max_tokens: budget,
-              messages: [
-                ...messages,
-                { role: 'user', content: `Return JSON matching this schema: ${JSON.stringify(schema)}` },
-              ],
-              response_format: { type: 'json_object' },
+          response = await policy.dispatch(policyGeneration, controller, () =>
+            provider('https://openrouter.ai/api/v1/chat/completions', {
+              method: 'POST',
+              signal: controller.signal,
+              headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model,
+                max_tokens: budget,
+                messages: [
+                  ...messages,
+                  { role: 'user', content: `Return JSON matching this schema: ${JSON.stringify(schema)}` },
+                ],
+                response_format: { type: 'json_object' },
+              }),
             }),
-          })
+          )
         else {
           const safe = diagnostic
             .split(key)
@@ -226,11 +286,21 @@ export function storytellerMiddleware(mode = 'development') {
         content = result.choices?.[0]?.message?.content
       if (typeof content !== 'string' || result.choices?.[0]?.finish_reason === 'length')
         throw new Error('The model returned incomplete structured data.')
+      if (
+        !policy.allowed(policyGeneration) ||
+        input?.policyInstance !== policy.snapshot().instance ||
+        controller.signal.aborted
+      ) {
+        reply(res, 409, { error: 'Model permission changed; response discarded.' })
+        return
+      }
       const proposal = JSON.parse(content.replace(/^```(?:json)?\s*|\s*```$/g, ''))
       reply(res, 200, {
         proposal,
         model: typeof result.model === 'string' ? result.model : model,
         generation: result.id,
+        policyGeneration,
+        policyInstance: policy.snapshot().instance,
       })
     } catch (error) {
       if (!res.destroyed)
@@ -244,6 +314,7 @@ export function storytellerMiddleware(mode = 'development') {
                 : 'Model request failed.',
         })
     } finally {
+      policy.finish(controller)
       clearTimeout(timer)
       res.off('close', cancel)
       active--

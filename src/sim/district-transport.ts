@@ -1,3 +1,4 @@
+import { deliverFreight } from './freight-transit'
 import {
   GOODS,
   inventory,
@@ -295,7 +296,8 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       }
     }
     seller.stocks[good] = Math.max(0, seller.stocks[good] - amount)
-    buyer.stocks[good] += amount
+    const legs = path.chain.flatMap((edge) => reverseLegs(edge.legs))
+    deliverFreight(w, sellerId, buyerId, good, amount, legs)
     for (const [index, count] of path.usage) remaining[index] = Math.max(0, remaining[index] - amount * count)
     for (const edge of path.chain)
       linkRemaining.set(edge, (linkRemaining.get(edge) ?? edge.capacity) - amount)
@@ -304,7 +306,6 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     buyer.prices[good] *= Math.exp(
       Math.max(-0.06, Math.min(0.06, Math.log(targetPrice / Math.max(0.01, buyer.prices[good])))),
     )
-    const legs = path.chain.flatMap((edge) => reverseLegs(edge.legs))
     exportable.get(sellerId)![good] -= amount
     system.shipments.push({
       from: sellerId,

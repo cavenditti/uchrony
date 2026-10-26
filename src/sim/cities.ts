@@ -51,7 +51,8 @@ export function evolveCities(w: World, initialize = false) {
       let room = Math.floor(population(u) * 0.003)
       for (const c of u.cells)
         if (c !== best && score(best) > score(c) + 0.15 && room > 0) {
-          const amount = Math.min(room, Math.floor((u.residents[c] ?? 0) * 0.003))
+          const vacancy = w.adaptive ? Math.max(0, Math.floor((w.adaptive.sites[`home:${best}`]?.capacity ?? 0) - (u.residents[best] ?? 0))) : Infinity
+          const amount = Math.min(room, vacancy, Math.floor((u.residents[c] ?? 0) * 0.003))
           u.residents[c] -= amount
           u.residents[best] += amount
           room -= amount
@@ -99,7 +100,7 @@ export function evolveCities(w: World, initialize = false) {
       const demand = clamp((residents[c] + jobs[c] * 2) / MODEL_PARAMETERS.fullBuiltPopulationPerCell)
       const target =
         habitat < 0.06 ? demand * 0.1 : clamp(demand + spread * 0.15 * Math.min(1, residents[c] / 1000))
-      if (!initialize) local.built[c] = clamp(oldBuilt[c] + clamp(target - oldBuilt[c], -0.003, 0.006))
+      if (!initialize && !w.adaptive) local.built[c] = clamp(oldBuilt[c] + clamp(target - oldBuilt[c], -0.003, 0.006))
     }
   const former = new Set(local.cities.filter((c) => c.absorbedBy === undefined).flatMap((c) => c.cells))
   const remaining = new Set(

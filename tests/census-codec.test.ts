@@ -1,4 +1,4 @@
-import { encodeSaveBlock, decodeSaveBlock } from '../src/sim/save-codec'
+import { encodeSaveBlock, decodeSaveBlock, packWorldSave } from '../src/sim/save-codec'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -36,7 +36,7 @@ test('packed district exports and disk checkpoints restore an identical continua
   const before = digest(w),
     blob = worldBlob(w),
     text = await blob.text()
-  assert(text.includes('district-blocks-v1'))
+  assert(text.includes('district-blocks-v2'))
   assert(blob.size < Buffer.byteLength(JSON.stringify(w)) * 0.8)
   assert.equal(digest(w), before)
   const restored = parseSave(text)
@@ -61,6 +61,38 @@ test('packed district exports and disk checkpoints restore an identical continua
     keys = bad.censusEncoding.schemas[group[0]]
   group[keys.indexOf('ageCohorts') + 1] = 'cohorts-v1:AAAB'
   assert.throws(() => restoreWorld(bad))
+})
+
+test('bounded economic tables retain all records and key order, read v1 saves and reject forged tables', () => {
+  const w = generateWorld('Bounded economic serialization')
+  tick(w)
+  const expected = digest(w),
+    packed = packWorldSave(w) as any
+  assert.equal(packed.worldEncoding, 'district-blocks-v2')
+  assert(packed.economy.fields.households.blocks.length > 1)
+  for (const block of packed.economy.fields.households.blocks)
+    assert((decodeSaveBlock(block) as unknown[]).length <= 256)
+  assert.equal(digest(restoreWorld(JSON.parse(JSON.stringify(packed)))), expected)
+  const old = {
+    ...packed,
+    worldEncoding: 'district-blocks-v1',
+    economy: encodeSaveBlock(w.economy),
+    localEconomy: encodeSaveBlock(w.localEconomy),
+  }
+  assert.equal(digest(restoreWorld(JSON.parse(JSON.stringify(old)))), expected)
+  const duplicate = structuredClone(packed)
+  duplicate.economy.fields.households.blocks.push(duplicate.economy.fields.households.blocks[0])
+  assert.throws(() => restoreWorld(duplicate), /record identities/)
+  const missing = structuredClone(packed)
+  missing.economy.keys.pop()
+  assert.throws(() => restoreWorld(missing), /key order/)
+  const oversized = structuredClone(packed)
+  oversized.localEconomy.fields.units.blocks[0].bytes = 2 ** 40
+  assert.throws(() => restoreWorld(oversized), /expansion/)
+  const inherited = structuredClone(packed)
+  inherited.economy.fields.constructor = inherited.economy.fields.households
+  assert.throws(() => restoreWorld(inherited), /economic save field/)
+  assert.equal(digest(w), expected)
 })
 
 test('compressed save blocks reject truncation, corrupt bytes and unsafe expansion lengths', () => {

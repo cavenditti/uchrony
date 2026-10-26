@@ -437,6 +437,7 @@ export function generateWorld(
   const world: World = {
     version: 1,
     generatorVersion: 4,
+    modelProvenance: { accepted: 0, lastMonth: 0, roles: {}, source: 'native' },
     simulation: { ...settings },
     seed,
     rng: rng.rng,

@@ -1105,7 +1105,7 @@ function Province({
           <h3>{r.name}</h3>
           <span>
             {title(r.terrain)}
-            {r.coastal ? ' · Coastal province' : ' · Inland province'}
+            {r.coastal ? ' · Coastal area' : ' · Inland area'}
           </span>
         </div>
         <button className="icon-button" aria-label="Close province details" onClick={onClose}>
@@ -1123,9 +1123,14 @@ function Province({
         </b>
       </div>
       <div className="data-row">
-        <span>Adaptive districts</span>
+        <span>Local markets</span>
         <b>{spatialState(world).districts.filter((d) => d.region === r.id).length}</b>
       </div>
+      {world.adaptive && <details className="district-economies">
+        <summary>Current administration</summary>
+        <p className="panel-note">Municipal and provincial borders evolve independently. The figures below describe this established statistical area.</p>
+        {Object.values(world.adaptive.jurisdictions).filter((j) => j.retired === undefined && j.cells.some((c) => r.cells.includes(c))).map((j) => <div className="data-row" key={j.id}><span>{j.level === 'municipality' ? 'Municipality' : 'Province'}</span><b>{j.name}</b></div>)}
+      </details>}
       <DistrictEconomies world={world} province={r.id} />
       <Meter label="Food needs met" value={r.foodCoverage} />
       <Meter label="Other needs met" value={r.materialCoverage ?? 1} />

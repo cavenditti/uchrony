@@ -1,0 +1,447 @@
+{
+  "currentModelHash": "36e7efbe383cca29f1ad3f9b8d1895e6097e5b0b22fde2b61dfa62fb0218701a",
+  "reconstructedPreProjectionHash": "97ce5c13c99c108f91bff9df379d192896290c645f041a78420bfe73b988d564",
+  "expectedPreProjectionHash": "97ce5c13c99c108f91bff9df379d192896290c645f041a78420bfe73b988d564",
+  "matches": true,
+  "differences": [
+    "adaptive-persistence.ts",
+    "district-types.ts",
+    "save-codec.ts",
+    "statecraft.ts",
+    "types.ts",
+    "view-snapshot.ts",
+    "worker.ts"
+  ],
+  "scope": "UI projection and dossier subscriptions, optional display-only types and rejection of rewound legal-identity counters. Bounded save-table encoding retains exact decoded records and older-format compatibility. The additional statecraft transaction isolation and depot rebinding repair changes settlement execution. It is covered by focused conservation/rollback tests and the failing largest-world replay; it is not described as a display-only change. Prior route-validation-only compatibility is separately recorded.",
+  "files": {
+    "adaptive-persistence.ts": {
+      "current": "6203a3141ccb39ee0d8be7b7a27ce72d27c884855a54e87bdaf96adcc6b8def1",
+      "preProjection": "3ae55e979d0c93a9a07a677e4defceb69a4ab4126b9ec01585cde55fcd448949"
+    },
+    "adaptive-types.ts": {
+      "current": "639c9f0e9f57426951dc0cd2c7396ceb08b140f4d1b6cf43dccbf1a7051270dd",
+      "preProjection": "639c9f0e9f57426951dc0cd2c7396ceb08b140f4d1b6cf43dccbf1a7051270dd"
+    },
+    "adaptive-world.ts": {
+      "current": "c180e211a63a913e1772767fb5e1555483c5de6b929133ec3b520257e975c261",
+      "preProjection": "c180e211a63a913e1772767fb5e1555483c5de6b929133ec3b520257e975c261"
+    },
+    "advisors.ts": {
+      "current": "392b733b7d40fd1bda94e6cd36b8a7b1ed6219d7d45b44a02b1f87ee52001f80",
+      "preProjection": "392b733b7d40fd1bda94e6cd36b8a7b1ed6219d7d45b44a02b1f87ee52001f80"
+    },
+    "age-cohorts.ts": {
+      "current": "0ab080c2840ae27c4d8c0c84cbcca4e9e195712fa4a246ba65f615ccccb53cdc",
+      "preProjection": "0ab080c2840ae27c4d8c0c84cbcca4e9e195712fa4a246ba65f615ccccb53cdc"
+    },
+    "agreement-references.ts": {
+      "current": "eda0ec710ece8956531165cd3fb1892a8b91ba8b59760ab2e1eb0d482c816bb4",
+      "preProjection": "eda0ec710ece8956531165cd3fb1892a8b91ba8b59760ab2e1eb0d482c816bb4"
+    },
+    "agreements.ts": {
+      "current": "0104760ebbd481947967f408897636061ef666d93628298bf7579f083cb90945",
+      "preProjection": "0104760ebbd481947967f408897636061ef666d93628298bf7579f083cb90945"
+    },
+    "allocation.ts": {
+      "current": "bac9149d501a3e370b2ec0ffb53427aded5d233d30552d5aa5fd6c2ecc1e03f4",
+      "preProjection": "bac9149d501a3e370b2ec0ffb53427aded5d233d30552d5aa5fd6c2ecc1e03f4"
+    },
+    "ambitions.ts": {
+      "current": "eb3681f9f247c3c2abf152ea2855a77c6477c719b10a9a78150ed4e0ce91741c",
+      "preProjection": "eb3681f9f247c3c2abf152ea2855a77c6477c719b10a9a78150ed4e0ce91741c"
+    },
+    "banking.ts": {
+      "current": "65186971efb1dcb10db61abe5bb4588bc0e37a9bc4c2378ce244eb06f56a9173",
+      "preProjection": "65186971efb1dcb10db61abe5bb4588bc0e37a9bc4c2378ce244eb06f56a9173"
+    },
+    "census-codec.ts": {
+      "current": "31452b9f1194104dc11023246bb81363b89fc0a037598f94b4358842910e2b56",
+      "preProjection": "31452b9f1194104dc11023246bb81363b89fc0a037598f94b4358842910e2b56"
+    },
+    "character-persistence.ts": {
+      "current": "dbafd327e6bbc556ad70e4af5af71be485ee44b6bb1470a795ad6b563afee4ea",
+      "preProjection": "dbafd327e6bbc556ad70e4af5af71be485ee44b6bb1470a795ad6b563afee4ea"
+    },
+    "character-types.ts": {
+      "current": "0b7f5f483012ad2859879b6c39561c2cc3ecd40fb07a5bdf9c4814e45c0cbae1",
+      "preProjection": "0b7f5f483012ad2859879b6c39561c2cc3ecd40fb07a5bdf9c4814e45c0cbae1"
+    },
+    "character.ts": {
+      "current": "7aee7f3a549800952059d7622e60adf3f9df6322daea6db7153a04fe42cdc1a0",
+      "preProjection": "7aee7f3a549800952059d7622e60adf3f9df6322daea6db7153a04fe42cdc1a0"
+    },
+    "cities.ts": {
+      "current": "07fe6b7b13575f8e2b0c03a546d980816ee0a7a89badda1581e7405761483a85",
+      "preProjection": "07fe6b7b13575f8e2b0c03a546d980816ee0a7a89badda1581e7405761483a85"
+    },
+    "commute-ledger.ts": {
+      "current": "0921815302595e62d7ec32d43e3e93b2d3d165e7326c3a9ca6b025b766f156c4",
+      "preProjection": "0921815302595e62d7ec32d43e3e93b2d3d165e7326c3a9ca6b025b766f156c4"
+    },
+    "commuting.ts": {
+      "current": "3c5043df02fa75c00c667691b398d2fe104678bb6a013819d6aa86d197165c38",
+      "preProjection": "3c5043df02fa75c00c667691b398d2fe104678bb6a013819d6aa86d197165c38"
+    },
+    "corridor-bundling.ts": {
+      "current": "7e678fc2cdbcf514e6dcf34269dd52473d89347300ebda03548db38f96bfaa6d",
+      "preProjection": "7e678fc2cdbcf514e6dcf34269dd52473d89347300ebda03548db38f96bfaa6d"
+    },
+    "corridors.ts": {
+      "current": "54f42e65d05740cb4f6918f90aa2820bee0a8320338df2dd7848b4c715c595dd",
+      "preProjection": "54f42e65d05740cb4f6918f90aa2820bee0a8320338df2dd7848b4c715c595dd"
+    },
+    "diplomatic-friction.ts": {
+      "current": "f530a2dce6ea2a08468cb150f0f8056789a7863a06d856b85574506ee72a2ed4",
+      "preProjection": "f530a2dce6ea2a08468cb150f0f8056789a7863a06d856b85574506ee72a2ed4"
+    },
+    "diplomatic-persistence.ts": {
+      "current": "65827791994f0d6fbce818bbb27503842289e5038e283d2822bed6843f88e906",
+      "preProjection": "65827791994f0d6fbce818bbb27503842289e5038e283d2822bed6843f88e906"
+    },
+    "district-finance.ts": {
+      "current": "d7343d6bcdfa4ca679c526701c9851508f7297ba6720a14282426ea2896b61fd",
+      "preProjection": "d7343d6bcdfa4ca679c526701c9851508f7297ba6720a14282426ea2896b61fd"
+    },
+    "district-persistence.ts": {
+      "current": "6cc48b22fd1d14f07db0000d0a58e3fdfb5af8aa7676d4ad9d57a883a9c09381",
+      "preProjection": "6cc48b22fd1d14f07db0000d0a58e3fdfb5af8aa7676d4ad9d57a883a9c09381"
+    },
+    "district-transport.ts": {
+      "current": "c720a2c2308c72c5737927cd05c7139d35e9b920c4487fcf27bbc703852e0d1d",
+      "preProjection": "c720a2c2308c72c5737927cd05c7139d35e9b920c4487fcf27bbc703852e0d1d"
+    },
+    "district-types.ts": {
+      "current": "57b0021654d45cb344e24085331797ca24593fc5b98d02cc89b9ede3b70a3949",
+      "preProjection": "a5d5b8c705df38d337a85fac707b7d66d3e2a72ee0a9c47075b693f0998d798f"
+    },
+    "districts.ts": {
+      "current": "ec82b69bf4321fa39465d6ac1fbc80ab517910d2ce3adc129683a09767da39e6",
+      "preProjection": "ec82b69bf4321fa39465d6ac1fbc80ab517910d2ce3adc129683a09767da39e6"
+    },
+    "economic-persistence.ts": {
+      "current": "9385c69a79e45f064a9e430e6dbfdfb4b11e94a1a2fe40d95accba27ac16b48b",
+      "preProjection": "9385c69a79e45f064a9e430e6dbfdfb4b11e94a1a2fe40d95accba27ac16b48b"
+    },
+    "economic-types.ts": {
+      "current": "2488fdd7121be10b204ef25108b67ebe32aec6aa16e8068ab807830d57f19cab",
+      "preProjection": "2488fdd7121be10b204ef25108b67ebe32aec6aa16e8068ab807830d57f19cab"
+    },
+    "economy.ts": {
+      "current": "cc5f8ac84bf22c8453e61b4da03ab120e85941b6918072303cff4e68648a0e18",
+      "preProjection": "cc5f8ac84bf22c8453e61b4da03ab120e85941b6918072303cff4e68648a0e18"
+    },
+    "effects.ts": {
+      "current": "ff44dc791f651b4f2e1878821bb16c5206188b7fd197cf57cd6f6c12f12d10b7",
+      "preProjection": "ff44dc791f651b4f2e1878821bb16c5206188b7fd197cf57cd6f6c12f12d10b7"
+    },
+    "engine.ts": {
+      "current": "15826697d56f86776150e35808e88e567efe9f4e2aea1f0a8f249705cede1e68",
+      "preProjection": "15826697d56f86776150e35808e88e567efe9f4e2aea1f0a8f249705cede1e68"
+    },
+    "firms.ts": {
+      "current": "3708bec3cce010b664645736044accb41409bb28d248a948b6358d9289f8ea7c",
+      "preProjection": "3708bec3cce010b664645736044accb41409bb28d248a948b6358d9289f8ea7c"
+    },
+    "forces.ts": {
+      "current": "65453adf3683e1e8802b3793fdc9b3c538516799769866b885108d0b0d120b70",
+      "preProjection": "65453adf3683e1e8802b3793fdc9b3c538516799769866b885108d0b0d120b70"
+    },
+    "freight-transit.ts": {
+      "current": "d772d20a2547195bac44cdf40e571fc43be2e395e794dabfcd2279c65c23ddc6",
+      "preProjection": "d772d20a2547195bac44cdf40e571fc43be2e395e794dabfcd2279c65c23ddc6"
+    },
+    "generate.ts": {
+      "current": "9976f64c0190d677310fdb631a25709faceda02a2baeeb8d2e125d3467df8005",
+      "preProjection": "9976f64c0190d677310fdb631a25709faceda02a2baeeb8d2e125d3467df8005"
+    },
+    "geography.ts": {
+      "current": "4f05deaea5445dd1950cb830775ae062b885057afabe1b5ee5ab8c38d729268d",
+      "preProjection": "4f05deaea5445dd1950cb830775ae062b885057afabe1b5ee5ab8c38d729268d"
+    },
+    "geopolitics-persistence.ts": {
+      "current": "ca90c9a4da53051902d97a02cee8cf16ef24e13ebdffeebd2b5e5711d893c7a1",
+      "preProjection": "ca90c9a4da53051902d97a02cee8cf16ef24e13ebdffeebd2b5e5711d893c7a1"
+    },
+    "geopolitics.ts": {
+      "current": "8ddc4b112ae9e87763a1edf4b6b78fe7e1820ab6ed31e45817f4eae5573ed898",
+      "preProjection": "8ddc4b112ae9e87763a1edf4b6b78fe7e1820ab6ed31e45817f4eae5573ed898"
+    },
+    "goods-accounting.ts": {
+      "current": "ec1b576d5ca81b8e05dd569696a38ad1429b777eca70156f3e3f6303bd0ebd56",
+      "preProjection": "ec1b576d5ca81b8e05dd569696a38ad1429b777eca70156f3e3f6303bd0ebd56"
+    },
+    "heap.ts": {
+      "current": "1bd557f1b9d4ebb78fb7d7e4b34ac4f40db6338bef60c496fc1bd3c93f5676d9",
+      "preProjection": "1bd557f1b9d4ebb78fb7d7e4b34ac4f40db6338bef60c496fc1bd3c93f5676d9"
+    },
+    "hex.ts": {
+      "current": "4808e735024606ad79ea8161b2b2051fc4e16c7e46b47d6c2079522d54b538d8",
+      "preProjection": "4808e735024606ad79ea8161b2b2051fc4e16c7e46b47d6c2079522d54b538d8"
+    },
+    "historical-macro.ts": {
+      "current": "04472a673c0c2818c058845606a8598c652117c042fbc11bc1dea7d37d2fc72d",
+      "preProjection": "04472a673c0c2818c058845606a8598c652117c042fbc11bc1dea7d37d2fc72d"
+    },
+    "history-procedural.ts": {
+      "current": "2fa39e18ab70850d3bbd0b295d720c993215afdf4d94088c6c149ce80d6366a8",
+      "preProjection": "2fa39e18ab70850d3bbd0b295d720c993215afdf4d94088c6c149ce80d6366a8"
+    },
+    "history-repertoire.ts": {
+      "current": "eedbadd6674870dd1633a47dd3a2e5e7eb52321f2d08f085d1c04713cce30440",
+      "preProjection": "eedbadd6674870dd1633a47dd3a2e5e7eb52321f2d08f085d1c04713cce30440"
+    },
+    "history-schema.ts": {
+      "current": "ffa6061c28f4a3e5edaec22091865d0c7df384cdb13960a9b8f1c6edae4a8463",
+      "preProjection": "ffa6061c28f4a3e5edaec22091865d0c7df384cdb13960a9b8f1c6edae4a8463"
+    },
+    "history-types.ts": {
+      "current": "241f033f02d06fbb76aa2bc8472684fcd4b786042f812af8a3f9c50f63da4786",
+      "preProjection": "241f033f02d06fbb76aa2bc8472684fcd4b786042f812af8a3f9c50f63da4786"
+    },
+    "history.ts": {
+      "current": "d31f49f8e994e9424077c844ea627f05cb79da885589992e97ecd20c794e36fe",
+      "preProjection": "d31f49f8e994e9424077c844ea627f05cb79da885589992e97ecd20c794e36fe"
+    },
+    "hydrology.ts": {
+      "current": "3e9421bc7ec36819ff9fd7112429719254893afc64b405a08f486f7e937d7efe",
+      "preProjection": "3e9421bc7ec36819ff9fd7112429719254893afc64b405a08f486f7e937d7efe"
+    },
+    "identities.ts": {
+      "current": "f9761a02c9e6a78c166e139cb8e729caa42f625a282ae1951ca0f20ef2af9f51",
+      "preProjection": "f9761a02c9e6a78c166e139cb8e729caa42f625a282ae1951ca0f20ef2af9f51"
+    },
+    "inspection.ts": {
+      "current": "41eff270b51d04bc45fd0c4d672cff80068cfdd23648f0249a4d9b4d563d9cf0",
+      "preProjection": "41eff270b51d04bc45fd0c4d672cff80068cfdd23648f0249a4d9b4d563d9cf0"
+    },
+    "institutions.ts": {
+      "current": "4ba47e912fb57c0993dc6fddb530521cffcbc00fddae5e210f7c70974b8b5168",
+      "preProjection": "4ba47e912fb57c0993dc6fddb530521cffcbc00fddae5e210f7c70974b8b5168"
+    },
+    "intelligence-persistence.ts": {
+      "current": "2897c3e60ba5aa13377e6821fa58dbb6c7f6399469f24508607f03cea142985c",
+      "preProjection": "2897c3e60ba5aa13377e6821fa58dbb6c7f6399469f24508607f03cea142985c"
+    },
+    "intelligence.ts": {
+      "current": "e534c96ccd408113e36dc4e908fe996ae19bcbcbb2a1fce475f7d3442d8cad9c",
+      "preProjection": "e534c96ccd408113e36dc4e908fe996ae19bcbcbb2a1fce475f7d3442d8cad9c"
+    },
+    "jurisdictions.ts": {
+      "current": "d63f792ec6bbcc5a695a4f77c8be929e95259bdb3d19d19ceedebe6d6ac107e4",
+      "preProjection": "d63f792ec6bbcc5a695a4f77c8be929e95259bdb3d19d19ceedebe6d6ac107e4"
+    },
+    "labor-market.ts": {
+      "current": "2a31179d250539ee2788adb87fa829254e23416844d53ef822343ae5c2bf5312",
+      "preProjection": "2a31179d250539ee2788adb87fa829254e23416844d53ef822343ae5c2bf5312"
+    },
+    "land-use.ts": {
+      "current": "94b6c6c0c8d3fff4ef3a62f529065bb3db507c59d790f3e7510e0089562a3bcd",
+      "preProjection": "94b6c6c0c8d3fff4ef3a62f529065bb3db507c59d790f3e7510e0089562a3bcd"
+    },
+    "landscape.ts": {
+      "current": "26fd8bb0e630f35a749c816f343b49e30555538cb554d55f5e21afaa31ed170b",
+      "preProjection": "26fd8bb0e630f35a749c816f343b49e30555538cb554d55f5e21afaa31ed170b"
+    },
+    "ledger.ts": {
+      "current": "1bb2588e122e4856d88a9b5c0c68f4bbd553c566ae7c13446d5451357d69cd9b",
+      "preProjection": "1bb2588e122e4856d88a9b5c0c68f4bbd553c566ae7c13446d5451357d69cd9b"
+    },
+    "llm-policy.ts": {
+      "current": "9c9300ca6e6e2dc661f4bc64f5f3d3bedd4d2ed13d7caf603fd98c387542f68b",
+      "preProjection": "9c9300ca6e6e2dc661f4bc64f5f3d3bedd4d2ed13d7caf603fd98c387542f68b"
+    },
+    "local-units.ts": {
+      "current": "d65e4610b75e2506e79500dcbc0b1c633c696ee6d4496fa2928bd6ab0c5c216b",
+      "preProjection": "d65e4610b75e2506e79500dcbc0b1c633c696ee6d4496fa2928bd6ab0c5c216b"
+    },
+    "macroeconomy.ts": {
+      "current": "7fefc2a41a71248efc1ef2d20d8eb2ad59884e600087287db00eeaf8676fe358",
+      "preProjection": "7fefc2a41a71248efc1ef2d20d8eb2ad59884e600087287db00eeaf8676fe358"
+    },
+    "military-limits.ts": {
+      "current": "412b3aaaaf056723e5d4ebd5f871722c7d8f657ba097350ddb6e41e283cb4801",
+      "preProjection": "412b3aaaaf056723e5d4ebd5f871722c7d8f657ba097350ddb6e41e283cb4801"
+    },
+    "military-persistence.ts": {
+      "current": "74c94a111400de1299fb23ffeb17ee6b8b97908e854be2f2e4f642e14f548220",
+      "preProjection": "74c94a111400de1299fb23ffeb17ee6b8b97908e854be2f2e4f642e14f548220"
+    },
+    "military-personnel.ts": {
+      "current": "74e481865b791fd2e4efe679290c917694491f78e65ecc3dbcfdb2944345e608",
+      "preProjection": "74e481865b791fd2e4efe679290c917694491f78e65ecc3dbcfdb2944345e608"
+    },
+    "military-types.ts": {
+      "current": "fe09ebec15dd9f2ed512458a20b7c4524dfe67868a9fc37118b95f38839ba420",
+      "preProjection": "fe09ebec15dd9f2ed512458a20b7c4524dfe67868a9fc37118b95f38839ba420"
+    },
+    "military.ts": {
+      "current": "238dec7100e54d632b34302e40c6a3da04c6d487fec9c41e8f49da6adf1a6197",
+      "preProjection": "238dec7100e54d632b34302e40c6a3da04c6d487fec9c41e8f49da6adf1a6197"
+    },
+    "model-parameters.ts": {
+      "current": "806c7654b1cdfdf6f52a9a92fb2259f6fbf0316c0413e302ed8674e971ed0520",
+      "preProjection": "806c7654b1cdfdf6f52a9a92fb2259f6fbf0316c0413e302ed8674e971ed0520"
+    },
+    "monetary-policy.ts": {
+      "current": "9fbd9af70c0bf4476619cb3b58df948edd1192de51d70a55b9d19a3a098714dd",
+      "preProjection": "9fbd9af70c0bf4476619cb3b58df948edd1192de51d70a55b9d19a3a098714dd"
+    },
+    "narrative.ts": {
+      "current": "767971b7b5e329af3865e2d15726a27c2a614c5e3ddac40cafc06fc2de2ec5d5",
+      "preProjection": "767971b7b5e329af3865e2d15726a27c2a614c5e3ddac40cafc06fc2de2ec5d5"
+    },
+    "national-accounts.ts": {
+      "current": "8b2e78b3132543fa4f8089a5f0f496e8df88c3d42bfc93d2418554e0f29cdec1",
+      "preProjection": "8b2e78b3132543fa4f8089a5f0f496e8df88c3d42bfc93d2418554e0f29cdec1"
+    },
+    "naval-control.ts": {
+      "current": "f9eb2c17a1d3aebb56c0a43cbe8ff67de855759644802aa61a06d81ad64de24b",
+      "preProjection": "f9eb2c17a1d3aebb56c0a43cbe8ff67de855759644802aa61a06d81ad64de24b"
+    },
+    "navy.ts": {
+      "current": "858499c76b4ceb9710875a9276540dd0b995bb2a47bc7ec5a0a7f176cbb00ef0",
+      "preProjection": "858499c76b4ceb9710875a9276540dd0b995bb2a47bc7ec5a0a7f176cbb00ef0"
+    },
+    "persistence.ts": {
+      "current": "78110d829b9a81b7e896d3242cf92faced729e7573cbec2cd5780c15ddcf7038",
+      "preProjection": "78110d829b9a81b7e896d3242cf92faced729e7573cbec2cd5780c15ddcf7038"
+    },
+    "physical-space.ts": {
+      "current": "ef9fcab5c58f6c9dfb98551c4b452e7de02f01225259ecc152be6b15d5d9a9ef",
+      "preProjection": "ef9fcab5c58f6c9dfb98551c4b452e7de02f01225259ecc152be6b15d5d9a9ef"
+    },
+    "playback.ts": {
+      "current": "8c3ccd377f92e350e2617acbe520a1ce2f65428d130c10853901eb2fce4b34bf",
+      "preProjection": "8c3ccd377f92e350e2617acbe520a1ce2f65428d130c10853901eb2fce4b34bf"
+    },
+    "population-clone.ts": {
+      "current": "81cb902a445d7d269267ee7bdb9d0f036d6940e1f354fa906b90a51a3b2f98f0",
+      "preProjection": "81cb902a445d7d269267ee7bdb9d0f036d6940e1f354fa906b90a51a3b2f98f0"
+    },
+    "population-persistence.ts": {
+      "current": "d1fbc323237fa95733cbe0897b1951ea3baec58ab92777a5ec5ffe8c6e4f2055",
+      "preProjection": "d1fbc323237fa95733cbe0897b1951ea3baec58ab92777a5ec5ffe8c6e4f2055"
+    },
+    "population-types.ts": {
+      "current": "7ba8924a689102a9290664ceea54185611d5b475ea71e9e0538face8f26ecb9a",
+      "preProjection": "7ba8924a689102a9290664ceea54185611d5b475ea71e9e0538face8f26ecb9a"
+    },
+    "population.ts": {
+      "current": "d0d5550426bb90f878ff0bedd7c5b2f1d4180a3dd79962983e3fbe8274569077",
+      "preProjection": "d0d5550426bb90f878ff0bedd7c5b2f1d4180a3dd79962983e3fbe8274569077"
+    },
+    "pressure-persistence.ts": {
+      "current": "d29e08c1b51f74f6b292b7a35b49810e43af0ae0b3b64deff574c5673dd77831",
+      "preProjection": "d29e08c1b51f74f6b292b7a35b49810e43af0ae0b3b64deff574c5673dd77831"
+    },
+    "pressures.ts": {
+      "current": "0a2bbf145b52057bda7fe8d258b81dc30d9f89f77d3165ccd5267c9e36bc6e1b",
+      "preProjection": "0a2bbf145b52057bda7fe8d258b81dc30d9f89f77d3165ccd5267c9e36bc6e1b"
+    },
+    "public-services.ts": {
+      "current": "5e4a64f74de7d105988c0b145e6f3b67a2948343851617fc51964942a93886b8",
+      "preProjection": "5e4a64f74de7d105988c0b145e6f3b67a2948343851617fc51964942a93886b8"
+    },
+    "random.ts": {
+      "current": "9c0f6e9a7ccb12f5bd5656a3cbc807eb60c4a42953d891cf5b8e98aad5b4036f",
+      "preProjection": "9c0f6e9a7ccb12f5bd5656a3cbc807eb60c4a42953d891cf5b8e98aad5b4036f"
+    },
+    "road-backbone.ts": {
+      "current": "71452662eb0d06161cfcbf5ff059e982f2358d134721df2fea2b63df78ef7d4f",
+      "preProjection": "71452662eb0d06161cfcbf5ff059e982f2358d134721df2fea2b63df78ef7d4f"
+    },
+    "save-codec.ts": {
+      "current": "ec9b8e0f0371e088f33e6c04bc3f9af83492ce65f7679d6a11f06ee7fc0d5018",
+      "preProjection": "40ddbf1e1335359d4ae93d09eb3c2b8a2ae82bb3171e603c914e2e51ff920330"
+    },
+    "scale.ts": {
+      "current": "d52649f74fafd64cc0f20f4b95a7050ba4dc4bfa7cd0cbe5ca5ffa6727681de3",
+      "preProjection": "d52649f74fafd64cc0f20f4b95a7050ba4dc4bfa7cd0cbe5ca5ffa6727681de3"
+    },
+    "settings.ts": {
+      "current": "eff671eb20a46eebe245877c1f14dadf98cda150b924287870aa69e35f6894e3",
+      "preProjection": "eff671eb20a46eebe245877c1f14dadf98cda150b924287870aa69e35f6894e3"
+    },
+    "shipping-backbone.ts": {
+      "current": "ad48ffbc8c2756c8c12ead74da38038e35b18f752ed8c1891f01154e5457faae",
+      "preProjection": "ad48ffbc8c2756c8c12ead74da38038e35b18f752ed8c1891f01154e5457faae"
+    },
+    "snapshot-mailbox.ts": {
+      "current": "90140897ea2608e1c52b8c96e017bf8e6d14b6e2788d592780a6946d5fa664b8",
+      "preProjection": "90140897ea2608e1c52b8c96e017bf8e6d14b6e2788d592780a6946d5fa664b8"
+    },
+    "sovereignty-persistence.ts": {
+      "current": "396ce014dd5da75b51ff8cd76f42a2502a8455e0213209b6550c167f862d9ffb",
+      "preProjection": "396ce014dd5da75b51ff8cd76f42a2502a8455e0213209b6550c167f862d9ffb"
+    },
+    "sovereignty.ts": {
+      "current": "94418e26524e66bd2ac5c6d18933dc3f8c7ddf9571103cf279efaaff407b5687",
+      "preProjection": "94418e26524e66bd2ac5c6d18933dc3f8c7ddf9571103cf279efaaff407b5687"
+    },
+    "spatial-persistence.ts": {
+      "current": "68eb066970400ca0e7649df342af859e2b9238b326ac5c73ff8c54ed521c40e6",
+      "preProjection": "68eb066970400ca0e7649df342af859e2b9238b326ac5c73ff8c54ed521c40e6"
+    },
+    "spatial.ts": {
+      "current": "22e9151144c94a3b665a4c7fb19b1d92977a139d2cdf4b3af31392816f67c60e",
+      "preProjection": "22e9151144c94a3b665a4c7fb19b1d92977a139d2cdf4b3af31392816f67c60e"
+    },
+    "statecraft-persistence.ts": {
+      "current": "67ae3b1b52b7029177d8dc268f9d0e201050be9e97cf38a2e5e47de91f6d12db",
+      "preProjection": "67ae3b1b52b7029177d8dc268f9d0e201050be9e97cf38a2e5e47de91f6d12db"
+    },
+    "statecraft-schema.ts": {
+      "current": "b49a21f42ec1592c723582a2e6a79195ef9896eba72f74c38c35edcfc4250507",
+      "preProjection": "b49a21f42ec1592c723582a2e6a79195ef9896eba72f74c38c35edcfc4250507"
+    },
+    "statecraft-types.ts": {
+      "current": "fafd6dab5ca6559c379909440ac304ae414f95bbdff97817dc208a5aeafd06d4",
+      "preProjection": "fafd6dab5ca6559c379909440ac304ae414f95bbdff97817dc208a5aeafd06d4"
+    },
+    "statecraft.ts": {
+      "current": "7cc354a2d41e65dd0df287c05a02acd59202f6f1fba021a4a972840675015aa9",
+      "preProjection": "7f748cbef46c9a2c6117f0a5e11c42e210d084c5dae9eb1d9e7a0efddf6cc461"
+    },
+    "strategic-assessment.ts": {
+      "current": "9a23c9f84035f27c2422a5d4a2bd6e0b2cf6c9df6e712ef27f0dfc0f97525dfb",
+      "preProjection": "9a23c9f84035f27c2422a5d4a2bd6e0b2cf6c9df6e712ef27f0dfc0f97525dfb"
+    },
+    "trade-memory.ts": {
+      "current": "52734d833a63b4c1c340cf83c10902da3be8e8fe877fc3f25a912ded6680b5c9",
+      "preProjection": "52734d833a63b4c1c340cf83c10902da3be8e8fe877fc3f25a912ded6680b5c9"
+    },
+    "transport.ts": {
+      "current": "35082bfffca87afafa0a6c8eb2e32eec06ffcc1a4a2c26ccd864cfb6c2862ca6",
+      "preProjection": "35082bfffca87afafa0a6c8eb2e32eec06ffcc1a4a2c26ccd864cfb6c2862ca6"
+    },
+    "types.ts": {
+      "current": "46ea69dbb651d56898c968216bec90edc310bf5946c6c1a997d6be6d4e5f18a6",
+      "preProjection": "0fdab4ebb466e3f76995eba5dd8a8f0017e3a6013ddbfc4c58ba28d4ea5348ae"
+    },
+    "view-snapshot.ts": {
+      "current": "b53261dd2dd70c446b32fc7b658018ea55a16ff2d69318253ab2c2de5d478c53",
+      "preProjection": "49ab4d54efe920e29018a90884d5a59c942b8a21fcbb737b75e0c20dbdd078cc"
+    },
+    "worker.ts": {
+      "current": "548292d6072f66d60c5a52f3f14c10e1ef60972104076d2740dc04159bd67d69",
+      "preProjection": "3279063017e285875304dd4addaabe35a31d469c9289290ef1256c3d2cd9ca55"
+    }
+  },
+  "finalDisplaySubscription": {
+    "currentSimulationSourceHash": "36e7efbe383cca29f1ad3f9b8d1895e6097e5b0b22fde2b61dfa62fb0218701a",
+    "reconstructedSettlementSourceHash": "9c945ffb30af7396e2497876097787dc83e6dbca02d789bb6ce675d8a20e2c2d",
+    "matches": true,
+    "differences": [
+      "types.ts",
+      "view-snapshot.ts",
+      "worker.ts"
+    ],
+    "scope": "Dossier subscriptions and lean residential display payloads; display-only metadata. The canonical tick, remeshing, construction, administration and settlement sources are unchanged."
+  },
+  "earlierValidationOnlyChange": {
+    "qualifiedModelHash": "185d95353bbbaaa227cb3362e67ce743df1fb63b638060b271e4d9c7cceb1622",
+    "currentModelHash": "97ce5c13c99c108f91bff9df379d192896290c645f041a78420bfe73b988d564",
+    "reconstructedPriorHash": "185d95353bbbaaa227cb3362e67ce743df1fb63b638060b271e4d9c7cceb1622",
+    "difference": "Only persistence.ts route-summary validation capacity: fixed 20000 replaced by directed region-pair bound. Economic transitions are unchanged."
+  }
+}

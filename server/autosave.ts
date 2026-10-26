@@ -1,5 +1,6 @@
 import { packWorldSave } from '../src/sim/save-codec'
 import { createHash, randomUUID } from 'node:crypto'
+import { constants } from 'node:fs'
 import { copyFile, mkdir, open, readFile, rename, stat, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -31,7 +32,7 @@ export function validateSaveRecord(value: unknown): WorldSave {
 }
 export class DiskAutosaves {
   private queues = new Map<string, Promise<void>>()
-  private verified = new Map<string, string>()
+  private verified = new Map<string, { fingerprint: string; adaptive: boolean }>()
   private async fingerprint(path: string) {
     const info = await stat(path)
     return `${info.size}:${info.mtimeMs}:${info.ctimeMs}`
@@ -39,12 +40,15 @@ export class DiskAutosaves {
   private async verifiedCurrent(path: string) {
     try {
       const signature = await this.fingerprint(path)
-      if (this.verified.get(path) === signature) return true
-      if (!(await this.readFile(path))) return false
-      this.verified.set(path, signature)
-      return true
+      const cached = this.verified.get(path)
+      if (cached?.fingerprint === signature) return cached
+      const saved = await this.readFile(path)
+      if (!saved) return null
+      const verified = { fingerprint: signature, adaptive: !!saved.world.adaptive }
+      this.verified.set(path, verified)
+      return verified
     } catch {
-      return false
+      return null
     }
   }
   constructor(readonly root: string) {}
@@ -59,30 +63,49 @@ export class DiskAutosaves {
       const parsed = JSON.parse(await readFile(path, 'utf8'))
       if (parsed.checksum !== checksum(parsed)) throw new Error('Autosave checksum does not match.')
       const save = validateSaveRecord(parsed)
-      return { version: save.version, savedAt: save.savedAt, world: save.world } as WorldSave
+      return {
+        version: save.version,
+        savedAt: save.savedAt,
+        world: save.world,
+        encoded: parsed.world as unknown,
+      }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw error
     }
   }
-  async read(slot: string): Promise<{ save: WorldSave | null; recovered: boolean }> {
+  read(slot: string): Promise<{ save: WorldSave | null; recovered: boolean }>
+  read(slot: string, encoded: true): Promise<{ save: WorldSave<unknown> | null; recovered: boolean }>
+  async read(
+    slot: string,
+    encoded = false,
+  ): Promise<{ save: WorldSave<unknown> | null; recovered: boolean }> {
+    const output = (value: NonNullable<Awaited<ReturnType<DiskAutosaves['readFile']>>>) => ({
+      version: value.version,
+      savedAt: value.savedAt,
+      world: encoded ? value.encoded : value.world,
+    })
     let damaged = false
     try {
       const save = await this.readFile(this.path(slot))
-      if (save) return { save, recovered: false }
+      if (save) return { save: output(save), recovered: false }
     } catch {
       damaged = true
     }
     const previous = await this.readFile(this.path(slot, true))
-    if (previous) return { save: previous, recovered: true }
+    if (previous) return { save: output(previous), recovered: true }
     if (damaged) throw new Error('The saved files could not be restored. They have been kept for recovery.')
     return { save: null, recovered: false }
   }
-  async write(slot: string, value: WorldSave) {
+  async write(slot: string, value: WorldSave<unknown>) {
     const save = validateSaveRecord(value),
       current = this.path(slot),
       backup = this.path(slot, true)
-    const packed = { ...save, world: packWorldSave(save.world) }
+    // The worker already compressed this immutable snapshot. Decode and validate
+    // above, but retain its original encoding instead of compressing it twice.
+    // Narrow legacy recovery still runs when either replica is restored.
+    const encoded = value.world && typeof value.world === 'object' && 'worldEncoding' in value.world
+    const packed = { ...save, world: encoded ? value.world : packWorldSave(save.world) }
     const data = JSON.stringify({ ...packed, checksum: checksum(packed) })
     if (Buffer.byteLength(data) > MAX_SAVE_BYTES) throw new Error('Autosave exceeds the supported size.')
     const previous = this.queues.get(slot) ?? Promise.resolve()
@@ -103,11 +126,24 @@ export class DiskAutosaves {
           // Never replace a good backup with an unreadable current file.
           const prior = await this.verifiedCurrent(current)
           if (prior) {
+            if (save.world.adaptive && !prior.adaptive) {
+              // Write-once recovery copy survives later rotations of the ordinary previous save.
+              await copyFile(
+                current,
+                join(this.root, `${slot}.pre-adaptive-v1.json`),
+                constants.COPYFILE_EXCL,
+              ).catch((error: NodeJS.ErrnoException) => {
+                if (error.code !== 'EEXIST') throw error
+              })
+            }
             await copyFile(current, backupTemporary)
             await rename(backupTemporary, backup)
           }
           await rename(temporary, current)
-          this.verified.set(current, await this.fingerprint(current))
+          this.verified.set(current, {
+            fingerprint: await this.fingerprint(current),
+            adaptive: !!save.world.adaptive,
+          })
           const directory = await open(this.root, 'r')
           try {
             await directory.sync()
@@ -180,10 +216,11 @@ export function autosaveMiddleware(root: string, onError: (error: unknown) => vo
         `uchrony_save_slot=${slot}; Path=/api/saves; HttpOnly; SameSite=Strict; Max-Age=31536000`,
       )
       if (req.method === 'GET') {
-        const result = await store.read(slot)
+        // Validation still runs; return the verified encoded representation without recompressing it.
+        const result = await store.read(slot, true)
         reply(200, {
           ...result,
-          save: result.save ? { ...result.save, world: packWorldSave(result.save.world) } : null,
+          save: result.save,
           slot,
         })
         return

@@ -1,3 +1,4 @@
+import { activeJurisdictions } from './jurisdictions'
 import { localFirmRegion } from './local-units'
 import { apportion } from './allocation'
 import { landscapeAt, settlementWeight } from './landscape'
@@ -84,6 +85,17 @@ export function refreshSpatial(w: World) {
       }
     })
     proposal.splits = [...splits].sort()
+  }
+  if (w.adaptive && w.localEconomy) {
+    const residents = new Map<number, number>()
+    for (const id of w.localEconomy.active) for (const [cell, count] of Object.entries(w.localEconomy.units[id].residents)) residents.set(+cell, count)
+    w.spatial.settlements = activeJurisdictions(w, 'municipality').map((j) => {
+      const count = j.cells.reduce((sum, c) => sum + (residents.get(c) ?? 0), 0)
+      const region = w.cells[j.seat].region
+      return { id: j.id, region, cell: j.seat, name: j.name, cells: [...j.cells], population: count,
+        kind: count >= 40000 ? 'city' : count >= 8000 ? 'town' : 'village',
+        capital: w.nations.some((n) => n.capital === region && j.cells.includes(w.regions[region].center)) }
+    })
   }
   return w.spatial
 }

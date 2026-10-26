@@ -5075,6 +5075,14 @@ select option {
   color: var(--muted);
   font-size: 12px;
 }
+.city-view-caption button {
+  pointer-events: auto;
+  margin-top: 7px;
+  padding: 5px 0;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .city-explore {
   display: flex;
   align-items: center;
@@ -5094,3 +5102,15 @@ select option {
     font-size: 23px;
   }
 }
+
+.llm-switch { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; }
+.llm-switch input { width: 1.2rem; height: 1.2rem; accent-color: var(--accent); }
+
+.local-inspection { position: fixed; z-index: 29; top: 4rem; right: 1rem; width: min(25rem, calc(100vw - 2rem)); max-height: calc(100dvh - 5rem); overflow: auto; padding: 1rem; background: var(--panel, #203436); color: var(--text, #e8e5d5); border: 1px solid var(--border, #65726c); border-radius: 8px; }
+.local-inspection-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.local-inspection h2 { margin: 0; font-size: 1.25rem; }
+.local-inspection p { margin: 0.6rem 0; font-size: 0.85rem; }
+.local-inspection label { display: grid; gap: 0.35rem; margin-top: 0.8rem; }
+.local-inspection select, .local-inspection input { width: 100%; min-width: 0; }
+.local-inspection-map { display: block; width: 100%; max-height: 230px; background: #172a2b; overflow: hidden; }
+.local-inspection ol { padding-left: 1.2rem; font-size: 0.85rem; line-height: 1.8; }

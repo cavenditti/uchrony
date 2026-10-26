@@ -1,3 +1,4 @@
+import { rebuildAdaptiveMesh } from './adaptive-world'
 import { consolidateClaims } from './district-finance'
 import { MODEL_PARAMETERS } from './model-parameters'
 import { GOODS, inventory, population, clamp, type Region, type World, type Inventory } from './types'
@@ -498,6 +499,11 @@ export function extractDistrictResource(
 
 /** Conservative finite-volume remapping at a closed month boundary. No firm is divided. */
 export function remeshDistricts(w: World, partition: SpatialDistrict[]) {
+  if (w.adaptive) {
+    // Compatibility entry point: numerical refinement cannot novate household debt or create merchants.
+    rebuildAdaptiveMesh(w, partition.length <= w.regions.length ? 'coarse' : 'adaptive')
+    return
+  }
   const system = ensureDistrictEconomy(w),
     e = w.economy!
   const old = system.active.map((id) => system.units[id])

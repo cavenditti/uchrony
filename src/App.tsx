@@ -1,3 +1,7 @@
+import { LocalInspection } from './components/LocalInspection'
+import { inspectionAround, type InspectionSnapshot } from './sim/inspection'
+import { InspectionMailbox } from './inspection-mailbox'
+import { OFF_POLICY } from './sim/llm-policy'
 import { DEFAULT_WORLD_SCALE, WORLD_SCALES, type WorldScale } from './sim/scale'
 import { WorldOverview } from './components/WorldOverview'
 import { inWorldText, narrativeProjection, presentWorld } from './sim/narrative'
@@ -65,6 +69,17 @@ const tabLayer: Partial<Record<Tab, Layer>> = {
 }
 
 export default function App() {
+  const [inspection, setInspection] = useState<InspectionSnapshot | null>(null)
+  const inspectionSequence = useRef(0)
+  const inspectionMailbox = useRef<InspectionMailbox | null>(null)
+  inspectionMailbox.current ??= new InspectionMailbox((request) => {
+    worker.current?.postMessage({ type: 'inspect', request } satisfies WorkerRequest)
+  })
+  const requestInspection = (bounds: InspectionSnapshot['bounds']) => {
+    inspectionMailbox.current!.submit({ id: ++inspectionSequence.current, bounds, detail: 'street' })
+  }
+  const [llmPolicy, setLlmPolicy] = useState({ ...OFF_POLICY })
+  const [llmPending, setLlmPending] = useState(false)
   const [world, setWorld] = useState<World | null>(null),
     [running, setRunning] = useState(false),
     [speed, setSpeed] = useState(1)
@@ -186,6 +201,21 @@ export default function App() {
         notify('World exported, including history and the random state for exact continuation.')
         return
       }
+      if (data.type === 'inspection') {
+        if (data.snapshot.request === inspectionSequence.current) setInspection(data.snapshot)
+        inspectionMailbox.current!.settle(data.snapshot.request)
+        return
+      }
+      if (data.type === 'inspection-error') {
+        if (data.request === inspectionSequence.current) notify(data.message, true)
+        inspectionMailbox.current!.settle(data.request)
+        return
+      }
+      if (data.type === 'llm-policy') {
+        setLlmPolicy(data.policy)
+        setLlmPending(false)
+        return
+      }
       if (data.type === 'storyteller') {
         setStoryteller(narrativeProjection(data.status))
         return
@@ -208,6 +238,7 @@ export default function App() {
         setBusy(false)
       }
       if (data.type === 'error') {
+        setLlmPending(false)
         notify(data.message, true)
         if (!data.recoverable) setRunning(false)
         return
@@ -254,10 +285,19 @@ export default function App() {
     }
   }, [notify, send])
 
+  useEffect(() => {
+    worker.current?.postMessage({ type: 'view-focus', nation: inspectorOpen ? nation : null } satisfies WorkerRequest)
+  }, [inspectorOpen, nation])
+
   // Acknowledge only after React commits, so busy painting cannot queue old worlds.
   useEffect(() => {
     if (world) worker.current?.postMessage({ type: 'snapshot-ack', mapKey } satisfies WorkerRequest)
   }, [world, mapKey])
+  useEffect(() => {
+    inspectionSequence.current++
+    inspectionMailbox.current!.clear()
+    setInspection(null)
+  }, [mapKey])
 
   useEffect(() => {
     worker.current?.postMessage({ type: 'playback', running, speed } satisfies WorkerRequest)
@@ -551,7 +591,9 @@ export default function App() {
               <p>
                 {agents.pending
                   ? `${agents.pending} background deliberations. The simulation continues independently.`
-                  : 'Governments deliberate in the background.'}
+                  : llmPolicy.enabled
+                    ? 'Governments deliberate in the background.'
+                    : 'Governments use native simulation rules.'}
               </p>
               {agents.error && <p className="negative">{agents.error}</p>}
             </div>
@@ -563,6 +605,35 @@ export default function App() {
             </summary>
             <div className="chrome-popover world-menu">
               <h2>{world.seed}</h2>
+              <label className="llm-switch">
+                <span>LLM assistance</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={llmPolicy.enabled}
+                  disabled={llmPending || llmPolicy.forcedOff}
+                  onChange={(event) => {
+                    setLlmPending(true)
+                    worker.current?.postMessage({
+                      type: 'llm-policy',
+                      enabled: event.target.checked,
+                    } satisfies WorkerRequest)
+                  }}
+                />
+              </label>
+              <p aria-live="polite">
+                {llmPending
+                  ? 'Updating all tabs…'
+                  : llmPolicy.forcedOff
+                    ? 'Disabled by server settings.'
+                    : llmPolicy.enabled
+                      ? 'On for all tabs. Model requests may incur charges.'
+                      : 'Off for all tabs. Native simulation continues.'}
+              </p>
+              <p>
+                This world: {world.modelProvenance?.source === 'native' ? 'native simulation' : world.modelProvenance?.source === 'model-assisted' ? `${world.modelProvenance.accepted} accepted model responses` : 'earlier model use unknown'}.
+              </p>
+              <hr />
               <button
                 onClick={() => {
                   closeMenus()
@@ -628,6 +699,18 @@ export default function App() {
           </details>
         </div>
       </header>
+      {inspection && (
+        <LocalInspection
+          snapshot={inspection}
+          currentMonth={world.month}
+          onClose={() => {
+            inspectionSequence.current++
+            inspectionMailbox.current!.clear()
+            setInspection(null)
+          }}
+          onRefresh={() => requestInspection(inspection.bounds)}
+        />
+      )}
       <main className="workspace atlas-stage">
         <section className="atlas-workspace" aria-label="World atlas">
           <WorldMap
@@ -643,6 +726,9 @@ export default function App() {
             orderMode={orderedArmy !== null}
             showContext={!inspectorOpen && !overviewOpen}
             onSelect={selectRegion}
+            onInspectDaily={(cell) => requestInspection(inspectionAround(world, cell))}
+            onInspectArea={requestInspection}
+            onInspectionViewport={inspection ? requestInspection : undefined}
             onLayer={setLayer}
             onInspect={(id, section) => {
               selectRegion(id)
@@ -1114,6 +1200,15 @@ export default function App() {
             <p>
               Uchrony is a local world-history simulation. Let states govern themselves, or intervene in any
               one of them.
+            </p>
+            <p>
+              Municipalities and provinces can reorganize over a continuous landscape. Adaptive spatial
+              resolution preserves the same people, firms, goods and accounts. Close inspection shows
+              representative daily activity from the recorded population and paid jobs.
+            </p>
+            <p>
+              LLM assistance is optional and off by default. The World menu switch applies to every tab; the
+              native simulation continues with it off.
             </p>
             <button className="about-model-link" onClick={() => setModal('model')}>
               <BookOpen size={17} aria-hidden="true" />

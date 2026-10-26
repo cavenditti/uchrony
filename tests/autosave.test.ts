@@ -12,6 +12,9 @@ import { LatestSaveQueue, persistSave, restoreSave } from '../src/storage/autosa
 import type { SaveBackend } from '../src/storage/backends'
 import type { WorldSave } from '../src/storage/save-types'
 import type { World } from '../src/sim/types'
+import { ensureAdaptiveWorld } from '../src/sim/adaptive-world'
+import { restoreWorld } from '../src/sim/persistence'
+import { packWorldSave } from '../src/sim/save-codec'
 
 const world = generateWorld('Durable autosave')
 const record = (savedAt: number, value = world): WorldSave => ({ version: 1, savedAt, world: value })
@@ -25,6 +28,34 @@ const backend = (name: 'disk' | 'browser', value: WorldSave | null, fails = fals
     if (fails) throw new Error(`${name} unavailable`)
     value = next
   },
+})
+
+test('disk writes validate compressed snapshots without recompressing their bytes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'uchrony-encoded-save-')),
+    store = new DiskAutosaves(root),
+    slot = randomUUID(),
+    source = structuredClone(world)
+  ensureAdaptiveWorld(source)
+  const encoded = packWorldSave(source) as { regions: { data: string }[] }
+  // A valid alternative gzip header must survive unchanged; recompression resets its timestamp.
+  const block = Buffer.from(encoded.regions[0].data, 'base64')
+  block[4] = 1
+  encoded.regions[0].data = block.toString('base64')
+  try {
+    await store.write(slot, { version: 1, savedAt: 1, world: encoded })
+    assert.deepEqual((await store.read(slot, true)).save!.world, encoded)
+    assert.deepEqual((await store.read(slot)).save!.world, source)
+    const damaged = structuredClone(encoded)
+    damaged.regions[0].data = 'invalid'
+    await assert.rejects(store.write(slot, { version: 1, savedAt: 2, world: damaged }))
+    assert.deepEqual(
+      (await store.read(slot, true)).save!.world,
+      encoded,
+      'invalid data cannot replace the good save',
+    )
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('a browser quota failure does not prevent a disk save, and the reverse also works', async () => {
@@ -48,6 +79,30 @@ test('restore chooses the newest valid replica and retains the legacy fallback',
   assert.equal(loaded.source, 'legacy')
   assert.deepEqual(loaded.world, world)
   assert.equal(JSON.stringify(world), legacy)
+})
+test('restore expands only the winning replica and falls back after a corrupt newer world', async () => {
+  const unused = {
+    version: 1 as const,
+    savedAt: 1,
+    get world(): typeof world {
+      throw new Error('An older replica should not be expanded')
+    },
+  }
+  const valid = record(2)
+  assert.equal(
+    (await restoreSave([backend('disk', unused), backend('browser', valid)], null)).source,
+    'browser',
+  )
+  const broken = { ...record(3), world: { ...world, rng: NaN } }
+  const recovered = await restoreSave([backend('disk', valid), backend('browser', broken)], null)
+  assert.equal(recovered.source, 'disk')
+  assert.deepEqual(recovered.world, world)
+  await assert.rejects(restoreSave([backend('disk', broken)], null), /Existing saves have been kept/)
+  const malformed = { ...valid, savedAt: NaN }
+  assert.equal(
+    (await restoreSave([backend('disk', malformed), backend('browser', valid)], null)).source,
+    'browser',
+  )
 })
 test('unreadable saves do not silently generate a replacement world', async () => {
   await assert.rejects(
@@ -169,6 +224,27 @@ test('the disk endpoint requires same-origin writes and isolates browser save sl
     assert.equal(other.save, null)
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('adaptive migration retains a byte-identical original beyond ordinary backup rotations', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'uchrony-migration-')),
+    store = new DiskAutosaves(root),
+    slot = randomUUID()
+  try {
+    await store.write(slot, record(1))
+    const original = await readFile(join(root, `${slot}.json`), 'utf8')
+    const migrated = structuredClone(world)
+    ensureAdaptiveWorld(migrated)
+    await store.write(slot, record(2, migrated))
+    await store.write(slot, record(3, migrated))
+    await store.write(slot, record(4, migrated))
+    assert.equal(await readFile(join(root, `${slot}.pre-adaptive-v1.json`), 'utf8'), original)
+    assert.equal((await store.read(slot)).save?.savedAt, 4)
+    const transport = (await store.read(slot, true)).save!
+    assert.deepEqual(restoreWorld(transport.world), migrated)
+  } finally {
     await rm(root, { recursive: true, force: true })
   }
 })

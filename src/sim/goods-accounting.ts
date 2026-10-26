@@ -4,6 +4,7 @@ import { GOODS, inventory, type World, type Inventory } from './types'
 /** Includes mobile stores: loading a convoy is a transfer, not final consumption. */
 export function physicalStocks(w: World): Inventory {
   const totals = inventory()
+  for (const shipment of w.adaptive?.transit ?? []) for (const g of GOODS) totals[g] += shipment.goods[g]
   for (const r of economicRegions(w)) for (const g of GOODS) totals[g] += r.stocks[g]
   for (const f of w.economy?.firms ?? []) for (const g of GOODS) totals[g] += f.stocks[g]
   for (const a of w.armies) {

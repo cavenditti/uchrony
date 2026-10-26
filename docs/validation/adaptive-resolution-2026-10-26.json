@@ -1,0 +1,1037 @@
+{
+  "modelHash": "9c945ffb30af7396e2497876097787dc83e6dbca02d789bb6ce675d8a20e2c2d",
+  "months": 12,
+  "pairedSeeds": 2,
+  "tolerance": 0,
+  "interpretation": "Exact retained firms, household pools and contracts; this does not validate a compressed heterogeneous closure.",
+  "providerCalls": 0,
+  "cases": [
+    {
+      "name": "uniform-prices",
+      "seed": 0,
+      "evidence": {},
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10769254,
+            "realOutput": 2926.1514640229166,
+            "priceIndex": 1.032280207947592,
+            "unemployment": 0.6462887134547126,
+            "foodAccess": 0.9523488795985535,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002513845957881822,
+            "survivingFirms": 1461
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            12605,
+            2407
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10491822,
+            "realOutput": 2792.0473608300317,
+            "priceIndex": 1.0588336825510267,
+            "unemployment": 0.6593934129625055,
+            "foodAccess": 0.004092389540933262,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.00249647622855487,
+            "survivingFirms": 1564
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            12605,
+            2443
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10191878,
+            "realOutput": 2648.8503290183335,
+            "priceIndex": 1.0685311274875984,
+            "unemployment": 0.6728165998280513,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0024795863758114594,
+            "survivingFirms": 1670
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            12605,
+            2443
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 9900995,
+            "realOutput": 2507.5375981513544,
+            "priceIndex": 1.0728793886309183,
+            "unemployment": 0.6836653870738714,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002464200910488942,
+            "survivingFirms": 1768
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            12605,
+            2449
+          ]
+        }
+      ]
+    },
+    {
+      "name": "uniform-prices",
+      "seed": 1,
+      "evidence": {},
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10567476,
+            "realOutput": 2844.0154636051752,
+            "priceIndex": 1.034498653616393,
+            "unemployment": 0.6430253761371695,
+            "foodAccess": 0.9576523127505358,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0032058701248838793,
+            "survivingFirms": 1278
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            12319,
+            2414
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10300235,
+            "realOutput": 2720.9970854134317,
+            "priceIndex": 1.0605036176127587,
+            "unemployment": 0.6553822972463769,
+            "foodAccess": 0.004927564285646202,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.003179838875027655,
+            "survivingFirms": 1358
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            12319,
+            2460
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10006033,
+            "realOutput": 2583.6703357117685,
+            "priceIndex": 1.0709256611710585,
+            "unemployment": 0.6694873313673578,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0031556630682414333,
+            "survivingFirms": 1448
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            12319,
+            2460
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 9719848,
+            "realOutput": 2443.679565399688,
+            "priceIndex": 1.0755875252824936,
+            "unemployment": 0.6807750561591064,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.003134023264852675,
+            "survivingFirms": 1543
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            12319,
+            2460
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mine-bottleneck",
+      "seed": 0,
+      "evidence": {
+        "minePool": 11,
+        "ore": 1207006.552137722
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10135012,
+            "realOutput": 2991.0450973571947,
+            "priceIndex": 1.031963777245748,
+            "unemployment": 0.5996962266673007,
+            "foodAccess": 0.9635554643734575,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0033197090454457905,
+            "survivingFirms": 1213
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            11815,
+            2246
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 9887341,
+            "realOutput": 2852.5939185206216,
+            "priceIndex": 1.0546168586457145,
+            "unemployment": 0.6154107960281454,
+            "foodAccess": 0.007372433364812961,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0032890331275804117,
+            "survivingFirms": 1276
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            11815,
+            2282
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 9605474,
+            "realOutput": 2713.5274377667115,
+            "priceIndex": 1.0627456093190593,
+            "unemployment": 0.6280573042356131,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.003263941773482009,
+            "survivingFirms": 1351
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            11815,
+            2282
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 9331672,
+            "realOutput": 2559.941683526166,
+            "priceIndex": 1.0668420804492398,
+            "unemployment": 0.6422642414299127,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.003242079067270757,
+            "survivingFirms": 1424
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            78,
+            11815,
+            2285
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mine-bottleneck",
+      "seed": 1,
+      "evidence": {
+        "minePool": 419,
+        "ore": 822462.3834930459
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10263904,
+            "realOutput": 2787.1869176055698,
+            "priceIndex": 1.0303250478855974,
+            "unemployment": 0.6378740687739047,
+            "foodAccess": 0.9554216276246609,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0028431571622401296,
+            "survivingFirms": 1303
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            74,
+            11982,
+            2322
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 9994486,
+            "realOutput": 2671.367599676182,
+            "priceIndex": 1.0535362824115295,
+            "unemployment": 0.6486222989087764,
+            "foodAccess": 0.006131935673534206,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.00281995510848809,
+            "survivingFirms": 1383
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            74,
+            11982,
+            2349
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 9705800,
+            "realOutput": 2533.486911529677,
+            "priceIndex": 1.0630248110582317,
+            "unemployment": 0.6614049261315227,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0028015204495464734,
+            "survivingFirms": 1463
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            74,
+            11982,
+            2349
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 9427883,
+            "realOutput": 2399.030888675717,
+            "priceIndex": 1.0666728378308694,
+            "unemployment": 0.6718701409714625,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0027854643419995915,
+            "survivingFirms": 1562
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            74,
+            11982,
+            2352
+          ]
+        }
+      ]
+    },
+    {
+      "name": "port",
+      "seed": 0,
+      "evidence": {
+        "seaRoutes": 343
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10835843,
+            "realOutput": 2792.3535192642134,
+            "priceIndex": 1.029896553763395,
+            "unemployment": 0.667599442323734,
+            "foodAccess": 0.9554925480944055,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002557024553323024,
+            "survivingFirms": 1465
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            79,
+            12658,
+            2501
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10561656,
+            "realOutput": 2661.64260315139,
+            "priceIndex": 1.050500317203657,
+            "unemployment": 0.6806827289864932,
+            "foodAccess": 0.0040969540626234575,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0025440465067614456,
+            "survivingFirms": 1566
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            79,
+            12658,
+            2561
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10259539,
+            "realOutput": 2520.201211316729,
+            "priceIndex": 1.0593128499817668,
+            "unemployment": 0.6944461092382137,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002527506578073384,
+            "survivingFirms": 1678
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            79,
+            12658,
+            2561
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 9966701,
+            "realOutput": 2386.0848154088717,
+            "priceIndex": 1.0629199778338239,
+            "unemployment": 0.704770566202569,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002512107751871973,
+            "survivingFirms": 1809
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            79,
+            12658,
+            2564
+          ]
+        }
+      ]
+    },
+    {
+      "name": "port",
+      "seed": 1,
+      "evidence": {
+        "seaRoutes": 343
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10907835,
+            "realOutput": 2810.1786059410574,
+            "priceIndex": 1.0337489020068742,
+            "unemployment": 0.6679035045927838,
+            "foodAccess": 0.9574521828784925,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0027684066869240434,
+            "survivingFirms": 1380
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            82,
+            12792,
+            2526
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10634432,
+            "realOutput": 2676.7647290120403,
+            "priceIndex": 1.0603292415020593,
+            "unemployment": 0.6815182077191895,
+            "foodAccess": 0.0024612709845450577,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002755344051542393,
+            "survivingFirms": 1472
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            82,
+            12792,
+            2561
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10331277,
+            "realOutput": 2536.5449877218152,
+            "priceIndex": 1.0691238040798443,
+            "unemployment": 0.6946615896345605,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0027387428738578105,
+            "survivingFirms": 1562
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            82,
+            12792,
+            2561
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 10037215,
+            "realOutput": 2399.4048841683198,
+            "priceIndex": 1.0733602413485135,
+            "unemployment": 0.7053213463928605,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0027242684305834675,
+            "survivingFirms": 1663
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            82,
+            12792,
+            2561
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polycentric",
+      "seed": 0,
+      "evidence": {
+        "centers": [
+          4353,
+          5585
+        ],
+        "residents": 115496
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10813902,
+            "realOutput": 2781.537469276722,
+            "priceIndex": 1.0383742486718501,
+            "unemployment": 0.6696418165388365,
+            "foodAccess": 0.9488873588065432,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0027420078756205373,
+            "survivingFirms": 1427
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            75,
+            12654,
+            2444
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10534009,
+            "realOutput": 2666.443169772059,
+            "priceIndex": 1.0634328536759625,
+            "unemployment": 0.6797304433851646,
+            "foodAccess": 0.004747460918851261,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0027196722336872746,
+            "survivingFirms": 1544
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            75,
+            12654,
+            2494
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10233362,
+            "realOutput": 2541.4563561644804,
+            "priceIndex": 1.0740989947607193,
+            "unemployment": 0.6891740010549582,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002698324896720088,
+            "survivingFirms": 1659
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            75,
+            12654,
+            2494
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 9941254,
+            "realOutput": 2401.854545458196,
+            "priceIndex": 1.0786206467774149,
+            "unemployment": 0.7000206337285441,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002678824472711423,
+            "survivingFirms": 1779
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            75,
+            12654,
+            2494
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polycentric",
+      "seed": 1,
+      "evidence": {
+        "centers": [
+          1876,
+          3332
+        ],
+        "residents": 130437
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 11032286,
+            "realOutput": 2866.095667453799,
+            "priceIndex": 1.0394883176216139,
+            "unemployment": 0.6595672555444326,
+            "foodAccess": 0.9570423309179908,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002950091086281569,
+            "survivingFirms": 1367
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            77,
+            12832,
+            2501
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10754479,
+            "realOutput": 2739.1050561928464,
+            "priceIndex": 1.066254239074309,
+            "unemployment": 0.671427604992042,
+            "foodAccess": 0.009575564020532458,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0029316809062832254,
+            "survivingFirms": 1465
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            77,
+            12832,
+            2560
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10448211,
+            "realOutput": 2601.4809778847493,
+            "priceIndex": 1.0769810766595254,
+            "unemployment": 0.6829277207107172,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0029153906887825947,
+            "survivingFirms": 1561
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            77,
+            12832,
+            2560
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 10149909,
+            "realOutput": 2463.1919426707036,
+            "priceIndex": 1.0803143567879916,
+            "unemployment": 0.6929637780266338,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.00290036394206841,
+            "survivingFirms": 1663
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            77,
+            12832,
+            2563
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deprivation",
+      "seed": 0,
+      "evidence": {
+        "laborerCashShareRetained": 0.1
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10235211,
+            "realOutput": 2663.550432158595,
+            "priceIndex": 1.0367543858398205,
+            "unemployment": 0.6683424083626617,
+            "foodAccess": 0.8821370998857471,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002677069838480262,
+            "survivingFirms": 1417
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            72,
+            11935,
+            2269
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 9980826,
+            "realOutput": 2563.5227967301653,
+            "priceIndex": 1.0629192840097934,
+            "unemployment": 0.677282359727473,
+            "foodAccess": 0.005468766683503606,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002660014652540633,
+            "survivingFirms": 1519
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            72,
+            11935,
+            2287
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 9694160,
+            "realOutput": 2452.296072342578,
+            "priceIndex": 1.0750444232399141,
+            "unemployment": 0.6851662430976745,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0026399790368482673,
+            "survivingFirms": 1629
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            72,
+            11935,
+            2287
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 9417474,
+            "realOutput": 2330.989408547265,
+            "priceIndex": 1.0791737300935775,
+            "unemployment": 0.6941906351103335,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002621181156155243,
+            "survivingFirms": 1756
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            72,
+            11935,
+            2287
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deprivation",
+      "seed": 1,
+      "evidence": {
+        "laborerCashShareRetained": 0.1
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10561589,
+            "realOutput": 2903.1556983408273,
+            "priceIndex": 1.039129626589542,
+            "unemployment": 0.6392042167925717,
+            "foodAccess": 0.8661885332392534,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002427393415158114,
+            "survivingFirms": 1482
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            73,
+            12357,
+            2425
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10297751,
+            "realOutput": 2772.9773763443627,
+            "priceIndex": 1.0692397803925204,
+            "unemployment": 0.6527173560929728,
+            "foodAccess": 0.00410536607855008,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002411579041343681,
+            "survivingFirms": 1615
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            73,
+            12357,
+            2460
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10003365,
+            "realOutput": 2632.040912157195,
+            "priceIndex": 1.0841711495676103,
+            "unemployment": 0.6682599524863506,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0023924678895379573,
+            "survivingFirms": 1722
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            73,
+            12357,
+            2460
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 9718015,
+            "realOutput": 2492.397716896683,
+            "priceIndex": 1.088994830657331,
+            "unemployment": 0.6793214150721126,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0023739842082059984,
+            "survivingFirms": 1846
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            73,
+            12357,
+            2460
+          ]
+        }
+      ]
+    },
+    {
+      "name": "network-disruption",
+      "seed": 0,
+      "evidence": {
+        "closedRegion": 52
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10896416,
+            "realOutput": 2853.9317187639567,
+            "priceIndex": 1.03393702883883,
+            "unemployment": 0.67000722518555,
+            "foodAccess": 0.9547190533302403,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.00205543866224675,
+            "survivingFirms": 1673
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            76,
+            12683,
+            2427
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10611331,
+            "realOutput": 2726.632327044496,
+            "priceIndex": 1.056606070435993,
+            "unemployment": 0.6812345731514472,
+            "foodAccess": 0.003336584203336747,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002040164082759006,
+            "survivingFirms": 1819
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            76,
+            12683,
+            2460
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10307071,
+            "realOutput": 2588.5311096138557,
+            "priceIndex": 1.0654546950104922,
+            "unemployment": 0.6910332796131149,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.0020257522334517133,
+            "survivingFirms": 1958
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            76,
+            12683,
+            2460
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 10012201,
+            "realOutput": 2462.2454110629683,
+            "priceIndex": 1.0712173558998253,
+            "unemployment": 0.69874218636563,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002011170075470064,
+            "survivingFirms": 2094
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            76,
+            12683,
+            2460
+          ]
+        }
+      ]
+    },
+    {
+      "name": "network-disruption",
+      "seed": 1,
+      "evidence": {
+        "closedRegion": 40
+      },
+      "comparisons": [
+        {
+          "month": 3,
+          "values": {
+            "population": 10914086,
+            "realOutput": 2822.423528433694,
+            "priceIndex": 1.0294972045272957,
+            "unemployment": 0.6634096150191575,
+            "foodAccess": 0.9562717126429245,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002397177326045682,
+            "survivingFirms": 1538
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            79,
+            12708,
+            2502
+          ]
+        },
+        {
+          "month": 6,
+          "values": {
+            "population": 10635742,
+            "realOutput": 2696.633128821651,
+            "priceIndex": 1.0516598537893451,
+            "unemployment": 0.6756102018649266,
+            "foodAccess": 0.0038891527405749606,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002373658796537188,
+            "survivingFirms": 1656
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            79,
+            12708,
+            2567
+          ]
+        },
+        {
+          "month": 9,
+          "values": {
+            "population": 10332431,
+            "realOutput": 2558.9529058679773,
+            "priceIndex": 1.0600190826467115,
+            "unemployment": 0.6888559625244877,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.00235555646923141,
+            "survivingFirms": 1769
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            79,
+            12708,
+            2567
+          ]
+        },
+        {
+          "month": 12,
+          "values": {
+            "population": 10037162,
+            "realOutput": 2417.677608189386,
+            "priceIndex": 1.0633471752196706,
+            "unemployment": 0.6998372422786903,
+            "foodAccess": 0,
+            "meanCommuteMinutes": 0,
+            "populationConcentration": 0.002339078638558204,
+            "survivingFirms": 1912
+          },
+          "maximumDifference": 0,
+          "leaves": [
+            79,
+            12708,
+            2567
+          ]
+        }
+      ]
+    }
+  ],
+  "failure": null
+}

@@ -1,3 +1,4 @@
+import { linkDistrictPeople, aggregateDistricts } from './districts'
 import { publicTransfer, transferDebt } from './ledger'
 import { previousResearchOutput } from './public-services'
 import { clonePopulationHolders } from './population-clone'
@@ -580,6 +581,11 @@ export function settleConventionalOffers(world: World) {
     'devolution',
     'institution',
   ])
+  for (const offer of readyOffers(world)) {
+    if (!offer.terms.length || offer.terms.some((term) => !routine.has(term.kind)))
+      offer.nativeReview =
+        'Pending interpretation: these terms are outside native agreement rules. LLM assistance is optional; no agreement is assumed.'
+  }
   const offers = readyOffers(world)
     .filter((offer) => offer.terms.length && offer.terms.every((term) => routine.has(term.kind)))
     .slice(0, 6)
@@ -823,8 +829,58 @@ export function acceptRefereeDecision(
           warfare: territorial ? structuredClone(world.warfare) : world.warfare,
           historical: territorial ? structuredClone(world.historical) : world.historical,
           events: [...world.events],
+          // Settlement can transfer deposits/debts and return military inventories.
+          // Isolate every affected ledger so a later rejected clause cannot leak writes.
+          economy: world.economy
+            ? {
+                ...world.economy,
+                credit: structuredClone(world.economy.credit),
+                ledger: structuredClone(world.economy.ledger),
+                banking: structuredClone(world.economy.banking),
+                ...(world.economy.accounts
+                  ? {
+                      accounts: territorial
+                        ? structuredClone(world.economy.accounts)
+                        : world.economy.accounts,
+                    }
+                  : {}),
+              }
+            : undefined,
+          localEconomy:
+            territorial && world.localEconomy
+              ? {
+                  ...world.localEconomy,
+                  provinceSignals: structuredClone(world.localEconomy.provinceSignals),
+                  units: Object.fromEntries(
+                    Object.entries(world.localEconomy.units).map(([id, unit]) => [
+                      id,
+                      {
+                        ...unit,
+                        stocks: { ...unit.stocks },
+                        consumption: { ...unit.consumption },
+                        population: { ...unit.population },
+                        residents: { ...unit.residents },
+                      },
+                    ]),
+                  ),
+                }
+              : world.localEconomy,
+        }
+        if (territorial && trial.localEconomy) {
+          linkDistrictPeople(trial)
+          // A province's depot is the principal market, including inside the trial.
+          // Independent province copies would lose subsequent withdrawals at rollup.
+          for (const region of trial.regions) {
+            const depot = trial.localEconomy.units[region.id]
+            region.stocks = depot.stocks
+            region.consumption = depot.consumption
+          }
         }
         applyTerms(trial, offer, resolved)
+        if (territorial && trial.localEconomy) {
+          linkDistrictPeople(trial)
+          aggregateDistricts(trial)
+        }
         const before =
             world.regions.reduce((sum, region) => sum + population(region), 0) +
             allForces(world).reduce((sum, army) => sum + army.soldiers, 0),
@@ -838,6 +894,8 @@ export function acceptRefereeDecision(
             trial.nations.reduce((sum, nation) => sum + nation.treasury, 0) + institutionalFunds(trial)
         if (Math.abs(fundsAfter - fundsBefore) > 1e-6)
           throw new Error('Settlement would create or destroy treasury funds.')
+        if (trial.economy) world.economy = trial.economy
+        if (trial.localEconomy) world.localEconomy = trial.localEconomy
         world.institutions = trial.institutions
         world.intelligence = trial.intelligence
         world.nations = trial.nations

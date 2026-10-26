@@ -2,8 +2,10 @@ import { economicRegions, economicRegion, provinceId, localFirmRegion } from '..
 import { STRATA, STRATUM_LABELS } from '../sim/economic-types'
 import { censusOf } from '../sim/view-snapshot'
 import type { EconomicStratum } from '../sim/economic-types'
-const stratumPeople = (world: World, region: number, stratum: EconomicStratum) =>
-  censusOf(economicRegion(world, region), world.month).strata[stratum] ?? 0
+const stratumPeople = (world: World, region: number, stratum: EconomicStratum) => {
+  const place = economicRegion(world, region)
+  return (place.strataCounts ?? censusOf(place, world.month).strata)[stratum] ?? 0
+}
 import type { World } from '../sim/types'
 const money = (n: number) =>
   Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(n * 1000)
@@ -19,6 +21,12 @@ export function EconomicAccounts({
 }) {
   const e = world.economy
   if (!e) return <p className="panel-note">Household accounts initialize when this legacy world advances.</p>
+  if (world.viewOnly && world.viewNation !== undefined && world.viewNation !== nation)
+    return (
+      <p className="panel-note" role="status">
+        Loading this state's economic accounts…
+      </p>
+    )
   const places = economicRegions(world).filter((r) =>
     region === undefined ? r.nation === nation : provinceId(r) === region,
   )
@@ -205,9 +213,10 @@ export function MacroAccounts({ world, nation }: { world: World; nation: number 
                   <dt>Outstanding loan assets</dt>
                   <dd>
                     {money(
-                      e.credit.loans
-                        .filter((l) => l.bank === bank.id)
-                        .reduce((sum, l) => sum + l.principal, 0),
+                      world.viewBankLoans?.[bank.id] ??
+                        e.credit.loans
+                          .filter((l) => l.bank === bank.id)
+                          .reduce((sum, l) => sum + l.principal, 0),
                     )}{' '}
                     crowns
                   </dd>

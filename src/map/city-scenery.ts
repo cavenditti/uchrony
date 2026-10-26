@@ -1,3 +1,4 @@
+import { StringTable } from './string-table'
 import * as THREE from 'three'
 import type { World } from '../sim/types'
 import { spatialState } from '../sim/spatial'
@@ -5,6 +6,7 @@ import { describeCity, cityLayout, type CityDescription, type CityPoint } from '
 import type { RiverCurve } from './rivers'
 import { TerrainPicker } from './relief-picking'
 import { architectureMaterial, townGroundMaterial, windMaterial } from './city-materials'
+import { reliefRandom } from './relief-field'
 
 const PALETTES = [
   { walls: '#d6c5a4', roof: '#8d5845', paving: '#a29173', trim: '#89765d' },
@@ -33,9 +35,8 @@ export class CityScenery {
   private descriptions: CityDescription[] = []
   private cache = new Map<string, CityEntry>()
   private overview = new THREE.Group()
-  private signature = ''
-  private heights = new Map<string, number>()
-  private ranges = new Map<string, [number, number]>()
+  private heights = new StringTable<number>()
+  private ranges = new StringTable<[number, number]>()
   private overviewMatrices: Float32Array[] = []
   private hidden = new Set<string>()
   private clock = 0
@@ -74,16 +75,24 @@ export class CityScenery {
   }
 
   update(world: World) {
-    const cities = spatialState(world).settlements.map((s) => describeCity(world, s))
-    const signature = cities.map((c) => c.key).join('|')
-    if (signature === this.signature) return
-    this.signature = signature
+    const places = world.adaptive ? (world.viewHomes ?? Object.values(world.adaptive.sites).filter((s) => s.kind === 'residential')).filter((s) => s.capacity > 200).map((s) => {
+      const count = world.localEconomy?.units[s.pool]?.residents[s.cell] ?? 0
+      return { id: s.id, region: world.cells[s.cell].region, cell: s.cell, name: '', population: count, capital: false, capacity: s.capacity,
+        kind: (count >= 40000 ? 'city' : count >= 8000 ? 'town' : 'village') as 'city' | 'town' | 'village' }
+    }) : spatialState(world).settlements
+    const seats = new Set(Object.values(world.adaptive?.jurisdictions ?? {}).filter((j) => j.retired === undefined).map((j) => j.seat))
+    const cities = places.map((s) => {
+      const city = describeCity(world, s), civic = !world.adaptive || seats.has(s.cell)
+      return { ...city, civic, key: `${city.key}:${civic}` }
+    })
+    if (cities.length === this.descriptions.length && cities.every((c, i) => c.key === this.descriptions[i].key)) return
     this.viewKey = ''
     this.descriptions = cities
     this.heights.clear()
     this.ranges.clear()
     this.hidden.clear()
-    const keys = new Set(cities.map((c) => c.key))
+    const keys = new StringTable<true>()
+    for (const city of cities) keys.set(city.key, true)
     for (const [id, entry] of this.cache)
       if (!keys.has(entry.key)) {
         this.release(entry.group)
@@ -91,26 +100,45 @@ export class CityScenery {
       }
     this.release(this.overview)
     this.overview = new THREE.Group()
-    const walls: Piece[] = [],
-      roofs: Piece[] = []
+    const countFor = (c: CityDescription) => c.capacity === undefined ? (c.kind === 'city' ? 7 : c.kind === 'town' ? 4 : 2) : Math.max(1, Math.min(12, Math.ceil(Math.sqrt(c.capacity / 150))))
+    const total = cities.reduce((n, c) => n + countFor(c), 0)
+    // Write straight into GPU instance buffers. Materializing hundreds of thousands
+    // of temporary Piece/Color records also required one large JS array allocation.
+    const walls = new THREE.InstancedMesh(this.geometries.box, this.wallMaterial, total)
+    const roofs = new THREE.InstancedMesh(this.geometries.hip, this.roofMaterial, total)
+    const colors = PALETTES.map((p) => ({ walls: new THREE.Color(p.walls), roof: new THREE.Color(p.roof) }))
+    let index = 0
+    const put = (mesh: THREE.InstancedMesh, x: number, y: number, z: number, w: number, h: number, d: number, color: THREE.Color) => {
+      this.dummy.position.set(x, y, z)
+      this.dummy.rotation.set(0, 0, 0)
+      this.dummy.scale.set(w, h, d)
+      this.dummy.updateMatrix()
+      mesh.setMatrixAt(index, this.dummy.matrix)
+      mesh.setColorAt(index, color)
+    }
     for (const c of cities) {
       this.heights.set(c.id, this.height(c.x, c.z))
-      const first = walls.length
-      const palette = PALETTES[c.style]
-      for (let j = 0; j < (c.kind === 'city' ? 7 : c.kind === 'town' ? 4 : 2); j++) {
-        const a = j * 2.4,
-          d = Math.sqrt(j) * 1.25,
+      const first = index, count = countFor(c), palette = colors[c.style]
+      for (let j = 0; j < count; j++) {
+        const a = j * 2.4 + (c.capacity === undefined ? 0 : reliefRandom(c.seed + j) * Math.PI * 2),
+          d = c.capacity === undefined ? Math.sqrt(j) * 1.25 : Math.sqrt((j + 0.3) / count) * c.radius * 0.75,
           x = c.x + Math.cos(a) * d,
           z = c.z + Math.sin(a) * d
         const floor = this.height(x, z),
-          h = j === 0 ? 3.7 : 1.5
-        walls.push({ x, y: floor + h / 2, z, w: 1, h, d: 1, color: new THREE.Color(palette.walls) })
-        roofs.push({ x, y: floor + h + 0.4, z, w: 1.2, h: 0.8, d: 1.2, color: new THREE.Color(palette.roof) })
+          h = j === 0 && c.civic ? 3.7 : c.capacity === undefined ? 1.5 : 0.6 + reliefRandom(c.seed + j + 91) * 0.8
+        put(walls, x, floor + h / 2, z, 1, h, 1, palette.walls)
+        put(roofs, x, floor + h + 0.4, z, 1.2, 0.8, 1.2, palette.roof)
+        index++
       }
-      this.ranges.set(c.id, [first, walls.length - first])
+      this.ranges.set(c.id, [first, count])
     }
-    this.addInstances(this.overview, 'box', walls, this.wallMaterial)
-    this.addInstances(this.overview, 'hip', roofs, this.roofMaterial)
+    for (const mesh of [walls, roofs]) {
+      mesh.computeBoundingSphere()
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      if (total) this.overview.add(mesh)
+      else mesh.dispose()
+    }
     this.overviewMatrices = this.overview.children.map((mesh) =>
       ((mesh as THREE.InstancedMesh).instanceMatrix.array as Float32Array).slice(),
     )
@@ -411,7 +439,7 @@ export class CityScenery {
       floor = this.height(p.x, p.z),
       stone = new THREE.Color(palette.walls),
       roof = new THREE.Color(palette.roof)
-    if (layout.square.length) {
+    if (layout.square.length && city.civic !== false) {
       const civic = (u: number, v: number) => ({
         x: p.x + u * Math.cos(layout.angle) + v * Math.sin(layout.angle),
         z: p.z - u * Math.sin(layout.angle) + v * Math.cos(layout.angle),

@@ -1,3 +1,4 @@
+import { recordLocalJob } from './commuting'
 import { extractDistrictResource } from './districts'
 import { economicRegions, economicRegion, localFirmRegion, provinceId } from './local-units'
 import {
@@ -241,7 +242,7 @@ export function hireFirms(w: World, r: Region) {
     const utilization = clamp(needed, 0.05, 0.98)
     f.laborMix = inventory()
     for (const g of GOODS) f.laborMix[g] = needed > 0 ? required[g] / needed : baseline[g]
-    f.desiredEmployment = benchmarkJobs * utilization * (1 - r.devastation * 0.5)
+    f.desiredEmployment = Math.min(benchmarkJobs * utilization * (1 - r.devastation * 0.5), w.adaptive?.sites[`firm:${f.id}`]?.capacity ?? Infinity)
     const valueAdded = GOODS.reduce((sum, g) => {
       const inputs = Object.entries(recipes[g] ?? {}).reduce(
         (cost, [input, rate]) => cost + r.prices[input as Good] * rate,
@@ -314,6 +315,7 @@ export function hireFirms(w: World, r: Region) {
       h.income += paid
       h.taxes += tax
       w.nations[r.nation].income += tax
+      recordLocalJob(w, r.id, f.id, s, actual, paid)
       f.employment += actual
       f.payroll += paid
       recordWages(w, r.id, firmAccount(f.id), paid)
@@ -424,13 +426,13 @@ export function firmCapacity(
   return { q }
 }
 /** Producers quote replacement-cost prices with bounded markups, not unbounded inventory inflation. */
-export function produceFirms(w: World, r: Region) {
+export function produceFirms(w: World, r: Region, hired = false) {
   const e = ensureEconomy(w),
     firms = regionalFirms(w, r.id).filter((f) => f.active),
     merchant = e.producers[r.id]
   r.production = inventory()
   r.plannedProduction = inventory()
-  hireFirms(w, r)
+  if (!hired) hireFirms(w, r)
   for (const f of firms) {
     const { q } = firmCapacity(w, r, f, firms.length)
     const laborShares = f.laborMix ?? baseLaborMix(w, r, f)

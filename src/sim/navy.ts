@@ -319,15 +319,15 @@ export function advanceNavy(w: World) {
         ['timber', repair * 60],
         ['iron', repair * 15],
         ['tools', repair * 4],
-      ] as const)
-        recordUse(w, marketStore(r.id), good, amount)
-      r.stocks.timber -= repair * 60
-      r.stocks.iron -= repair * 15
-      r.stocks.tools -= repair * 4
+      ] as const) {
+        // Division/multiplication of the limiting input can round up by one ULP.
+        // The physical withdrawal and consumption entry must use the same available quantity.
+        const used = Math.min(r.stocks[good], amount)
+        recordUse(w, marketStore(r.id), good, used)
+        r.stocks[good] -= used
+        r.consumption[good] += used
+      }
       publicExpense(w, n.id, repair * 150, 'naval repairs', r.id)
-      r.consumption.timber += repair * 60
-      r.consumption.iron += repair * 15
-      r.consumption.tools += repair * 4
       for (const a of aboard) {
         const loaded = Math.min(
           Math.max(0, r.stocks.food - population(r) * 0.025),

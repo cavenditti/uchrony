@@ -30,6 +30,11 @@ checks = {
         s['lastSaveAgoMs'] < 90000 and set(s['world'].get('replicas', [])) == {'disk', 'browser'}
         for s in samples if s['elapsedMs'] >= 90000
     ),
+    'declaredPublicationBudget': all(
+        s['lastWorldAgoMs'] < result.get('budgets', {}).get('worldGapSeconds', 30) * 1000
+        for s in samples if s['elapsedMs'] >= result.get('budgets', {}).get('worldGapSeconds', 30) * 1000
+    ),
+    'repeatedInspection': not result.get('inspection') or counters.get('inspections', 0) >= 10,
 }
 memory = lines('process-memory.jsonl') if (root / 'process-memory.jsonl').exists() else []
 start_time = datetime.fromisoformat(initial['timestamp'].replace('Z', '+00:00')).timestamp()
@@ -37,14 +42,24 @@ end_time = datetime.fromisoformat(state.get('timestamp', initial['timestamp']).r
 memory = [s for s in memory if start_time <= s['time'] <= end_time]
 renderer = [max((p['rssMiB'] for p in s['processes'] if p['role'] == 'renderer'), default=0) for s in memory]
 renderer = [value for value in renderer if value > 0]
+first_save = next((s for s in samples if s['counters']['saves'] > 0), None)
 summary = {
     'passed': all(checks.values()), 'checks': checks,
+    'enduranceCompleted': all(value for key, value in checks.items()
+                             if key not in {'regularReplicatedSaves', 'declaredPublicationBudget', 'simulationAdvanced'}),
+    'performancePassed': all(checks[key] for key in ['regularReplicatedSaves', 'declaredPublicationBudget', 'simulationAdvanced']),
+    'budgetMisses': result.get('budgetMisses', []),
     'wallSeconds': result['wallSeconds'], 'seed': 'A world unwritten',
+    'budgets': result.get('budgets', {'worldGapSeconds': 30, 'saveGapSeconds': 90}),
+    'inspectionReplies': counters.get('inspections', 0),
     'startMonth': initial['world']['month'], 'endMonth': state.get('world', {}).get('month'),
     'drags': min(counters.get('pointerDown', 0), counters.get('pointerUp', 0)),
     'keyboardZoomActions': result['cycles'],
     'saves': counters.get('saves'), 'saveMiB': state.get('world', {}).get('saveBytes', 0) / 1024**2,
-    'longestSampledSaveGapSeconds': max(s['lastSaveAgoMs'] for s in samples if s['elapsedMs'] >= 90000) / 1000,
+    # Exclude time spent paused before begin(); this does not change pass/fail.
+    'longestSampledSaveGapSeconds': max((min(s['lastSaveAgoMs'], s['elapsedMs']) for s in samples if s['elapsedMs'] >= 90000), default=0) / 1000,
+    'rawLongestSampledSaveAgeSeconds': max((s['lastSaveAgoMs'] for s in samples), default=0) / 1000,
+    'firstPostStartSaveSeconds': (first_save['elapsedMs'] - first_save['lastSaveAgoMs']) / 1000 if first_save else None,
     'frameMs': state.get('frameMs'), 'framesOverOneSecond': counters.get('over1000ms'),
     'mainPageHeapPeakMiB': max(s.get('heapMiB', 0) or 0 for s in samples),
     'mainPageHeapFinalMiB': state.get('heapMiB'),

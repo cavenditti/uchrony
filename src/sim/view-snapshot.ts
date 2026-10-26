@@ -1,8 +1,10 @@
-import { clamp, type Army, type World } from './types'
+import { clamp, GOODS, type Inventory, type Army, type World } from './types'
 import { unitLoyalty } from './forces'
 import type { IdentityAxis, PopulationCommunity } from './population-types'
-import type { EconomicStratum } from './economic-types'
+import { STRATA, type EconomicStratum } from './economic-types'
 import { communitySize } from './population'
+import { localFirmRegion } from './local-units'
+import { spatialState } from './spatial'
 
 const axes: IdentityAxis[] = ['culture', 'language', 'belief', 'movement']
 export interface PopulationCensus {
@@ -99,17 +101,44 @@ export function censusUnitLoyalty(world: World, force: Army) {
 }
 
 /** UI-only data must never be used as a save or as simulation input. */
-export function viewSnapshot(world: World): Omit<World, 'cells'> {
+export function viewSnapshot(world: World, detailNation?: number | null): Omit<World, 'cells'> {
+  const includes = (nation: number) => detailNation === undefined || detailNation === nation
+  const places = new Set(
+    (world.localEconomy ? Object.values(world.localEconomy.units) : world.regions)
+      .filter((unit) => includes(unit.nation))
+      .map((unit) => unit.id),
+  )
+  const firms = world.economy?.firms?.filter((firm) => places.has(localFirmRegion(firm)))
+  const borrowers = new Set([
+    ...[...places].flatMap((id) => [`producer:${id}`, ...STRATA.map((s) => `household:${id}:${s}`)]),
+    ...(firms ?? []).map((firm) => `firm:${firm.id}`),
+  ])
+  const bankLoans: Record<number, number> = {}
+  for (const loan of world.economy?.credit.loans ?? [])
+    if (loan.bank !== undefined) bankLoans[loan.bank] = (bankLoans[loan.bank] ?? 0) + loan.principal
   const { cells: _cells, ...rest } = world
-  const residents = new Map<number, PopulationCommunity[]>()
+  const strata = new Map<number, Partial<Record<EconomicStratum, number>>>()
   if (world.localEconomy)
     for (const r of world.regions)
-      for (const g of r.communities ?? []) {
+      for (const g of includes(r.nation) ? (r.communities ?? []) : []) {
         const id = g.locality ?? r.id,
-          groups = residents.get(id) ?? []
-        groups.push(g)
-        residents.set(id, groups)
+          counts = strata.get(id) ?? {},
+          stratum = g.stratum ?? 'laborer'
+        counts[stratum] = (counts[stratum] ?? 0) + communitySize(g)
+        strata.set(id, counts)
       }
+  const shipmentTotals: Record<number, { arriving: number; leaving: number }> = {}
+  for (const shipment of world.localEconomy?.shipments ?? []) {
+    const from = (shipmentTotals[shipment.from] ??= { arriving: 0, leaving: 0 })
+    const to = (shipmentTotals[shipment.to] ??= { arriving: 0, leaving: 0 })
+    from.leaving += shipment.quantity
+    to.arriving += shipment.quantity
+  }
+  // Work ledgers and production forecasts are not display data. One shared empty
+  // inventory also remains shared across structuredClone/postMessage. None of
+  // these projected work buffers may be used to save or advance a world.
+  const empty = Object.fromEntries(GOODS.map((good) => [good, 0])) as Inventory
+  const e = world.economy
   const project = <T extends PopulationHolder>(entity: T): T => {
     const { communities: _communities, ...data } = entity
     return { ...data, census: censusOf(entity, world.month) } as T
@@ -117,15 +146,119 @@ export function viewSnapshot(world: World): Omit<World, 'cells'> {
   return {
     ...rest,
     viewOnly: true,
+    ...(world.adaptive
+      ? {
+          viewHomes: Object.values(world.adaptive.sites)
+            .filter((site) => site.kind === 'residential')
+            .map(({ id, cell, pool, capacity }) => ({ id, cell, pool, capacity })),
+        }
+      : {}),
+    ...(detailNation !== undefined ? { viewNation: detailNation, viewBankLoans: bankLoans } : {}),
+    spatial: spatialState(world),
+    ...(e
+      ? {
+          economy: {
+            ...e,
+            ...(detailNation !== undefined
+              ? {
+                  households: Object.fromEntries(
+                    Object.entries(e.households).filter(([id]) => places.has(+id)),
+                  ),
+                  credit: {
+                    ...e.credit,
+                    loans: e.credit.loans.filter((loan) => borrowers.has(loan.borrower)),
+                  },
+                  ...(e.banking
+                    ? {
+                        banking: {
+                          ...e.banking,
+                          accounts: {},
+                          banks: e.banking.banks.map((bank) => ({ ...bank, owners: {} })),
+                        },
+                      }
+                    : {}),
+                }
+              : {}),
+            ledger: { ...e.ledger, opening: {}, net: {}, entries: [] },
+            inventoryPrices: undefined,
+            ...(e.accounts ? { accounts: { ...e.accounts, businesses: {}, stores: {} } } : {}),
+            producers: Object.fromEntries(
+              Object.entries(e.producers)
+                .filter(([id]) => places.has(+id))
+                .map(([id, p]) => [
+                  id,
+                  {
+                    ...p,
+                    projects: [],
+                    forecast: empty,
+                    planned: empty,
+                    sold: empty,
+                    inputTargets: empty,
+                    openingStocks: empty,
+                    losses: empty,
+                    intermediate: empty,
+                  },
+                ]),
+            ),
+            firms: firms?.map((f) => ({
+              ...f,
+              projects: [],
+              prices: empty,
+              production: empty,
+              planned: empty,
+              forecast: empty,
+              sold: empty,
+              laborMix: undefined,
+              labor: undefined,
+            })),
+          },
+        }
+      : {}),
+    ...(world.adaptive
+      ? {
+          adaptive: {
+            ...world.adaptive,
+            sites: {},
+            commuting: [],
+            commutingRows: [],
+            commuteRoutes: {},
+            construction: [],
+            boundaries: [],
+            transit: [],
+            tree: { leaves: [], changed: {}, month: world.adaptive.tree.month },
+            jurisdictions: Object.fromEntries(
+              Object.entries(world.adaptive.jurisdictions).filter(([, j]) => j.retired === undefined),
+            ),
+          },
+        }
+      : {}),
     ...(world.localEconomy
       ? {
           localEconomy: {
             ...world.localEconomy,
+            shipments: [],
+            shipmentTotals,
             units: Object.fromEntries(
-              Object.entries(world.localEconomy.units).map(([id, u]) => [
-                id,
-                project({ ...u, communities: residents.get(+id) ?? [] }),
-              ]),
+              Object.entries(world.localEconomy.units).map(([id, u]) => {
+                const { communities: _communities, census: _census, ...data } = u
+                return [
+                  id,
+                  {
+                    ...data,
+                    strataCounts: strata.get(+id) ?? {},
+                    ...(includes(u.nation)
+                      ? {}
+                      : {
+                          stocks: empty,
+                          production: empty,
+                          plannedProduction: empty,
+                          consumption: empty,
+                          prices: empty,
+                          populationDynamics: undefined,
+                        }),
+                  },
+                ]
+              }),
             ),
           },
         }

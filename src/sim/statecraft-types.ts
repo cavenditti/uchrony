@@ -54,6 +54,7 @@ export interface DiplomaticOffer {
   breaches: number
   delivered: number
   reviewAfter?: number
+  nativeReview?: string
 }
 export interface DiplomaticMessage {
   id: number

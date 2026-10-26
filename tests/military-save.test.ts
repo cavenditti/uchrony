@@ -78,6 +78,19 @@ function fleetWorld() {
   return { w, r, f: w.warfare!.fleets.at(-1)! }
 }
 
+test('naval repairs consume exactly the available limiting input despite floating-point roundoff', () => {
+  const { w, r, f } = fleetWorld()
+  const iron = 8.299999999999999e-19
+  assert(iron / 15 * 15 > iron, 'fixture must reproduce the one-ULP overshoot')
+  r.stocks.iron = iron
+  r.consumption.iron = 0
+  f.hull = 0.5
+  advanceNavy(w)
+  assert.equal(r.stocks.iron, 0)
+  assert.equal(r.consumption.iron, iron)
+  validateWorld(w)
+})
+
 test('fleet manifests drop armies that have dispersed before the naval phase', () => {
   const { w, r, f } = fleetWorld(),
     a = w.armies.find((a) => a.nation === r.nation)!

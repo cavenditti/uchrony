@@ -1,10 +1,11 @@
+import { matchCommuters } from './commuting'
 import { MODEL_PARAMETERS as P } from './model-parameters'
 import { economicRegions } from './local-units'
 import { tradeDistricts } from './district-transport'
 import { marketStore } from './national-accounts'
 import { ensureEconomy, balance, producerAccount, publicGoods } from './ledger'
 import { finishProduction, consumeHouseholds, recordTrade } from './macroeconomy'
-import { ensureFirms, produceFirms } from './firms'
+import { ensureFirms, hireFirms, produceFirms } from './firms'
 import { MinHeap } from './heap'
 import { seaPassageView } from './naval-control'
 import {
@@ -100,10 +101,17 @@ export function reserveTarget(r: Region, good: Good) {
 
 export function produce(world: World) {
   ensureFirms(world)
+  if (world.adaptive) {
+    world.adaptive.commuting = []
+    world.adaptive.commutingRows = []
+    world.adaptive.commuteRoutes = {}
+    for (const r of economicRegions(world)) hireFirms(world, r)
+    matchCommuters(world)
+  }
   for (const r of economicRegions(world)) {
     for (const g of GOODS) if (!r.prices[g]) r.prices[g] = BASE_PRICE[g]
     r.migration = 0
-    produceFirms(world, r)
+    produceFirms(world, r, !!world.adaptive)
     finishProduction(world, r)
   }
 }

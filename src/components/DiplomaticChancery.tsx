@@ -214,6 +214,7 @@ export function DiplomaticChancery({
               {dateLabel({ month: offer.notBefore, startYear: world.startYear })}, subject to consent.
             </p>
           )}
+          {offer.status === 'proposed' && offer.nativeReview && <p className="panel-note">{offer.nativeReview}</p>}
           {!!offer.supersedes && (
             <p className="agreement-relationship">
               Revises <AgreementReference {...referenceProps} id={offer.supersedes} />

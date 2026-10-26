@@ -211,13 +211,36 @@ test('paused-world advice schedules a cheap review without bypassing rate limits
     },
   }
   Object.defineProperty(globalThis, 'self', { value: worker, configurable: true })
+  const policy = {
+    instance: 'adviser-test',
+    enabled: true,
+    forcedOff: false,
+    generation: 1,
+    dispatched: 0,
+    cancelled: 0,
+    active: 0,
+  }
+  const priorEvents = Object.getOwnPropertyDescriptor(globalThis, 'EventSource')
+  Object.defineProperty(globalThis, 'EventSource', {
+    configurable: true,
+    value: class {
+      onmessage = null
+      onerror = null
+    },
+  })
+  t.after(() => {
+    if (priorEvents) Object.defineProperty(globalThis, 'EventSource', priorEvents)
+    else Reflect.deleteProperty(globalThis, 'EventSource')
+  })
   t.mock.method(Date, 'now', () => wall)
   t.mock.method(globalThis, 'setInterval', ((fn: () => void) => {
     pulse = fn
     return 0
   }) as typeof setInterval)
   t.mock.method(globalThis, 'fetch', (async (url: string, options?: RequestInit) => {
-    if (url === '/api/history/status') return new Response(JSON.stringify({ configured }))
+    if (url === '/api/history/status')
+      return Response.json({ configured, policy: { ...policy, enabled: configured } })
+    if (url === '/api/history/policy') return Response.json(policy)
     assert.equal(url, '/api/statecraft/decision', 'ordinary suggestions use the cheap decision pass')
     const { context } = JSON.parse(options!.body as string)
     return new Promise<Response>((finish, reject) => {
@@ -237,6 +260,8 @@ test('paused-world advice schedules a cheap review without bypassing rate limits
       new Response(
         JSON.stringify({
           model: 'mock-decision',
+          policyGeneration: policy.generation,
+          policyInstance: policy.instance,
           proposal: plan([{ advice: id, response: 'I will weigh the costs before deciding.' }]),
         }),
       ),

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Uchrony native replay qualification</title>
+  </head>
+  <body>
+    <h1>Native replay without rendering or inspection</h1>
+    <label>Starting checkpoint <input id="checkpoint" type="file" accept=".json" /></label>
+    <label>Final month <input id="end" type="number" value="49" /></label>
+    <button id="start">Run native replay</button>
+    <pre id="status">Choose an exported world.</pre>
+    <div id="downloads"></div>
+    <script type="module" src="./native-replay.ts"></script>
+  </body>
+</html>

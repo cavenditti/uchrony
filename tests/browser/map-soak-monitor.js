@@ -17,6 +17,7 @@ const counters = {
   frames: 0,
   over100ms: 0,
   over1000ms: 0,
+  inspections: 0,
 }
 const world = { month: null, cells: 0, states: 0, regions: 0, routes: 0, cohorts: 0 }
 const gpu = {}
@@ -79,6 +80,7 @@ window.Worker = class extends NativeWorker {
         world.routes = data.world.routes?.length ?? world.routes
         lastWorldAt = performance.now()
       } else if (data.type === 'error') recordError('simulation', data.message)
+      if (data.type === 'inspection') counters.inspections++
       if (data.type === 'storage' && data.state === 'saved') {
         counters.saves++
         savedMonth = data.month

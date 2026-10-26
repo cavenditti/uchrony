@@ -12,8 +12,8 @@ import { validateWorld } from '../src/sim/persistence'
 
 const people = (w: World) =>
   w.regions.reduce((s, r) => s + population(r), 0) + allForces(w).reduce((s, a) => s + a.soldiers, 0)
-function ready(seed: string) {
-  const w = generateWorld(seed)
+function ready(seed: string, nations = 8) {
+  const w = generateWorld(seed, 3, nations)
   ensureStatecraft(w)
   for (const n of w.nations) {
     n.ai = false
@@ -123,7 +123,7 @@ test('ungarrisoned conquest preserves local allegiances and raises resistance ra
 
 test('exposed small AI states form a multilateral defense league without manufacturing a human government’s consent', () => {
   // This seed has the three exposed neighbors required by the coalition fixture.
-  const w = ready('survival-league-0')
+  const w = ready('survival-league-0', 16)
   const exposure = (nation: number) => [
     ...new Set(
       w.regions

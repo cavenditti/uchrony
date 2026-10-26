@@ -1,3 +1,4 @@
+import { StringTable } from './string-table'
 import { HEX, edgeNeighbors } from '../sim/hex'
 import type { Cell } from '../sim/types'
 
@@ -29,7 +30,7 @@ export function buildGeometry(
   height: number,
   regionCount: number,
 ): MapGeometry {
-  const vertices = new Map<string, Point>()
+  const vertices = new StringTable<Point>()
   const vertex = (x: number, y: number) => {
     const id = key(x, y)
     if (!vertices.has(id)) {
@@ -67,7 +68,8 @@ export function buildGeometry(
       }
     }
   const trace = (segments: Segment[]): Ring[] => {
-    const outgoing = new Map(segments.map((s) => [s.from, s]))
+    const outgoing = new StringTable<Segment>()
+    for (const segment of segments) outgoing.set(segment.from, segment)
     const rings: Ring[] = []
     while (outgoing.size) {
       const start = outgoing.values().next().value!,

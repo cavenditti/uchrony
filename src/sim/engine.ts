@@ -1,3 +1,7 @@
+import { arriveFreight } from './freight-transit'
+import { ensureAdaptiveWorld, syncSites, rebuildAdaptiveMesh, refreshAdaptiveTotals } from './adaptive-world'
+import { reviewAdministration, reconcileJurisdictionSovereignty } from './jurisdictions'
+import { advanceLandUse } from './land-use'
 import { MODEL_PARAMETERS } from './model-parameters'
 import { realService, nationalRealService } from './public-services'
 import { economicRegions, provinceId } from './local-units'
@@ -5,11 +9,10 @@ import {
   ensureDistrictEconomy,
   linkDistrictPeople,
   aggregateDistricts,
-  remeshDistricts,
   refreshEndowment,
 } from './districts'
 import { evolveCities } from './cities'
-import { refreshSpatial, buildSpatial } from './spatial'
+import { refreshSpatial } from './spatial'
 import { inventoryFlow, marketStore, recordUse, reconcileGDP } from './national-accounts'
 import { beginEconomyMonth, fundGovernment, finishEconomyMonth } from './macroeconomy'
 import { publicExpense } from './ledger'
@@ -518,8 +521,7 @@ export function tick(w: World): World {
   const converting = !w.localEconomy
   ensureDistrictEconomy(w)
   if (converting) evolveCities(w, true)
-  const proposed = buildSpatial(w)
-  remeshDistricts(w, proposed.districts)
+  ensureAdaptiveWorld(w)
   w.month++
   w.totals.births = 0
   w.totals.deaths = 0
@@ -527,6 +529,7 @@ export function tick(w: World): World {
   ensureWarfare(w)
   beginPopulationMonth(w)
   beginEconomyMonth(w)
+  arriveFreight(w)
   aggregateDistricts(w)
   worldEvents(w)
   advanceHistory(w)
@@ -554,9 +557,16 @@ export function tick(w: World): World {
   reinforceArmies(w)
   advanceSovereignty(w)
   linkDistrictPeople(w)
+  reconcileJurisdictionSovereignty(w)
+  reviewAdministration(w)
+  advanceLandUse(w)
   finishEconomyMonth(w)
+  if (w.adaptive?.transit) w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
   evolveCities(w)
   aggregateDistricts(w)
+  syncSites(w)
+  if (w.month % 6 === 0) rebuildAdaptiveMesh(w)
+  else refreshAdaptiveTotals(w)
   summarize(w)
   refreshSpatial(w)
   return w

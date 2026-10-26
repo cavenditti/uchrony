@@ -54,6 +54,8 @@ export interface DistrictEconomy {
   cities: City[]
   nextCity: number
   shipments: DistrictShipment[]
+  /** Exact UI-only throughput; canonical shipment paths remain in the simulation and saves. */
+  shipmentTotals?: Record<number, { arriving: number; leaving: number }>
   revision: number
   lastRemesh: number
   provinceSignals?: Record<

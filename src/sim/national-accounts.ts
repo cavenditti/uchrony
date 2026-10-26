@@ -53,6 +53,11 @@ function businessRegion(w: World, account: string) {
 function currentStore(w: World, key: string) {
   const [kind, text] = key.split(':'),
     id = Number(text)
+  if (kind === 'transit') {
+    const shipment = w.adaptive?.transit?.find((s) => s.id === id)
+    if (!shipment) return undefined
+    return { region: shipment.to, nation: economicNation(w, shipment.to), owner: shipment.owner, government: false, quantity: shipment.goods, prices: economicRegion(w, shipment.to).prices }
+  }
   if (kind === 'market') {
     const r = economicRegion(w, id)
     return {
@@ -127,6 +132,7 @@ export function beginNationalAccounts(w: World) {
     businesses: {},
     stores: {},
   }
+  for (const shipment of w.adaptive?.transit ?? []) addStore(w, `transit:${shipment.id}`)
   for (const r of economicRegions(w)) addStore(w, marketStore(r.id))
   for (const f of w.economy!.firms ?? []) addStore(w, firmStore(f.id))
   for (const a of w.armies) addStore(w, armyStore(a.id))

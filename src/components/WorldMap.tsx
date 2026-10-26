@@ -1,3 +1,5 @@
+import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
+import type { SpatialBounds } from '../sim/adaptive-types'
 import { districtDensityScale, spatialState, type Settlement } from '../sim/spatial'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -42,6 +44,9 @@ interface Props {
   showArmies: boolean
   running: boolean
   focus: { region: number; key: number; nation?: number; settlement?: string } | null
+  onInspectDaily?: (cell: number) => void
+  onInspectArea?: (bounds: SpatialBounds) => void
+  onInspectionViewport?: (bounds: SpatialBounds) => void
   onSelect: (region: number) => void
   onLayer: (layer: Layer) => void
   onInspect: (region: number, section: Tab) => void
@@ -74,6 +79,9 @@ export function WorldMap({
   running,
   focus,
   onSelect,
+  onInspectDaily,
+  onInspectArea,
+  onInspectionViewport,
   onLayer,
   onInspect,
   onClear,
@@ -176,6 +184,24 @@ export function WorldMap({
   const resizeMetrics = useRef({ fit, mapW, mapH, verticalFactor })
   resizeMetrics.current = { fit, mapW, mapH, verticalFactor }
   const reset = useCallback(() => setView({ zoom: 1, x: 0, y: 0 }), [])
+  const inspectionViewport = useRef(onInspectionViewport)
+  inspectionViewport.current = onInspectionViewport
+  const inspecting = !!onInspectionViewport
+  const inspectionBounds = () => {
+    const center = isRelief ? reliefRef.current?.locate(size.w / 2, size.h / 2) : undefined
+    const meters = world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT
+    const x = (center?.x ?? mapW / 2 - view.x / scale) * meters
+    const y = (center?.y ?? mapH / 2 - view.y / (scale * verticalFactor)) * meters
+    const span = Math.min(12000, Math.max(500, Math.min(size.w, size.h) / scale * meters))
+    return { x: x - span / 2, y: y - span / 2, size: span }
+  }
+  useEffect(() => {
+    if (!inspecting) return
+    const timer = setTimeout(() => {
+      inspectionViewport.current?.(inspectionBounds())
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [inspecting, view, size, scale, isRelief, verticalFactor, mapKey])
 
   useEffect(() => {
     const holder = holderRef.current
@@ -877,9 +903,14 @@ export function WorldMap({
       )}
       <div className="map-scale">
         <span />
-        <small>{Math.round(((65 / scale) * 4) / 10) * 10} km</small>
+        <small>{((65 / scale) * (world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT) / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} km</small>
       </div>
       <div className="map-view-switch" role="group" aria-label="Map presentation">
+        {world.adaptive && onInspectArea && (
+          <button aria-label="Inspect daily life" title="Inspect this area's recorded homes, jobs and daily activity" onClick={() => onInspectArea(inspectionBounds())}>
+            <ScanSearch size={15} /> Inspect
+          </button>
+        )}
         <button
           aria-pressed={presentation === 'relief'}
           disabled={reliefError || reliefReady !== mapKey}
@@ -914,6 +945,7 @@ export function WorldMap({
       {closeCity && (
         <div className="city-view-caption" aria-label="City view">
           <h2>{closeCity.name}</h2>
+          {world.adaptive && onInspectDaily && <button onClick={() => { exploreCity(closeCity); onInspectDaily(closeCity.cell) }}>Inspect daily life</button>}
           <p>
             {compact(closeCity.population)} people ·{' '}
             {closeCity.capital

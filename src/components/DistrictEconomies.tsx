@@ -17,6 +17,12 @@ export function DistrictEconomies({ world, province }: { world: World; province:
         Local markets and district populations initialize on the first monthly step.
       </p>
     )
+  if (world.viewOnly && world.viewNation !== undefined && world.viewNation !== world.regions[province].nation)
+    return (
+      <p className="panel-note" role="status">
+        Loading this district's economic accounts…
+      </p>
+    )
   const units = local.active
     .map((id) => local.units[id])
     .filter((u) => u.province === province)
@@ -36,18 +42,22 @@ export function DistrictEconomies({ world, province }: { world: World; province:
     economy.producers[unit.id].cash +
     STRATA.reduce((sum, s) => sum + economy.households[unit.id][s].cash, 0) +
     firms.reduce((sum, f) => sum + f.cash, 0)
-  const arriving = local.shipments.filter((s) => s.to === unit.id).reduce((sum, s) => sum + s.quantity, 0)
-  const leaving = local.shipments.filter((s) => s.from === unit.id).reduce((sum, s) => sum + s.quantity, 0)
+  const arriving =
+    local.shipmentTotals?.[unit.id]?.arriving ??
+    local.shipments.filter((s) => s.to === unit.id).reduce((sum, s) => sum + s.quantity, 0)
+  const leaving =
+    local.shipmentTotals?.[unit.id]?.leaving ??
+    local.shipments.filter((s) => s.from === unit.id).reduce((sum, s) => sum + s.quantity, 0)
   const city = local.cities.find(
     (c) => c.absorbedBy === undefined && c.cells.some((id) => unit.cells.includes(id)),
   )
   return (
     <details className="district-economies">
       <summary>
-        Local districts <span>{units.length} resident markets</span>
+        Local markets <span>{units.length} resident catchments</span>
       </summary>
       <label className="district-selector">
-        Inspect a district
+        Inspect a local market
         <select value={unit.id} onChange={(event) => setSelection(Number(event.target.value))}>
           {units.map((u) => (
             <option key={u.id} value={u.id}>
@@ -59,7 +69,10 @@ export function DistrictEconomies({ world, province }: { world: World; province:
       <p className="panel-note">
         {unit.activity[0].toUpperCase() + unit.activity.slice(1)} district across {unit.cells.length} terrain{' '}
         {unit.cells.length === 1 ? 'cell' : 'cells'}.{' '}
-        {unit.id === province ? 'Contains the provincial administrative depot.' : ''}
+        {unit.id === province ? 'Contains the established regional depot.' : ''}
+        {world.adaptive
+          ? ' Economic accounts continue across changes to municipal and provincial borders.'
+          : ''}
       </p>
       <dl className="stratum-accounts">
         <div>

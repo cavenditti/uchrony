@@ -14,22 +14,31 @@ function checked(record: WorldSave) {
   return { ...record, world: restoreWorld(record.world) }
 }
 export async function restoreSave(backends: SaveBackend[], legacy: string | null): Promise<RestoredSave> {
-  const reads = await Promise.allSettled(
-    backends.map(async (backend) => {
-      const record = await backend.read()
-      return record ? checked(record) : null
-    }),
-  )
+  // Read encoded replicas together, but never expand two complete worlds just to
+  // choose a timestamp. Invalid newer copies still fall back to an older one.
+  const reads = await Promise.allSettled(backends.map((backend) => backend.read()))
+  let invalid = reads.some((result) => result.status === 'rejected')
   const candidates = reads
     .flatMap((result, index) =>
       result.status === 'fulfilled' && result.value
         ? [{ record: result.value, source: backends[index].name }]
         : [],
     )
+    .filter(({ record }) => {
+      const valid = record.version === 1 && Number.isSafeInteger(record.savedAt) && record.savedAt >= 0
+      invalid ||= !valid
+      return valid
+    })
     .sort((a, b) => b.record.savedAt - a.record.savedAt)
-  if (candidates.length) return { world: candidates[0].record.world, source: candidates[0].source }
+  for (const candidate of candidates) {
+    try {
+      return { world: checked(candidate.record).world, source: candidate.source }
+    } catch {
+      invalid = true
+    }
+  }
   if (legacy) return { world: parseSave(legacy), source: 'legacy' }
-  if (reads.some((result) => result.status === 'rejected'))
+  if (invalid)
     throw new Error(
       'Your saved world could not be checked. Existing saves have been kept. Retry restoring before starting a new world.',
     )

@@ -13,6 +13,7 @@ export type CityBuilding = CityPoint & {
   angle: number
   roof: 'gable' | 'hip' | 'flat'
   tone: number
+  representedCapacity?: number
 }
 export type CityDescription = {
   id: string
@@ -25,6 +26,8 @@ export type CityDescription = {
   kind: Settlement['kind']
   capital: boolean
   style: number
+  capacity?: number
+  civic?: boolean
 }
 export type CityLayout = {
   city: CityDescription
@@ -40,10 +43,12 @@ export type CityLayout = {
   angle: number
 }
 
+const homeCapacity = new WeakMap<NonNullable<World['viewHomes']>, Float64Array>()
+
 /** Stable visual identities do not depend on district IDs or monthly population totals. */
 export function describeCity(
-  world: Pick<World, 'seed' | 'cells' | 'regions'>,
-  site: Settlement,
+  world: Pick<World, 'seed' | 'cells' | 'regions'> & Partial<Pick<World, 'adaptive' | 'viewHomes'>>,
+  site: Settlement & { capacity?: number },
 ): CityDescription {
   const cell = world.cells[site.cell],
     seed = hashSeed(`${world.seed}:townscape:1:${site.id}`)
@@ -51,12 +56,20 @@ export function describeCity(
     cell.terrain === 'desert'
       ? 2
       : hashSeed(`${world.seed}:architecture:${world.regions[site.region]?.culture ?? 0}`) % 4
-  const radius =
+  let capacities = world.viewHomes && homeCapacity.get(world.viewHomes)
+  if (world.viewHomes && !capacities) {
+    capacities = new Float64Array(world.cells.length).fill(NaN)
+    for (const home of world.viewHomes) capacities[home.cell] = home.capacity
+    homeCapacity.set(world.viewHomes, capacities)
+  }
+  const recorded = capacities?.[site.cell]
+  const capacity = site.capacity ?? (recorded !== undefined && !Number.isNaN(recorded) ? recorded : world.adaptive?.sites[`home:${site.cell}`]?.capacity)
+  const radius = capacity !== undefined ? Math.min(8.2, Math.max(0.8, Math.sqrt(capacity * 40 / Math.PI) / world.adaptive!.metersPerMapUnit)) :
     (site.kind === 'city' ? 15 : site.kind === 'town' ? 10 : 5.5) * (0.92 + reliefRandom(seed) * 0.16)
   return {
     id: site.id,
     cell: site.cell,
-    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${style}`,
+    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${style}:${Math.round(capacity ?? 0)}`,
     x: cell.x,
     z: cell.y,
     radius,
@@ -64,6 +77,7 @@ export function describeCity(
     kind: site.kind,
     capital: site.capital,
     style,
+    capacity,
   }
 }
 const distanceTo = (p: CityPoint, a: CityPoint, b: CityPoint) => {
@@ -443,6 +457,7 @@ export function cityLayout(
       continue
     gardens.push({ ...p, width, depth, angle: -angle })
   }
+  if (city.capacity !== undefined && buildings.length) for (const building of buildings) building.representedCapacity = city.capacity / buildings.length
   return {
     city,
     pattern,

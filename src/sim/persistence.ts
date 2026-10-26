@@ -1,3 +1,4 @@
+import { validateAdaptiveWorld } from './adaptive-persistence'
 import { unpackWorldSave } from './save-codec'
 import { validateDistrictEconomy } from './district-persistence'
 import { validateEconomy } from './economic-persistence'
@@ -310,7 +311,11 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     }
     if (last !== toCell) fail('freight endpoints do not match shipment')
   }
-  if (!Array.isArray(w.routes) || w.routes.length > 20000) fail('invalid routes')
+  // Published routes summarize directed geographical-region pairs. Large worlds
+  // can legitimately exceed the old fixed 20,000-route limit; file-size and
+  // per-route geometry checks still bound and validate their representation.
+  if (!Array.isArray(w.routes) || w.routes.length > w.regions.length * (w.regions.length - 1))
+    fail('invalid routes')
   for (const r of w.routes) {
     if (
       !object(r) ||
@@ -490,6 +495,11 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   validateDistrictEconomy(w)
   validateEconomy(w)
   validateSpatial(w)
+  validateAdaptiveWorld(w)
+  if (w.modelProvenance) {
+    const p = w.modelProvenance
+    if (!Number.isSafeInteger(p.accepted) || p.accepted < 0 || !number(p.lastMonth, 0, w.month) || !object(p.roles) || Object.values(p.roles).some((n) => !Number.isSafeInteger(n) || n < 0) || !['native', 'model-assisted', 'legacy-unknown'].includes(p.source)) fail('invalid model provenance')
+  }
   return w
 }
 

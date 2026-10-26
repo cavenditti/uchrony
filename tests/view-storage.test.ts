@@ -1,3 +1,5 @@
+import { describeCity } from '../src/map/city-layout'
+import { spatialState } from '../src/sim/spatial'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
@@ -21,6 +23,102 @@ import { ByteStorageClient } from '../src/storage/byte-client'
 
 const world = generateWorld('View and save fidelity', 3, 8, undefined, 'regional')
 tick(world)
+
+test('display projection keeps exact balances, debts, stocks, strata and shipment totals without work ledgers', () => {
+  const before = JSON.stringify(world),
+    view = viewSnapshot(world)
+  const original = world.economy!,
+    shown = view.economy!
+  assert.deepEqual(shown.households, original.households)
+  assert.deepEqual(shown.credit, original.credit)
+  assert.deepEqual(shown.banking, original.banking)
+  assert.deepEqual(shown.accounts!.nations, original.accounts!.nations)
+  assert.deepEqual(shown.accounts!.world, original.accounts!.world)
+  assert.equal(shown.ledger.discrepancy, original.ledger.discrepancy)
+  assert.equal(shown.ledger.entries.length, 0)
+  assert.deepEqual(shown.accounts!.stores, {})
+  for (const firm of original.firms!) {
+    const display = shown.firms!.find((f) => f.id === firm.id)!
+    for (const key of ['cash', 'stocks', 'employment', 'wage', 'profit', 'markup', 'active'] as const)
+      assert.deepEqual(display[key], firm[key])
+  }
+  for (const unit of Object.values(world.localEconomy!.units)) {
+    const display = view.localEconomy!.units[unit.id]
+    const groups = world.regions[unit.province].communities!.filter(
+      (g) => (g.locality ?? unit.province) === unit.id,
+    )
+    assert.deepEqual(display.strataCounts, censusOf({ communities: groups }, world.month).strata)
+    assert.deepEqual(display.population, unit.population)
+    assert.deepEqual(display.stocks, unit.stocks)
+    assert.equal(shown.producers[unit.id].cash, original.producers[unit.id].cash)
+    for (const [key, endpoint] of [
+      ['arriving', 'to'],
+      ['leaving', 'from'],
+    ] as const) {
+      const expected = world
+        .localEconomy!.shipments.filter((s) => s[endpoint] === unit.id)
+        .reduce((sum, s) => sum + s.quantity, 0)
+      assert.equal(view.localEconomy!.shipmentTotals?.[unit.id]?.[key] ?? 0, expected)
+    }
+    assert.equal(display.census, undefined)
+  }
+  assert.equal(view.localEconomy!.shipments.length, 0)
+  // Shared work buffers do not become one fresh object per enterprise in transit.
+  const cloned = structuredClone(view)
+  assert.equal(cloned.economy!.firms![0].forecast, cloned.economy!.firms![1].forecast)
+  assert.equal(JSON.stringify(world), before)
+  assert.throws(() => restoreWorld(view), /display snapshot/)
+})
+
+test('dossier subscriptions preserve exact selected accounts and global bank totals without retaining other accounts', () => {
+  const before = JSON.stringify(world),
+    all = viewSnapshot(world),
+    overview = viewSnapshot(world, null)
+  assert.equal(overview.viewNation, null)
+  assert.deepEqual(overview.economy!.households, {})
+  assert.deepEqual(overview.economy!.producers, {})
+  assert.deepEqual(overview.economy!.firms, [])
+  assert.deepEqual(overview.economy!.banking!.accounts, {})
+  assert.deepEqual(overview.spatial, all.spatial)
+  assert.deepEqual(overview.adaptive, all.adaptive)
+  for (const nation of world.nations) {
+    const view = viewSnapshot(world, nation.id),
+      e = view.economy!
+    assert.equal(view.viewNation, nation.id)
+    assert.deepEqual(e.national, world.economy!.national)
+    assert.deepEqual(e.accounts!.nations, world.economy!.accounts!.nations)
+    const places = Object.values(world.localEconomy!.units).filter((u) => u.nation === nation.id)
+    assert.deepEqual(
+      Object.keys(e.households),
+      places.map((u) => String(u.id)),
+    )
+    for (const place of places) {
+      assert.deepEqual(e.households[place.id], world.economy!.households[place.id])
+      assert.deepEqual(e.producers[place.id], all.economy!.producers[place.id])
+      assert.deepEqual(view.localEconomy!.units[place.id], all.localEconomy!.units[place.id])
+    }
+    for (const firm of e.firms!)
+      assert.deepEqual(
+        firm,
+        all.economy!.firms!.find((f) => f.id === firm.id),
+      )
+    for (const bank of world.economy!.banking!.banks) {
+      assert.equal(
+        view.viewBankLoans![bank.id] ?? 0,
+        world
+          .economy!.credit.loans.filter((loan) => loan.bank === bank.id)
+          .reduce((sum, loan) => sum + loan.principal, 0),
+      )
+    }
+    for (const unit of Object.values(world.localEconomy!.units)) {
+      const shown = view.localEconomy!.units[unit.id]
+      for (const key of ['population', 'residents', 'cells', 'foodCoverage', 'happiness'] as const)
+        assert.deepEqual(shown[key], unit[key])
+    }
+  }
+  assert.equal(JSON.stringify(world), before)
+  assert.throws(() => worldBlob({ ...overview, cells: world.cells }), /display snapshot/)
+})
 
 test('compact census preserves identities, strata, ages, fluency and top communities', () => {
   const before = JSON.stringify(world),
@@ -92,6 +190,47 @@ test('byte snapshots preserve the complete canonical world at capture time', asy
   assert.equal(record.savedAt, savedAt)
   assert.equal(JSON.stringify(restoreWorld(record.world)), expected)
   world.month = old
+})
+
+test('nested save sections use bounded temporary strings with byte-exact JSON and Unicode', async () => {
+  const fixture = {
+    version: 1,
+    nested: { rows: Array.from({ length: 16000 }, (_, i) => ({ id: i, text: 'a'.repeat(512) })) },
+    text: 'x'.repeat(65535) + '🌍' + '\ud800' + '\n'.repeat(65536),
+    omitted: undefined,
+    sparse: [, { nested: ['present'] }, undefined],
+    values: [undefined, null, -0, NaN, Infinity, '\udc00'],
+  }
+  const stringify = JSON.stringify,
+    expected = stringify(fixture)
+  let largest = 0,
+    mostStringParts = 0,
+    blob: Blob
+  const NativeBlob = globalThis.Blob
+  globalThis.Blob = class extends NativeBlob {
+    constructor(parts: BlobPart[] = [], options?: BlobPropertyBag) {
+      mostStringParts = Math.max(mostStringParts, parts.filter((p) => typeof p === 'string').length)
+      super(parts, options)
+    }
+  }
+  JSON.stringify = ((...args: Parameters<typeof JSON.stringify>) => {
+    const encoded = stringify(...args)
+    largest = Math.max(largest, encoded?.length ?? 0)
+    return encoded
+  }) as typeof JSON.stringify
+  try {
+    blob = worldBlob(fixture as unknown as import('../src/sim/types').World)
+  } finally {
+    JSON.stringify = stringify
+    globalThis.Blob = NativeBlob
+  }
+  assert.equal(await blob!.text(), expected)
+  assert.equal(
+    mostStringParts,
+    1,
+    'Each chunk must use one backing string rather than thousands of Blob segments',
+  )
+  assert(largest < 1024 * 1024, `Temporary JSON string grew to ${largest} characters`)
 })
 
 test('UI backpressure coalesces worlds without dropping command acknowledgements', () => {
@@ -241,4 +380,20 @@ test('save I/O uses a private byte channel and recovers after a writer disconnec
   await client.backend('browser').writeBlob!(new Blob(['retry']))
   client.disconnect()
   replacement.port2.close()
+})
+
+test('lean residential display records preserve every recorded capacity and town description', () => {
+  const before = JSON.stringify(world),
+    projected = viewSnapshot(world, null)
+  const view = { ...projected, cells: world.cells }
+  const homes = Object.values(world.adaptive!.sites).filter((s) => s.kind === 'residential')
+  assert.equal(view.viewHomes!.length, homes.length)
+  assert.deepEqual(
+    view.viewHomes,
+    homes.map(({ id, cell, pool, capacity }) => ({ id, cell, pool, capacity })),
+  )
+  assert.deepEqual(view.adaptive!.sites, {})
+  for (const settlement of spatialState(world).settlements)
+    assert.deepEqual(describeCity(view, settlement), describeCity(world, settlement))
+  assert.equal(JSON.stringify(world), before)
 })

@@ -71,6 +71,8 @@ export interface Region {
   nation: number
   culture: number
   census?: PopulationCensus
+  /** UI-only local-market breakdown; full identity/age censuses are published by geographical region. */
+  strataCounts?: Partial<Record<import('./economic-types').EconomicStratum, number>>
   communities?: PopulationCommunity[]
   populationDynamics?: PopulationDynamics
   center: number
@@ -239,9 +241,16 @@ export interface HistoryPoint {
   nations: { id: number; population: number; gdp: number; territory: number; treasury: number }[]
 }
 export interface World {
+  adaptive?: import('./adaptive-types').AdaptiveWorld
+  modelProvenance?: import('./llm-policy').ModelProvenance
   localEconomy?: import('./district-types').DistrictEconomy
   spatial?: import('./spatial').SpatialState
   viewOnly?: true
+  /** UI subscription only. Undefined publishes all details; null publishes summaries. */
+  viewNation?: number | null
+  viewBankLoans?: Record<number, number>
+  /** Compact display records; avoids cloning a giant string-keyed site registry. */
+  viewHomes?: { id: string; cell: number; pool: number; capacity: number }[]
   economy?: EconomicSystem
   version: 1
   simulation?: SimulationSettings
@@ -332,6 +341,9 @@ export type Command =
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }
 export type WorkerRequest =
+  | { type: 'view-focus'; nation: number | null }
+  | { type: 'inspect'; request: import('./inspection').InspectionRequest }
+  | { type: 'llm-policy'; enabled: boolean }
   | {
       type: 'generate'
       seed: string
@@ -357,6 +369,9 @@ export type WorkerRequest =
   | { type: 'agent-strategy'; nation: number }
   | { type: 'event-details'; event: number }
 export type WorkerResponse =
+  | { type: 'inspection'; snapshot: import('./inspection').InspectionSnapshot }
+  | { type: 'inspection-error'; request: number; message: string }
+  | { type: 'llm-policy'; policy: import('./llm-policy').LlmPolicySnapshot }
   | {
       type: 'storage'
       state: 'saving' | 'saved' | 'error' | 'restored'

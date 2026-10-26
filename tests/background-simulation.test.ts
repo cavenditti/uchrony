@@ -29,9 +29,32 @@ test('pending external requests never gate months, local events or worker playba
   }
   const originalSelf = Object.getOwnPropertyDescriptor(globalThis, 'self')
   Object.defineProperty(globalThis, 'self', { value: worker, configurable: true })
+  const policy = {
+    instance: 'background-test',
+    enabled: true,
+    forcedOff: false,
+    generation: 1,
+    dispatched: 0,
+    cancelled: 0,
+    active: 0,
+  }
+  const priorEvents = Object.getOwnPropertyDescriptor(globalThis, 'EventSource')
+  Object.defineProperty(globalThis, 'EventSource', {
+    configurable: true,
+    value: class {
+      onmessage = null
+      onerror = null
+    },
+  })
+  t.after(() => {
+    if (priorEvents) Object.defineProperty(globalThis, 'EventSource', priorEvents)
+    else Reflect.deleteProperty(globalThis, 'EventSource')
+  })
   t.mock.method(globalThis, 'setInterval', (() => 0) as typeof setInterval)
   t.mock.method(globalThis, 'fetch', (async (url: string, options?: RequestInit) => {
-    if (url === '/api/history/status') return new Response(JSON.stringify({ configured }))
+    if (url === '/api/history/status')
+      return Response.json({ configured, policy: { ...policy, enabled: configured } })
+    if (url === '/api/history/policy') return Response.json(policy)
     requests.push(url)
     return new Promise((_resolve, reject) => {
       options?.signal?.addEventListener('abort', () => reject(new Error('Aborted')), { once: true })

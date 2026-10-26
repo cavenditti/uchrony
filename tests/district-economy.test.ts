@@ -403,9 +403,10 @@ test('simultaneous migration carries original debts and beneficial ownership wit
   auditLedger(w)
 })
 
-test('empty retired accounts archive only after every asset and claim has transferred', () => {
+test('legacy retired accounts archive only after every asset and claim has transferred', () => {
   const w = generateWorld('District archive')
-  tick(w)
+  ensureDistrictEconomy(w)
+  ensureFirms(w)
   remeshDistricts(w, coarse(w))
   const before = assets(w)
   archiveRetiredDistricts(w)
