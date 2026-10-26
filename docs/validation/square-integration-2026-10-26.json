@@ -1,0 +1,537 @@
+{
+  "date": "2026-10-26",
+  "topology": "square-v1",
+  "generatorVersion": 5,
+  "status": "local, uncommitted; previous unrelated changes retained",
+  "scope": "Square topology and adaptive-grid integration; existing river-generation method and curved rendering retained.",
+  "currentSimSha256": "118ba721195df829d9ce870f48a44216c4177a032bb43aad3a2a7740fee80c0e",
+  "hashMethod": "sorted src/sim/*.ts: relative path, NUL, file bytes, NUL",
+  "validation": {
+    "productionBuild": "npm run build passed; existing large-chunk advisory remains",
+    "targetedTests": {
+      "distinctPassed": 111,
+      "unresolvedFailures": 0,
+      "tests": {
+        "disk writes validate compressed snapshots without recompressing their bytes": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "a browser quota failure does not prevent a disk save, and the reverse also works": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "restore chooses the newest valid replica and retains the legacy fallback": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "restore expands only the winning replica and falls back after a corrupt newer world": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "unreadable saves do not silently generate a replacement world": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "the save queue serializes writes and coalesces intermediate worlds": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "a replaced world cannot receive stale save-success notifications": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "disk autosaves restore large worlds atomically and recover the previous verified copy": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "the disk endpoint requires same-origin writes and isolates browser save slots": {
+          "passed": true,
+          "log": "uchrony-square-endpoint.log"
+        },
+        "adaptive migration retains a byte-identical original beyond ordinary backup rotations": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "dated census encoding is exact for signed dates, large counts, empty lists and sparse bins": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "packed district exports and disk checkpoints restore an identical continuation": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "bounded economic tables retain all records and key order, read v1 saves and reject forged tables": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "compressed save blocks reject truncation, corrupt bytes and unsafe expansion lengths": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "allegiance convergence reproduces the reported failure and coalesces without dropping people": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "safe recovery merges civilian and military duplicate representations after checking all census totals": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "autosave writes the checked canonical snapshot rather than the rejected duplicate input": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "disk recovery checks original bytes before canonicalizing and preserves the original checkpoint": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "continental settings produce distinct major landmasses, offshore islands, and an ocean frame": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "drainage always descends to the sea, runoff accumulates, and visible rivers do not stop inland": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "provinces remain connected and rendered polygons contain their simulation cell centers": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "geographic cache keys ignore economic changes but reflect different loaded geography": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "zoom holds the geographic point under the cursor fixed, including clamped limits": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "old hex saves are rejected without mutation and malformed square drainage is rejected": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "closed depressions acquire deterministic, descending outlets without losing runoff or moving the ocean": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "largest-map regression: drainage branches instead of hundreds of long grid canals": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "an all-ocean map remains valid and a land-only input fails explicitly": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "bounded map lookups retain exact coastline geometry and freight traversal order": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "sharded string lookups preserve insertion order through replacement and deletion at atlas scale": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "world scale adds physical distance, connected provinces, independent states and a sparse navigable shipping network": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "continental generation supports many states and legacy regional saves retain their dimensions": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "the atlas can zoom from the full world to individual settlements": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "manual recruitment is immediately saveable, before the next simulation month": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "saves from the recruitment bug recover missing operations without inventing supplies or changing people": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "only machine roundoff at military bounds is recoverable; real negatives and dangling transports fail": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "naval repairs consume exactly the available limiting input despite floating-point roundoff": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "fleet manifests drop armies that have dispersed before the naval phase": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "automatic embarkation eligibility rejects inaccessible ports and insufficient berths": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "an unaffordable allied-port purchase cannot give a fleet negative ammunition": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "recruiting the 501st formation remains saveable and preserves people and military identities": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "a state can rebuild its funded standing cadre after the world passes 500 formations": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "the shared safety boundary rejects oversized saves and blocks recruitment before spending or taking civilians": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "route-summary capacity follows the number of region pairs and retains every recorded shipment": {
+          "passed": true,
+          "log": "uchrony-square-save-scale.log"
+        },
+        "retired hex-world restore reports the new-world requirement without writing either replica": {
+          "passed": true,
+          "log": "uchrony-square-memory-final.log"
+        },
+        "migration and 12 alternating mesh refinements retain every owner, cohort, stock and debt term": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "administrative merger and split are atomic, preserve legal claims and reject annexation or missing land": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "inspection reconstruction, cache loss and repeated zoom cannot mutate authoritative state": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "a representative commute starts at its sampled home and uses its own travel time": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "coarse, fine and adaptive partitioning execute the same retained heterogeneous economic closure": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "commuting totals equal paid enterprise employment; construction and save continuation reconcile": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "untrusted adaptive saves reject parent/child overlap and missing residential ownership": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "saved shipments cannot change ownership or inject negative inventory": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "restoration rejects a rewound jurisdiction sequence before it can overwrite legal succession": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "long freight remains owned inventory in transit and arrives exactly once": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "diagonal sailing charges physical distance and preserves fractional progress through a save": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "physical squares, rendered boundaries and picking agree exactly without row offsets": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "diagonally touching land produces two closed coast rings without losing a boundary": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "diagonal roads cost their physical length and cannot cut across water corners": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "ships take distance-aware diagonal routes but cannot sail between touching land corners": {
+          "passed": true,
+          "log": "uchrony-square-final-regressions.log"
+        },
+        "dynamic cells partition the complete land and water domain conservatively across resolutions": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "shared faces measure physical contact and do not connect land across gaps or water": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "recursive range and nearest search match exhaustive physical queries at every grid resolution": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "square saves require the complete land and water partition": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "membership refresh supports physical sites moving between within-sample leaves without changing root geometry": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "ocean cells refine around fleet activity and coarsen after the dwell period without moving sites": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "within-sample door-to-door travel uses actual meter positions and is independent of numerical cell size": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "equally busy parallel crossings merge physically and remain stable with opposing freight": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "bundling is deterministic under input order and bounds extra travel effort": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "short, distant and inactive lanes stay separate, and clear lanes avoid congestion": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "nearby water lanes cannot merge through a land barrier": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "road bundles honor terrain and cannot use an unrelated province": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "long crossings four and five tiles apart share a trunk without moving ports": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "short parallel roads merge even when fewer than twelve edges can be shared": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "a small parallel fork rejoins an already shared long road": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "several parallel branches converge on one common trunk in the same review": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "long lanes up to eight tiles apart consolidate with bounded detours": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "repeated network cleanup strictly improves its objective without detour growth inside a review": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "district conversion preserves every dated sex cohort, deposit, debt and physical good": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "repeated split/merge cycles preserve claims, equipment, goods, money and GDP with operating firms": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "local resource availability limits output and depletion survives remeshing": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "district transport uses contiguous physical paths and conserves goods during real local trade": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "city footprints join across district borders without transferring people or assets, retaining names": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "district state survives exact save/reload continuation and population accounting": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "provincial interventions use the real depot and keep local populations synchronized": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "local save validation rejects duplicated people, stocks, geography, ownership and claims": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "simultaneous migration carries original debts and beneficial ownership without migrating arrivals again": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "legacy retired accounts archive only after every asset and claim has transferred": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "demobilization and recruitment conserve dated people across immediate district rollups": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "blocked freight cannot originate loans for undeliverable goods": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "dispersed farming density stays rural while neighboring concentrations form a town": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "freight distance labels use the same physical scale as inspection and the map bar": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "sea remains flat; relief is finite outside the field and does not mutate geography": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "the height field is continuous at square row and column boundaries": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "scenery variation is deterministic and bounded without consuming simulation randomness": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "camera-only frames neither resize backing stores nor invalidate overlay textures": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "camera redraws do not bypass the freight upload cadence; new content is immediate": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "bounded terrain picking matches exhaustive raycasting, including slopes, edges and ocean": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "smooth reaches preserve drainage endpoints and tributary joins without mutating geography": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "estuary distance follows drainage through short reaches and tributaries, not nearby inland water": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "forest clusters are deterministic, budgeted and independent of administrative remeshing": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "landscape interpolation is bounded, continuous and reused across administrative changes": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "3D river ribbons follow actual terrain triangles and change visibility without rebuilding": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "young towns share a sparse road backbone with bounded detours and no lost destinations": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "cross-links require developed infrastructure, logistics and real established traffic together": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "civilian access stays symmetric and domestic components survive foreign border closures": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "fresh local markets use the sparse backbone while preserving segment budgets and reachable markets": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "shipping navigates around a headland and cannot connect separated water bodies": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "roads use a low pass, stay within the connected provinces, and share harbor access": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "civilian routes are symmetric while military sea access is checked in each direction": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "shipments use the exact physical network; saved geometry rejects jumps, water roads and broken endpoints": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        },
+        "map corridors aggregate opposing shipments once and focus only relevant freight": {
+          "passed": true,
+          "log": "uchrony-square-final-map-transport.log"
+        }
+      }
+    },
+    "finalBatches": [
+      {
+        "tests": 34,
+        "log": "/private/tmp/uchrony-square-final-regressions.log"
+      },
+      {
+        "tests": 54,
+        "log": "/private/tmp/uchrony-square-final-map-transport.log"
+      }
+    ],
+    "initialFailuresResolved": [
+      "Obsolete hex geometry fingerprint replaced with square-generator fingerprint and independent exact land-area assertion.",
+      "Local disk endpoint test passed when allowed to bind its isolated test server.",
+      "Earlier route fixtures now verify traversability and physical detours with diagonal square movement."
+    ],
+    "sourceTiming": "Tests ran across integration. The final network diagonal sovereignty guard is covered by the coordinated settlement regression and 24-month run. Subsequent corridors.ts and transport.ts edits were formatting only.",
+    "fullSuiteRun": false,
+    "offlineMeshReport": "docs/validation/square-grid-2026-10-26.json",
+    "coordinatedSettlementReport": "docs/validation/urban-density-2026-10-26.json"
+  },
+  "browser": {
+    "isolatedOrigin": "http://127.0.0.1:5196",
+    "worldSeed": "Square integration 2026-10-26",
+    "cells": 129024,
+    "advancedMonth": 1,
+    "restoredMonth": 1,
+    "replicas": [
+      "disk",
+      "browser"
+    ],
+    "saveBytes": 219493772,
+    "viewports": [
+      [
+        1280,
+        577
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "checks": [
+      "new largest world",
+      "advance one month",
+      "capital / rivers / boundaries",
+      "local inspection on desktop and mobile",
+      "save to both replicas",
+      "reload / restore",
+      "old browser save sentinel unchanged",
+      "no horizontal overflow"
+    ],
+    "errors": [],
+    "providerCalls": 0,
+    "evidenceDirectory": "/private/tmp/uchrony-square-browser-20261026",
+    "screenshots": [
+      "final-capital.png",
+      "final-inspection.png",
+      "final-mobile.png",
+      "final-mobile-inspection.png"
+    ],
+    "runtimeEvidence": [
+      "final-browser-evidence.json",
+      "final-restore-evidence.json"
+    ]
+  },
+  "savePolicy": {
+    "newWorldRequired": true,
+    "oldFilesUntouched": true,
+    "diskNamespace": ".uchrony/autosaves/square-v1/",
+    "browserDatabase": "uchrony-square-saves"
+  },
+  "limits": [
+    "Targeted checks are not a full long-duration suite.",
+    "Offline mesh timings are not browser or sustained simulation throughput.",
+    "Terrain samples remain fixed measurements; numerical leaves adapt without inventing terrain or moving ownership."
+  ]
+}

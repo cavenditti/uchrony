@@ -252,7 +252,7 @@ export function autosaveMiddleware(root: string, onError: (error: unknown) => vo
   }
 }
 export function autosaveServer(): Plugin {
-  const middleware = autosaveMiddleware(resolve('.uchrony', 'autosaves'))
+  const middleware = autosaveMiddleware(resolve('.uchrony', 'autosaves', 'square-v1'))
   return {
     name: 'uchrony-local-autosaves',
     configureServer(server) {

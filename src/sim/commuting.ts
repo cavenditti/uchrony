@@ -1,3 +1,4 @@
+import { localWalkingConnection } from './residential-geometry'
 import { recordCommute } from './commute-ledger'
 import { STRATA, type EconomicStratum } from './economic-types'
 import { economicRegions, localFirmRegion } from './local-units'
@@ -8,7 +9,7 @@ import { WAGE_SKILL } from './firms'
 import { cellPosition } from './physical-space'
 import { queryAdaptiveSites } from './adaptive-grid'
 import { syncSites, refreshAdaptiveTotals } from './adaptive-world'
-import { neighbors } from './hex'
+import { movementNeighbors } from './grid'
 import { MinHeap } from './heap'
 import type { World } from './types'
 import type { PhysicalSite } from './adaptive-types'
@@ -52,7 +53,7 @@ export function commuteRoute(w: World, from: number, to: number, limit = 90) {
   }
 }
 
-/** Door-to-door access uses persistent meter positions, including travel inside one source hex.
+/** Door-to-door access uses persistent meter positions, including travel inside one terrain sample.
  * Inter-cell roads remain surveyed physical links; remeshing never adds a free road. */
 export function commuteSiteRoute(
   w: World,
@@ -63,13 +64,36 @@ export function commuteSiteRoute(
   const walk = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     (Math.hypot(a.x - b.x, a.y - b.y) / 1000 / 4) * 60
   if (from.cell === to.cell) {
-    const minutes = walk(from, to)
-    return minutes <= limit ? { minutes, cells: [from.cell], mode: 'walk' as const } : null
+    const route = localWalkingConnection(w, from, to, w.regions[w.cells[from.cell].region]?.nation, [
+      from.cell,
+      to.cell,
+    ])
+    return route && route.minutes <= limit ? route : null
   }
   const access = walk(from, cellPosition(w, from.cell)) + walk(to, cellPosition(w, to.cell))
-  if (access > limit) return null
   const route = commuteRoute(w, from.cell, to.cell, limit)
-  return route && route.minutes + access <= limit ? { ...route, minutes: route.minutes + access } : null
+  const network =
+    route && route.minutes + access <= limit
+      ? {
+          ...route,
+          minutes: route.minutes + access,
+          points: [
+            { x: from.x, y: from.y },
+            ...route.cells.map((id) => cellPosition(w, id)),
+            { x: to.x, y: to.y },
+          ],
+        }
+      : null
+  // Adjacent source cells are a survey reference, not compulsory waypoints for
+  // pedestrians living next to their shared edge.
+  if (movementNeighbors(w.cells, from.cell, w.width, w.height).includes(to.cell)) {
+    const direct = localWalkingConnection(w, from, to, w.regions[w.cells[from.cell].region].nation, [
+      from.cell,
+      to.cell,
+    ])
+    if (direct && direct.minutes <= limit && (!network || direct.minutes < network.minutes)) return direct
+  }
+  return network
 }
 function calculateRoutes(
   w: World,
@@ -89,10 +113,23 @@ function calculateRoutes(
     const current = heap.pop()
     if (current.cost !== distances.get(current.id) || current.cost > limit) continue
     const p = cellPosition(w, current.id)
-    for (const next of neighbors(current.id, w.width, w.height)) {
+    for (const next of movementNeighbors(w.cells, current.id, w.width, w.height)) {
       const cell = w.cells[next],
         region = w.regions[cell.region]
       if (cell.terrain === 'water' || region?.nation !== nation || region.devastation > 0.9) continue
+      const x = current.id % w.width,
+        y = Math.floor(current.id / w.width),
+        nx = next % w.width,
+        ny = Math.floor(next / w.width)
+      if (
+        x !== nx &&
+        y !== ny &&
+        [y * w.width + nx, ny * w.width + x].some((id) => {
+          const side = w.regions[w.cells[id].region]
+          return side?.nation !== nation || side.devastation > 0.9
+        })
+      )
+        continue
       const q = cellPosition(w, next),
         infrastructure = Math.min(region.infrastructure, w.regions[w.cells[current.id].region].infrastructure)
       const corridor = corridors.get(`${Math.min(current.id, next)}:${Math.max(current.id, next)}`)

@@ -1,4 +1,5 @@
-import { neighbors } from './hex'
+import { movementNeighbors, stepDistance } from './grid'
+import { MinHeap } from './heap'
 import { clamp, type World, type RouteLeg } from './types'
 
 const cache = new WeakMap<World, { month: number; revision: number; pressure: Map<number, Float64Array> }>()
@@ -16,17 +17,24 @@ export function navalPressure(world: World) {
       f.morale *
       Math.min(1, f.soldiers / Math.max(1, f.warships * 90 + f.transports * 30)) *
       (1 + world.nations[f.nation].technologies.military * 0.15)
-    const visited = new Set([f.cell]),
-      queue = [{ cell: f.cell, distance: 0 }]
-    for (let i = 0; i < queue.length; i++) {
-      const at = queue[i]
-      pressure.get(f.nation)![at.cell] += strength * (1 - at.distance / 6)
-      if (at.distance >= 4) continue
-      for (const cell of neighbors(at.cell, world.width, world.height))
-        if (!visited.has(cell) && world.cells[cell].terrain === 'water') {
-          visited.add(cell)
-          queue.push({ cell, distance: at.distance + 1 })
+    const distances = new Map([[f.cell, 0]]),
+      queue = new MinHeap()
+    queue.push(f.cell, 0)
+    while (queue.size) {
+      const at = queue.pop()
+      if (at.cost !== distances.get(at.id)) continue
+      pressure.get(f.nation)![at.id] += strength * (1 - at.cost / 6)
+      for (const cell of movementNeighbors(world.cells, at.id, world.width, world.height)) {
+        const distance = at.cost + stepDistance(world.cells[at.id], world.cells[cell])
+        if (
+          world.cells[cell].terrain === 'water' &&
+          distance <= 4 &&
+          distance < (distances.get(cell) ?? Infinity)
+        ) {
+          distances.set(cell, distance)
+          queue.push(cell, distance)
         }
+      }
     }
   }
   cache.set(world, { month: world.month, revision, pressure })

@@ -1,0 +1,101 @@
+{
+  "date": "2026-10-26",
+  "topology": "square-v1",
+  "sourceSpanMeters": 1024,
+  "minimumSpanMeters": 128,
+  "seed": "Adaptive grid qualification 2026-10-26",
+  "command": "node --expose-gc --import tsx tests/qualify-adaptive-grid.ts",
+  "scope": "Offline geometry, conservation and recursive search; timings include no rendering or long-run simulation. Per-mode heap is sampled after explicit GC when enabled, not peak browser memory.",
+  "results": [
+    {
+      "scale": "regional",
+      "sourceCells": 8064,
+      "sites": 4515,
+      "initializedMs": 803,
+      "sampledHeapMiB": 85,
+      "modes": [
+        {
+          "mode": "coarse",
+          "heapAfterGcMiB": 76,
+          "leaves": 35,
+          "interfaces": 58,
+          "fragments": 8064,
+          "remeshMs": 14,
+          "fortyQueriesWithExhaustiveVerificationMs": 8,
+          "found": 2343,
+          "landAreaM2": 3810525184,
+          "waterAreaM2": 4645191680
+        },
+        {
+          "mode": "fine",
+          "heapAfterGcMiB": 87,
+          "leaves": 8064,
+          "interfaces": 15944,
+          "fragments": 8064,
+          "remeshMs": 47,
+          "fortyQueriesWithExhaustiveVerificationMs": 14,
+          "found": 2343,
+          "landAreaM2": 3810525184,
+          "waterAreaM2": 4645191680
+        },
+        {
+          "mode": "adaptive",
+          "heapAfterGcMiB": 85,
+          "leaves": 6279,
+          "interfaces": 12865,
+          "fragments": 8430,
+          "remeshMs": 59,
+          "fortyQueriesWithExhaustiveVerificationMs": 11,
+          "found": 2343,
+          "landAreaM2": 3810525184,
+          "waterAreaM2": 4645191680
+        }
+      ]
+    },
+    {
+      "scale": "world",
+      "sourceCells": 129024,
+      "sites": 70835,
+      "initializedMs": 7483,
+      "sampledHeapMiB": 938,
+      "modes": [
+        {
+          "mode": "coarse",
+          "heapAfterGcMiB": 845,
+          "leaves": 504,
+          "interfaces": 962,
+          "fragments": 129024,
+          "remeshMs": 227,
+          "fortyQueriesWithExhaustiveVerificationMs": 55,
+          "found": 2236,
+          "landAreaM2": 62151196672,
+          "waterAreaM2": 73140273152
+        },
+        {
+          "mode": "fine",
+          "heapAfterGcMiB": 1011,
+          "leaves": 129024,
+          "interfaces": 257312,
+          "fragments": 129024,
+          "remeshMs": 681,
+          "fortyQueriesWithExhaustiveVerificationMs": 180,
+          "found": 2236,
+          "landAreaM2": 62151196672,
+          "waterAreaM2": 73140273152
+        },
+        {
+          "mode": "adaptive",
+          "heapAfterGcMiB": 938,
+          "leaves": 67443,
+          "interfaces": 139762,
+          "fragments": 134286,
+          "remeshMs": 957,
+          "fortyQueriesWithExhaustiveVerificationMs": 114,
+          "found": 2236,
+          "landAreaM2": 62151196672,
+          "waterAreaM2": 73140273152
+        }
+      ]
+    }
+  ]
+}

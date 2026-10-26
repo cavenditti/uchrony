@@ -2,7 +2,9 @@ import type { Settlement } from '../sim/spatial'
 import type { World } from '../sim/types'
 import { hashSeed } from '../sim/random'
 import { reliefRandom } from './relief-field'
-import { HEX } from '../sim/hex'
+import { cellAt } from '../sim/grid'
+import type { UrbanForm } from './urban-form'
+import { parcelLayout } from './parcel-layout'
 import { riverHalfWidth, riverPoint, type RiverCurve } from './rivers'
 
 export type CityPoint = { x: number; z: number }
@@ -13,9 +15,12 @@ export type CityBuilding = CityPoint & {
   angle: number
   roof: 'gable' | 'hip' | 'flat'
   tone: number
+  use?: 'housing' | 'workshop'
+  storeys?: number
   representedCapacity?: number
 }
 export type CityDescription = {
+  form?: UrbanForm
   id: string
   cell: number
   key: string
@@ -43,12 +48,19 @@ export type CityLayout = {
   angle: number
 }
 
-const homeCapacity = new WeakMap<NonNullable<World['viewHomes']>, Map<string, NonNullable<World['viewHomes']>[number]>>()
+const homeCapacity = new WeakMap<
+  NonNullable<World['viewHomes']>,
+  Map<string, NonNullable<World['viewHomes']>[number]>
+>()
 
 /** Stable visual identities do not depend on district IDs or monthly population totals. */
 export function describeCity(
   world: Pick<World, 'seed' | 'cells' | 'regions'> & Partial<Pick<World, 'adaptive' | 'viewHomes'>>,
-  site: Settlement & { capacity?: number; parcel?: import('../sim/adaptive-types').SpatialBounds },
+  site: Settlement & {
+    form?: UrbanForm
+    capacity?: number
+    parcel?: import('../sim/adaptive-types').SpatialBounds
+  },
 ): CityDescription {
   const cell = world.cells[site.cell],
     seed = hashSeed(`${world.seed}:townscape:1:${site.id}`)
@@ -66,16 +78,24 @@ export function describeCity(
   const capacity = site.capacity ?? recorded?.capacity
   const extent = site.parcel ?? recorded?.parcel
   const scale = world.adaptive?.metersPerMapUnit ?? 1
-  const position = site.position ?? (recorded?.x !== undefined && recorded.y !== undefined ? { x: recorded.x, y: recorded.y } : undefined)
-  const radius = capacity !== undefined ? Math.min(extent ? extent.size / (2 * scale) : 8.2, Math.max(0.35, Math.sqrt(capacity * 40 / Math.PI) / scale)) :
-    (site.kind === 'city' ? 15 : site.kind === 'town' ? 10 : 5.5) * (0.92 + reliefRandom(seed) * 0.16)
+  const position =
+    site.position ??
+    (recorded?.x !== undefined && recorded.y !== undefined ? { x: recorded.x, y: recorded.y } : undefined)
+  const radius =
+    capacity !== undefined
+      ? Math.min(
+          extent ? extent.size / (2 * scale) : 8.2,
+          Math.max(0.35, Math.sqrt((capacity * 40) / Math.PI) / scale),
+        )
+      : (site.kind === 'city' ? 15 : site.kind === 'town' ? 10 : 5.5) * (0.92 + reliefRandom(seed) * 0.16)
   return {
+    form: site.form,
     id: site.id,
     cell: site.cell,
-    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${style}:${Math.round(capacity ?? 0)}:${position?.x ?? cell.x}:${position?.y ?? cell.y}:${radius}`,
+    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${style}:${Math.round(capacity ?? 0)}:${position?.x ?? cell.x}:${position?.y ?? cell.y}:${radius}:${JSON.stringify(site.form)}`,
     x: position ? position.x / scale : cell.x,
     z: position ? position.y / scale : cell.y,
-    radius,
+    radius: site.form ? site.form.parcel.size / (2 * scale) : radius,
     seed,
     kind: site.kind,
     capital: site.capital,
@@ -140,25 +160,12 @@ export function cityLayout(
       }
   }
   const isLand = (p: CityPoint) => {
-    const row = Math.round(p.z / (HEX * 1.5))
-    let closest = Infinity,
-      land = false
-    for (let r = row - 1; r <= row + 1; r++) {
-      const col = Math.round(p.x / (Math.sqrt(3) * HEX) - (r % 2) / 2)
-      for (let q = col - 1; q <= col + 1; q++) {
-        if (q < 0 || q >= world.width || r < 0 || r >= world.height) continue
-        const c = world.cells[r * world.width + q],
-          distance = (c.x - p.x) ** 2 + (c.y - p.z) ** 2
-        if (distance < closest) {
-          closest = distance
-          land = c.terrain !== 'water'
-        }
-      }
-    }
-    return land
+    const id = cellAt(p.x, p.z, world.width, world.height)
+    return id !== undefined && world.cells[id].terrain !== 'water'
   }
   const dry = (p: CityPoint, setback = 1) =>
     isLand(p) && channels.every(({ a, b, width }) => distanceTo(p, a, b) > width + setback)
+  if (city.form) return parcelLayout(city, dry)
   const pattern = (['market', 'planned', 'spine'] as const)[Math.floor(random(71) * 3) % 3]
   let angle = random(1) * Math.PI * 2
   if (pattern === 'spine' && channels.length) {
@@ -460,7 +467,8 @@ export function cityLayout(
       continue
     gardens.push({ ...p, width, depth, angle: -angle })
   }
-  if (city.capacity !== undefined && buildings.length) for (const building of buildings) building.representedCapacity = city.capacity / buildings.length
+  if (city.capacity !== undefined && buildings.length)
+    for (const building of buildings) building.representedCapacity = city.capacity / buildings.length
   return {
     city,
     pattern,

@@ -270,6 +270,7 @@ export interface World {
   sovereignty?: SovereigntyState
   pressures?: PressureState
   generatorVersion?: number
+  gridTopology?: 'square-v1'
   seed: string
   rng: number
   month: number

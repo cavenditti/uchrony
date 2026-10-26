@@ -3,10 +3,24 @@ import { population, type World } from './types'
 import type { PhysicalSite, SpatialBounds, PointMeters } from './adaptive-types'
 import { cellPolygon, pointInPolygon } from './physical-space'
 import { queryAdaptiveLeaves } from './adaptive-grid'
+import { SETTLEMENT } from './settlement-model'
 
 export function occupiedResidents(w: World, site: PhysicalSite) {
   if (site.kind !== 'residential' || site.retired !== undefined) return 0
   return site.residents ?? w.localEconomy?.units[site.pool]?.residents[site.cell] ?? 0
+}
+
+/** An opening rural record represents dispersed housing, not a compact block.
+ * Building elsewhere in its source cell must not urbanize all its occupants.
+ * New surveyed parcels represent compact development; opening sites retain the
+ * known built footprint rather than borrowing another parcel's investment.
+ */
+export function compactResidence(site: PhysicalSite, retained = false) {
+  const opening = site.openingBuilt ?? 0
+  return (
+    opening >= (retained ? SETTLEMENT.retainedBuiltCover : SETTLEMENT.entryBuiltCover) ||
+    (site.id.startsWith('residence:') && (site.investedValue ?? 0) > 0)
+  )
 }
 
 export function residentialSites(w: World) {
@@ -180,7 +194,7 @@ export function findResidentialParcel(
 ) {
   const size = 128,
     radius = 1000,
-    origin = -1000
+    origin = 0
   const bounds = { x: near.x - radius, y: near.y - radius, size: radius * 2 }
   const owned = new Set(w.localEconomy!.units[near.pool].cells)
   const cells = [...new Set(queryAdaptiveLeaves(w, bounds).flatMap((n) => n.fragments.map((f) => f.cell)))]

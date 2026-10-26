@@ -184,7 +184,7 @@ export function NavalForces({
           </div>
           <p className="panel-note">
             {f.course.length
-              ? `Underway toward ${f.target === null ? 'open water' : w.regions[f.target].name} · ${f.course.length} sea hexes remaining`
+              ? `Underway toward ${f.target === null ? 'open water' : w.regions[f.target].name} · ${f.course.length} sea cells remaining`
               : `Off ${w.regions[f.region].name}`}{' '}
             · {f.mission}
           </p>

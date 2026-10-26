@@ -19,10 +19,10 @@ import {
   clamp,
 } from './types'
 import { hashSeed, random } from './random'
-import { neighbors } from './hex'
+import { neighbors, GRID_TOPOLOGY } from './grid'
 import { generateGeography } from './geography'
 import { MinHeap } from './heap'
-export { HEX, neighbors } from './hex'
+export { CELL_SIZE, neighbors } from './grid'
 
 export const GRID_W = 112
 export const GRID_H = 72
@@ -436,7 +436,8 @@ export function generateWorld(
   })
   const world: World = {
     version: 1,
-    generatorVersion: 4,
+    generatorVersion: 5,
+    gridTopology: GRID_TOPOLOGY,
     modelProvenance: { accepted: 0, lastMonth: 0, roles: {}, source: 'native' },
     simulation: { ...settings },
     seed,

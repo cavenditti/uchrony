@@ -1,3 +1,4 @@
+import { stepDistance } from './grid'
 import { MinHeap } from './heap'
 import { bundleCorridors } from './corridor-bundling'
 import { shippingBackbone } from './shipping-backbone'
@@ -316,7 +317,7 @@ function buildNetwork(world: World, profile?: CorridorProfile, base?: TransportN
         isWater(to)
           ? profile
             ? profile.cost[profile.index(from, to)]
-            : 1 + (Number(shore[from]) + Number(shore[to])) * 0.15
+            : (1 + (Number(shore[from]) + Number(shore[to])) * 0.15) * stepDistance(cells[from], cells[to])
           : Infinity,
       targets,
     )
@@ -406,7 +407,8 @@ function seaBackbone(
     if (at.cost !== distance[at.id]) continue
     for (const next of adjacent[at.id]) {
       if (world.cells[next].terrain !== 'water') continue
-      const step = 1 + (+shore[at.id] + +shore[next]) * 0.15,
+      const step =
+          (1 + (+shore[at.id] + +shore[next]) * 0.15) * stepDistance(world.cells[at.id], world.cells[next]),
         candidate = at.cost + step
       if (candidate < distance[next]) {
         distance[next] = candidate
@@ -423,7 +425,10 @@ function seaBackbone(
       const from = owner[a],
         to = owner[b],
         key = `${ports[from].region}-${ports[to].region}`,
-        cost = distance[a] + distance[b] + 1 + (+shore[a] + +shore[b]) * 0.15
+        cost =
+          distance[a] +
+          distance[b] +
+          (1 + (+shore[a] + +shore[b]) * 0.15) * stepDistance(world.cells[a], world.cells[b])
       if (cost < (crossings.get(key)?.cost ?? Infinity)) crossings.set(key, { from, to, a, b, cost })
     }
   }

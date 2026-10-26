@@ -24,14 +24,14 @@ import {
 import type { ReliefMap } from '../map/relief'
 import { terrainHeight } from '../map/relief-field'
 import { resizeCanvas } from '../map/render-budget'
-import { HEX } from '../sim/hex'
+import { CELL_SIZE } from '../sim/grid'
 import { contains, zoomAt } from '../map/geometry'
 import { buildAtlas, drawAtlas, drawPlaceLabels, terrainColors } from '../map/renderer'
 import { freightOverlay, drawFreight } from '../map/trade'
 import { population, type World, type Layer } from '../sim/types'
 import { dominantIdentity, identityAxis, identityColor } from '../map/identity'
 import { censusOf, mergeCensuses, censusDistribution } from '../sim/view-snapshot'
-import { drawWarfare } from '../map/warfare'
+import { drawWarfare, fleetMapPosition } from '../map/warfare'
 import { compact, type Tab } from './Inspector'
 
 interface Props {
@@ -166,8 +166,8 @@ export function WorldMap({
           : null
   const freight = useMemo(() => freightOverlay(world, nation, region), [world, nation, region])
   const atlas = useMemo(() => buildAtlas(world), [mapKey])
-  const mapW = world.width * Math.sqrt(3) * HEX,
-    mapH = world.height * HEX * 1.5
+  const mapW = world.width * CELL_SIZE,
+    mapH = world.height * CELL_SIZE
   const verticalFactor = isRelief && tilt ? Math.sin(Math.PI * 0.29) : 1
   const fit = Math.min(size.w / mapW, size.h / (mapH * verticalFactor)) * 0.94
   const scale = fit * view.zoom,
@@ -192,7 +192,7 @@ export function WorldMap({
     const meters = world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT
     const x = (center?.x ?? mapW / 2 - view.x / scale) * meters
     const y = (center?.y ?? mapH / 2 - view.y / (scale * verticalFactor)) * meters
-    const span = Math.min(12000, Math.max(500, Math.min(size.w, size.h) / scale * meters))
+    const span = Math.min(12000, Math.max(500, (Math.min(size.w, size.h) / scale) * meters))
     return { x: x - span / 2, y: y - span / 2, size: span }
   }
   useEffect(() => {
@@ -489,9 +489,8 @@ export function WorldMap({
       )
       ctx.restore()
       if (isRelief && scale >= 3 && (showArmies || layer === 'military')) {
-        const badge = (cell: number, label: string, owner: number) => {
-          const c = world.cells[cell],
-            p = reliefRef.current!.project(c.x, c.y)
+        const badge = (c: { x: number; y: number }, label: string, owner: number) => {
+          const p = reliefRef.current!.project(c.x, c.y)
           if (p.x < -40 || p.x > size.w + 40 || p.y < -40 || p.y > size.h + 40) return
           ctx.fillStyle = '#24343a'
           ctx.strokeStyle = world.nations[owner].color
@@ -505,9 +504,13 @@ export function WorldMap({
         }
         for (const a of world.armies)
           if (a.operations?.embarkedOn == null)
-            badge(world.regions[a.region].center, `Troops ${(a.soldiers / 1000).toFixed(1)}k`, a.nation)
+            badge(
+              world.cells[world.regions[a.region].center],
+              `Troops ${(a.soldiers / 1000).toFixed(1)}k`,
+              a.nation,
+            )
         for (const f of world.warfare?.fleets ?? [])
-          badge(f.cell, `Ships ${f.warships + f.transports}`, f.nation)
+          badge(fleetMapPosition(world, f), `Ships ${f.warships + f.transports}`, f.nation)
       }
       if (moving && (isRelief || freightMoving)) frame.current = requestAnimationFrame(draw)
     }
@@ -903,11 +906,21 @@ export function WorldMap({
       )}
       <div className="map-scale">
         <span />
-        <small>{((65 / scale) * (world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT) / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} km</small>
+        <small>
+          {(((65 / scale) * (world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT)) / 1000).toLocaleString(
+            undefined,
+            { maximumFractionDigits: 1 },
+          )}{' '}
+          km
+        </small>
       </div>
       <div className="map-view-switch" role="group" aria-label="Map presentation">
         {world.adaptive && onInspectArea && (
-          <button aria-label="Inspect daily life" title="Inspect this area's recorded homes, jobs and daily activity" onClick={() => onInspectArea(inspectionBounds())}>
+          <button
+            aria-label="Inspect daily life"
+            title="Inspect this area's recorded homes, jobs and daily activity"
+            onClick={() => onInspectArea(inspectionBounds())}
+          >
             <ScanSearch size={15} /> Inspect
           </button>
         )}
@@ -945,11 +958,18 @@ export function WorldMap({
       {closeCity && (
         <div className="city-view-caption" aria-label="City view">
           <h2>{closeCity.name}</h2>
-          {world.adaptive && (onInspectArea || onInspectDaily) && <button onClick={() => {
-            exploreCity(closeCity)
-            if (closeCity.position && onInspectArea) onInspectArea({ x: closeCity.position.x - 500, y: closeCity.position.y - 500, size: 1000 })
-            else onInspectDaily?.(closeCity.cell)
-          }}>Inspect daily life</button>}
+          {world.adaptive && (onInspectArea || onInspectDaily) && (
+            <button
+              onClick={() => {
+                exploreCity(closeCity)
+                if (closeCity.position && onInspectArea)
+                  onInspectArea({ x: closeCity.position.x - 500, y: closeCity.position.y - 500, size: 1000 })
+                else onInspectDaily?.(closeCity.cell)
+              }}
+            >
+              Inspect daily life
+            </button>
+          )}
           <p>
             {compact(closeCity.population)} people ·{' '}
             {closeCity.capital

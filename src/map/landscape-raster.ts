@@ -1,21 +1,14 @@
 import { landscapeField, sampleLandscape } from './landscape-field'
 import { hashSeed, noise } from '../sim/random'
 import { clamp, type World } from '../sim/types'
+import { illuminated } from './illuminated-palette'
 
 const ease = (x: number) => {
   const t = clamp(x)
   return t * t * (3 - 2 * t)
 }
-const dry = [147, 151, 84],
-  green = [88, 119, 61],
-  trees = [43, 77, 45]
-const dune = [195, 169, 119],
-  stone = [116, 121, 113],
-  ice = [221, 230, 224],
-  frozen = [145, 157, 137]
-const deep = [13, 38, 53],
-  shallow = [24, 78, 91],
-  shore = [61, 125, 122]
+const { dry, green, forest: trees, sand: dune, stone, snow: ice, tundra: frozen } = illuminated.land
+const { deep, shallow, shore } = illuminated.sea
 const mix = (a: number, b: number, t: number) => a + (b - a) * t
 
 /** Bounded, geographic albedo and bathymetry. Administrative remeshing never rebakes these rasters. */
@@ -55,7 +48,7 @@ export function landscapeRasters(
       const rock = ease((elevation - 0.36) * 3.3 + Math.hypot(dx, dy) * 2.3 + (fine - 0.5) * 0.3)
       const snow = ease((elevation - 0.63) * 8 + (broad - 0.5) * 0.7) * (1 - desert * 0.8)
       const sand = ease(desert * 0.9 + (0.35 - moisture) * 1.2)
-      const grain = 0.91 + detail * 0.16
+      const grain = 0.95 + detail * 0.09
       const i = (py * width + px) * 4
       for (let k = 0; k < 3; k++) {
         let color = mix(dry[k], green[k], ease(moisture))

@@ -4,7 +4,7 @@ import { METERS_PER_MAP_UNIT } from './physical-space'
 import { localFirmRegion } from './local-units'
 import { apportion } from './allocation'
 import { landscapeAt, settlementWeight } from './landscape'
-import { neighbors } from './hex'
+import { neighbors } from './grid'
 import { clamp, population, type World } from './types'
 
 export interface Settlement {

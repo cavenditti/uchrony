@@ -19,7 +19,7 @@ import { validateWorld, restoreWorld } from '../src/sim/persistence'
 import { auditBanks } from '../src/sim/banking'
 import { auditNationalAccounts } from '../src/sim/national-accounts'
 import { tradeDistricts, districtNetwork } from '../src/sim/district-transport'
-import { neighbors } from '../src/sim/hex'
+import { neighbors, movementNeighbors } from '../src/sim/grid'
 import { ensureFirms, firmCapacity, regionalFirms } from '../src/sim/firms'
 import { viewSnapshot } from '../src/sim/view-snapshot'
 import { relocateHouseholdClaims } from '../src/sim/district-finance'
@@ -224,7 +224,7 @@ test('district transport uses contiguous physical paths and conserves goods duri
     assert(s.freight > 0)
     for (const leg of s.legs)
       for (let i = 1; i < leg.cells.length; i++)
-        assert(neighbors(leg.cells[i - 1], w.width, w.height).includes(leg.cells[i]))
+        assert(movementNeighbors(w.cells, leg.cells[i - 1], w.width, w.height).includes(leg.cells[i]))
   }
   const usage = new Map<number, number>()
   for (const s of w.localEconomy!.shipments)

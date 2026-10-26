@@ -7,6 +7,8 @@ import { TerrainPicker } from '../src/map/relief-picking'
 import { zoomAt } from '../src/map/geometry'
 import type { World } from '../src/sim/types'
 import type { Settlement } from '../src/sim/spatial'
+import { urbanForm } from '../src/map/urban-form'
+import { CELL_SIZE } from '../src/sim/grid'
 import { SceneryMotion } from '../src/map/scenery-motion'
 const width = 40,
   height = 40
@@ -19,9 +21,9 @@ const world = {
     id,
     q: id % width,
     r: Math.floor(id / width),
-    x: (id % width) * 12.124,
+    x: ((id % width) + 0.5) * CELL_SIZE,
     z: 0,
-    y: Math.floor(id / width) * 10.5,
+    y: (Math.floor(id / width) + 0.5) * CELL_SIZE,
     elevation: 0.2,
     moisture: 0.4,
     terrain: 'plains',
@@ -219,4 +221,58 @@ test('scenery time freezes while disabled and resumes without hidden-tab catch-u
   motion.advance(910000, true)
   assert.equal(uniform.value, 0.2, 'a late frame has bounded movement')
   assert.equal(motion.time, uniform, 'animation updates do not allocate replacement uniforms')
+})
+
+test('funded capacity raises floor area and height within the same parcel, with distinct work and garden forms', () => {
+  const scale = 1024 / CELL_SIZE,
+    center = { x: world.cells[site.cell].x * scale, y: world.cells[site.cell].y * scale }
+  const parcel = { x: center.x - 256, y: center.y - 256, size: 512 }
+  const render = (capacity: number, activity = 'urban', distance = 0) => {
+    const form = urbanForm(capacity, parcel, center, scale, activity, false, distance, 1500)
+    const description = describeCity(
+      { ...world, adaptive: { metersPerMapUnit: scale, sites: {} } as World['adaptive'] },
+      { ...site, capacity, position: center, parcel, form },
+    )
+    return cityLayout(world, description)
+  }
+  const low = render(1000, 'urban', 1000),
+    dense = render(30000),
+    industry = render(1000, 'industrial', 1000)
+  assert.equal(low.city.form!.district, 'gardens')
+  assert.equal(dense.city.form!.district, 'center')
+  assert.equal(industry.city.form!.district, 'industrial')
+  assert(dense.buildings.length > low.buildings.length)
+  assert(
+    Math.max(...dense.buildings.map((b) => b.height)) > Math.max(...low.buildings.map((b) => b.height)) * 3,
+  )
+  assert(
+    new Set(dense.buildings.map((b) => b.width.toFixed(3))).size > 8,
+    'frontages vary instead of repeating one house',
+  )
+  assert(
+    dense.buildings.every(
+      (b) => Math.hypot(Math.abs(b.x * scale - center.x) - 256, Math.abs(b.z * scale - center.y) - 256) > 60,
+    ),
+    'the outer silhouette does not stamp parcel corners',
+  )
+  assert(industry.buildings.some((b) => b.use === 'workshop'))
+  assert(
+    industry.buildings.filter((b) => b.use === 'workshop').every((b) => b.representedCapacity === undefined),
+  )
+  for (const layout of [low, dense, industry]) {
+    const represented = layout.buildings.reduce((sum, b) => sum + (b.representedCapacity ?? 0), 0)
+    assert(Math.abs(represented - layout.city.capacity!) < 1e-7)
+    assert(layout.buildings.length <= 256)
+    for (const b of layout.buildings) {
+      assert(b.x - b.width / 2 >= parcel.x / scale && b.x + b.width / 2 <= (parcel.x + parcel.size) / scale)
+      assert(b.z - b.depth / 2 >= parcel.y / scale && b.z + b.depth / 2 <= (parcel.y + parcel.size) / scale)
+    }
+  }
+  const core = dense.buildings.filter((b) => Math.hypot(b.x * scale - center.x, b.z * scale - center.y) < 100)
+  const edge = dense.buildings.filter((b) => Math.hypot(b.x * scale - center.x, b.z * scale - center.y) > 180)
+  assert(core.length && edge.length, 'both central and peripheral buildings are represented')
+  assert(
+    core.reduce((s, b) => s + b.storeys!, 0) / core.length >
+      edge.reduce((s, b) => s + b.storeys!, 0) / edge.length,
+  )
 })

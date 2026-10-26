@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-25",
+  "scope": "3D river-to-sea material blending; uncommitted",
+  "tests": {
+    "command": "node --import tsx --test tests/river-rendering.test.ts tests/relief.test.ts",
+    "passed": 11
+  },
+  "build": "pass; existing large-chunk warning",
+  "browser": {
+    "cells": 129024,
+    "cities": ["Meridia", "Serrana"],
+    "viewports": [
+      [1280, 720],
+      [390, 844]
+    ],
+    "animatedDrags": 6,
+    "animatedZoomActions": 6,
+    "additionalRegionalZoomOuts": 6,
+    "warningsOrErrors": [],
+    "simulation": false,
+    "autosave": false,
+    "enduranceQualification": false
+  },
+  "cost": {
+    "addedAttributeBytesPerRiverVertex": 4,
+    "addedTextures": 0,
+    "addedDrawCalls": 0,
+    "notes": "Reuses ocean texture and shared coastal material functions; additional fragment work and generation-time drainage traversal."
+  },
+  "captures": [
+    ".impeccable/review/estuary-before.jpg",
+    ".impeccable/review/estuary-desktop.jpg",
+    ".impeccable/review/estuary-mobile.jpg",
+    ".impeccable/review/estuary-serrana.jpg",
+    ".impeccable/review/estuary-regional.jpg"
+  ],
+  "sourceSha256": {
+    "src/map/rivers.ts": "251419e5c6539c85b1c17601a7ef1ba9dffa44a21b1e72dabc6daf3ffc1dbef1",
+    "src/map/river-surface.ts": "939c45942f77f59d4b8e7ba4f3195f12f00b44b01056df5b5ad52f7629054de0",
+    "src/map/landscape-material.ts": "4ee1a463459f2f31de68fa0f6098cfaf012e2fe3117e8ec976a0f2586adac61f",
+    "src/map/relief.ts": "e5f1f10b7caf932100248318604f50b588c5fac065d2d9e41bb74b053ab29cd2",
+    "tests/river-rendering.test.ts": "15381cd18ee524a4c8ad1c574c4a7766706f72795bc43e79e6600f64b6e8306c"
+  }
+}

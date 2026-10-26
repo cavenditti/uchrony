@@ -1,7 +1,8 @@
 import * as THREE from 'three'
-import { riverHalfWidth, riverPoint, type RiverCurve } from './rivers'
+import { riverHalfWidth, riverPoint, riverOutletDistances, type RiverCurve } from './rivers'
 import type { TerrainPicker } from './relief-picking'
-import { surfaceNoiseShader } from './landscape-material'
+import { surfaceNoiseShader, coastalWaterShader } from './landscape-material'
+import { illuminated } from './illuminated-palette'
 
 /** Retained vector ribbons keep river curves independent of the 4096px terrain
  * texture. Samples sit on the actual terrain triangles, not a second height field.
@@ -9,7 +10,7 @@ import { surfaceNoiseShader } from './landscape-material'
 export function riverSurface(
   curves: RiverCurve[],
   picker: TerrainPicker,
-  coast?: { texture: THREE.Texture; width: number; height: number },
+  coast?: { texture: THREE.Texture; ocean: THREE.Texture; width: number; height: number },
   time = { value: 0 },
 ) {
   const incoming = new Map<number, number>()
@@ -23,11 +24,13 @@ export function riverSurface(
   // Adapt sampling to total geographic length; no camera-dependent geometry work.
   const spacing = Math.max(2.5, lengths.reduce((sum, n) => sum + n, 0) / 60000)
   const steps = lengths.map((n) => Math.max(2, Math.ceil(n / spacing)))
+  const outletDistances = riverOutletDistances(curves, lengths)
   const pairs = steps.reduce((sum, n) => sum + n + 1, 0)
   const positions = new Float32Array(pairs * 6),
     flows = new Float32Array(pairs * 2),
     across = new Float32Array(pairs * 2),
     banks = new Float32Array(pairs * 2),
+    mouthDistances = new Float32Array(pairs * 2),
     indices = new Uint32Array(steps.reduce((sum, n) => sum + n, 0) * 6)
   const ray = new THREE.Ray(new THREE.Vector3(0, 10000, 0), new THREE.Vector3(0, -1, 0))
   let vertex = 0,
@@ -64,6 +67,7 @@ export function riverSurface(
         positions.set([x, y + 0.15, z], vertex * 3)
         across[vertex] = sign
         banks[vertex] = bank
+        mouthDistances[vertex] = Math.min(1e6, outletDistances[c] + lengths[c] * (1 - t))
         flows[vertex++] = curve.flow
       }
       if (i < count) {
@@ -78,14 +82,15 @@ export function riverSurface(
   geometry.setAttribute('riverFlow', new THREE.BufferAttribute(flows, 1))
   geometry.setAttribute('riverAcross', new THREE.BufferAttribute(across, 1))
   geometry.setAttribute('riverBank', new THREE.BufferAttribute(banks, 1))
+  geometry.setAttribute('riverMouthDistance', new THREE.BufferAttribute(mouthDistances, 1))
   geometry.setIndex(new THREE.BufferAttribute(indices, 1))
   geometry.computeVertexNormals()
   geometry.computeBoundingSphere()
   const minimumFlow = { value: 0 }
   const material = new THREE.MeshStandardMaterial({
-    color: '#306b70',
-    roughness: 0.34,
-    metalness: 0.02,
+    color: illuminated.river,
+    roughness: 0.85,
+    metalness: 0,
     transparent: true,
     depthWrite: false,
     polygonOffset: true,
@@ -93,24 +98,25 @@ export function riverSurface(
     polygonOffsetUnits: -2,
   })
   if (coast) material.defines = { RIVER_COAST: 1 }
-  material.customProgramCacheKey = () => `uchrony-vector-rivers-v2:${Boolean(coast)}`
+  material.customProgramCacheKey = () => `uchrony-illuminated-rivers-v2:${Boolean(coast)}`
   material.onBeforeCompile = (shader) => {
     shader.uniforms.sceneryTime = time
     shader.uniforms.riverMinimumFlow = minimumFlow
-    shader.uniforms.riverBankColor = { value: new THREE.Color('#82896a') }
+    shader.uniforms.riverBankColor = { value: new THREE.Color(illuminated.bank) }
     if (coast) {
       shader.uniforms.riverLand = { value: coast.texture }
+      shader.uniforms.riverOcean = { value: coast.ocean }
       shader.uniforms.riverWorldSize = { value: new THREE.Vector2(coast.width, coast.height) }
     }
     const varying =
-      'varying float vRiverFlow;\nvarying float vRiverAcross;\nvarying float vRiverBank;\nvarying vec3 vRiverPosition;\n'
+      'varying float vRiverFlow;\nvarying float vRiverAcross;\nvarying float vRiverBank;\nvarying float vRiverMouthDistance;\nvarying vec3 vRiverPosition;\n'
     shader.vertexShader =
-      'attribute float riverFlow;\nattribute float riverAcross;\nattribute float riverBank;\n' +
+      'attribute float riverFlow;\nattribute float riverAcross;\nattribute float riverBank;\nattribute float riverMouthDistance;\n' +
       varying +
       shader.vertexShader
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
-      '#include <begin_vertex>\nvRiverFlow = riverFlow;\nvRiverAcross = riverAcross;\nvRiverBank = riverBank;\nvRiverPosition = position;',
+      '#include <begin_vertex>\nvRiverFlow = riverFlow;\nvRiverAcross = riverAcross;\nvRiverBank = riverBank;\nvRiverMouthDistance = riverMouthDistance;\nvRiverPosition = position;',
     )
     shader.fragmentShader =
       varying +
@@ -120,11 +126,13 @@ export function riverSurface(
       uniform vec3 riverBankColor;
       #ifdef RIVER_COAST
         uniform sampler2D riverLand;
+        uniform sampler2D riverOcean;
         uniform vec2 riverWorldSize;
       #endif
       ` +
       surfaceNoiseShader +
       '\n' +
+      coastalWaterShader +
       shader.fragmentShader
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <clipping_planes_fragment>',
@@ -133,19 +141,27 @@ export function riverSurface(
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <map_fragment>',
       `#include <map_fragment>
+      float estuary = 0.0;
+      #ifdef RIVER_COAST
+        // A short mixing reach preserves the inland blue while meeting the local sea pigment.
+        estuary = 1.0-smoothstep(10.0,42.0,vRiverMouthDistance);
+      #endif
       float pixelWidth = max(fwidth(vRiverAcross), 0.003);
       float grain = surfaceNoise(vRiverPosition.xz * 1.6);
       float edge = abs(vRiverAcross) + (grain - 0.5) * 0.035;
-      float bankDetail = vRiverBank * (1.0 - smoothstep(0.15, 0.55, pixelWidth));
+      float bankDetail = vRiverBank * (1.0 - smoothstep(0.15, 0.55, pixelWidth)) * (1.0-estuary);
       float bank = smoothstep(0.80 - min(pixelWidth, 0.16), 0.97, edge) * bankDetail;
       float shallows = smoothstep(0.2, 0.86, edge) * vRiverBank;
-      diffuseColor.rgb *= mix(0.75, 1.27, shallows);
+      diffuseColor.rgb *= mix(0.91, 1.15, shallows);
+      diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.5,0.68,0.72),waterMarks(vRiverPosition.xz*1.7,sceneryTime)*0.32*(1.0-bank));
       diffuseColor.rgb = mix(diffuseColor.rgb, riverBankColor * (0.87 + grain * 0.23), bank);
       diffuseColor.a *= 1.0 - smoothstep(1.0 - pixelWidth * 1.5, 1.0, edge);
       #ifdef RIVER_COAST
         // Reuse the retained land mask: river mouths end at the real coastline,
         // instead of leaving square ribbons on top of the ocean.
         vec2 landUv = vec2(vRiverPosition.x / riverWorldSize.x, 1.0 - vRiverPosition.z / riverWorldSize.y);
+        vec3 seaColor = coastalWaterColor(texture2D(riverOcean,landUv).rgb,vRiverPosition.xz,sceneryTime);
+        diffuseColor.rgb = mix(diffuseColor.rgb,seaColor,estuary);
         float land = texture2D(riverLand, landUv).a;
         diffuseColor.a *= smoothstep(0.02, 0.85, land);
       #endif
@@ -154,7 +170,11 @@ export function riverSurface(
     )
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <roughnessmap_fragment>',
-      '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.94, bank);',
+      '#include <roughnessmap_fragment>\nroughnessFactor = mix(mix(roughnessFactor, 0.9, estuary), 0.94, bank);',
+    )
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      'outgoingLight=mix(outgoingLight,diffuseColor.rgb*1.08,0.45);\n#include <opaque_fragment>',
     )
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
@@ -166,6 +186,7 @@ export function riverSurface(
         surfaceNoise(p + vec2(0.0, 0.2)) - surfaceNoise(p - vec2(0.0, 0.2))
       ) * 0.08 * detail * (1.0 - bank);
       normal = normalize(normal + mat3(viewMatrix) * vec3(slope.x, 0.0, slope.y));
+      normal = normalize(mix(normal,mat3(viewMatrix)*coastalWaterNormal(vRiverPosition.xz,sceneryTime),estuary));
       `,
     )
   }

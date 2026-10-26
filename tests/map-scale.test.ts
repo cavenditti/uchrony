@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
-import { neighbors } from '../src/sim/hex'
+import { movementNeighbors, neighbors, CELL_SIZE } from '../src/sim/grid'
 import { tick } from '../src/sim/engine'
 import { validateWorld, restoreWorld } from '../src/sim/persistence'
 import { transportNetwork } from '../src/sim/transport'
@@ -22,7 +22,7 @@ test('world scale adds physical distance, connected provinces, independent state
   assert.equal(new Set(w.nations.map((n) => n.name)).size, 32)
   assert.equal(new Set(w.nations.map((n) => n.shortName)).size, 32)
   assert.equal(new Set(w.regions.map((r) => r.name)).size, w.regions.length)
-  assert(w.cells.at(-1)!.x > 5400, 'physical hex size stays fixed as the world grows')
+  assert(w.cells.at(-1)!.x === (w.width - 0.5) * CELL_SIZE, 'physical sample size stays fixed as the world grows')
   for (const r of w.regions) {
     const seen = new Set([r.center]),
       queue = [r.center]
@@ -43,7 +43,7 @@ test('world scale adds physical distance, connected provinces, independent state
     assert.equal(link.legs.at(-1)!.cells.at(-1), w.regions[link.to].center)
     for (const leg of link.legs)
       for (let i = 1; i < leg.cells.length; i++)
-        assert(neighbors(leg.cells[i - 1], w.width, w.height).includes(leg.cells[i]))
+        assert(movementNeighbors(w.cells, leg.cells[i - 1], w.width, w.height).includes(leg.cells[i]))
   }
   // Every coastal province on a shared basin must be mutually reachable by
   // land and/or sea, including the islands the sparse network was built for.

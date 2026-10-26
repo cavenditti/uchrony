@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
-import { neighbors, HEX } from '../src/sim/hex'
+import { movementNeighbors, neighbors, CELL_SIZE } from '../src/sim/grid'
 import { transportNetwork } from '../src/sim/transport'
 import { trade, transportGraph } from '../src/sim/economy'
 import { validateWorld } from '../src/sim/persistence'
@@ -18,8 +18,8 @@ function map(rows: string[]): World {
       id: r * width + q,
       q,
       r,
-      x: (q + (r % 2) / 2) * Math.sqrt(3) * HEX,
-      y: r * 1.5 * HEX,
+      x: (q + 0.5) * CELL_SIZE,
+      y: (r + 0.5) * CELL_SIZE,
       terrain: name === '.' ? 'water' : 'plains',
       region: names.indexOf(name),
       elevation: name === '.' ? 0 : 0.3,
@@ -44,7 +44,7 @@ function assertLegs(w: World, from: number, to: number, legs: NonNullable<Route[
     leg.cells.forEach((id, i) => {
       const water = w.cells[id].terrain === 'water'
       assert.equal(water, leg.mode === 'sea' && i > 0 && i < leg.cells.length - 1)
-      if (i) assert(neighbors(leg.cells[i - 1], w.width, w.height).includes(id))
+      if (i) assert(movementNeighbors(w.cells, leg.cells[i - 1], w.width, w.height).includes(id))
     })
     at = leg.cells[leg.cells.length - 1]
   }

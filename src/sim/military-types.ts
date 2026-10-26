@@ -28,6 +28,8 @@ export interface Fleet extends Army {
   arms: number
   mission: 'patrol' | 'escort' | 'blockade' | 'transport' | 'return'
   course: number[]
+  /** Distance already travelled toward the next waypoint, in terrain-sample spans. */
+  sailingProgress?: number
   embarked: number[]
 }
 export interface Warfare {

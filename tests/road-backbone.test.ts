@@ -73,7 +73,13 @@ test('cross-links require developed infrastructure, logistics and real establish
   assert.deepEqual(roadBackbone(w, input), early, 'age or technology alone cannot manufacture mature demand')
   w.corridors = corridorGeography(w).segments.map(({ a, b }) => ({ a, b, familiarity: 0.8, traffic: 200 }))
   const mature = roadBackbone(w, input)
-  assert(mature.length > early.length * 1.3)
+  const added = mature.filter((link) => !early.includes(link))
+  assert(added.length > 0, 'funded, busy places gain useful cross-links')
+  for (const link of added) {
+    const before = distances(w, early, link.from)[link.to]
+    const after = distances(w, mature, link.from)[link.to]
+    assert(after < before, 'each added connection shortens an actual journey')
+  }
   assert(
     early.every((link) => mature.includes(link)),
     'maturity adds useful roads without dismantling the backbone',

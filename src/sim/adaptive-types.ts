@@ -68,7 +68,7 @@ export interface AdaptiveWorld {
   version: 1
   initialized: number
   revision: number
-  /** The existing map's neighboring cell centers are 1 km apart. Explicit synthetic scale. */
+  /** Fixed conversion between render coordinates and physical metres. */
   metersPerMapUnit: number
   minimumSpan: number
   mode: 'adaptive' | 'coarse' | 'fine'

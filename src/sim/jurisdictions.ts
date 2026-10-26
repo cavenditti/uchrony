@@ -1,4 +1,4 @@
-import { neighbors } from './hex'
+import { neighbors } from './grid'
 import { cellPosition } from './physical-space'
 import { ensureAdaptiveWorld } from './adaptive-world'
 import { householdAccount, governmentAccount, transfer } from './ledger'

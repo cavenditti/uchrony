@@ -1,4 +1,4 @@
-import { HEX } from './hex'
+import { CELL_SIZE, CELL_METERS } from './grid'
 import type { World } from './types'
 import type {
   PointMeters,
@@ -8,7 +8,7 @@ import type {
   SpatialInterface,
 } from './adaptive-types'
 
-export const METERS_PER_MAP_UNIT = 1000 / (Math.sqrt(3) * HEX)
+export const METERS_PER_MAP_UNIT = CELL_METERS / CELL_SIZE
 export function cellPosition(w: World, id: number): PointMeters {
   const c = w.cells[id],
     scale = w.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT
@@ -26,11 +26,13 @@ export function polygonArea(p: PointMeters[]) {
 }
 export function cellPolygon(w: World, id: number): PointMeters[] {
   const p = cellPosition(w, id),
-    radius = HEX * (w.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT)
-  return Array.from({ length: 6 }, (_, i) => {
-    const a = (Math.PI / 3) * i - Math.PI / 2
-    return { x: p.x + Math.cos(a) * radius, y: p.y + Math.sin(a) * radius }
-  })
+    half = CELL_METERS / 2
+  return [
+    { x: p.x - half, y: p.y - half },
+    { x: p.x + half, y: p.y - half },
+    { x: p.x + half, y: p.y + half },
+    { x: p.x - half, y: p.y + half },
+  ]
 }
 /** Clip the same original land polygon at every level, including thin cut cells. */
 export function clipPolygon(polygon: PointMeters[], b: SpatialBounds) {
@@ -58,23 +60,7 @@ export function clipPolygon(polygon: PointMeters[], b: SpatialBounds) {
   return result
 }
 export function rootBounds(w: World): SpatialBounds {
-  // Keep legacy addresses stable at the original scale. Inspect the full extent: an odd
-  // penultimate row can extend farther east than the final row.
-  const radius = HEX * (w.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT)
-  let east = 0,
-    south = 0,
-    west = -1000,
-    north = -1000
-  for (const c of w.cells) {
-    const p = cellPosition(w, c.id)
-    east = Math.max(east, p.x + radius)
-    south = Math.max(south, p.y + radius)
-    west = Math.min(west, p.x - radius)
-    north = Math.min(north, p.y - radius)
-  }
-  const end = cellPosition(w, w.cells.length - 1)
-  const size = 2 ** Math.ceil(Math.log2(Math.max(east - west, south - north, end.x + 2000, end.y + 2000)))
-  return { x: west, y: north, size }
+  return { x: 0, y: 0, size: CELL_METERS * 2 ** Math.ceil(Math.log2(Math.max(w.width, w.height))) }
 }
 export function nodeBounds(root: SpatialBounds, address: string) {
   if (!/^r[0-3]*$/.test(address) || address.length > 40) throw new Error('Invalid spatial address')
@@ -91,9 +77,21 @@ export function quadrant(p: PointMeters, b: SpatialBounds) {
 }
 export function splitFragments(fragments: SpatialFragment[], bounds: SpatialBounds) {
   const output: SpatialFragment[][] = [[], [], [], []]
+  // Dyadic sample boundaries align with the tree. Most fragments therefore
+  // belong wholly to one child, with no clipping or polygon allocation needed.
+  const middle = { x: bounds.x + bounds.size / 2, y: bounds.y + bounds.size / 2 }
+  const crossing: SpatialFragment[] = []
+  for (const f of fragments) {
+    const left = f.polygon.every((p) => p.x <= middle.x)
+    const right = f.polygon.every((p) => p.x >= middle.x)
+    const top = f.polygon.every((p) => p.y <= middle.y)
+    const bottom = f.polygon.every((p) => p.y >= middle.y)
+    if ((left || right) && (top || bottom)) output[Number(!left) + 2 * Number(!top)].push(f)
+    else crossing.push(f)
+  }
   for (let i = 0; i < 4; i++) {
     const b = nodeBounds(bounds, 'r' + i)
-    for (const f of fragments) {
+    for (const f of crossing) {
       const polygon = clipPolygon(f.polygon, b),
         area = polygonArea(polygon)
       if (area > 1e-6) output[i].push({ cell: f.cell, water: f.water, polygon, area })

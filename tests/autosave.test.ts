@@ -30,6 +30,26 @@ const backend = (name: 'disk' | 'browser', value: WorldSave | null, fails = fals
   },
 })
 
+test('retired hex-world restore reports the new-world requirement without writing either replica', async () => {
+  const old = structuredClone(world)
+  delete old.gridTopology
+  old.generatorVersion = 4
+  const original = JSON.stringify(old)
+  let writes = 0
+  const replicas: SaveBackend[] = (['disk', 'browser'] as const).map((name) => ({
+    name,
+    async read() {
+      return record(100, old)
+    },
+    async write() {
+      writes++
+    },
+  }))
+  await assert.rejects(restoreSave(replicas, null), /retired hex grid.*new square-grid world/)
+  assert.equal(writes, 0)
+  assert.equal(JSON.stringify(old), original)
+})
+
 test('disk writes validate compressed snapshots without recompressing their bytes', async () => {
   const root = await mkdtemp(join(tmpdir(), 'uchrony-encoded-save-')),
     store = new DiskAutosaves(root),

@@ -1,5 +1,5 @@
 import { GOODS, population, type World } from './types'
-import { neighbors } from './hex'
+import { movementNeighbors, neighbors } from './grid'
 import { communitySize } from './population'
 
 /** Import checks are read-only. Duplicate/missing ownership must never be repaired by minting or deleting assets. */
@@ -266,7 +266,7 @@ export function validateDistrictEconomy(w: World) {
         if (
           !int(c, 0, w.cells.length - 1) ||
           (w.cells[c].terrain === 'water') !== (leg.mode === 'sea' && i > 0 && i < leg.cells.length - 1) ||
-          (i > 0 && !neighbors(leg.cells[i - 1], w.width, w.height).includes(c))
+          (i > 0 && !movementNeighbors(w.cells, leg.cells[i - 1], w.width, w.height).includes(c))
         )
           fail('shipment geometry')
       }

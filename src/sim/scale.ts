@@ -1,4 +1,4 @@
-/** A hex keeps its physical size: larger worlds add distance, land and settlements. */
+/** A terrain sample keeps its physical size: larger worlds add distance, land and settlements. */
 export const WORLD_SCALES = {
   regional: { label: 'Regional', width: 112, height: 72, provinces: 180, states: 8 },
   continental: { label: 'Continental', width: 224, height: 144, provinces: 560, states: 16 },

@@ -1,7 +1,7 @@
 import { GOODS, population, type World } from './types'
 import { rebuildAdaptiveMesh } from './adaptive-world'
 import { STRATA } from './economic-types'
-import { cellPolygon, pointInPolygon } from './physical-space'
+import { cellPolygon, pointInPolygon, METERS_PER_MAP_UNIT } from './physical-space'
 
 export function validateAdaptiveWorld(w: World) {
   const a = w.adaptive
@@ -20,7 +20,7 @@ export function validateAdaptiveWorld(w: World) {
     a.initialized > w.month ||
     !Number.isSafeInteger(a.revision) ||
     a.revision < 0 ||
-    !finite(a.metersPerMapUnit, 1) ||
+    a.metersPerMapUnit !== METERS_PER_MAP_UNIT ||
     !finite(a.minimumSpan, 25) ||
     !['adaptive', 'coarse', 'fine'].includes(a.mode)
   )
@@ -31,7 +31,7 @@ export function validateAdaptiveWorld(w: World) {
     !object(a.tree) ||
     !Array.isArray(a.tree.leaves) ||
     !object(a.tree.changed) ||
-    (a.tree.domain !== undefined && a.tree.domain !== 'world') ||
+    a.tree.domain !== 'world' ||
     !Array.isArray(a.boundaries) ||
     !Array.isArray(a.names) ||
     !Array.isArray(a.commuting) ||

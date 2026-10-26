@@ -116,9 +116,8 @@ export function settlementMigrationOptions(w: World) {
 /** Unmet location demand goes to the housing investor, not directly to capacity.
  * Existing residents can request a better location even before it has vacancies.
  */
-export function residentialDemand(w: World) {
-  const access = settlementAccess(w),
-    demand = new Map<string, number>()
+export function residentialDemand(w: World, access = settlementAccess(w)) {
+  const demand = new Map<string, number>()
   for (const id of w.localEconomy!.active) {
     const homes = access.homes(id)
     const shortage = Math.max(

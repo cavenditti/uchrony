@@ -1,4 +1,12 @@
 import type { World } from '../sim/types'
+import type { Fleet } from '../sim/military-types'
+import { stepDistance } from '../sim/grid'
+export function fleetMapPosition(w: World, f: Fleet) {
+  const origin = w.cells[f.cell],
+    next = w.cells[f.course[0]],
+    t = next ? (f.sailingProgress ?? 0) / stepDistance(origin, next) : 0
+  return next ? { x: origin.x + (next.x - origin.x) * t, y: origin.y + (next.y - origin.y) * t } : origin
+}
 export function drawWarfare(ctx: CanvasRenderingContext2D, w: World, selected: number, markers = true) {
   ctx.save()
   ctx.lineJoin = 'round'
@@ -20,7 +28,7 @@ export function drawWarfare(ctx: CanvasRenderingContext2D, w: World, selected: n
   }
   ctx.setLineDash([])
   for (const f of w.warfare?.fleets ?? []) {
-    const c = w.cells[f.cell]
+    const c = fleetMapPosition(w, f)
     if (markers) {
       ctx.fillStyle = '#24343a'
       ctx.strokeStyle = w.nations[f.nation].color

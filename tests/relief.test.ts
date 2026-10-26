@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { terrainHeight, reliefRandom } from '../src/map/relief-field'
-import { HEX } from '../src/sim/hex'
+import { CELL_SIZE } from '../src/sim/grid'
 import type { Cell } from '../src/sim/types'
 
 const field = (elevation: number) => ({
@@ -12,8 +12,8 @@ const field = (elevation: number) => ({
     q: id % 6,
     r: Math.floor(id / 6),
     elevation,
-    x: ((id % 6) + (Math.floor(id / 6) % 2) / 2) * Math.sqrt(3) * HEX,
-    y: Math.floor(id / 6) * HEX * 1.5,
+    x: ((id % 6) + 0.5) * CELL_SIZE,
+    y: (Math.floor(id / 6) + 0.5) * CELL_SIZE,
     terrain: elevation <= 0.095 ? 'water' : 'mountains',
     moisture: 0.5,
     river: false,
@@ -34,7 +34,7 @@ test('sea remains flat; relief is finite outside the field and does not mutate g
   assert.deepEqual(mountains, before)
 })
 
-test('the height field is continuous at staggered row and column boundaries', () => {
+test('the height field is continuous at square row and column boundaries', () => {
   const world = field(0.5)
   for (const c of world.cells) c.elevation += (c.id % 4) * 0.035
   for (let y = 5; y < 45; y += 0.5) {

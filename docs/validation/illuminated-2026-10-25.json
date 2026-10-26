@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-25",
+  "scope": "Illuminated-atlas art-direction trial; uncommitted",
+  "checks": {
+    "targetedTests": {
+      "command": "node --import tsx --test tests/city-rendering.test.ts tests/relief.test.ts tests/river-rendering.test.ts",
+      "passed": 16
+    },
+    "productionBuild": "pass; existing large-chunk warning"
+  },
+  "cityCache": {
+    "maxVisibleCities": 6,
+    "maxCachedCities": 12,
+    "retainedGeometryAndInstanceBytes": 2045784,
+    "previousBytes": 2045404,
+    "excludes": [
+      "shared geometry",
+      "materials",
+      "shadow target",
+      "terrain",
+      "driver allocations",
+      "total browser memory"
+    ]
+  },
+  "browser": {
+    "surface": "http://127.0.0.1:5192/tests/browser/map-stress.html?landscape=1&cities=1",
+    "cells": 129024,
+    "viewports": [
+      [1280, 720],
+      [390, 844]
+    ],
+    "cities": ["Meridia", "Ord", "Serrana", "Torwick City", "Illyria"],
+    "animatedDrags": 10,
+    "animatedZoomActions": 10,
+    "presentations": ["3D", "Atlas"],
+    "layers": ["Terrain", "Population"],
+    "consoleWarningsOrErrors": [],
+    "simulationRunning": false,
+    "savesEnabled": false,
+    "externalModelCalls": false,
+    "enduranceTest": false
+  },
+  "limits": [
+    "World-tree shared sphere geometry has more vertices than the former icosahedron.",
+    "Pigment/detail shaders add GPU work; unchanged cache bounds do not establish unchanged frame cost.",
+    "No new 20-minute simulation/autosave qualification; this is a graphics and interaction check."
+  ],
+  "captures": [
+    ".impeccable/review/illuminated-desktop.jpg",
+    ".impeccable/review/illuminated-mobile.jpg",
+    ".impeccable/review/illuminated-city-alt.jpg",
+    ".impeccable/review/illuminated-regional.jpg",
+    ".impeccable/review/illuminated-atlas.jpg",
+    ".impeccable/review/illuminated-population.jpg"
+  ],
+  "sourcesSha256": {
+    "src/map/illuminated-palette.ts": "ef889c85fc33006201735e2a251dd8c83650b9e5cf8957d49ea527c923e4be5a",
+    "src/map/landscape-raster.ts": "d477844d63ce6904ac22abeef851714e66d133cdc72e7f10c0f08b3bb6f9e96d",
+    "src/map/renderer.ts": "55ef4145c6ec27c30273c049fed2eee56ec9822eb44de85b87e6fb88f64a3e3f",
+    "src/map/landscape-material.ts": "3510957187f820f5bfe403f9a2650b309220249dba6c42c7ab7d5f41752a1601",
+    "src/map/city-materials.ts": "c3a80f7bbbe8c1cf7cfe9aea730feddc5254027e3e1de88467263e46b1e59145",
+    "src/map/city-scenery.ts": "f3e4b8698926657648f3b39fe954b97a437011eda8478935e8cc8666c0479595",
+    "src/map/river-surface.ts": "e3f10f9e9718ccff3c07aa136c1c98713b26751221dd50e880dc09a869ce2780",
+    "src/map/relief.ts": "afe1b909e1d98c1ba19524fb7b63e2030f42ce9cf00e5da7dfa7f30b152638b9"
+  },
+  "review": {
+    "type": "fresh independent default-role substitute for unavailable named reviewer",
+    "initialDisposition": "fix",
+    "findings": ["Atlas coast outline weight", "provisional map-local design documentation"],
+    "correction": "Atlas coast strokes use 1.7px and 0.65px screen-space widths; relief texture footprint unchanged",
+    "finalDisposition": "ship",
+    "verdictScope": "Both named fixes resolved; no whole-surface or AAA certification."
+  }
+}

@@ -13,14 +13,14 @@ import {
 } from '../src/sim/adaptive-world'
 import { applyAdministrativeReform, activeJurisdictions } from '../src/sim/jurisdictions'
 import { inspectWorld, inspectionAround } from '../src/sim/inspection'
-import { polygonArea, cellPolygon } from '../src/sim/physical-space'
+import { polygonArea, cellPolygon, cellPosition } from '../src/sim/physical-space'
 import { balances, borrow, householdAccount } from '../src/sim/ledger'
 import { physicalStocks } from '../src/sim/goods-accounting'
 import { validateWorld, restoreWorld } from '../src/sim/persistence'
 import { packWorldSave } from '../src/sim/save-codec'
 import { tick } from '../src/sim/engine'
 import { refreshSpatial } from '../src/sim/spatial'
-import { neighbors } from '../src/sim/hex'
+import { neighbors } from '../src/sim/grid'
 import type { World } from '../src/sim/types'
 import { submitStandingOffer } from '../src/sim/statecraft'
 
@@ -172,6 +172,51 @@ test('inspection reconstruction, cache loss and repeated zoom cannot mutate auth
   const clone = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(w))))
   assert.deepEqual(inspectWorld(clone, { id: 1, bounds, detail: 'street' }), first)
   assert.equal(digest(clone.adaptive), digest(w.adaptive))
+})
+
+test('a representative commute starts at its sampled home and uses its own travel time', () => {
+  const w = fixture('Inspection physical journey')
+  ensureAdaptiveWorld(w)
+  const sites = Object.values(w.adaptive!.sites)
+  const home = sites.find(
+    (s) =>
+      s.kind === 'residential' && (s.residents ?? w.localEconomy!.units[s.pool].residents[s.cell] ?? 0) > 0,
+  )!
+  const workplace = sites.find((s) => s.kind === 'establishment')!
+  assert(home && workplace)
+  const center = cellPosition(w, home.cell)
+  Object.assign(home, { x: center.x - 200, y: center.y })
+  Object.assign(workplace, { cell: home.cell, x: center.x + 200, y: center.y })
+  w.cells[home.cell].terrain = 'plains'
+  w.adaptive!.commutingRows = []
+  w.adaptive!.commuting = [
+    {
+      residence: home.pool,
+      workplace: workplace.id,
+      route: 'display-fixture',
+      stratum: 'laborer',
+      workers: 1,
+      wage: 1,
+      minutes: 60,
+      mode: 'walk',
+    },
+  ]
+  const before = digest(w)
+  const view = inspectWorld(w, {
+    id: 1,
+    detail: 'street',
+    bounds: { x: home.x - 1, y: home.y - 1, size: 2 },
+  })
+  const routine = view.routines.find((r) => r.home === home.id && r.workplace === workplace.id)!
+  assert(routine)
+  assert.deepEqual(routine.journeys![0].points, [
+    { x: home.x, y: home.y },
+    { x: workplace.x, y: workplace.y },
+  ])
+  assert(Math.abs((routine.journeys![0].end - routine.journeys![0].start) * 60 - 6) < 1e-9)
+  assert.equal(routine.activities[1].label, 'Travel to work · 6 min')
+  assert.deepEqual(routine.journeys![1].points, [...routine.journeys![0].points].reverse())
+  assert.equal(digest(w), before)
 })
 
 test('coarse, fine and adaptive partitioning execute the same retained heterogeneous economic closure', () => {

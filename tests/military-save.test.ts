@@ -14,6 +14,7 @@ import { reinforceArmies } from '../src/sim/military-personnel'
 import { allForces } from '../src/sim/forces'
 import { persistSave, restoreSave } from '../src/storage/autosave'
 import type { WorldSave } from '../src/storage/save-types'
+import { movementNeighbors, stepDistance } from '../src/sim/grid'
 
 test('manual recruitment is immediately saveable, before the next simulation month', () => {
   const w = generateWorld('manual-recruit-save')
@@ -78,10 +79,49 @@ function fleetWorld() {
   return { w, r, f: w.warfare!.fleets.at(-1)! }
 }
 
+test('diagonal sailing charges physical distance and preserves fractional progress through a save', () => {
+  const { w, f } = fleetWorld()
+  const harbors = new Set(transportNetwork(w).harbors.map((h) => h.water))
+  const start = w.cells.find(
+    (c) =>
+      c.terrain === 'water' &&
+      !harbors.has(c.id) &&
+      movementNeighbors(w.cells, c.id, w.width, w.height).some(
+        (id) => w.cells[id].terrain === 'water' && !harbors.has(id) && stepDistance(c, w.cells[id]) > 1,
+      ),
+  )!
+  const next = movementNeighbors(w.cells, start.id, w.width, w.height).find(
+    (id) => w.cells[id].terrain === 'water' && !harbors.has(id) && stepDistance(start, w.cells[id]) > 1,
+  )!
+  f.cell = start.id
+  f.target = null
+  f.food = f.soldiers * 0.034 * 10
+  w.nations[f.nation].technologies.logistics = 0
+  assert(!transportNetwork(w).harbors.some((h) => h.water === f.cell))
+  const path = Array.from({ length: 61 }, (_, i) => (i % 2 ? next : start.id))
+  f.course = path.slice(1)
+  advanceNavy(w)
+  const completed = path.length - 1 - f.course.length
+  const traveled = path
+    .slice(1, completed + 1)
+    .reduce((sum, id, i) => sum + stepDistance(w.cells[path[i]], w.cells[id]), 0)
+  assert(Math.abs(traveled + f.sailingProgress! - 11) < 1e-9)
+  assert(f.sailingProgress! > 0 && f.sailingProgress! < Math.SQRT2)
+  validateWorld(w)
+  const restored = restoreWorld(JSON.parse(JSON.stringify(w)))
+  assert.equal(restored.warfare!.fleets.at(-1)!.sailingProgress, f.sailingProgress)
+  advanceNavy(w)
+  advanceNavy(restored)
+  assert.deepEqual(restored.warfare, w.warfare)
+  validateWorld(restored)
+  restored.warfare!.fleets.at(-1)!.sailingProgress = Math.SQRT2
+  assert.throws(() => validateWorld(restored), /sailing progress/)
+})
+
 test('naval repairs consume exactly the available limiting input despite floating-point roundoff', () => {
   const { w, r, f } = fleetWorld()
   const iron = 8.299999999999999e-19
-  assert(iron / 15 * 15 > iron, 'fixture must reproduce the one-ULP overshoot')
+  assert((iron / 15) * 15 > iron, 'fixture must reproduce the one-ULP overshoot')
   r.stocks.iron = iron
   r.consumption.iron = 0
   f.hull = 0.5

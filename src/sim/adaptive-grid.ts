@@ -17,7 +17,7 @@ interface Branch {
   children: number[]
   leaf?: AdaptiveNode
 }
-/** Runtime topology of the active numerical cells. Original hex IDs identify source geography only. */
+/** Runtime topology of the active numerical cells. Terrain sample IDs identify source geography only. */
 export interface AdaptiveGrid {
   mesh: AdaptiveMesh
   leaves: readonly AdaptiveNode[]
@@ -156,7 +156,7 @@ export function queryAdaptiveSitesInBounds(
   return result.sort((a, b) => a.id.localeCompare(b.id))
 }
 
-/** Exact radial query, with no province, market, original-hex or current-leaf boundary restriction. */
+/** Exact radial query, with no province, market, terrain-sample or current-leaf boundary restriction. */
 export function queryAdaptiveSites(
   w: World,
   point: PointMeters,

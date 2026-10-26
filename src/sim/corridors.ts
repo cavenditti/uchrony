@@ -1,6 +1,6 @@
 import { economicRegions } from './local-units'
 import { effectMultiplier } from './effects'
-import { neighbors } from './hex'
+import { movementNeighbors, stepDistance } from './grid'
 import type { Cell, CorridorTrace, RouteLeg, Terrain, World } from './types'
 
 export const CORRIDOR_LEARNING = {
@@ -26,9 +26,10 @@ const difficulty: Record<Terrain, number> = {
 /** Travel effort remains positive even on a fully established corridor. */
 export function roadCost(a: Cell, b: Cell) {
   return (
-    (difficulty[a.terrain] + difficulty[b.terrain]) / 2 +
-    Math.abs(a.elevation - b.elevation) * 12 +
-    (a.river || b.river ? 0.35 : 0)
+    ((difficulty[a.terrain] + difficulty[b.terrain]) / 2 +
+      Math.abs(a.elevation - b.elevation) * 12 +
+      (a.river || b.river ? 0.35 : 0)) *
+    stepDistance(a, b)
   )
 }
 
@@ -41,15 +42,19 @@ interface Segment {
 const geography = new WeakMap<Cell[], ReturnType<typeof buildGeography>>()
 function buildGeography(world: World) {
   const { cells, width, height } = world,
-    adjacent = cells.map((cell) => neighbors(cell.id, width, height)),
+    adjacent = cells.map((cell) => movementNeighbors(cells, cell.id, width, height)),
     water = (id: number) => cells[id].terrain === 'water',
     shore = cells.map((cell) => water(cell.id) && adjacent[cell.id].some((id) => !water(id))),
     segments: Segment[] = [],
     indices = new Int32Array(cells.length * 4).fill(-1),
     key = (a: number, b: number) => {
       const low = Math.min(a, b),
-        delta = Math.abs(a - b)
-      return low * 4 + (delta === 1 ? 0 : delta === width - 1 ? 1 : delta === width ? 2 : 3)
+        high = Math.max(a, b)
+      if (!cells[low] || !cells[high]) return -1
+      const dx = cells[high].q - cells[low].q,
+        dy = cells[high].r - cells[low].r
+      if (dy < 0 || dy > 1 || Math.abs(dx) > 1 || (!dy && dx !== 1)) return -1
+      return low * 4 + (dy === 0 ? 0 : dx + 2)
     }
   for (const a of cells)
     for (const b of adjacent[a.id]) {
@@ -60,14 +65,14 @@ function buildGeography(world: World) {
             ? roadCost(a, cells[b])
             : mode === 'port'
               ? 1
-              : 1 + (+shore[a.id] + +shore[b]) * 0.15
+              : (1 + (+shore[a.id] + +shore[b]) * 0.15) * stepDistance(a, cells[b])
       indices[key(a.id, b)] = segments.length
       segments.push({ a: a.id, b, mode, effort })
     }
   return {
     adjacent,
     segments,
-    index: (a: number, b: number) => indices[key(a, b)],
+    index: (a: number, b: number) => indices[key(a, b)] ?? -1,
     usages: new WeakMap<RouteLeg[], ReadonlyMap<number, number>>(),
   }
 }
@@ -94,29 +99,34 @@ export function corridorProfile(world: World) {
     familiarity[i] = trace.familiarity
     traffic[i] = trace.traffic
   }
-  const provinces = new Map(economicRegions(world).map((region) => {
-    const tech = world.nations[region.nation].technologies.logistics,
-      infra = region.infrastructure,
-      damage = 1 - region.devastation * 0.6
-    return [region.id, {
-      friction:
-        (((2 - infra) * (1 + region.devastation * 0.5)) / (1 + tech * 0.1)) *
-        effectMultiplier(world, 'tradeCost', region.nation, region.id),
-      seaFriction: effectMultiplier(world, 'tradeCost', region.nation, region.id) / (1 + tech * 0.1),
-      road:
-        (1000 + infra * 6000) *
-        (1 + tech * 0.25) *
-        damage *
-        effectMultiplier(world, 'tradeCapacity', region.nation, region.id),
-      port:
-        (2500 + infra * 9000) *
-        (1 + tech * 0.15) *
-        damage *
-        effectMultiplier(world, 'tradeCapacity', region.nation, region.id),
-    }] as const
-  }))
-  const cellUnit=new Int32Array(world.cells.length).fill(-1)
-  for(const r of economicRegions(world))for(const c of r.cells)cellUnit[c]=r.id
+  const provinces = new Map(
+    economicRegions(world).map((region) => {
+      const tech = world.nations[region.nation].technologies.logistics,
+        infra = region.infrastructure,
+        damage = 1 - region.devastation * 0.6
+      return [
+        region.id,
+        {
+          friction:
+            (((2 - infra) * (1 + region.devastation * 0.5)) / (1 + tech * 0.1)) *
+            effectMultiplier(world, 'tradeCost', region.nation, region.id),
+          seaFriction: effectMultiplier(world, 'tradeCost', region.nation, region.id) / (1 + tech * 0.1),
+          road:
+            (1000 + infra * 6000) *
+            (1 + tech * 0.25) *
+            damage *
+            effectMultiplier(world, 'tradeCapacity', region.nation, region.id),
+          port:
+            (2500 + infra * 9000) *
+            (1 + tech * 0.15) *
+            damage *
+            effectMultiplier(world, 'tradeCapacity', region.nation, region.id),
+        },
+      ] as const
+    }),
+  )
+  const cellUnit = new Int32Array(world.cells.length).fill(-1)
+  for (const r of economicRegions(world)) for (const c of r.cells) cellUnit[c] = r.id
   const globalCost = effectMultiplier(world, 'tradeCost'),
     globalCapacity = effectMultiplier(world, 'tradeCapacity')
   geo.segments.forEach((segment, i) => {

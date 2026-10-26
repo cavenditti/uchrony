@@ -1,6 +1,6 @@
 import { fractal, hashSeed, random, noise } from './random'
 import { clamp, type Cell, type Terrain } from './types'
-import { HEX, neighbors } from './hex'
+import { CELL_SIZE, neighbors } from './grid'
 import { erodeDrainage } from './hydrology'
 
 export const SEA_LEVEL = 0.095
@@ -125,8 +125,8 @@ export function generateGeography(seed: string, continents: number, width: numbe
         id: r * width + q,
         q,
         r,
-        x: Math.sqrt(3) * HEX * (q + (r % 2) / 2),
-        y: HEX * 1.5 * r,
+        x: CELL_SIZE * (q + 0.5),
+        y: CELL_SIZE * (r + 0.5),
         elevation,
         moisture,
         terrain,

@@ -87,8 +87,8 @@ export function LocalInspection({
         {snapshot.sites.map((s) => (
           <rect
             key={s.id}
-            x={coordinate(s.x, b.x) - 0.7}
-            y={coordinate(s.y, b.y) - 0.7}
+            x={coordinate(s.x, b.x) - (s.kind === 'establishment' ? 1.25 : 0.7)}
+            y={coordinate(s.y, b.y) - (s.kind === 'establishment' ? 1.25 : 0.7)}
             width={s.kind === 'establishment' ? 2.5 : 1.4}
             height={s.kind === 'establishment' ? 2.5 : 1.4}
             fill={s.kind === 'establishment' ? 'var(--accent)' : 'currentColor'}
@@ -116,8 +116,8 @@ export function LocalInspection({
             site && (
               <circle
                 key={r.id}
-                cx={coordinate(site.x, b.x) + 1.5}
-                cy={coordinate(site.y, b.y) + 1.5}
+                cx={coordinate(site.x, b.x)}
+                cy={coordinate(site.y, b.y)}
                 r={r.id === routine?.id ? 1.3 : 0.6}
                 fill="var(--accent)"
               >

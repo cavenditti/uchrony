@@ -3,6 +3,7 @@ import type { World } from './types'
 import { population } from './types'
 import { localFirmRegion } from './local-units'
 import { ensureDistrictEconomy } from './districts'
+import { CELL_METERS } from './grid'
 import {
   METERS_PER_MAP_UNIT,
   cellPosition,
@@ -33,7 +34,7 @@ export function ensureAdaptiveWorld(w: World) {
     initialized: w.month,
     revision: 0,
     metersPerMapUnit: METERS_PER_MAP_UNIT,
-    minimumSpan: 125,
+    minimumSpan: 128,
     mode: 'adaptive',
     tree: { leaves: [], changed: {}, month: -1, domain: 'world' },
     sites: {},
@@ -47,7 +48,7 @@ export function ensureAdaptiveWorld(w: World) {
       source: 'legacy',
       month: w.month,
       assumptions: [
-        'Neighboring legacy terrain centers are 1 km apart; geography is preserved.',
+        'Terrain samples occupy aligned 1,024 m squares; numerical refinement preserves this geography.',
         'Opening residential capacity equals 115% of residents plus existing built-land capacity.',
         'Legacy markets and household pools retain their exact identities and heterogeneous closure state.',
         'Opening site capacity is a balance-sheet initialization, not output or GDP.',
@@ -189,12 +190,10 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
     if (corridor.traffic > 0)
       for (const cell of [corridor.a, corridor.b])
         activity.set(cell, (activity.get(cell) ?? 0) + corridor.traffic / 20000)
-  const fragments = w.cells
-    .filter((c) => !reconstruct || a.tree.domain === 'world' || c.terrain !== 'water')
-    .map((c) => {
-      const polygon = cellPolygon(w, c.id)
-      return { cell: c.id, water: c.terrain === 'water', polygon, area: polygonArea(polygon) }
-    })
+  const fragments = w.cells.map((c) => {
+    const polygon = cellPolygon(w, c.id)
+    return { cell: c.id, water: c.terrain === 'water', polygon, area: polygonArea(polygon) }
+  })
   const makeNode = (
     id: string,
     bounds: SpatialBounds,
@@ -271,10 +270,10 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
     const refine = reconstruct
       ? priorBranches.has(id)
       : mode === 'coarse'
-        ? bounds.size > 16000
+        ? bounds.size > 16 * CELL_METERS
         : mode === 'fine'
-          ? bounds.size > 1000
-          : bounds.size > 16000 ||
+          ? bounds.size > CELL_METERS
+          : bounds.size > 16 * CELL_METERS ||
             node.indicator > (priorBranches.has(id) ? 0.55 : 1) ||
             (priorBranches.has(id) && dwell)
     if (bounds.size / 2 >= a.minimumSpan && refine) {

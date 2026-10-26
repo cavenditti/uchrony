@@ -54,7 +54,7 @@ export function browserBackend(): SaveBackend {
         reject(new Error('The browser database is unavailable.'))
         return
       }
-      const request = indexedDB.open('uchrony-saves', 1)
+      const request = indexedDB.open('uchrony-square-saves', 1)
       let finished = false
       const timer = setTimeout(() => {
         finished = true

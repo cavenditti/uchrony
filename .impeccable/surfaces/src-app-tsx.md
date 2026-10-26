@@ -42,3 +42,21 @@ Lit 3D channels use deeper centers, shallow edges, restrained earth-colored bank
 ## Town materials and motion — 25 October 2026
 
 The next pass makes close town inspection richer through procedural masonry, roof tiles, timber accents, cobbles, civic details and planted plots. A gentle shared wind moves flags and foliage, while water ripples follow the running/paused state. This replaces the preceding static-ripple treatment without adding a new art direction or global interface tokens. Motion stops when paused, hidden or reduced motion is enabled; the same retained city limits and 30 fps ceiling govern the scene. Material and geometry costs, visual checks and their limits are recorded in [map rendering](../../docs/MAP_RENDERING.md#animated-scenery-and-town-materials--25-october-2026).
+
+## Illuminated-atlas trial — 25 October 2026
+
+Status: first implementation of a map-local art-direction trial. The user accepted “let’s try it out and see how it ends up looking” after the recommendation inspired by [Matrakçı Nasuh’s city miniatures](https://www.ee.bilkent.edu.tr/~history/Ext/matruk). This is permission to explore the result, not permanent approval of a replacement global design system. The earlier direction contract still governs the operational interface.
+
+THESIS: A living illuminated atlas with real 3D geography and towns.
+
+OWN-WORLD: Jade/ochre terrain, lapis-blue water, pale masonry, vermilion/turquoise/slate roofs, fine architectural edges, arched windows, sparse brush-wave marks, rounded/slender foliage, and tiny gold civic details. These pigments are local to the landscape; slate controls, brass actions, Alegreya lettering, dossier hierarchy, and thematic data meaning remain intact.
+
+STORY: Zoom from regions into distinctive seeded town plans and observe the existing shared animated scenery.
+
+FIRST VIEWPORT: Geography dominates. Close zoom reveals architecture; the trial introduces no new panels.
+
+FORM: The retained code-native 3D scene receives procedural pigments and materials. Geographic data, town plans, interactions, and simulation semantics remain intact. No generated or sourced shipping raster assets are introduced. Fine Atlas coastline strokes use screen-space widths; relief keeps its existing texture footprint.
+
+FINISH: The first independent review requested finer Atlas coastline weight and documentation. The final Atlas recapture and documentation update resolved both specified fixes; the independent verdict is `ship` at that scope. Validation covers the isolated animated graphics fixture, not a fresh simulation/autosave endurance run. See [map rendering](../../docs/MAP_RENDERING.md#illuminated-atlas-trial--25-october-2026) for measured costs and evidence.
+
+The subsequent 3D estuary refinement retains rich inland blue while matching the existing sea pigment, ripples and roughness near actual outlets. Banks fade before open water. The transition follows drainage through tributary joins; it is an illustrated mixing zone, with no sediment simulation, new global token or additional texture. Atlas keeps its cartographic strokes.

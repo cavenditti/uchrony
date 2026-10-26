@@ -1,4 +1,4 @@
-import { HEX } from '../sim/hex'
+import { CELL_SIZE } from '../sim/grid'
 import { clamp, type World } from '../sim/types'
 
 export type Geography = Pick<World, 'cells' | 'width' | 'height'>
@@ -12,14 +12,14 @@ export interface LandscapeField {
 }
 const fields = new WeakMap<World['cells'], LandscapeField>()
 
-/** A bounded render lattice reconstructed from actual sample positions, not hex edges.
+/** A bounded render lattice reconstructed from actual sample positions, independent of numerical leaf edges.
  * The simulation's administrative quadtree can split/merge without changing this field.
  */
 export function landscapeField(world: Geography): LandscapeField {
   const cached = fields.get(world.cells)
   if (cached) return cached
-  const spanX = world.width * Math.sqrt(3) * HEX,
-    spanY = world.height * HEX * 1.5
+  const spanX = world.width * CELL_SIZE,
+    spanY = world.height * CELL_SIZE
   const width = Math.min(768, world.width * 2),
     height = Math.min(496, world.height * 2)
   const support = Math.sqrt((spanX * spanY) / Math.max(1, world.cells.length)) * 2.15
@@ -65,12 +65,12 @@ export function landscapeField(world: Geography): LandscapeField {
       data[at + 5] =
         ((data[(y * width + Math.max(0, x - 1)) * STRIDE] -
           data[(y * width + Math.min(width - 1, x + 1)) * STRIDE]) *
-          HEX) /
+          (CELL_SIZE / 2)) /
         (spanX / (width - 1))
       data[at + 6] =
         ((data[(Math.max(0, y - 1) * width + x) * STRIDE] -
           data[(Math.min(height - 1, y + 1) * width + x) * STRIDE]) *
-          HEX) /
+          (CELL_SIZE / 2)) /
         (spanY / (height - 1))
     }
   const field = { width, height, spanX, spanY, data }

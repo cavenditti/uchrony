@@ -98,6 +98,8 @@ Uchrony frames a living atlas with compact, inspectable state dossiers. Blue-gre
 
 This records the implemented, provisional code-led direction, seed ec4fabee; it is not a claim of user approval. The source is authoritative for the current build. Product mechanisms belong in PRODUCT.md, and the first-surface composition remains in .impeccable/surfaces/src-app-tsx.md.
 
+The illuminated-atlas map treatment is a first trial accepted for exploration on 25 October 2026, inspired by Matrakçı Nasuh’s city miniatures. It changes the landscape and town materials locally; it does not replace the cabinet-map interface or establish permanent approval of this art direction.
+
 **Key Characteristics:**
 
 - Geography remains the dominant visual field.
@@ -128,6 +130,12 @@ The palette combines slate blue-green framing, warm pale text, brass actions, an
 - **Selected state** (`selected-state`): a local selection surface in the country list.
 
 **The Brass Action Rule.** Use brass for primary actions, active controls, and keyboard focus; territorial colors communicate the map’s data.
+
+### Provisional map-local pigments — 25 October 2026
+
+The trial uses jade and ochre ground, lapis-blue water, pale masonry, vermilion/turquoise/slate roofs, and restrained gold civic finials. The implementation source is `src/map/illuminated-palette.ts`; these are local scenery colors, not additions to the global frontmatter token set. Terrain pigment enhancement is enabled for Terrain and disabled for thematic land fills; thematic river color remains restrained. Data-layer meaning continues to take precedence.
+
+**The Map-local Trial Rule.** Keep the illuminated pigments and miniature materials local to the map trial; preserve slate controls, brass actions, Alegreya lettering, and the meaning of thematic data colors.
 
 ## Typography
 
@@ -207,6 +215,12 @@ The layer picker, stacked zoom controls, and tooltip use compact dark floating s
 The map extends the cabinet-map world with a default tilted 3D landscape and a retained flat Atlas view. Raised terrain, directional lighting, deterministic forest clusters, and small roofed province centers give geography depth; capitals receive a taller keep when the scene is built. Terrain is the initial layer. Shared province polygons, the smoothed land silhouette, thematic fills, and draped trade and military overlays retain their cartographic meaning in both presentations. Political fills remain grouped by state; detailed province divisions appear on closer inspection. Alegreya labels project into a separate 2D overlay and reserve screen space to avoid overlaps. The 3D/Atlas and tilt/above controls retain opaque slate backing and brass active states; WebGL failure falls back to Atlas. The large decorative map heading remains an accessible, visually hidden heading. These landscape materials and data colors are map-specific, not new interface tokens. Keep the established typography, ruled dossiers, and action palette when extending the scenery; see [map rendering](docs/MAP_RENDERING.md) for architecture and visual limits.
 
 Freight is a physical network overlay: muted solid roads, warm dashed shipping lanes, and hollow harbor markers. Each shared segment is drawn once, with width based on total monthly tonnage. The trade layer dims unrelated shipments while emphasizing the selected state's or province's imports and exports. Cargo dots follow actual travel direction at a constant screen speed and stop when paused or reduced motion is requested. The dossier explains cargo, distance, and harbor transfers without requiring map hover.
+
+### Illuminated-atlas map trial
+
+The existing 3D geography and deterministic towns receive a matte mineral-pigment treatment. Procedural wall grain, arched windows, fine architectural edge lines, and tiled roofs reveal detail at close range; distance filtering softens the smaller marks. Rounded and slender foliage, sparse animated brush-wave marks, and a small gold civic accent support the miniature character. Lighting still describes relief and architecture. Atlas coastline strokes stay fine in screen space; the 3D terrain-texture coastline retains its existing footprint.
+
+This trial adds no panel or sourced/generated shipping raster artwork. Existing code-native geography, selection, camera controls, shared scenery motion, pause/reduced-motion behavior, and town cache limits remain the context. It is an invitation to judge the result, not a permanent global visual replacement. Trial evidence and its performance limits are recorded in [map rendering](docs/MAP_RENDERING.md#illuminated-atlas-trial--25-october-2026).
 
 ### Meters and Chronicle
 

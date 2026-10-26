@@ -2,19 +2,19 @@ import { activeJurisdictions } from '../sim/jurisdictions'
 import { landscapeRasters } from './landscape-raster'
 import { riverCurves, riverPaths } from './rivers'
 import { spatialState, districtDensityScale, settlementPosition } from '../sim/spatial'
-import { HEX, neighbors } from '../sim/hex'
+import { CELL_SIZE, neighbors } from '../sim/grid'
 import { clamp, type World, type Layer } from '../sim/types'
 import { buildGeometry, type MapGeometry, type Ring } from './geometry'
 import { dominantIdentity, identityAxis, identityColor } from './identity'
 
 export const terrainColors = {
-  plains: '#a6b77c',
-  forest: '#66845b',
-  hills: '#93966c',
-  mountains: '#a6a89a',
-  desert: '#d7bd87',
-  tundra: '#ced5c8',
-  water: '#235568',
+  plains: '#b9be85',
+  forest: '#316d5b',
+  hills: '#a4ad83',
+  mountains: '#b19990',
+  desert: '#debc8b',
+  tundra: '#b3beae',
+  water: '#2e6087',
 }
 export const pathFor = (rings: Ring[], smooth = false) => {
   const path = new Path2D()
@@ -95,8 +95,8 @@ function administrativeEdges(world: World, level: 'municipality' | 'province') {
 export function buildAtlas(world: World): AtlasCache {
   const { cells, width, height } = world
   const geometry = buildGeometry(cells, width, height, world.regions.length)
-  const worldWidth = Math.ceil(width * Math.sqrt(3) * HEX),
-    worldHeight = Math.ceil(height * HEX * 1.5),
+  const worldWidth = Math.ceil(width * CELL_SIZE),
+    worldHeight = Math.ceil(height * CELL_SIZE),
     resolution = Math.min(1, 2400 / Math.max(worldWidth, worldHeight)),
     w = Math.ceil(worldWidth * resolution),
     h = Math.ceil(worldHeight * resolution)
@@ -218,33 +218,13 @@ export function drawAtlas(
     : 0.85
   if (!relief) ctx.drawImage(cache.relief, 0, 0, cache.worldWidth, cache.worldHeight)
   ctx.globalAlpha = 1
-  if (world.localEconomy && ['terrain', 'political', 'trade'].includes(layer)) {
-    ctx.fillStyle = '#a89b83'
-    for (const city of world.localEconomy.cities)
-      if (city.absorbedBy === undefined)
-        for (const id of city.cells) {
-          const cell = world.cells[id]
-          ctx.globalAlpha = 0.18 + Math.min(0.3, (world.localEconomy.built[id] ?? 0) * 0.3)
-          ctx.beginPath()
-          for (let k = 0; k < 6; k++) {
-            const angle = ((k * 60 - 30) * Math.PI) / 180,
-              x = cell.x + HEX * Math.cos(angle),
-              y = cell.y + HEX * Math.sin(angle)
-            if (k === 0) ctx.moveTo(x, y)
-            else ctx.lineTo(x, y)
-          }
-          ctx.closePath()
-          ctx.fill()
-        }
-    ctx.globalAlpha = 1
-  }
   // Curved centerlines share confluence positions and are cached with immutable geography.
   const minimumFlow = scale >= 0.7 ? 0 : 12 / Math.max(0.08, scale)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   for (let pass = 0; !relief && pass < 2; pass++) {
     const bank = pass === 0
-    ctx.strokeStyle = bank ? '#263e366b' : layer === 'terrain' ? '#438d9d' : '#457a88bb'
+    ctx.strokeStyle = bank ? '#b29a657d' : layer === 'terrain' ? '#356d9f' : '#457a88bb'
     for (const river of cache.rivers) {
       if (river.flow < minimumFlow) continue
       const width = Math.max(0.5 / scale, Math.min(6, 0.35 + Math.sqrt(river.flow) * 0.13))
@@ -305,10 +285,10 @@ export function drawAtlasLinework(
   }
   ctx.restore()
   // Shore ink retains a readable screen width in both presentations.
-  ctx.strokeStyle = '#74aea14d'
+  ctx.strokeStyle = '#254e6470'
   ctx.lineWidth = (relief ? 2 : 1.7) / scale
   ctx.stroke(cache.land)
-  ctx.strokeStyle = '#cecc9d99'
+  ctx.strokeStyle = '#e3ce9bcc'
   ctx.lineWidth = (relief ? 0.8 : 0.65) / scale
   ctx.stroke(cache.land)
 }

@@ -1,8 +1,8 @@
 import type { World } from './types'
 import type { PhysicalSite } from './adaptive-types'
-import { residentialSites, occupiedResidents } from './residential-sites'
+import { residentialSites, occupiedResidents, compactResidence } from './residential-sites'
 import { queryAdaptiveSites } from './adaptive-grid'
-import { commuteSiteRoute } from './commuting'
+import { residentialFootprint, footprintConnection, localWalkingConnection } from './residential-geometry'
 import { SETTLEMENT, isVisibleSettlement } from './settlement-model'
 
 export interface SettlementComponent {
@@ -25,25 +25,17 @@ export function settlementComponents(w: World): SettlementComponent[] {
   const sites = residentialSites(w)
     .filter((s) => {
       if (!s.parcel) return false
-      const built = w.localEconomy!.built[s.cell] ?? 0
-      const developed =
-        (s.investedValue ?? 0) > 0 ||
-        built >= (former.has(s.id) ? SETTLEMENT.retainedBuiltCover : SETTLEMENT.entryBuiltCover)
-      return developed && occupiedResidents(w, s) / (s.parcel.size ** 2 / 1e6) >= SETTLEMENT.minimumDensity
+      return (
+        compactResidence(s, former.has(s.id)) &&
+        occupiedResidents(w, s) / (s.parcel.size ** 2 / 1e6) >= SETTLEMENT.minimumDensity
+      )
     })
     .sort((a, b) => a.id.localeCompare(b.id))
   const byId = new Map(sites.map((s) => [s.id, s])),
     remaining = new Set(byId.keys())
   const maximum = sites.reduce((max, s) => Math.max(max, s.parcel!.size), 0)
   const components: SettlementComponent[] = []
-  const gap = (a: PhysicalSite, b: PhysicalSite) => {
-    const x = a.parcel!,
-      y = b.parcel!
-    return Math.hypot(
-      Math.max(x.x - y.x - y.size, y.x - x.x - x.size, 0),
-      Math.max(x.y - y.y - y.size, y.y - x.y - x.size, 0),
-    )
-  }
+  const footprints = new Map(sites.map((s) => [s.id, residentialFootprint(w, s)]))
   for (const start of sites) {
     if (!remaining.delete(start.id)) continue
     const members = [start]
@@ -51,7 +43,14 @@ export function settlementComponents(w: World): SettlementComponent[] {
       const from = members[i],
         radius = (from.parcel!.size + maximum) / Math.SQRT2 + 150
       for (const to of queryAdaptiveSites(w, from, radius, (s) => remaining.has(s.id))) {
-        if (gap(from, to) > 150 || !commuteSiteRoute(w, from, to, 20)) continue
+        const connection = footprintConnection(footprints.get(from.id)!, footprints.get(to.id)!)
+        const nation = w.localEconomy!.units[from.pool].nation
+        if (
+          w.localEconomy!.units[to.pool].nation !== nation ||
+          connection.distance > 150 + 1e-7 ||
+          !localWalkingConnection(w, connection.from, connection.to, nation, [from.cell, to.cell])
+        )
+          continue
         remaining.delete(to.id)
         members.push(to)
       }

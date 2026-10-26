@@ -1,5 +1,6 @@
 import { commutesAt } from './commute-ledger'
 import { queryAdaptiveLeaves, queryAdaptiveSitesInBounds } from './adaptive-grid'
+import { commuteSiteRoute } from './commuting'
 import { cellPosition } from './physical-space'
 import { activeJurisdictions } from './jurisdictions'
 import { hashSeed } from './random'
@@ -136,15 +137,13 @@ export function inspectWorld(w: World, request: InspectionRequest): InspectionSn
       const total = flows.reduce((sum, f) => sum + f.workers * share, 0)
       if (!total) continue
       let draw = ((hashSeed(`${seed}:${stratum}`) / 0x100000000) * total) / share
-      const flow = flows.find((f) => (draw -= f.workers) <= 0) ?? flows[flows.length - 1],
-        travelHours = flow.minutes / 60
-      const path = flow.route ? w.adaptive.commuteRoutes?.[flow.route]?.cells : flow.cells
+      const flow = flows.find((f) => (draw -= f.workers) <= 0) ?? flows[flows.length - 1]
       const workplace = w.adaptive.sites[flow.workplace]
-      const points = [
-        { x: home.x, y: home.y },
-        ...(path ?? []).map((cell) => cellPosition(w, cell)),
-        { x: workplace.x, y: workplace.y },
-      ]
+      // A representative home is sampled from its pool. Its displayed journey
+      // must start there, not inherit the pool centre's route and travel time.
+      // This is a read-only conditional itinerary; paid contracts stay unchanged.
+      const journey = workplace ? commuteSiteRoute(w, home, workplace, 24 * 60) : null
+      const travelHours = (journey?.minutes ?? flow.minutes) / 60
       const person = representativePerson(
         groups,
         w.month,
@@ -161,15 +160,17 @@ export function inspectWorld(w: World, request: InspectionRequest): InspectionSn
         weight: total,
         age: person ? String(person.age) : 'working age',
         sex: person?.sex ?? 'female',
-        journeys: [
-          { start: 8 - travelHours, end: 8, points },
-          { start: 17, end: 17 + travelHours, points: [...points].reverse() },
-        ],
+        journeys: journey
+          ? [
+              { start: 8 - travelHours, end: 8, points: journey.points },
+              { start: 17, end: 17 + travelHours, points: [...journey.points].reverse() },
+            ]
+          : [],
         activities: [
           { hour: 0, label: 'At home', site: home.id },
           {
             hour: 8 - travelHours,
-            label: `Travel to work · ${Math.round(flow.minutes)} min`,
+            label: `Travel to work · ${Math.round(travelHours * 60)} min`,
             site: flow.workplace,
           },
           { hour: 8, label: 'At work', site: flow.workplace },

@@ -1111,7 +1111,7 @@ export default function App() {
               >
                 {Object.entries(WORLD_SCALES).map(([key, extent]) => (
                   <option key={key} value={key}>
-                    {extent.label} · {(extent.width * extent.height).toLocaleString()} hexes
+                    {extent.label} · {(extent.width * extent.height).toLocaleString()} square cells
                   </option>
                 ))}
               </select>

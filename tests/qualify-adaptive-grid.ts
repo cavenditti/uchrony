@@ -85,10 +85,16 @@ for (const scale of ['regional', 'world'] as WorldScale[]) {
 }
 const report = {
   date: '2026-10-26',
+  topology: 'square-v1',
+  sourceSpanMeters: 1024,
+  minimumSpanMeters: 128,
   seed: 'Adaptive grid qualification 2026-10-26',
   command: 'node --expose-gc --import tsx tests/qualify-adaptive-grid.ts',
   scope:
     'Offline geometry, conservation and recursive search; timings include no rendering or long-run simulation. Per-mode heap is sampled after explicit GC when enabled, not peak browser memory.',
   results,
 }
-writeFileSync('docs/validation/adaptive-grid-2026-10-26.json', JSON.stringify(report, null, 2) + '\n')
+writeFileSync(
+  process.argv[2] ?? 'docs/validation/square-grid-2026-10-26.json',
+  JSON.stringify(report, null, 2) + '\n',
+)

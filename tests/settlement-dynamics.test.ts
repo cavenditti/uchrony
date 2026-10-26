@@ -27,6 +27,10 @@ import { rebaseEndowments } from './fixtures/endowment'
 import { viewSnapshot } from '../src/sim/view-snapshot'
 import { optimizeResidentialLocations, settlementAccess } from '../src/sim/settlement-access'
 import { cellPosition } from '../src/sim/physical-space'
+import { planHousingInvestment, housingInputs } from '../src/sim/housing-investment'
+import { commuteRoute } from '../src/sim/commuting'
+import { localWalkingConnection } from '../src/sim/residential-geometry'
+import { neighbors } from '../src/sim/grid'
 import { participatingLabor } from '../src/sim/age-cohorts'
 
 function fixture(seed = 'Physical settlements') {
@@ -55,6 +59,7 @@ function prepareTwinParcels() {
   const w = fixture(),
     local = w.localEconomy!
   for (const c of Object.keys(local.built)) local.built[+c] = 0
+  for (const home of residentialSites(w)) home.openingBuilt = 0
   local.cities = []
   w.spatial!.settlements = []
   const unit = local.active.map((id) => local.units[id]).find((u) => population(u) >= 5000)!
@@ -84,6 +89,7 @@ function prepareTwinParcels() {
 test('rural spare capacity and empty parcels do not become towns or municipal catchments', () => {
   const w = fixture('Rural housing is not a town')
   for (const key of Object.keys(w.localEconomy!.built)) w.localEconomy!.built[+key] = 0
+  for (const home of residentialSites(w)) home.openingBuilt = 0
   w.localEconomy!.cities = []
   w.spatial!.settlements = []
   evolveCities(w, true)
@@ -95,7 +101,7 @@ test('rural spare capacity and empty parcels do not become towns or municipal ca
   validateWorld(w)
 })
 
-test('two settlements can occupy one source hex; occupied infill merges identities without moving assets', () => {
+test('two settlements can occupy one terrain sample; occupied infill merges identities without moving assets', () => {
   const { w, make, first, second, total } = prepareTwinParcels()
   const before = holdings(w)
   evolveCities(w, true)
@@ -124,6 +130,13 @@ test('two settlements can occupy one source hex; occupied infill merges identiti
   assert.equal(active.length, 1)
   assert.equal(active[0].population, total)
   assert(active[0].sites!.includes(second.id) && active[0].sites!.includes(bridge.id))
+  const patches = settlementPlaces(w)
+  assert(
+    patches.every(
+      (p) => p.form!.angle === patches[0].form!.angle && p.form!.planSeed === patches[0].form!.planSeed,
+    ),
+    'merged neighborhoods share one street frame',
+  )
   assert.equal(active[0].parents.length, 1)
   assert(active[0].aliases.length > 0)
   assert.equal(holdings(w), before)
@@ -146,7 +159,7 @@ test('numerical coarsening and refinement retain every physical parcel, occupant
   }
 })
 
-test('subhex locations and settlement identities survive compressed save and compact display exactly', () => {
+test('within-cell locations and settlement identities survive compressed save and compact display exactly', () => {
   const { w } = prepareTwinParcels()
   evolveCities(w, true)
   refreshSpatial(w)
@@ -168,8 +181,8 @@ test('subhex locations and settlement identities survive compressed save and com
   assert.throws(() => validateWorld(repeated), /sequence/)
 })
 
-test('funded expansion creates a subhex parcel only after payment; capacity waits for construction', () => {
-  const w = fixture('Funded subhex homes')
+test('funded expansion creates a within-cell parcel only after payment; capacity waits for construction', () => {
+  const w = fixture('Funded within-cell homes')
   beginEconomyMonth(w)
   const home = residentialSites(w).find(
     (s) => (s.residents ?? 0) > 1000 && w.localEconomy!.units[s.pool].cells.length === 1,
@@ -178,6 +191,7 @@ test('funded expansion creates a subhex parcel only after payment; capacity wait
   const r = w.localEconomy!.units[home.pool],
     sponsor = w.economy!.producers[home.pool]
   home.capacity = home.residents! * 1.15 - 100
+  home.openingBuilt = 0.1
   home.parcel = { x: home.x - 32, y: home.y - 32, size: 64 }
   for (const p of Object.values(w.economy!.producers)) p.cash = 0
   const h = w.economy!.households[home.pool].laborer
@@ -333,4 +347,129 @@ test('nonfarm workplace access attracts residents even with equal initial crowdi
   assert(to.residents! > old!)
   assert.equal(from.residents! + to.residents!, total)
   assert.equal(holdings(w), before)
+})
+
+test('small rural shortages repair existing homes instead of surveying tiny urban plots', () => {
+  const w = fixture('Rural infill cost'),
+    home = residentialSites(w).find((s) => s.capacity > 1000)!
+  home.openingBuilt = 0
+  const unit = w.localEconomy!.units[home.pool],
+    sponsor = w.economy!.producers[home.pool]
+  unit.stocks.timber = unit.stocks.stone = 1000
+  sponsor.cash = 1000
+  const before = JSON.stringify(w.adaptive!.sites)
+  const plan = planHousingInvestment(w, home, 10, [home], 1000, settlementAccess(w))!
+  assert(plan && !plan.plot)
+  assert.equal(plan.site.id, home.id)
+  assert.equal(plan.spaces, 10)
+  assert.equal(JSON.stringify(w.adaptive!.sites), before, 'planning cannot create people, assets or parcels')
+  const low = housingInputs(100, 100, 16384),
+    high = housingInputs(100, 2000, 16384),
+    expansion = housingInputs(10, 0, 16384, 100)
+  assert(
+    high.stone > low.stone && high.labor > low.labor,
+    'vertical development uses increasing marginal inputs',
+  )
+  assert(expansion.stone > 12 && expansion.labor > 4, 'new land pays real fixed and distance-based works')
+})
+
+test('occupied parcels merge across terrain boundaries without a mandatory center detour', () => {
+  const w = fixture('Adjacent occupied edges'),
+    local = w.localEconomy!
+  for (const home of residentialSites(w)) home.openingBuilt = 0
+  local.cities = []
+  const first = residentialSites(w).find(
+    (a) =>
+      (a.residents ?? 0) > 1000 &&
+      neighbors(a.cell, w.width, w.height).some((id) => {
+        const b = w.adaptive!.sites[`home:${id}`]
+        return b && (b.residents ?? 0) > 1000 && local.units[a.pool].nation === local.units[b.pool].nation
+      }),
+  )!
+  const second = neighbors(first.cell, w.width, w.height)
+    .map((id) => w.adaptive!.sites[`home:${id}`])
+    .find(
+      (b) => b && (b.residents ?? 0) > 1000 && local.units[b.pool].nation === local.units[first.pool].nation,
+    )!
+  const pa = cellPosition(w, first.cell),
+    pb = cellPosition(w, second.cell),
+    length = Math.hypot(pb.x - pa.x, pb.y - pa.y),
+    dx = (pb.x - pa.x) / length,
+    dy = (pb.y - pa.y) / length
+  const added = [first, second].map((home, i) => {
+    const point = { x: (pa.x + pb.x) / 2 + (i ? 64 : -64) * dx, y: (pa.y + pb.y) / 2 + (i ? 64 : -64) * dy }
+    const s = createResidentialParcel(w, home.pool, home.cell, point, {
+      x: point.x - 64,
+      y: point.y - 64,
+      size: 128,
+    })
+    s.capacity = 1200
+    s.residents = 1000
+    s.investedValue = 1
+    home.residents! -= 1000
+    return s
+  })
+  syncResidentialPopulation(w)
+  refreshAdaptiveTotals(w)
+  const before = holdings(w)
+  evolveCities(w, true)
+  refreshSpatial(w)
+  const cities = local.cities.filter((c) => c.population && c.absorbedBy === undefined)
+  assert.equal(cities.length, 1)
+  assert.equal(cities[0].population, 2000)
+  assert(cities[0].sites!.includes(added[0].id) && cities[0].sites!.includes(added[1].id))
+  assert.equal(holdings(w), before)
+  validateWorld(w)
+})
+
+test('direct walks cannot cross water or a zero-width land corner', () => {
+  const w = fixture('Corner walking barrier')
+  const c = w.cells.find(
+    (a) =>
+      a.q + 1 < w.width &&
+      a.r + 1 < w.height &&
+      [a.id, a.id + 1, a.id + w.width, a.id + w.width + 1].every(
+        (id) =>
+          w.cells[id].terrain !== 'water' &&
+          w.regions[w.cells[id].region].nation === w.regions[a.region].nation,
+      ),
+  )!
+  assert(c)
+  const a = c.id,
+    b = a + w.width + 1,
+    nation = w.regions[c.region].nation,
+    from = cellPosition(w, a),
+    to = cellPosition(w, b)
+  assert(localWalkingConnection(w, from, to, nation, [a, b]))
+  w.cells[a + 1].terrain = 'water'
+  w.cells[a + w.width].terrain = 'water'
+  assert.equal(localWalkingConnection(w, from, to, nation, [a, b]), null)
+  assert.equal(localWalkingConnection(w, from, cellPosition(w, a + 1), nation, [a, a + 1]), null)
+})
+
+test('network fallback cannot cross an inaccessible sovereign corner', () => {
+  const w = fixture('Sovereign walking barrier')
+  const c = w.cells.find(
+    (a) =>
+      a.q + 1 < w.width &&
+      a.r + 1 < w.height &&
+      [a.id, a.id + 1, a.id + w.width, a.id + w.width + 1].every(
+        (id) =>
+          w.cells[id].terrain !== 'water' &&
+          w.regions[w.cells[id].region].nation === w.regions[a.region].nation,
+      ),
+  )!
+  const from = c.id,
+    to = from + w.width + 1,
+    nation = w.regions[c.region].nation
+  w.corridors = []
+  for (const id of [from, from + 1, from + w.width, to]) w.cells[id].terrain = 'plains'
+  assert(commuteRoute(w, from, to, 23))
+  for (const id of [from + 1, from + w.width]) {
+    const region = { ...w.regions[w.cells[id].region], nation: (nation + 1) % w.nations.length }
+    w.cells[id].region = w.regions.length
+    w.regions.push(region)
+  }
+  w.month++
+  assert.equal(commuteRoute(w, from, to, 23), null)
 })

@@ -12,6 +12,8 @@ import { terrainMaterial, oceanMaterial } from './landscape-material'
 import { forestSites } from './forest-sites'
 import { riverSurface } from './river-surface'
 import { SceneryMotion } from './scenery-motion'
+import { windMaterial } from './city-materials'
+import { illuminated } from './illuminated-palette'
 
 export type ReliefCamera = { w: number; h: number; scale: number; x: number; y: number; tilt: boolean }
 
@@ -36,7 +38,8 @@ export class ReliefMap {
   private scenery = new THREE.Group()
   private treeScale = { value: 1 }
   private motion = new SceneryMotion()
-  private sun = new THREE.DirectionalLight('#fff0d8', 2.65)
+  private pigment = { value: 1 }
+  private sun = new THREE.DirectionalLight('#fff0d8', 1.85)
   private cities: CityScenery
   private raycaster = new THREE.Raycaster()
   private cameraState: ReliefCamera = { w: 1, h: 1, scale: 1, x: 0, y: 0, tilt: true }
@@ -62,7 +65,7 @@ export class ReliefMap {
       powerPreference: 'high-performance',
     })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75))
-    this.renderer.setClearColor('#102c3b')
+    this.renderer.setClearColor('#193354')
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
@@ -92,7 +95,7 @@ export class ReliefMap {
       positions.getY(row * (segmentsX + 1) + column),
     )
     this.picker = new TerrainPicker(geometry)
-    const material = terrainMaterial(this.texture)
+    const material = terrainMaterial(this.texture, this.pigment)
     this.terrain = new THREE.Mesh(geometry, material)
     this.terrain.receiveShadow = true
     this.scene.add(this.terrain)
@@ -108,6 +111,7 @@ export class ReliefMap {
       this.picker,
       {
         texture: this.texture,
+        ocean: this.oceanTexture,
         width: this.width,
         height: this.height,
       },
@@ -139,7 +143,7 @@ export class ReliefMap {
     const overlayMesh = new THREE.Mesh(geometry, this.overlayMaterial)
     overlayMesh.renderOrder = 2
     this.scene.add(overlayMesh)
-    this.scene.add(new THREE.HemisphereLight('#d6e7f0', '#303d25', 1.1))
+    this.scene.add(new THREE.HemisphereLight('#f3ead1', '#647b70', 1.65))
     const sun = this.sun
     sun.shadow.mapSize.set(2048, 2048)
     sun.shadow.bias = -0.00015
@@ -175,7 +179,7 @@ export class ReliefMap {
             if (Math.hypot(tree.x - city.x, tree.z - city.z) < city.radius + 5) return false
       return true
     })
-    const geometry = new THREE.IcosahedronGeometry(1, 0)
+    const geometry = new THREE.SphereGeometry(1, 8, 6)
     const canopy = geometry.attributes.position
     for (let i = 0; i < canopy.count; i++) {
       const x = canopy.getX(i),
@@ -196,27 +200,22 @@ export class ReliefMap {
     geometry.translate(0, 0.8, 0)
     const crowns = new THREE.InstancedMesh(
       geometry,
-      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: false }),
+      windMaterial(this.motion.time, false, this.treeScale),
       trees.length,
     )
-    crowns.material.onBeforeCompile = (shader) => {
-      shader.uniforms.townTreeScale = this.treeScale
-      shader.uniforms.sceneryTime = this.motion.time
-      shader.vertexShader = 'uniform float townTreeScale;\nuniform float sceneryTime;\n' + shader.vertexShader
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <begin_vertex>',
-        '#include <begin_vertex>\ntransformed *= townTreeScale;\ntransformed.x += sin(sceneryTime*1.3+dot(instanceMatrix[3].xz,vec2(0.31,0.17))+position.y)*max(0.0,position.y)*0.025*townTreeScale;',
-      )
-    }
-    crowns.material.customProgramCacheKey = () => 'town-tree-scale-v1'
     let index = 0
     for (const { x, z, variation: r } of trees) {
       dummy.position.set(x, terrainHeight(world, x, z) + 0.2, z)
       dummy.rotation.set((r - 0.5) * 0.18, r * Math.PI, 0)
-      dummy.scale.set(3.1 + r * 2.2, 4 + r * 5, 2.7 + r * 2.5)
+      const slender = r > 0.64
+      dummy.scale.set(
+        slender ? 2.1 : 3.1 + r * 2.2,
+        slender ? 10 + r * 3 : 4 + r * 5,
+        slender ? 2 : 2.7 + r * 2.5,
+      )
       dummy.updateMatrix()
       crowns.setMatrixAt(index, dummy.matrix)
-      color.setHSL(0.25 + r * 0.07, 0.24 + r * 0.1, 0.14 + r * 0.12)
+      color.setHSL(0.37 + r * 0.06, 0.39 + r * 0.1, 0.18 + r * 0.1)
       crowns.setColorAt(index++, color)
     }
     crowns.computeBoundingSphere()
@@ -297,7 +296,8 @@ export class ReliefMap {
     if (this.sun.castShadow) this.renderer.shadowMap.needsUpdate = true
     this.cities.view(this.camera, this.cameraState.w, this.cameraState.h, scale)
     this.rivers.minimumFlow.value = scale >= 0.7 ? 0 : 12 / Math.max(0.08, scale)
-    this.rivers.mesh.material.color.set(layer === 'terrain' ? '#306b70' : '#3d6872')
+    this.pigment.value = layer === 'terrain' ? 1 : 0
+    this.rivers.mesh.material.color.set(layer === 'terrain' ? illuminated.river : '#3d6872')
     const ctx = this.textureCanvas.getContext('2d')!
     const ratio = this.textureCanvas.width / this.width
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)

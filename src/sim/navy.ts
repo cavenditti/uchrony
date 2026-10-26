@@ -2,7 +2,8 @@ import { marketStore, armyStore, fleetStore, recordGift, recordUse } from './nat
 import { publicExpense, publicGoods } from './ledger'
 import { clamp, population, relation, type Army, type World } from './types'
 import type { Fleet } from './military-types'
-import { neighbors } from './hex'
+import { movementNeighbors, stepDistance } from './grid'
+import { MinHeap } from './heap'
 import { transportNetwork } from './transport'
 import { diplomaticAccess } from './agreements'
 import {
@@ -70,6 +71,9 @@ export const friendlyPort = (w: World, nation: number, region: number) =>
   diplomaticAccess(w, nation, w.regions[region].nation)
 
 const paths = new WeakMap<World['cells'], Map<string, number[]>>()
+function sailingDistance(w: World, path: number[]) {
+  return path.slice(1).reduce((sum, id, i) => sum + stepDistance(w.cells[path[i]], w.cells[id]), 0)
+}
 export function waterPath(w: World, from: number, to: number) {
   if (w.cells[from]?.terrain !== 'water' || w.cells[to]?.terrain !== 'water') return []
   let saved = paths.get(w.cells)
@@ -81,14 +85,25 @@ export function waterPath(w: World, from: number, to: number) {
     prior = saved.get(key)
   if (prior) return [...prior]
   const previous = new Int32Array(w.cells.length).fill(-1),
-    queue = [from]
+    distances = new Float64Array(w.cells.length).fill(Infinity),
+    queue = new MinHeap()
   previous[from] = from
-  for (let i = 0; i < queue.length && previous[to] < 0; i++)
-    for (const id of neighbors(queue[i], w.width, w.height))
-      if (previous[id] < 0 && w.cells[id].terrain === 'water') {
-        previous[id] = queue[i]
-        queue.push(id)
+  distances[from] = 0
+  queue.push(from, 0)
+  while (queue.size) {
+    const current = queue.pop()
+    if (current.cost !== distances[current.id]) continue
+    if (current.id === to) break
+    for (const id of movementNeighbors(w.cells, current.id, w.width, w.height)) {
+      if (w.cells[id].terrain !== 'water') continue
+      const cost = current.cost + stepDistance(w.cells[current.id], w.cells[id])
+      if (cost < distances[id]) {
+        distances[id] = cost
+        previous[id] = current.id
+        queue.push(id, cost)
       }
+    }
+  }
   if (previous[to] < 0) return []
   const route = [to]
   while (route.at(-1) !== from) route.push(previous[route.at(-1)!])
@@ -206,6 +221,7 @@ export function orderFleet(w: World, id: number, target: number, mission: Fleet[
   if (!path.length) throw new Error('There is no navigable sea route to that coast.')
   f.target = target
   f.course = path.slice(1)
+  f.sailingProgress = 0
   f.mission = mission
   for (const army of w.armies.filter((a) => f.embarked.includes(a.id))) army.target = target
   return 'Naval orders recorded. Ships sail and consume provisions on subsequent months.'
@@ -370,7 +386,14 @@ export function advanceNavy(w: World) {
         Math.min(1, f.soldiers / Math.max(1, crewNeeded(f))) *
         (0.5 + f.hull * 0.5),
     )
-    for (let step = 0; step < speed && f.course.length; step++) f.cell = f.course.shift()!
+    let distance = speed + (f.sailingProgress ?? 0)
+    while (f.course.length) {
+      const step = stepDistance(w.cells[f.cell], w.cells[f.course[0]])
+      if (distance + 1e-9 < step) break
+      distance -= step
+      f.cell = f.course.shift()!
+    }
+    f.sailingProgress = f.course.length ? Math.max(0, distance) : 0
     if (!f.course.length && f.target !== null) f.region = f.target
     if (
       ['transport', 'return'].includes(f.mission) &&
@@ -389,7 +412,7 @@ export function advanceNavy(w: World) {
         .harbors.filter((h) => friendlyPort(w, f.nation, h.region))
         .map((h) => ({ h, path: waterPath(w, f.cell, h.water) }))
         .filter((v) => v.path.length)
-        .sort((a, b) => a.path.length - b.path.length)[0]
+        .sort((a, b) => sailingDistance(w, a.path) - sailingDistance(w, b.path))[0]
       if (port) orderFleet(w, f.id, port.h.region, 'return')
     }
   }
@@ -406,7 +429,7 @@ export function advanceNavy(w: World) {
       )
         continue
       const proximity = waterPath(w, a.cell, b.cell)
-      if (!proximity.length || proximity.length > 3) continue
+      if (!proximity.length || sailingDistance(w, proximity) > 2) continue
       const power = (f: Fleet) =>
         (f.warships + f.transports * 0.12) *
         f.hull *

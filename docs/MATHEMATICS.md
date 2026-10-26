@@ -234,7 +234,7 @@ Municipalities and provinces annually compare local mergers, splits and boundary
 
 ## Settlement formation and residential choice
 
-Town scenery requires occupied, connected development: village $N\ge500$, town $N\ge5000$, city $N\ge50000$. Developed parcels need density at least 300/km²; gaps up to 150 m connect only with a journey of at most 20 minutes. Empty plots cannot join settlements. These are classification conventions, not growth targets or a fitted definition of cities. [Degree of Urbanisation](https://human-settlement.emergency.copernicus.eu/degurbaDefinitions.php).
+Town scenery requires occupied, connected development: village $N\ge500$, town $N\ge5000$, city $N\ge50000$. Developed parcels need density at least 300/km²; gaps up to 150 m connect along their closest developed edges only when the intervening land is traversable within the same sovereign state. A detour via terrain-cell centers is not required; water gaps and zero-width diagonal passages remain barriers. Empty plots cannot join settlements. These are classification conventions, not growth targets or a fitted definition of cities. [Degree of Urbanisation](https://human-settlement.emergency.copernicus.eu/degurbaDefinitions.php).
 
 For home $i$, accessible nonfarm work and locational utility are
 
@@ -251,7 +251,17 @@ Construction anticipates one year of willingness to move toward the best accessi
 
 ## Housing, commuting and daily inspection
 
-Residential capacity changes through construction using timber, stone and available paid labor. A project settles its inputs and wages once, then completes after three months. Opening legacy capacity is an explicit initialization assumption, not GDP. Capacity is a physical limit; this version does not add landlord, rent or mortgage transactions.
+For a project adding $q$ places to existing capacity $H$ on land area $A$, define $B=\max(1,A/40)$ and
+
+$$
+D(q,H,A)=q\left[1+0.18\frac{H^2+Hq+q^2/3}{B^2}\right].
+$$
+
+Timber, stone and labor requirements are $0.08D$, $0.05D$ and $0.1D$. This integrates a convex marginal density cost. A new plot additionally requires $(4+0.005d,\;8+0.04d,\;2+0.02d)$ in those respective inputs, where $d$ is the access connection in meters. Investors compare feasible cost per place at current input prices and wages among nearby accessible infill and a new serviced plot. Funding and input constraints scale the project; a new plot's first project fits its ground capacity. Dispersed opening rural housing uses its full source land area for rehabilitation, and is not reclassified as compact urban development merely because money is spent. These are synthetic construction coefficients, not estimated elasticities.
+
+A project settles its inputs and wages once, then completes after three months. Opening legacy capacity is an explicit initialization assumption, not GDP. Capacity is a physical limit; this version does not add landlord, rent or mortgage transactions.
+
+The city view represents recorded capacity as floor area $F=40H$, with floor-area ratio $F/A$. It distributes this area over buildings with a center-weighted height profile; the sum of their represented housing places remains $H$. Courtyard blocks, garden housing and employment districts use different forms, following capacity density, position and the household pool's economic activity. Workshops carry no residential capacity. Shared street frames and overlapping irregular supports avoid drawing the numerical grid as square towns. Geometry is illustrative: there is no causal building, land-price or structural-engineering model. Vertical dimensions are exaggerated twofold for readability; observation does not build housing or move people.
 
 After local contracts, an unemployed worker pool searches accessible workplaces. Candidate weight is proportional to vacancies and wage and declines with travel time:
 

@@ -1,0 +1,286 @@
+{
+  "date": "2026-10-26",
+  "scope": "Conserved housing redevelopment and capacity-derived city forms; square geography is qualified separately.",
+  "modelHash": "0e94123d5799a5efd49d82c7e1d0ed3c019b465c30a3ca2473b619e220ccd07c",
+  "tests": {
+    "distinctPassed": 46,
+    "names": [
+      "UI backpressure coalesces worlds without dropping command acknowledgements",
+      "a failed multi-clause settlement leaves bank reserves, ledger entries and deposits unchanged",
+      "a representative commute starts at its sampled home and uses its own travel time",
+      "administrative merger and split are atomic, preserve legal claims and reject annexation or missing land",
+      "administrative settlement keeps the provincial depot attached to its market during later procurement",
+      "byte snapshots preserve the complete canonical world at capture time",
+      "city detail cache is bounded across a world tour and survives population-only updates",
+      "coarse, fine and adaptive partitioning execute the same retained heterogeneous economic closure",
+      "coastal parcels and squares stay on land; empty ocean creates no town detail",
+      "commuting totals equal paid enterprise employment; construction and save continuation reconcile",
+      "compact census preserves identities, strata, ages, fluency and top communities",
+      "deep zoom remains pointer-anchored and bounded without changing the Atlas default",
+      "direct walks cannot cross water or a zero-width land corner",
+      "display projection keeps exact balances, debts, stocks, strata and shipment totals without work ledgers",
+      "dossier subscriptions preserve exact selected accounts and global bank totals without retaining other accounts",
+      "every published guide equation renders with accessible MathML",
+      "freight distance labels use the same physical scale as inspection and the map bar",
+      "funded capacity raises floor area and height within the same parcel, with distinct work and garden forms",
+      "funded expansion creates a within-cell parcel only after payment; capacity waits for construction",
+      "inspection reconstruction, cache loss and repeated zoom cannot mutate authoritative state",
+      "invalid TeX is rejected instead of silently publishing a broken formula",
+      "invalid simulation state cannot overwrite either good replica",
+      "lean residential display records preserve every recorded capacity and town description",
+      "location optimization concentrates residents without per-cell rounding freeze or lost claims",
+      "long freight remains owned inventory in transit and arrives exactly once",
+      "migration and 12 alternating mesh refinements retain every owner, cohort, stock and debt term",
+      "nested save sections use bounded temporary strings with byte-exact JSON and Unicode",
+      "network fallback cannot cross an inaccessible sovereign corner",
+      "nonfarm workplace access attracts residents even with equal initial crowding",
+      "numerical coarsening and refinement retain every physical parcel, occupant and capacity",
+      "occupied parcels merge across terrain boundaries without a mandatory center detour",
+      "one administrative review can fund several mergers while retaining local service offices",
+      "partial saves report the failed replica and retry unchanged paused worlds",
+      "restoration rejects a rewound jurisdiction sequence before it can overwrite legal succession",
+      "rural spare capacity and empty parcels do not become towns or municipal catchments",
+      "save I/O uses a private byte channel and recovers after a writer disconnects",
+      "saved shipments cannot change ownership or inject negative inventory",
+      "saves share immutable bytes, bound concurrent writes, retry failures and discard stale status",
+      "scenery time freezes while disabled and resumes without hidden-tab catch-up",
+      "small rural shortages repair existing homes instead of surveying tiny urban plots",
+      "state succession retains loan ownership and all military and market goods",
+      "street organizations have different silhouettes and keep homes away from rendered river banks",
+      "town layouts are deterministic, distinct, and independent of monthly totals and district refinement",
+      "two settlements can occupy one terrain sample; occupied infill merges identities without moving assets",
+      "untrusted adaptive saves reject parent/child overlap and missing residential ownership",
+      "within-cell locations and settlement identities survive compressed save and compact display exactly"
+    ],
+    "logs": [
+      "/private/tmp/uchrony-density-final-regressions.log",
+      "/private/tmp/uchrony-density-last-checks.log"
+    ]
+  },
+  "productionBuild": "passed",
+  "native": {
+    "schema": 1,
+    "modelHash": "0e94123d5799a5efd49d82c7e1d0ed3c019b465c30a3ca2473b619e220ccd07c",
+    "seed": "Urban concentration 2026-10-26",
+    "requestedMonths": 24,
+    "completedMonths": 24,
+    "initialMonth": 0,
+    "checkpoint": null,
+    "llm": {
+      "policy": "forced-off",
+      "providerCalls": 0,
+      "source": "fresh-native"
+    },
+    "hardware": {
+      "cpu": "Apple M4 Pro",
+      "cores": 12,
+      "ramGiB": 24,
+      "platform": "darwin",
+      "release": "27.0.0"
+    },
+    "initialPopulation": 10566007,
+    "annual": [
+      {
+        "month": 1,
+        "population": 10581147,
+        "food": 1,
+        "prices": 1.029761468726258,
+        "unemployment": 0.006787527450976771,
+        "states": 8,
+        "money": 262546.37200000073,
+        "ledgerResidual": 5.207709818932926e-10,
+        "bankResidual": 1.57160684466362e-09,
+        "gdpResidual": 1.7280399333685637e-11,
+        "goodsResidual": {
+          "food": 5.820766091346741e-10,
+          "timber": 5.675246939063072e-10,
+          "stone": 5.093170329928398e-11,
+          "iron": -1.0913936421275139e-11,
+          "coal": -2.7284841053187847e-11,
+          "tools": -2.3646862246096134e-11,
+          "textiles": 5.4569682106375694e-11,
+          "arms": -8.668621376273222e-12
+        },
+        "leaves": 3810,
+        "sites": 6595,
+        "firms": 1366,
+        "reforms": 0,
+        "pools": 891,
+        "cohorts": 526615
+      },
+      {
+        "month": 12,
+        "population": 10740488,
+        "food": 0.9879485405941195,
+        "prices": 1.295810984900792,
+        "unemployment": 0.06844252014311247,
+        "states": 8,
+        "money": 268074.85800508776,
+        "ledgerResidual": 2.2635049390373752e-10,
+        "bankResidual": 3.812601789832115e-09,
+        "gdpResidual": 1.4551915228366852e-11,
+        "goodsResidual": {
+          "food": 9.89530235528946e-10,
+          "timber": 7.275957614183426e-11,
+          "stone": -6.366462912410498e-12,
+          "iron": -2.9103830456733704e-11,
+          "coal": -2.2737367544323206e-12,
+          "tools": -4.547473508864641e-12,
+          "textiles": 3.092281986027956e-11,
+          "arms": 1.028865881380625e-11
+        },
+        "leaves": 6900,
+        "sites": 6595,
+        "firms": 1775,
+        "reforms": 186,
+        "pools": 891,
+        "cohorts": 627010
+      },
+      {
+        "month": 24,
+        "population": 10846322,
+        "food": 0.8651100541899347,
+        "prices": 1.855993216136132,
+        "unemployment": 0.15194760099262528,
+        "states": 8,
+        "money": 270619.55368710676,
+        "ledgerResidual": 1.0186340659856796e-10,
+        "bankResidual": 3.8708094507455826e-09,
+        "gdpResidual": 1.0913936421275139e-11,
+        "goodsResidual": {
+          "food": -2.3283064365386963e-10,
+          "timber": -1.4551915228366852e-10,
+          "stone": -3.183231456205249e-12,
+          "iron": 1.4097167877480388e-11,
+          "coal": 9.094947017729282e-12,
+          "tools": -6.821210263296962e-13,
+          "textiles": -8.185452315956354e-12,
+          "arms": 1.787725523172412e-11
+        },
+        "leaves": 7389,
+        "sites": 6595,
+        "firms": 1722,
+        "reforms": 342,
+        "pools": 891,
+        "cohorts": 729834
+      }
+    ],
+    "restorations": 0,
+    "observerChecks": 3,
+    "failure": null,
+    "qualification": {
+      "conservation": "passed",
+      "continuation": "passed",
+      "observerIndependence": "passed",
+      "historicalAccuracy": "deferred",
+      "v5Behavior": "reported, not repaired"
+    },
+    "seconds": 55.420080750000004,
+    "peakHeapMiB": 552.5293579101562,
+    "monthlyMs": {
+      "median": 2245.884374999998,
+      "p95": 2749.772249999998,
+      "maximum": 3025.639750000002
+    },
+    "finalSaveBytes": 15738072
+  },
+  "urbanMetrics": {
+    "seed": "Urban concentration 2026-10-26",
+    "month": 24,
+    "homes": 3522,
+    "newHomes": 0,
+    "medianNewCapacity": 0,
+    "newHomesUnder100": 0,
+    "redevelopedHomes": 705,
+    "settlements": 158,
+    "patches": 158,
+    "types": {
+      "center": 154,
+      "industrial": 4
+    },
+    "representedFloors": {
+      "median": 10.614562394257115,
+      "p90": 21.321038853721056,
+      "max": 69.82010597740701
+    },
+    "largest": [
+      {
+        "name": "Aurel",
+        "people": 66576,
+        "cell": 1835,
+        "id": "city:97",
+        "nation": "Aurelian Republic"
+      },
+      {
+        "name": "Greenhaven",
+        "people": 47671,
+        "cell": 1137,
+        "id": "city:78",
+        "nation": "Verdant Commonwealth"
+      },
+      {
+        "name": "Illyria",
+        "people": 45834,
+        "cell": 3095,
+        "id": "city:92",
+        "nation": "Republic of Illyra"
+      },
+      {
+        "name": "Serrana",
+        "people": 44359,
+        "cell": 6000,
+        "id": "city:1",
+        "nation": "Serrane League"
+      },
+      {
+        "name": "Pelhaven",
+        "people": 37134,
+        "cell": 5444,
+        "id": "city:14",
+        "nation": "Serrane League"
+      }
+    ]
+  },
+  "browser": {
+    "preview": "http://127.0.0.1:5197/tests/browser/map-soak.html",
+    "isolation": "Separate preview output, autosave directory and browser session; forced LLM off with provider stub.",
+    "checkpoint": "/private/tmp/uchrony-density-native-24.json.final.json",
+    "checkpointNote": "First native 24-month run, used to compare current renderer on an unchanged world; final accounting qualification uses the later verified checkpoint.",
+    "viewports": [
+      [
+        1280,
+        900
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "errors": [],
+    "workerErrors": 0,
+    "contextLost": 0,
+    "screenshots": [
+      "/private/tmp/uchrony-density-aurel-final.png",
+      "/private/tmp/uchrony-density-mobile.png",
+      "/private/tmp/uchrony-density-comparison-final.png",
+      "/private/tmp/uchrony-density-distant-final.png"
+    ],
+    "providerCalls": 0,
+    "llmForcedOff": true
+  },
+  "limits": [
+    "Two-year conservation run, not a 200-year or historical accuracy qualification.",
+    "Initial housing capacity and within-parcel building positions remain aggregate assumptions; depicted floor counts are not a technology-calibrated structural engineering model.",
+    "Neighborhood activity comes from modeled household-pool employment classification; streets, courtyards and individual building shapes remain a derived view.",
+    "No claim that city count must fall; real funded growth and occupied connections determine settlement changes.",
+    "The concurrent square-grid migration requires new worlds; old user saves were left untouched."
+  ],
+  "sourceHashAtQualificationClose": "0e94123d5799a5efd49d82c7e1d0ed3c019b465c30a3ca2473b619e220ccd07c",
+  "sourceMatchedAtQualificationClose": true,
+  "subsequentSourceChange": {
+    "currentSimulationHash": "eef5379f5b553b86bf453bde5827c01a9b2adaa75382a2d2d436a2fd4cd48f70",
+    "testedSimulationHash": "0e94123d5799a5efd49d82c7e1d0ed3c019b465c30a3ca2473b619e220ccd07c",
+    "reportedChange": "The coordinating square-grid chat reports Prettier-only edits to src/sim/corridors.ts and src/sim/transport.ts after qualification completed.",
+    "verificationBoundary": "The native run remains bound to its recorded modelHash. This metadata update does not claim a new native run or independently verify equivalence of subsequent edits."
+  }
+}

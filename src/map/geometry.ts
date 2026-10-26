@@ -1,17 +1,15 @@
 import { StringTable } from './string-table'
-import { HEX, edgeNeighbors } from '../sim/hex'
+import { CELL_SIZE, edgeNeighbors } from '../sim/grid'
 import type { Cell } from '../sim/types'
 
 export type Point = { x: number; y: number }
 export type Ring = Point[]
 export type Edge = { a: Point; b: Point; left: number; right: number }
 const corners = [
-  [0, -2],
-  [1, -1],
+  [0, 0],
+  [1, 0],
   [1, 1],
-  [0, 2],
-  [-1, 1],
-  [-1, -1],
+  [0, 1],
 ]
 const key = (x: number, y: number) => `${x}:${y}`
 
@@ -23,7 +21,7 @@ export interface MapGeometry {
   bounds: { minX: number; minY: number; maxX: number; maxY: number }[]
 }
 
-/** Trace shared topology once. Jitter is shared by every incident cell, never per polygon. */
+/** Render the same exact square boundaries used by physical access and ownership. */
 export function buildGeometry(
   cells: Cell[],
   width: number,
@@ -34,11 +32,9 @@ export function buildGeometry(
   const vertex = (x: number, y: number) => {
     const id = key(x, y)
     if (!vertices.has(id)) {
-      let h = Math.imul(x + 11, 374761393) ^ Math.imul(y + 31, 668265263)
-      h = Math.imul(h ^ (h >>> 13), 1274126177)
       vertices.set(id, {
-        x: (x * Math.sqrt(3) * HEX) / 2 + ((h & 255) / 255 - 0.5) * HEX * 0.32,
-        y: (y * HEX) / 2 + (((h >>> 8) & 255) / 255 - 0.5) * HEX * 0.32,
+        x: x * CELL_SIZE,
+        y: y * CELL_SIZE,
       })
     }
     return { key: id, point: vertices.get(id)! }
@@ -51,13 +47,13 @@ export function buildGeometry(
   for (const c of cells)
     if (c.region >= 0 && c.terrain !== 'water') {
       const adjacent = edgeNeighbors(c.id, width, height)
-      for (let edge = 0; edge < 6; edge++) {
+      for (let edge = 0; edge < 4; edge++) {
         const n = adjacent[edge] < 0 ? undefined : cells[adjacent[edge]]
         if (n?.region === c.region) continue
         const [ax, ay] = corners[edge],
-          [bx, by] = corners[(edge + 1) % 6]
-        const a = vertex(2 * c.q + (c.r % 2) + ax, 3 * c.r + ay)
-        const b = vertex(2 * c.q + (c.r % 2) + bx, 3 * c.r + by)
+          [bx, by] = corners[(edge + 1) % 4]
+        const a = vertex(c.q + ax, c.r + ay)
+        const b = vertex(c.q + bx, c.r + by)
         const segment = { from: a.key, to: b.key, a: a.point, b: b.point }
         regionSegments[c.region].push(segment)
         if (!n || n.terrain === 'water') {
@@ -68,18 +64,31 @@ export function buildGeometry(
       }
     }
   const trace = (segments: Segment[]): Ring[] => {
-    const outgoing = new StringTable<Segment>()
-    for (const segment of segments) outgoing.set(segment.from, segment)
+    const outgoing = new StringTable<Segment[]>()
+    for (const segment of segments) {
+      const list = outgoing.get(segment.from)
+      if (list) list.push(segment)
+      else outgoing.set(segment.from, [segment])
+    }
     const rings: Ring[] = []
     while (outgoing.size) {
-      const start = outgoing.values().next().value!,
+      const start = outgoing.values().next().value![0],
         ring: Ring = []
       let next: Segment | undefined = start
       while (next) {
         ring.push(next.a)
-        outgoing.delete(next.from)
+        const list = outgoing.get(next.from)!
+        list.splice(list.indexOf(next), 1)
+        if (!list.length) outgoing.delete(next.from)
         if (next.to === start.from) break
-        next = outgoing.get(next.to)
+        const candidates = outgoing.get(next.to)
+        // At a corner shared by diagonally touching components, keep occupied
+        // land on the right instead of joining the two rings across that point.
+        const dx = next.b.x - next.a.x,
+          dy = next.b.y - next.a.y
+        const turn = (s: Segment) =>
+          Math.atan2(dx * (s.b.y - s.a.y) - dy * (s.b.x - s.a.x), dx * (s.b.x - s.a.x) + dy * (s.b.y - s.a.y))
+        next = candidates?.reduce((best, s) => (turn(s) > turn(best) ? s : best))
       }
       if (ring.length >= 3) rings.push(ring)
     }

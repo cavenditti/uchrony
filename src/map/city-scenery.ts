@@ -6,14 +6,10 @@ import { describeCity, cityLayout, type CityDescription, type CityPoint } from '
 import type { RiverCurve } from './rivers'
 import { TerrainPicker } from './relief-picking'
 import { architectureMaterial, townGroundMaterial, windMaterial } from './city-materials'
+import { illuminated } from './illuminated-palette'
 import { reliefRandom } from './relief-field'
 
-const PALETTES = [
-  { walls: '#d6c5a4', roof: '#8d5845', paving: '#a29173', trim: '#89765d' },
-  { walls: '#c6c4b6', roof: '#506675', paving: '#96988a', trim: '#747b75' },
-  { walls: '#deca9e', roof: '#c19d72', paving: '#ac9570', trim: '#947650' },
-  { walls: '#d4bd9e', roof: '#7d645c', paving: '#9e8e77', trim: '#796956' },
-]
+const PALETTES = illuminated.cities
 const DETAIL_LIMIT = 6,
   CACHE_LIMIT = 12
 
@@ -77,10 +73,15 @@ export class CityScenery {
   update(world: World) {
     const places = settlementPlaces(world)
     const cities = places.map((s) => {
-      const city = describeCity(world, s), civic = s.civic ?? true
+      const city = describeCity(world, s),
+        civic = s.civic ?? true
       return { ...city, civic, key: `${city.key}:${civic}` }
     })
-    if (cities.length === this.descriptions.length && cities.every((c, i) => c.key === this.descriptions[i].key)) return
+    if (
+      cities.length === this.descriptions.length &&
+      cities.every((c, i) => c.key === this.descriptions[i].key)
+    )
+      return
     this.viewKey = ''
     this.descriptions = cities
     this.heights.clear()
@@ -95,7 +96,29 @@ export class CityScenery {
       }
     this.release(this.overview)
     this.overview = new THREE.Group()
-    const countFor = (c: CityDescription) => c.capacity === undefined ? (c.kind === 'city' ? 7 : c.kind === 'town' ? 4 : 2) : Math.max(1, Math.min(12, Math.ceil(Math.sqrt(c.capacity / 150))))
+    // Overview samples the same physical building form as detail. Huge generic
+    // houses cannot suddenly replace a neighboring district at the cache edge.
+    const native = new Map(
+      cities
+        .filter((c) => c.form)
+        .map((c) => {
+          const all = cityLayout(this.geography, c, this.rivers).buildings
+          const count = Math.min(32, all.length)
+          return [
+            c.id,
+            Array.from({ length: count }, (_, i) => all[Math.floor((i * all.length) / count)]),
+          ] as const
+        }),
+    )
+    const countFor = (c: CityDescription) =>
+      native.get(c.id)?.length ??
+      (c.capacity === undefined
+        ? c.kind === 'city'
+          ? 7
+          : c.kind === 'town'
+            ? 4
+            : 2
+        : Math.max(1, Math.min(12, Math.ceil(Math.sqrt(c.capacity / 150)))))
     const total = cities.reduce((n, c) => n + countFor(c), 0)
     // Write straight into GPU instance buffers. Materializing hundreds of thousands
     // of temporary Piece/Color records also required one large JS array allocation.
@@ -103,9 +126,19 @@ export class CityScenery {
     const roofs = new THREE.InstancedMesh(this.geometries.hip, this.roofMaterial, total)
     const colors = PALETTES.map((p) => ({ walls: new THREE.Color(p.walls), roof: new THREE.Color(p.roof) }))
     let index = 0
-    const put = (mesh: THREE.InstancedMesh, x: number, y: number, z: number, w: number, h: number, d: number, color: THREE.Color) => {
+    const put = (
+      mesh: THREE.InstancedMesh,
+      x: number,
+      y: number,
+      z: number,
+      w: number,
+      h: number,
+      d: number,
+      color: THREE.Color,
+      angle = 0,
+    ) => {
       this.dummy.position.set(x, y, z)
-      this.dummy.rotation.set(0, 0, 0)
+      this.dummy.rotation.set(0, angle, 0)
       this.dummy.scale.set(w, h, d)
       this.dummy.updateMatrix()
       mesh.setMatrixAt(index, this.dummy.matrix)
@@ -113,16 +146,60 @@ export class CityScenery {
     }
     for (const c of cities) {
       this.heights.set(c.id, this.height(c.x, c.z))
-      const first = index, count = countFor(c), palette = colors[c.style]
+      const first = index,
+        count = countFor(c),
+        palette = colors[c.style]
       for (let j = 0; j < count; j++) {
+        const physical = native.get(c.id)?.[j]
+        if (physical) {
+          const b = physical,
+            floor = this.height(b.x, b.z),
+            roofHeight = Math.min(b.width, b.depth) * (b.roof === 'flat' ? 0.08 : 0.3)
+          put(walls, b.x, floor + b.height / 2, b.z, b.width, b.height, b.depth, palette.walls, b.angle)
+          put(
+            roofs,
+            b.x,
+            floor + b.height + roofHeight / 2,
+            b.z,
+            b.width * 1.04,
+            roofHeight,
+            b.depth * 1.04,
+            palette.roof,
+            b.angle,
+          )
+          index++
+          continue
+        }
+
         const a = j * 2.4 + (c.capacity === undefined ? 0 : reliefRandom(c.seed + j) * Math.PI * 2),
           d = c.capacity === undefined ? Math.sqrt(j) * 1.25 : Math.sqrt((j + 0.3) / count) * c.radius * 0.75,
           x = c.x + Math.cos(a) * d,
           z = c.z + Math.sin(a) * d
-        const floor = this.height(x, z),
-          h = j === 0 && c.civic ? 3.7 : c.capacity === undefined ? 1.5 : 0.6 + reliefRandom(c.seed + j + 91) * 0.8
-        put(walls, x, floor + h / 2, z, 1, h, 1, palette.walls)
-        put(roofs, x, floor + h + 0.4, z, 1.2, 0.8, 1.2, palette.roof)
+        const floor = this.height(x, z)
+        const form = c.form,
+          workshop = form && (form.district === 'industrial' || form.district === 'mining') && j % 3 === 0
+        const span = form ? form.parcel.size / form.metersPerMapUnit : 0
+        const width = form ? span * Math.sqrt(form.coverage / count) : 1
+        const floors = form ? form.floorAreaRatio / Math.max(0.01, form.coverage) : 0
+        const h = form
+          ? ((workshop ? 6 : 3 * floors * (1.25 - (j / count) * 0.5)) / form.metersPerMapUnit) * 2
+          : j === 0 && c.civic
+            ? 3.7
+            : c.capacity === undefined
+              ? 1.5
+              : 0.6 + reliefRandom(c.seed + j + 91) * 0.8
+        const roofHeight = form ? Math.min(width * 0.3, h * 0.2) : 0.8
+        put(walls, x, floor + h / 2, z, width, h, workshop ? width * 1.5 : width, palette.walls)
+        put(
+          roofs,
+          x,
+          floor + h + roofHeight / 2,
+          z,
+          width * 1.08,
+          roofHeight,
+          width * (workshop ? 1.6 : 1.08),
+          palette.roof,
+        )
         index++
       }
       this.ranges.set(c.id, [first, count])
@@ -163,7 +240,7 @@ export class CityScenery {
       visible.push({ city, distance: this.projection.x ** 2 + this.projection.y ** 2 })
     }
     visible.sort((a, b) => a.distance - b.distance)
-    for (const { city } of visible.slice(0, DETAIL_LIMIT)) {
+    for (const { city } of visible.slice(0, visible.some(({ city }) => city.form) ? 16 : DETAIL_LIMIT)) {
       let entry = this.cache.get(city.id)
       if (!entry) {
         // There are at most six near-camera towns. Each layout has a finite parcel budget.
@@ -176,7 +253,7 @@ export class CityScenery {
       this.hidden.add(city.id)
       entry.used = ++this.clock
     }
-    while (this.cache.size > CACHE_LIMIT) {
+    while (this.cache.size > (this.descriptions.some((c) => c.form) ? 24 : CACHE_LIMIT)) {
       let oldestId = '',
         oldest = Infinity
       for (const [id, entry] of this.cache)
@@ -287,8 +364,8 @@ export class CityScenery {
         high = Math.max(...floors)
       if (high - Math.min(...floors) > 1.4) continue
       const base = high + 0.04
-      const wall = new THREE.Color(palette.walls).multiplyScalar(0.86 + b.tone * 0.22)
-      const roof = new THREE.Color(palette.roof).multiplyScalar(0.8 + b.tone * 0.35)
+      const wall = new THREE.Color(palette.walls).multiplyScalar(0.94 + b.tone * 0.1)
+      const roof = new THREE.Color(palette.roof).multiplyScalar(0.88 + b.tone * 0.22)
       trim.push({
         x: b.x,
         y: floor + (base - floor) / 2,
@@ -309,6 +386,33 @@ export class CityScenery {
         a: b.angle,
         color: wall,
       })
+      if (city.form) {
+        const cap = Math.min(b.width, b.depth) * 0.08
+        const roofHeight = b.roof === 'flat' ? cap : Math.min(b.width, b.depth) * 0.3
+        parts[b.roof === 'flat' ? 'box' : b.roof].push({
+          x: b.x,
+          y: base + b.height + roofHeight / 2,
+          z: b.z,
+          w: b.width * 1.04,
+          h: roofHeight,
+          d: b.depth * 1.04,
+          a: b.angle,
+          color: roof,
+        })
+        const bands = Math.min(16, Math.floor(b.storeys ?? 1))
+        for (let floor = 1; floor < bands; floor++)
+          trim.push({
+            x: b.x,
+            y: base + (b.height * floor) / bands,
+            z: b.z,
+            w: b.width * 1.015,
+            h: cap * 0.22,
+            d: b.depth * 1.015,
+            a: b.angle,
+            color: wall.clone().multiplyScalar(0.75),
+          })
+        continue
+      }
       const offset = (u: number, v: number) => ({
         x: b.x + u * Math.cos(b.angle) + v * Math.sin(b.angle),
         z: b.z - u * Math.sin(b.angle) + v * Math.cos(b.angle),
@@ -492,7 +596,7 @@ export class CityScenery {
           w: 1.2,
           h: 1.2,
           d: 1.2,
-          color: new THREE.Color('#728f87'),
+          color: new THREE.Color('#398f96'),
         })
       else if (layout.landmark === 'belfry')
         parts.cone.push({
@@ -516,6 +620,17 @@ export class CityScenery {
             color: stone,
           })
       }
+      // One restrained gold finial marks the civic silhouette, not every roof.
+      if (layout.landmark !== 'keep')
+        parts.cylinder.push({
+          x: towerX,
+          y: floor + towerHeight + (layout.landmark === 'dome' ? 0.78 : 1.3),
+          z: towerZ,
+          w: 0.075,
+          h: 0.35,
+          d: 0.075,
+          color: new THREE.Color(illuminated.gold),
+        })
       // Market canopies and an open central basin retain the square as negative space.
       for (let i = 0; i < 4; i++) {
         const market = civic(-1.5 + i * 0.9, 1.8),
@@ -540,7 +655,7 @@ export class CityScenery {
           h: 0.09,
           d: 0.65,
           a: layout.angle,
-          color: new THREE.Color(i % 2 ? '#b88b63' : '#d9cdb1'),
+          color: new THREE.Color(i % 2 ? palette.roof : '#ead7a7'),
         })
         for (let j = 0; j < 2; j++) {
           const crate = civic(-1.5 + i * 0.9 + (j - 0.5) * 0.28, 1.8)
@@ -563,7 +678,7 @@ export class CityScenery {
         w: 0.78,
         h: 0.025,
         d: 0.78,
-        color: new THREE.Color('#537f80'),
+        color: new THREE.Color(illuminated.river),
       })
       parts.cylinder.push({ x: p.x, y: floor + 0.5, z: p.z + 0.25, w: 0.13, h: 0.65, d: 0.13, color: stone })
       for (const side of [-1, 1]) {
@@ -584,7 +699,7 @@ export class CityScenery {
           w: 0.78,
           h: 0.46,
           d: 1,
-          color: new THREE.Color(city.style % 2 ? '#6d8990' : '#ba8958'),
+          color: new THREE.Color(palette.roof),
         })
       }
     }
@@ -592,7 +707,7 @@ export class CityScenery {
       const corners = rectangle(garden.x, garden.z, garden.width, garden.depth, garden.angle)
       const heights = corners.map((p) => this.height(p.x, p.z))
       if (Math.max(...heights) - Math.min(...heights) > 0.6) continue
-      face(corners, new THREE.Color('#6d7950'), 2, 0.08)
+      face(corners, new THREE.Color('#7f9a70'), 2, 0.08)
       for (let j = 0; j < 3; j++) {
         const v = (j - 1) * garden.depth * 0.25,
           x = garden.x + v * Math.sin(garden.angle),
@@ -605,7 +720,7 @@ export class CityScenery {
           h: 0.18,
           d: 0.13,
           a: garden.angle,
-          color: new THREE.Color(j % 2 ? '#8a9252' : '#586b3d'),
+          color: new THREE.Color(j % 2 ? '#a0b27e' : '#467b58'),
         })
       }
       // A low boundary wall defines the planted parcel without closing the street.
@@ -633,16 +748,39 @@ export class CityScenery {
     )
     for (const p of planted) {
       const y = this.height(p.x, p.z)
+      if (city.form) {
+        const unit = 1 / city.form.metersPerMapUnit
+        trim.push({
+          x: p.x,
+          y: y + 12 * unit,
+          z: p.z,
+          w: 1.3 * unit,
+          h: 24 * unit,
+          d: 1.3 * unit,
+          color: new THREE.Color('#66533c'),
+        })
+        parts.tree.push({
+          x: p.x,
+          y: y + 28 * unit,
+          z: p.z,
+          w: 14 * unit,
+          h: 28 * unit,
+          d: 14 * unit,
+          color: new THREE.Color(illuminated.foliage),
+        })
+        continue
+      }
+      const slender = Math.sin(p.x * 12.9 + p.z * 7.8) > 0.25
       trim.push({ x: p.x, y: y + 0.45, z: p.z, w: 0.13, h: 0.9, d: 0.13, color: new THREE.Color('#66533c') })
       for (let j = 0; j < 3; j++)
         parts.tree.push({
-          x: p.x + Math.cos(j * 2.4) * 0.22,
-          y: y + 0.95 + j * 0.13,
-          z: p.z + Math.sin(j * 2.4) * 0.22,
-          w: 0.78,
-          h: 0.95,
-          d: 0.78,
-          color: new THREE.Color('#667b48').multiplyScalar(0.86 + j * 0.1),
+          x: p.x + (slender ? 0 : Math.cos(j * 2.4) * 0.22),
+          y: y + (slender ? 1.15 + j * 0.26 : 0.95 + j * 0.13),
+          z: p.z + (slender ? 0 : Math.sin(j * 2.4) * 0.22),
+          w: slender ? 0.47 - j * 0.08 : 0.78,
+          h: slender ? 1.3 : 0.95,
+          d: slender ? 0.47 - j * 0.08 : 0.78,
+          color: new THREE.Color(illuminated.foliage).multiplyScalar(0.86 + j * 0.12),
         })
     }
     const geometry = new THREE.BufferGeometry()

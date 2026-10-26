@@ -19,7 +19,7 @@ async function run() {
   )
   check((await disk.read()) === null, 'Use a fresh isolated disk slot.')
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open('uchrony-saves', 1)
+    const request = indexedDB.open('uchrony-square-saves', 1)
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })

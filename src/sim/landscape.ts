@@ -1,6 +1,6 @@
 import { clamp, type Cell, type Region } from './types'
 import { hashSeed, noise } from './random'
-import { neighbors } from './hex'
+import { neighbors } from './grid'
 
 export interface Landscape {
   /** Geographic suitability, not an economic or ethnic productivity trait. */

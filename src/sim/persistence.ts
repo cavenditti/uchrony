@@ -15,7 +15,7 @@ import { MAX_STATE_IDENTITIES } from './types'
 import { validateSovereignty } from './sovereignty-persistence'
 import { validatePressures } from './pressure-persistence'
 import { GOODS, FIELDS, type World, type RouteLeg } from './types'
-import { neighbors } from './hex'
+import { movementNeighbors, adjacentCells, CELL_SIZE, GRID_TOPOLOGY } from './grid'
 import { validateHistoryState, validateHistoricalRecord } from './history-schema'
 import { validateStatecraft } from './statecraft-persistence'
 import { validatePopulation } from './population-persistence'
@@ -44,8 +44,11 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   walk(w)
   if (w.viewOnly) fail('display snapshots cannot be restored')
   if (w.version !== 1) fail('unsupported version; this app supports version 1')
-  if (w.generatorVersion !== undefined && ![1, 2, 3, 4].includes(w.generatorVersion))
-    fail('unsupported geography generator')
+  if (w.gridTopology !== GRID_TOPOLOGY)
+    fail(
+      'this world uses the retired hex grid. Create a new square-grid world; your existing save file is unchanged',
+    )
+  if (w.generatorVersion !== 5) fail('unsupported geography generator')
   if (
     typeof w.seed !== 'string' ||
     w.seed.length > 100 ||
@@ -86,6 +89,8 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       c.id !== i ||
       !number(c.x) ||
       !number(c.y) ||
+      c.x !== (c.q + 0.5) * CELL_SIZE ||
+      c.y !== (c.r + 0.5) * CELL_SIZE ||
       c.q !== i % w.width ||
       c.r !== Math.floor(i / w.width) ||
       !terrain(c.terrain) ||
@@ -97,7 +102,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     if (c.terrain !== 'water' && !regionId(c.region)) fail('land cell without a province')
     if (c.riverFlow !== undefined && !number(c.riverFlow, 0, w.cells.length * 2)) fail('invalid river runoff')
     if (c.downstream !== undefined) {
-      if (!cellId(c.downstream) || !neighbors(c.id, w.width, w.height).includes(c.downstream))
+      if (!cellId(c.downstream) || !adjacentCells(c.id, w.width, w.height).includes(c.downstream))
         fail('invalid downstream connection')
       const next = w.cells[c.downstream]
       if (!object(next) || !number(next.elevation, -5, 5) || next.elevation >= c.elevation)
@@ -303,7 +308,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
           water = w.cells[id].terrain === 'water',
           seaInterior = leg.mode === 'sea' && i > 0 && i < leg.cells.length - 1
         if (water !== seaInterior) fail('freight path crosses invalid terrain')
-        if (i > 0 && !neighbors(leg.cells[i - 1], w.width, w.height).includes(id))
+        if (i > 0 && !movementNeighbors(w.cells, leg.cells[i - 1], w.width, w.height).includes(id))
           fail('freight path skips map cells')
       }
       if (leg.mode === 'sea' && leg.cells.length < 3) fail('shipping path needs water')
@@ -378,7 +383,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     }
   }
   if (w.corridors !== undefined) {
-    if (!Array.isArray(w.corridors) || w.corridors.length > w.cells.length * 3)
+    if (!Array.isArray(w.corridors) || w.corridors.length > w.cells.length * 4)
       fail('invalid corridor memory')
     const seen = new Set<number>()
     for (const trace of w.corridors) {
@@ -387,7 +392,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
         !cellId(trace.a) ||
         !cellId(trace.b) ||
         trace.a >= trace.b ||
-        !neighbors(trace.a, w.width, w.height).includes(trace.b) ||
+        !movementNeighbors(w.cells, trace.a, w.width, w.height).includes(trace.b) ||
         !number(trace.familiarity, 0, 1) ||
         !number(trace.traffic)
       )
@@ -498,7 +503,15 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   validateAdaptiveWorld(w)
   if (w.modelProvenance) {
     const p = w.modelProvenance
-    if (!Number.isSafeInteger(p.accepted) || p.accepted < 0 || !number(p.lastMonth, 0, w.month) || !object(p.roles) || Object.values(p.roles).some((n) => !Number.isSafeInteger(n) || n < 0) || !['native', 'model-assisted', 'legacy-unknown'].includes(p.source)) fail('invalid model provenance')
+    if (
+      !Number.isSafeInteger(p.accepted) ||
+      p.accepted < 0 ||
+      !number(p.lastMonth, 0, w.month) ||
+      !object(p.roles) ||
+      Object.values(p.roles).some((n) => !Number.isSafeInteger(n) || n < 0) ||
+      !['native', 'model-assisted', 'legacy-unknown'].includes(p.source)
+    )
+      fail('invalid model provenance')
   }
   return w
 }

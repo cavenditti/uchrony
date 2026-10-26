@@ -2,7 +2,7 @@ import type { CompetitiveFirm } from '../src/sim/economic-types'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
-import { neighbors } from '../src/sim/hex'
+import { neighbors } from '../src/sim/grid'
 import { tick } from '../src/sim/engine'
 import { buildSpatial, refreshSpatial, spatialState } from '../src/sim/spatial'
 import { validateWorld, restoreWorld } from '../src/sim/persistence'
@@ -140,10 +140,9 @@ test('saved refinement continues deterministically and UI projection retains set
   assert.deepEqual(viewSnapshot(w).spatial, w.spatial)
 })
 
-test('older saves gain read-only spatial detail without moving their residents or changing their terrain', () => {
+test('square worlds reconstruct omitted spatial detail without moving residents or changing terrain', () => {
   const w = generateWorld('Legacy spatial')
   delete w.spatial
-  w.generatorVersion = 2
   for (const c of w.cells) delete c.landscape
   const before = JSON.stringify(w)
   const first = spatialState(w)

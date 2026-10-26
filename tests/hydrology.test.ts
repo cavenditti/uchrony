@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateGeography, SEA_LEVEL } from '../src/sim/geography'
 import { erodeDrainage } from '../src/sim/hydrology'
-import { HEX, neighbors } from '../src/sim/hex'
+import { CELL_SIZE, adjacentCells } from '../src/sim/grid'
 import type { Cell } from '../src/sim/types'
 
 function basin(width: number, height: number): Cell[] {
@@ -14,8 +14,8 @@ function basin(width: number, height: number): Cell[] {
       id,
       q,
       r,
-      x: (q + (r % 2) / 2) * Math.sqrt(3) * HEX,
-      y: r * HEX * 1.5,
+      x: (q + 0.5) * CELL_SIZE,
+      y: (r + 0.5) * CELL_SIZE,
       elevation: ocean ? 0.05 : Math.min(q, r, width - q - 1, height - r - 1) <= 2 ? 0.4 : 0.2,
       moisture: 0.5,
       terrain: ocean ? 'water' : 'plains',
@@ -35,7 +35,7 @@ function checkDrainage(cells: Cell[], width: number, height: number) {
       continue
     }
     assert(c.downstream !== undefined)
-    assert(neighbors(c.id, width, height).includes(c.downstream))
+    assert(adjacentCells(c.id, width, height).includes(c.downstream))
     const next = cells[c.downstream]
     assert(next.elevation < c.elevation, 'strict descent also rules out all cycles')
     assert(next.riverFlow! >= c.riverFlow!)

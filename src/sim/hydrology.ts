@@ -1,4 +1,4 @@
-import { edgeNeighbors } from './hex'
+import { adjacentCells } from './grid'
 import { MinHeap } from './heap'
 import { fractal, hashSeed } from './random'
 import { clamp, type Cell } from './types'
@@ -13,8 +13,8 @@ const CHANNEL_RUNOFF = 24
  */
 export function erodeDrainage(cells: Cell[], width: number, height: number, seed: string, sea: number) {
   const count = cells.length,
-    adjacent = new Int32Array(count * 6),
-    distances = new Float64Array(count * 6),
+    adjacent = new Int32Array(count * 8),
+    distances = new Float64Array(count * 8),
     resistance = new Float64Array(count),
     surface = new Float64Array(count),
     filled = new Float64Array(count),
@@ -27,19 +27,22 @@ export function erodeDrainage(cells: Cell[], width: number, height: number, seed
     outlets: number[] = []
   const noiseSeed = hashSeed(`${seed}:watersheds:1`)
   // Distances come from geographic positions; districts and administrative refinement
-  // never participate. Normalize by one geographic sample's average spacing.
+  // never participate. Normalize by face-neighbour spacing, keeping a diagonal
+  // sqrt(2) times as long without rescaling the underlying geological fields.
   let spacing = 0,
     edges = 0
   for (const c of cells) {
-    const ns = edgeNeighbors(c.id, width, height)
-    for (let side = 0; side < 6; side++) {
-      const at = c.id * 6 + side,
+    const ns = adjacentCells(c.id, width, height)
+    for (let side = 0; side < 8; side++) {
+      const at = c.id * 8 + side,
         next = ns[side]
       adjacent[at] = next
       if (next >= 0) {
         distances[at] = Math.hypot(c.x - cells[next].x, c.y - cells[next].y)
-        spacing += distances[at]
-        edges++
+        if (side % 2 === 0) {
+          spacing += distances[at]
+          edges++
+        }
       }
     }
     if (c.terrain !== 'water') land.push(c.id)
@@ -75,8 +78,8 @@ export function erodeDrainage(cells: Cell[], width: number, height: number, seed
     }
     while (queue.size) {
       const { id } = queue.pop()
-      for (let side = 0; side < 6; side++) {
-        const at = id * 6 + side,
+      for (let side = 0; side < 8; side++) {
+        const at = id * 8 + side,
           next = adjacent[at]
         if (next < 0 || visited[next] || cells[next].terrain === 'water') continue
         visited[next] = 1
@@ -99,8 +102,8 @@ export function erodeDrainage(cells: Cell[], width: number, height: number, seed
       const { id, cost: total } = routes.pop()
       if (total !== cost[id]) continue
       if (cells[id].terrain !== 'water') order.push(id)
-      for (let side = 0; side < 6; side++) {
-        const at = id * 6 + side,
+      for (let side = 0; side < 8; side++) {
+        const at = id * 8 + side,
           next = adjacent[at],
           distance = distances[at]
         if (next < 0 || cells[next].terrain === 'water' || filled[next] < filled[id]) continue

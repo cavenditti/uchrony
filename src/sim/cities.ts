@@ -1,7 +1,7 @@
 import { settlementComponents, settledResidentsByCell } from './settlement-morphology'
 import { optimizeResidentialLocations } from './settlement-access'
 import { clamp, population, type World } from './types'
-import { neighbors } from './hex'
+import { neighbors } from './grid'
 import { landscapeAt } from './landscape'
 import { hashSeed } from './random'
 import { localFirmRegion } from './local-units'

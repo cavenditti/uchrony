@@ -1,5 +1,5 @@
 import { MAX_ARMIES } from './military-limits'
-import { neighbors } from './hex'
+import { movementNeighbors, stepDistance } from './grid'
 import type { World, RouteLeg } from './types'
 
 export function validateWarfare(
@@ -64,10 +64,17 @@ export function validateWarfare(
     ids.add(f.id)
     let at = f.cell
     for (const next of f.course) {
-      if (!water(next) || !neighbors(at, w.width, w.height).includes(next))
+      if (!water(next) || !movementNeighbors(w.cells, at, w.width, w.height).includes(next))
         fail(`fleet ${f.id} has a noncontiguous course at ${at}→${next}`)
       at = next
     }
+    if (
+      f.sailingProgress !== undefined &&
+      (!number(f.sailingProgress, Math.SQRT2) ||
+        (!f.course.length && f.sailingProgress !== 0) ||
+        (f.course.length && f.sailingProgress >= stepDistance(w.cells[f.cell], w.cells[f.course[0]])))
+    )
+      fail(`fleet ${f.id} has invalid sailing progress`)
     for (const id of f.embarked)
       if (!w.armies.some((a) => a.id === id && a.nation === f.nation && a.operations?.embarkedOn === f.id))
         fail(`fleet ${f.id} passenger ${id} disagrees with its embarkation record`)

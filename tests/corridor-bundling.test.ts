@@ -1,3 +1,4 @@
+import { stepDistance } from '../src/sim/grid'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { bundleCorridors, CORRIDOR_BUNDLING } from '../src/sim/corridor-bundling'
@@ -223,7 +224,12 @@ test('long crossings four and five tiles apart share a trunk without moving port
     for (const [i, link] of bundled.entries()) {
       assert.deepEqual(link.legs[0].cells.slice(0, 2), links[i].legs[0].cells.slice(0, 2))
       assert.deepEqual(link.legs[0].cells.slice(-2), links[i].legs[0].cells.slice(-2))
-      assert(link.legs[0].cells.length <= links[i].legs[0].cells.length + gap)
+      const distance = (cells: number[]) =>
+        cells.slice(1).reduce((sum, id, at) => sum + stepDistance(world.cells[cells[at]], world.cells[id]), 0)
+      assert(
+        distance(link.legs[0].cells) <= distance(links[i].legs[0].cells) + 2 * gap,
+        'joining and leaving the trunk stays within the physical cross-track detour budget',
+      )
     }
     assert.deepEqual(
       bundleCorridors(world, profile, bundled, () => true),

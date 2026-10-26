@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-24T01:03:15.550635+00:00",
+  "generatedAt": "2026-10-25T17:19:31.251337+00:00",
   "title": "Design System: Uchrony",
   "extensions": {
     "colorMeta": {
@@ -337,7 +337,7 @@
   ],
   "narrative": {
     "northStar": "The cabinet map table",
-    "overview": "Uchrony frames a living atlas with compact, inspectable state dossiers. Blue-green slate, warm pale lettering, restrained brass controls, and muted territorial colors create the character of a working map cabinet. Alegreya gives places and historical records a distinct voice while a quiet sans-serif carries operations and comparable data.\n\nThis records the implemented, provisional code-led direction, seed ec4fabee; it is not a claim of user approval. The source is authoritative for the current build. Product mechanisms belong in PRODUCT.md, and the first-surface composition remains in .impeccable/surfaces/src-app-tsx.md.",
+    "overview": "Uchrony frames a living atlas with compact, inspectable state dossiers. Blue-green slate, warm pale lettering, restrained brass controls, and muted territorial colors create the character of a working map cabinet. Alegreya gives places and historical records a distinct voice while a quiet sans-serif carries operations and comparable data.\n\nThis records the implemented, provisional code-led direction, seed ec4fabee; it is not a claim of user approval. The source is authoritative for the current build. Product mechanisms belong in PRODUCT.md, and the first-surface composition remains in .impeccable/surfaces/src-app-tsx.md.\n\nThe illuminated-atlas map treatment is a first trial accepted for exploration on 25 October 2026, inspired by Matrak\u00e7\u0131 Nasuh\u2019s city miniatures. It changes the landscape and town materials locally; it does not replace the cabinet-map interface or establish permanent approval of this art direction.",
     "keyCharacteristics": [
       "A full-height atlas beneath one compact header.",
       "Contextual, expandable dossiers and collapsible faction selection.",
@@ -359,6 +359,11 @@
         "name": "The Cabinet Plane Rule",
         "body": "Keep persistent workspace panels flat and ruled. Reserve diffuse shadows for floating menus, tooltips, dialogs, and temporary messages.",
         "section": "elevation"
+      },
+      {
+        "name": "The Map-local Trial Rule",
+        "body": "Keep the illuminated pigments and miniature materials local to the map trial; preserve slate controls, brass actions, Alegreya lettering, and the meaning of thematic data colors.",
+        "section": "colors"
       }
     ],
     "dos": [

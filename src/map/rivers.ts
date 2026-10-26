@@ -1,4 +1,4 @@
-import { neighbors } from '../sim/hex'
+import { neighbors } from '../sim/grid'
 import type { Cell, World } from '../sim/types'
 import type { Point } from './geometry'
 
@@ -11,6 +11,8 @@ export interface RiverCurve {
   d: Point
   flow: number
   endFlow?: number
+  /** True only when this reach ends in a water cell, not at an inland junction. */
+  mouth?: boolean
 }
 
 /** Drainage is topology; its presentation is a continuous curve in geographic coordinates.
@@ -48,7 +50,7 @@ export function riverCurves(world: Pick<World, 'cells' | 'width' | 'height'>): R
   }
   const curves: RiverCurve[] = []
   // Simplify whole reaches, stopping at EVERY confluence. Fitting one curve per
-  // simulation edge merely rounds a hex staircase; reach-scale fitting removes it.
+  // simulation edge merely rounds a grid staircase; reach-scale fitting removes it.
   for (const head of downstream.keys()) {
     if (tributaries.get(head) === 1) continue
     const chain = [cells[head]]
@@ -88,6 +90,7 @@ export function riverCurves(world: Pick<World, 'cells' | 'width' | 'height'>): R
         c: { x: d.x - end.x * reach, y: d.y - end.y * reach },
         flow: Math.max(1, a.riverFlow ?? 14),
         endFlow: Math.max(1, d.riverFlow ?? a.riverFlow ?? 14),
+        mouth: d.terrain === 'water',
       }
       let last = first + 1
       while (chain[last].id !== d.id) last++
@@ -181,4 +184,37 @@ export function riverPaths(curves: RiverCurve[]) {
 export function riverHalfWidth(curve: RiverCurve, t: number) {
   const flow = curve.flow + ((curve.endFlow ?? curve.flow) - curve.flow) * t
   return Math.min(6, 0.35 + Math.sqrt(flow) * 0.13) / 2
+}
+
+/** Approximate distance from each reach's downstream end to open water. Following
+ * drainage keeps the estuary continuous across joins without tinting nearby inland rivers.
+ */
+export function riverOutletDistances(curves: RiverCurve[], lengths: number[]) {
+  const outgoing = new Map(curves.map((curve, i) => [curve.from, i]))
+  const distances = new Float64Array(curves.length).fill(NaN)
+  for (let i = 0; i < curves.length; i++) {
+    if (!Number.isNaN(distances[i])) continue
+    const pending: [number, number][] = [],
+      seen = new Set<number>()
+    let current = i
+    while (Number.isNaN(distances[current])) {
+      if (curves[current].mouth) {
+        distances[current] = 0
+        break
+      }
+      const next = outgoing.get(curves[current].to)
+      if (next === undefined || seen.has(current)) {
+        distances[current] = Infinity
+        break
+      }
+      seen.add(current)
+      pending.push([current, next])
+      current = next
+    }
+    for (let j = pending.length - 1; j >= 0; j--) {
+      const [from, to] = pending[j]
+      distances[from] = lengths[to] + distances[to]
+    }
+  }
+  return distances
 }

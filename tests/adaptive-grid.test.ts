@@ -154,29 +154,19 @@ test('recursive range and nearest search match exhaustive physical queries at ev
   assert.equal(locateAdaptiveCell(w, { x: -1e8, y: 0 }), undefined)
 })
 
-test('legacy land-only saves retain their partition until an explicit full-domain remesh', () => {
+test('square saves require the complete land and water partition', () => {
   const w = fixture()
   rebuildAdaptiveMesh(w, 'fine')
   const clone = structuredClone(w)
-  clone.adaptive!.tree.leaves = adaptiveMesh(w)
-    .leaves.filter((n) => n.landArea > 1e-6)
-    .map((n) => n.id)
   delete clone.adaptive!.tree.domain
-  const before = JSON.stringify(clone.adaptive)
-  const mesh = adaptiveMesh(clone)
-  assert(mesh.leaves.every((n) => (n.waterArea ?? 0) === 0))
-  assert.equal(JSON.stringify(clone.adaptive), before)
-  const sea = w.cells.find((c) => c.terrain === 'water')!
-  assert.equal(locateAdaptiveCell(clone, cellPosition(clone, sea.id)), undefined)
-  rebuildAdaptiveMesh(clone)
-  assert.equal(locateAdaptiveCell(clone, cellPosition(clone, sea.id))!.source.id, sea.id)
-  const broken = structuredClone(clone)
-  const ocean = adaptiveMesh(clone).leaves.find((n) => !n.landArea)!
+  assert.throws(() => validateWorld(clone), /missing structures/)
+  const ocean = adaptiveMesh(w).leaves.find((n) => !n.landArea)!
+  const broken = structuredClone(w)
   broken.adaptive!.tree.leaves = broken.adaptive!.tree.leaves.filter((id) => id !== ocean.id)
   assert.throws(() => validateWorld(broken), /uncovered|partition/)
 })
 
-test('membership refresh supports physical sites moving between subhex leaves without changing root geometry', () => {
+test('membership refresh supports physical sites moving between within-sample leaves without changing root geometry', () => {
   const w = fixture(),
     root = rootBounds(w)
   rebuildAdaptiveMesh(w, 'fine')
@@ -233,7 +223,7 @@ test('ocean cells refine around fleet activity and coarsen after the dwell perio
   assert.equal(JSON.stringify(w.adaptive!.sites), sites)
 })
 
-test('subhex door-to-door travel uses actual meter positions and is independent of numerical cell size', async () => {
+test('within-sample door-to-door travel uses actual meter positions and is independent of numerical cell size', async () => {
   const { commuteSiteRoute } = await import('../src/sim/commuting')
   const w = fixture(),
     cell = w.regions[0].center,

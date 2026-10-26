@@ -2,8 +2,9 @@ import { STRATA } from './economic-types'
 import { producerAccount, householdAccount, transfer } from './ledger'
 import { marketStore, recordUse, recordOwnCapital, recordWages } from './national-accounts'
 import type { World } from './types'
-import { residentialDemand } from './settlement-access'
-import { residentialPools, findResidentialParcel, createResidentialParcel } from './residential-sites'
+import { residentialDemand, settlementAccess } from './settlement-access'
+import { residentialPools, createResidentialParcel } from './residential-sites'
+import { planHousingInvestment } from './housing-investment'
 import { MODEL_PARAMETERS } from './model-parameters'
 
 /** Housing-space development has physical inputs and paid labor. No imputed rent removes cash. */
@@ -22,7 +23,8 @@ export function advanceLandUse(w: World) {
   a.construction = a.construction.filter((p) => p.remaining > 0)
   const pending = new Set(a.construction.map((p) => p.site))
   const homes = residentialPools(w),
-    demand = residentialDemand(w)
+    access = settlementAccess(w),
+    demand = residentialDemand(w, access)
   for (const id of w.localEconomy.active) {
     const r = w.localEconomy.units[id],
       p = w.economy.producers[id],
@@ -39,27 +41,15 @@ export function advanceLandUse(w: World) {
       .reduce((sum, p) => sum + p.capacity, 0)
     const need = Math.max(0, (demand.get(site.id) ?? 0) - reserved)
     if (!need) continue
-    // Expansion surveys real plots once an existing ground footprint is full.
-    // Surveying alone reserves neither a parcel nor any construction resources.
-    const plot =
-      a.residentialVersion === 1 && site.parcel && site.capacity * 40 >= site.parcel.size ** 2
-        ? findResidentialParcel(w, site, homes.get(id))
-        : undefined
-    // One resident-place requires timber/stone and two worker-days; wages and materials use existing units.
-    const spaces = Math.min(
-      need,
-      r.stocks.timber / 0.08,
-      r.stocks.stone / 0.05,
-      available * 10,
-      p.cash / (p.wage * 0.1),
-      plot ? plot.parcel.size ** 2 / 40 : Infinity,
-    )
-    if (spaces <= 1e-6) continue
+    const investment = planHousingInvestment(w, site, need, homes.get(id) ?? [], available, access)
+    if (!investment) continue
+    site = investment.site
+    const { plot, spaces, inputs } = investment
     if (plot) {
       site = createResidentialParcel(w, id, plot.cell, plot.point, plot.parcel)
       homes.get(id)!.push(site)
     }
-    const labor = spaces * 0.1
+    const labor = inputs.labor
     let wages = 0
     for (const s of STRATA) {
       const h = hh[s],
@@ -76,8 +66,7 @@ export function advanceLandUse(w: World) {
       wages += paid
       recordWages(w, id, producerAccount(id), paid)
     }
-    const timber = spaces * 0.08,
-      stone = spaces * 0.05
+    const { timber, stone } = inputs
     const materials =
       recordUse(w, marketStore(id), 'timber', timber) + recordUse(w, marketStore(id), 'stone', stone)
     r.stocks.timber = Math.max(0, r.stocks.timber - timber)

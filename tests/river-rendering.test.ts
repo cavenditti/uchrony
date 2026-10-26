@@ -1,6 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { riverCurves, riverHalfWidth, riverPoint } from '../src/map/rivers'
+import {
+  riverCurves,
+  riverHalfWidth,
+  riverPoint,
+  riverOutletDistances,
+  type RiverCurve,
+} from '../src/map/rivers'
 import { landscapeField, landscapeElevation } from '../src/map/landscape-field'
 import { generateGeography } from '../src/sim/geography'
 
@@ -31,6 +37,7 @@ test('smooth reaches preserve drainage endpoints and tributary joins without mut
     }
     assert.deepEqual(riverPoint(curve, 0), { x: cells[curve.from].x, y: cells[curve.from].y })
     assert.deepEqual(riverPoint(curve, 1), { x: cells[curve.to].x, y: cells[curve.to].y })
+    assert.equal(curve.mouth, cells[curve.to].terrain === 'water')
     const dx = curve.d.x - curve.a.x,
       dy = curve.d.y - curve.a.y
     for (let i = 0; i <= 20; i++) {
@@ -57,6 +64,52 @@ test('smooth reaches preserve drainage endpoints and tributary joins without mut
     c.r += 100
   }
   assert.deepEqual(riverCurves(world), curves, 'positions and drainage, not administrative/grid addresses')
+})
+
+test('estuary distance follows drainage through short reaches and tributaries, not nearby inland water', async () => {
+  const reach = (from: number, to: number, length: number, mouth = false): RiverCurve => ({
+    from,
+    to,
+    a: { x: 0, y: 10 },
+    b: { x: length / 3, y: 10 },
+    c: { x: (length * 2) / 3, y: 10 },
+    d: { x: length, y: 10 },
+    flow: 100,
+    mouth,
+  })
+  const curves = [reach(2, 3, 30), reach(0, 1, 10), reach(3, 4, 8, true), reach(1, 3, 20), reach(8, 9, 12)]
+  const before = structuredClone(curves)
+  assert.deepEqual([...riverOutletDistances(curves, [30, 10, 8, 20, 12])], [8, 28, 0, 8, Infinity])
+  assert.deepEqual(curves, before)
+  assert.deepEqual(
+    [...riverOutletDistances([reach(0, 1, 5), reach(1, 0, 5)], [5, 5])],
+    [Infinity, Infinity],
+    'malformed cycles cannot stall rendering',
+  )
+
+  const { PlaneGeometry } = await import('three')
+  const { TerrainPicker } = await import('../src/map/relief-picking')
+  const { riverSurface } = await import('../src/map/river-surface')
+  const terrain = new PlaneGeometry(100, 80)
+  terrain.rotateX(-Math.PI / 2)
+  terrain.translate(50, 0, 40)
+  const { mesh } = riverSurface(curves, new TerrainPicker(terrain))
+  const distances = mesh.geometry.attributes.riverMouthDistance
+  assert(Array.from(distances.array).every(Number.isFinite), 'GPU interpolation never receives infinity')
+  let offset = 0
+  const endpoints = curves.map((curve) => {
+    const count = (Math.max(2, Math.ceil(curve.d.x / 2.5)) + 1) * 2
+    const result = [distances.getX(offset), distances.getX(offset + count - 1)]
+    offset += count
+    return result
+  })
+  assert.equal(endpoints[0][1], endpoints[2][0], 'tributary and main channel meet with the same blend')
+  assert.equal(endpoints[1][1], endpoints[3][0], 'short consecutive reaches keep a continuous blend')
+  assert.equal(endpoints[2][1], 0)
+  assert(endpoints[4][1] > 42, 'unconnected inland ends retain their river pigment')
+  mesh.geometry.dispose()
+  mesh.material.dispose()
+  terrain.dispose()
 })
 
 test('forest clusters are deterministic, budgeted and independent of administrative remeshing', async () => {

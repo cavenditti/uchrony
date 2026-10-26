@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld, neighbors } from '../src/sim/generate'
+import { adjacentCells } from '../src/sim/grid'
 import { buildGeometry, contains, geographyKey, zoomAt } from '../src/map/geometry'
 import { validateWorld } from '../src/sim/persistence'
 import type { World } from '../src/sim/types'
@@ -54,7 +55,7 @@ test('drainage always descends to the sea, runoff accumulates, and visible river
         steps = 0
       while (node.terrain !== 'water') {
         assert(node.downstream !== undefined)
-        assert(neighbors(node.id, w.width, w.height).includes(node.downstream))
+        assert(adjacentCells(node.id, w.width, w.height).includes(node.downstream))
         const next = w.cells[node.downstream]
         assert(next.elevation < node.elevation)
         assert((next.riverFlow ?? 0) >= (node.riverFlow ?? 0))
@@ -108,13 +109,14 @@ test('zoom holds the geographic point under the cursor fixed, including clamped 
   }
 })
 
-test('legacy saves remain loadable and malformed drainage is rejected', () => {
+test('old hex saves are rejected without mutation and malformed square drainage is rejected', () => {
   const w = generateWorld('Legacy')
-  delete w.generatorVersion
-  for (const c of w.cells) {
-    delete c.downstream
-    delete c.riverFlow
-  }
+  const old = structuredClone(w)
+  delete old.gridTopology
+  old.generatorVersion = 4
+  const before = JSON.stringify(old)
+  assert.throws(() => validateWorld(old), /retired hex grid.*new square-grid world/)
+  assert.equal(JSON.stringify(old), before)
   validateWorld(w)
   const c = w.cells.find((c) => c.terrain !== 'water')!
   c.downstream = c.id

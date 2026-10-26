@@ -1,4 +1,4 @@
-import { HEX } from '../../src/sim/hex'
+import { CELL_SIZE } from '../../src/sim/grid'
 import { corridorGeography } from '../../src/sim/corridors'
 import { MinHeap } from '../../src/sim/heap'
 import { transportNetwork } from '../../src/sim/transport'
@@ -14,8 +14,8 @@ export function corridorWorld(rows: string[]): World {
         id: r * width + q,
         q,
         r,
-        x: (q + (r % 2) / 2) * Math.sqrt(3) * HEX,
-        y: r * HEX * 1.5,
+        x: (q + 0.5) * CELL_SIZE,
+        y: (r + 0.5) * CELL_SIZE,
         terrain: name === '.' ? 'water' : 'plains',
         region: names.indexOf(name),
         elevation: name === '.' ? 0 : 0.3,

@@ -18,6 +18,7 @@ export async function restoreSave(backends: SaveBackend[], legacy: string | null
   // choose a timestamp. Invalid newer copies still fall back to an older one.
   const reads = await Promise.allSettled(backends.map((backend) => backend.read()))
   let invalid = reads.some((result) => result.status === 'rejected')
+  let incompatible: Error | undefined
   const candidates = reads
     .flatMap((result, index) =>
       result.status === 'fulfilled' && result.value
@@ -33,11 +34,13 @@ export async function restoreSave(backends: SaveBackend[], legacy: string | null
   for (const candidate of candidates) {
     try {
       return { world: checked(candidate.record).world, source: candidate.source }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('retired hex grid')) incompatible = error
       invalid = true
     }
   }
   if (legacy) return { world: parseSave(legacy), source: 'legacy' }
+  if (incompatible) throw incompatible
   if (invalid)
     throw new Error(
       'Your saved world could not be checked. Existing saves have been kept. Retry restoring before starting a new world.',
