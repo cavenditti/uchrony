@@ -1,3 +1,4 @@
+import { provinceWorks, roadInvestment } from './transport-development'
 import { economicRegions } from './local-units'
 import { effectMultiplier } from './effects'
 import { movementNeighbors, stepDistance } from './grid'
@@ -109,18 +110,21 @@ export function corridorProfile(world: World) {
         {
           friction:
             (((2 - infra) * (1 + region.devastation * 0.5)) / (1 + tech * 0.1)) *
-            effectMultiplier(world, 'tradeCost', region.nation, region.id),
+            effectMultiplier(world, 'tradeCost', region.nation, region.id) *
+            roadInvestment(world, region).cost,
           seaFriction: effectMultiplier(world, 'tradeCost', region.nation, region.id) / (1 + tech * 0.1),
           road:
             (1000 + infra * 6000) *
             (1 + tech * 0.25) *
             damage *
-            effectMultiplier(world, 'tradeCapacity', region.nation, region.id),
+            effectMultiplier(world, 'tradeCapacity', region.nation, region.id) *
+            roadInvestment(world, region).capacity,
           port:
             (2500 + infra * 9000) *
             (1 + tech * 0.15) *
             damage *
-            effectMultiplier(world, 'tradeCapacity', region.nation, region.id),
+            effectMultiplier(world, 'tradeCapacity', region.nation, region.id) *
+            (1 + (provinceWorks(world, region)?.harbor ?? 0) * 0.4),
         },
       ] as const
     }),

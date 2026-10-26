@@ -1,3 +1,4 @@
+import { localClimate } from './climate'
 import { recordLocalJob } from './commuting'
 import { extractDistrictResource } from './districts'
 import { economicRegions, economicRegion, localFirmRegion, provinceId } from './local-units'
@@ -242,7 +243,10 @@ export function hireFirms(w: World, r: Region) {
     const utilization = clamp(needed, 0.05, 0.98)
     f.laborMix = inventory()
     for (const g of GOODS) f.laborMix[g] = needed > 0 ? required[g] / needed : baseline[g]
-    f.desiredEmployment = Math.min(benchmarkJobs * utilization * (1 - r.devastation * 0.5), w.adaptive?.sites[`firm:${f.id}`]?.capacity ?? Infinity)
+    f.desiredEmployment = Math.min(
+      benchmarkJobs * utilization * (1 - r.devastation * 0.5),
+      w.adaptive?.sites[`firm:${f.id}`]?.capacity ?? Infinity,
+    )
     const valueAdded = GOODS.reduce((sum, g) => {
       const inputs = Object.entries(recipes[g] ?? {}).reduce(
         (cost, [input, rate]) => cost + r.prices[input as Good] * rate,
@@ -385,7 +389,7 @@ export function firmCapacity(
     (0.75 + 0.25 * (r.materialCoverage ?? 1)) *
     f.productivity
   const land = Math.max(1, r.cells.length * 1800 * (0.35 + r.fertility * 0.65)) / Math.max(1, active)
-  const season = 1 + Math.sin((((w.month % 12) - 4) / 12) * Math.PI * 2) * 0.23
+  const season = localClimate(w, w.cells[f.cell ?? r.center]).season
   const q = inventory()
   q.food =
     land *

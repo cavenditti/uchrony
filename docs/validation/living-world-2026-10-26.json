@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-26",
+  "command": "node --expose-gc --import tsx tests/qualify-living-world.ts",
+  "cpu": "Apple M4 Pro",
+  "node": "v26.11.1",
+  "scope": "One generated month per size; three warmed economic projections and 64 deterministic tile plans. No GPU, full-engine throughput, peak memory or endurance claim. Heap delta is a noisy post-GC sample; retained-array bytes are exact and exclude JavaScript objects.",
+  "sources": {
+    "src/sim/economic-landscape.ts": "75540d336e221f40d418548f3cb1c9a0a6a74f8bd922df5583bacd28fa78e10f",
+    "src/sim/climate.ts": "759fa317f666c49ceaa12f25c68764e03906eec8c52c8047c5464a86f7b1facb",
+    "src/map/activity-layout.ts": "b34b0b7f06cdf7849c1da4458b193c20953c211d6a645d563ba5ae0c9d74025b",
+    "src/map/activity-material.ts": "c47cab3194f3a8fcb72ac29bed9448a6a0398ba732dc22a17df2a72f2e6cedc3",
+    "src/map/activity-scenery.ts": "0f2136cbbd773b3f10570a804c5b54d2dbe8fae611a64cf14c7684c63d607992",
+    "tests/qualify-living-world.ts": "ba3629448524b4c612a3f7cd3bf7e3679ed6d51ae54be51c796cbcb133e595ac"
+  },
+  "results": [
+    {
+      "scale": "regional",
+      "sourceCells": 8064,
+      "month": 1,
+      "preparationMs": 2957,
+      "warmedProjectionMs": [
+        5.43,
+        3.56,
+        4.11
+      ],
+      "retainedArrayBytes": 169344,
+      "rgbaGroundTextureBytes": 32256,
+      "sampledHeapChangeBytes": 8947520,
+      "harbors": 97,
+      "activityCounts": {
+        "wild": 4631,
+        "fields": 1313,
+        "pasture": 974,
+        "forest": 859,
+        "timber": 71,
+        "quarry": 79,
+        "iron": 29,
+        "coal": 8,
+        "workshops": 43,
+        "town": 57
+      },
+      "detailTiles": 64,
+      "detailPlanMs": 5.9,
+      "detailPieces": 38028,
+      "detailMotions": 315,
+      "projectedResidents": 10719661,
+      "projectedWorkers": 2975218.981037372,
+      "populationAndEmploymentConserved": true,
+      "canonicalStateUnchanged": true
+    },
+    {
+      "scale": "world",
+      "sourceCells": 129024,
+      "month": 1,
+      "preparationMs": 50648,
+      "warmedProjectionMs": [
+        82.02,
+        75.48,
+        72.92
+      ],
+      "retainedArrayBytes": 2709504,
+      "rgbaGroundTextureBytes": 516096,
+      "sampledHeapChangeBytes": -127676464,
+      "harbors": 333,
+      "activityCounts": {
+        "wild": 72644,
+        "fields": 20492,
+        "pasture": 18086,
+        "forest": 13366,
+        "timber": 1493,
+        "quarry": 1078,
+        "iron": 125,
+        "coal": 41,
+        "workshops": 570,
+        "town": 1129
+      },
+      "detailTiles": 64,
+      "detailPlanMs": 4.64,
+      "detailPieces": 41634,
+      "detailMotions": 331,
+      "projectedResidents": 175107470,
+      "projectedWorkers": 48566323.239113584,
+      "populationAndEmploymentConserved": true,
+      "canonicalStateUnchanged": true
+    }
+  ]
+}

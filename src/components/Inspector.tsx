@@ -6,6 +6,8 @@ import { StateSecurity } from './StateSecurity'
 import { IntelligenceOffice } from './IntelligenceOffice'
 import { useState } from 'react'
 import {
+  Anchor,
+  TrainFront,
   ArrowUpRight,
   ArrowRight,
   Wheat,
@@ -32,7 +34,6 @@ import {
   Shirt,
   Flame,
   Flag,
-  Building2,
   SlidersHorizontal,
   Activity,
   ScrollText,
@@ -1126,17 +1127,48 @@ function Province({
         <span>Local markets</span>
         <b>{spatialState(world).districts.filter((d) => d.region === r.id).length}</b>
       </div>
-      {world.adaptive && <details className="district-economies">
-        <summary>Current administration</summary>
-        <p className="panel-note">Municipal and provincial borders evolve independently. The figures below describe this established statistical area.</p>
-        {Object.values(world.adaptive.jurisdictions).filter((j) => j.retired === undefined && j.cells.some((c) => r.cells.includes(c))).map((j) => <div className="data-row" key={j.id}><span>{j.level === 'municipality' ? 'Municipality' : 'Province'}</span><b>{j.name}</b></div>)}
-      </details>}
+      {world.adaptive && (
+        <details className="district-economies">
+          <summary>Current administration</summary>
+          <p className="panel-note">
+            Municipal and provincial borders evolve independently. The figures below describe this established
+            statistical area.
+          </p>
+          {Object.values(world.adaptive.jurisdictions)
+            .filter((j) => j.retired === undefined && j.cells.some((c) => r.cells.includes(c)))
+            .map((j) => (
+              <div className="data-row" key={j.id}>
+                <span>{j.level === 'municipality' ? 'Municipality' : 'Province'}</span>
+                <b>{j.name}</b>
+              </div>
+            ))}
+        </details>
+      )}
       <DistrictEconomies world={world} province={r.id} />
       <Meter label="Food needs met" value={r.foodCoverage} />
       <Meter label="Other needs met" value={r.materialCoverage ?? 1} />
       <Meter label="Public health" value={r.health} />
       <Meter label="Literacy" value={r.literacy} />
       <Meter label="Infrastructure" value={r.infrastructure / 1.5} text={percent(r.infrastructure)} />
+      {r.publicWorks && (
+        <div className="data-row">
+          <span>Public transport works</span>
+          <b>
+            {[
+              r.publicWorks.road === 'rail'
+                ? 'Railway'
+                : r.publicWorks.road === 'paved'
+                  ? 'Paved roads'
+                  : r.publicWorks.road
+                    ? 'Gravel roads'
+                    : '',
+              r.publicWorks.harbor ? `Docks · level ${r.publicWorks.harbor}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </b>
+        </div>
+      )}
       <Meter label="Unrest" value={r.unrest / 100} text={`${Math.round(r.unrest)} / 100`} color="#b78376" />
       <div className="data-row">
         <span>Net migration / month</span>
@@ -1153,7 +1185,14 @@ function Province({
           [
             { id: 'farm', label: 'Improve farmland', cost: '450k', icon: Wheat },
             { id: 'industry', label: 'Expand industry', cost: '900k', icon: Factory },
-            { id: 'road', label: 'Build roads', cost: '600k', icon: Building2 },
+            { id: 'road', label: 'Improve gravel roads', cost: '600k', icon: Route },
+            { id: 'paved-road', label: 'Pave roads · logistics 2', cost: '1,600k', icon: Route },
+            { id: 'railway', label: 'Build railway · logistics 3', cost: '3,200k', icon: TrainFront },
+            ...(r.coastal
+              ? ([
+                  { id: 'port', label: 'Expand harbor docks · logistics 1', cost: '1,200k', icon: Anchor },
+                ] as const)
+              : []),
             { id: 'school', label: 'Fund a school', cost: '500k', icon: BookOpen },
           ] as const
         ).map((item) => (
@@ -1166,7 +1205,9 @@ function Province({
         ))}
       </div>
       <p className="panel-note">
-        Each investment also uses 50 t of timber and 70 t of stone from local reserves.
+        Farms, industry, gravel roads and schools use 50 t timber and 70 t stone. Paved roads use 40 t timber,
+        160 t stone and 10 t tools; railways use 100 t timber, 100 t stone, 80 t iron and 30 t tools; docks
+        use 100 t timber, 120 t stone, 20 t iron and 10 t tools. Materials come from the provincial depot.
       </p>
       <details className="sandbox-tools">
         <summary>

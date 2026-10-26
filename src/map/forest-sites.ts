@@ -6,7 +6,7 @@ import type { World } from '../sim/types'
 /** World-space clustered scattering, built once per scene, with a fixed instance cap. */
 export function forestSites(world: Pick<World, 'cells' | 'width' | 'height' | 'seed'>) {
   const forestCount = world.cells.reduce((n, c) => n + Number(c.terrain === 'forest' && !c.river), 0)
-  const budget = Math.min(18000, Math.ceil(forestCount * 1.2))
+  const budget = Math.min(36000, Math.ceil(forestCount * 3.5))
   const field = landscapeField(world),
     values = new Float64Array(8)
   const salt = hashSeed(`${world.seed}:forest-scatter:1`)

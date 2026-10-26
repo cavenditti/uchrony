@@ -1,3 +1,4 @@
+import { economicLandscape } from './economic-landscape'
 import { clamp, GOODS, type Inventory, type Army, type World } from './types'
 import { unitLoyalty } from './forces'
 import type { IdentityAxis, PopulationCommunity } from './population-types'
@@ -146,6 +147,7 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
   return {
     ...rest,
     viewOnly: true,
+    viewLandscape: economicLandscape(world),
     ...(world.adaptive
       ? {
           viewHomes: Object.values(world.adaptive.sites)

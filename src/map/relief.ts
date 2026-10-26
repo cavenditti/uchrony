@@ -14,6 +14,9 @@ import { riverSurface } from './river-surface'
 import { SceneryMotion } from './scenery-motion'
 import { windMaterial } from './city-materials'
 import { illuminated } from './illuminated-palette'
+import { ActivityScenery } from './activity-scenery'
+import { activityTexture } from './activity-material'
+import { economicLandscape } from '../sim/economic-landscape'
 
 export type ReliefCamera = { w: number; h: number; scale: number; x: number; y: number; tilt: boolean }
 
@@ -41,6 +44,9 @@ export class ReliefMap {
   private pigment = { value: 1 }
   private sun = new THREE.DirectionalLight('#fff0d8', 1.85)
   private cities: CityScenery
+  private activities: ActivityScenery
+  private activityMap: { value: THREE.Texture }
+  private activityWorld?: World
   private raycaster = new THREE.Raycaster()
   private cameraState: ReliefCamera = { w: 1, h: 1, scale: 1, x: 0, y: 0, tilt: true }
   private overlayUpdates = new OverlayUpdates()
@@ -95,7 +101,13 @@ export class ReliefMap {
       positions.getY(row * (segmentsX + 1) + column),
     )
     this.picker = new TerrainPicker(geometry)
-    const material = terrainMaterial(this.texture, this.pigment)
+    const landscape = world.viewLandscape ?? economicLandscape(world)
+    this.activityMap = { value: activityTexture(world, landscape) }
+    const material = terrainMaterial(this.texture, this.pigment, {
+      texture: this.activityMap,
+      size: new THREE.Vector2(this.width, this.height),
+      grid: new THREE.Vector2(world.width, world.height),
+    })
     this.terrain = new THREE.Mesh(geometry, material)
     this.terrain.receiveShadow = true
     this.scene.add(this.terrain)
@@ -156,6 +168,8 @@ export class ReliefMap {
     this.scene.add(this.scenery)
     this.cities = new CityScenery(world, this.picker, atlas.riverCurves)
     this.scene.add(this.cities.group)
+    this.activities = new ActivityScenery(world, this.picker)
+    this.scene.add(this.activities.group)
     this.buildScenery(world)
   }
 
@@ -277,6 +291,7 @@ export class ReliefMap {
     this.scenery.visible = next.scale > 0.38
     this.cities.group.visible = next.scale > 0.38
     this.cities.view(this.camera, next.w, next.h, next.scale)
+    this.activities.view(this.camera, next.w, next.h, next.scale)
     this.treeScale.value = THREE.MathUtils.lerp(1, 0.16, THREE.MathUtils.smoothstep(next.scale, 1.5, 6))
     this.sun.castShadow = next.scale >= 3
     if (this.sun.castShadow) {
@@ -293,6 +308,14 @@ export class ReliefMap {
     this.lineworkWorld = world
     this.lineworkLayer = layer
     this.cities.update(world)
+    if (this.activityWorld !== world) {
+      const landscape = world.viewLandscape ?? economicLandscape(world)
+      this.activityMap.value.dispose()
+      this.activityMap.value = activityTexture(world, landscape)
+      this.activities.update(world, landscape)
+      this.activityWorld = world
+    }
+    this.activities.view(this.camera, this.cameraState.w, this.cameraState.h, scale)
     if (this.sun.castShadow) this.renderer.shadowMap.needsUpdate = true
     this.cities.view(this.camera, this.cameraState.w, this.cameraState.h, scale)
     this.rivers.minimumFlow.value = scale >= 0.7 ? 0 : 12 / Math.max(0.08, scale)
@@ -359,11 +382,14 @@ export class ReliefMap {
   render(time = 0, animated = false) {
     this.motion.advance(time, animated)
     this.cities.time.value = this.motion.time.value
+    this.activities.animate(this.motion.time.value)
     this.renderer.render(this.scene, this.camera)
   }
 
   dispose() {
     this.cities.dispose()
+    this.activities.dispose()
+    this.activityMap.value.dispose()
     const geometries = new Set<THREE.BufferGeometry>(),
       materials = new Set<THREE.Material>()
     this.scene.traverse((object) => {

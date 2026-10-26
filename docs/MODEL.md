@@ -504,12 +504,12 @@ Potential labor comes from exact age-specific participation and health. Competin
 Farm output has diminishing returns to labor and a land-based upper bound:
 
 ```text
-arable capacity = district hex count × 1,800 × (0.35 + 0.65 × fertility)
+arable capacity = district terrain-cell count × 1,800 × (0.35 + 0.65 × fertility)
 effective farm labor = capacity × (1 - exp(-farm workers / capacity))
 food output = effective farm labor × (0.105 + 0.125 × fertility) × abundance × technology × season × climate × efficiency
 ```
 
-This prevents adding people from creating unlimited farmland. Agricultural investment and research increase supportable population. Seasonal output varies by ±23%; annual climate varies from 0.82 to 1.16 of baseline. Industrial technology, literacy, and damage influence overall production efficiency.
+This prevents adding people from creating unlimited farmland. Agricultural investment and research increase supportable population. A firm's terrain cell determines its geographic season: the southern cycle is six months later than the northern cycle. Seasonal output varies by ±8% in tropical climates, ±12% in arid climates and ±23% elsewhere; the twelve-month mean multiplier is one. Annual world climate still varies from 0.82 to 1.16 of baseline. Temperature and biome use synthetic latitude, elevation and moisture rules, not a weather simulation. Industrial technology, literacy, and damage influence overall production efficiency.
 
 Timber, stone, iron, and coal throughput depends on allocated workers, resource abundance and the district's remaining resource richness. New worlds distribute iron and coal through separate spatially correlated geological fields with thresholds for workable deposits; some provinces have none, others have concentrated sources. Legacy provinces receive local natural endowments on conversion. Scarce industrial inputs constrain manufacturing and create reasons for access agreements, leverage and conflict. Local richness declines with remaining natural reserves. After extraction, standing timber recovers once per month: R[t+1] = R[after extraction] + max(0,K−R[after extraction]) × 0.002, with K = initial timber potential × 5,000 × (1−0.8 × built fraction). Built land reduces carrying stock; minerals do not regenerate. Forest age classes and ecological damage are not represented in that recovery rule. Industrial capacity constrains manufacturing. Recipe inputs are removed from stocks before outputs are credited:
 

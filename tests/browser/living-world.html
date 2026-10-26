@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Living landscape qualification</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #19252b;
+        color: #e6e7dd;
+        font:
+          15px Georgia,
+          serif;
+      }
+      header {
+        padding: 16px 22px;
+      }
+      h1 {
+        font-size: 25px;
+        margin: 0 0 6px;
+      }
+      p {
+        margin: 6px 0;
+        color: #c3ceca;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      button,
+      select {
+        background: #d7b77a;
+        color: #253034;
+        border: 0;
+        border-radius: 4px;
+        padding: 9px 13px;
+        font: 14px system-ui;
+        cursor: pointer;
+      }
+      button:focus-visible,
+      select:focus-visible {
+        outline: 3px solid #fff;
+        outline-offset: 3px;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: calc(100dvh - 195px);
+        min-height: 360px;
+      }
+      output {
+        display: block;
+        padding: 10px 22px;
+        font: 13px system-ui;
+        color: #c3ceca;
+      }
+      ::selection {
+        background: #d7b77a;
+        color: #253034;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Living landscape</h1>
+      <p id="description">
+        Controlled scenery fixture: working fields, dense woodland, extraction, workshops and a coastal
+        harbor.
+      </p>
+      <nav>
+        <button id="overview">Landscape</button><button id="fields">Farms &amp; forest</button
+        ><button id="industry">Mines &amp; workshops</button><button id="harbor">Harbor town</button
+        ><button id="motion">Pause activity</button><button id="season">Change season</button
+        ><button id="real">Generated world</button>
+      </nav>
+    </header>
+    <canvas></canvas><output id="result">Loading</output>
+    <script type="module" src="./living-world.ts"></script>
+  </body>
+</html>

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { activityGroundShader } from './activity-material'
 
 export const surfaceNoiseShader = `
 float surfaceHash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
@@ -46,16 +47,25 @@ vec3 coastalWaterNormal(vec2 position, float time) {
 `
 
 /** Close-range detail is evaluated in world coordinates, independent of district size or camera zoom. */
-export function terrainMaterial(texture: THREE.Texture, pigment = { value: 1 }) {
+export function terrainMaterial(
+  texture: THREE.Texture,
+  pigment = { value: 1 },
+  activity?: { texture: { value: THREE.Texture }; size: THREE.Vector2; grid: THREE.Vector2 },
+) {
   const material = new THREE.MeshStandardMaterial({
     map: texture,
     roughness: 0.94,
     metalness: 0,
     alphaTest: 0.3,
   })
-  material.customProgramCacheKey = () => 'uchrony-illuminated-ground-v1'
+  material.customProgramCacheKey = () => `uchrony-illuminated-ground-v2-${!!activity}`
   material.onBeforeCompile = (shader) => {
     shader.uniforms.pigmentStrength = pigment
+    if (activity) {
+      shader.uniforms.activityMap = activity.texture
+      shader.uniforms.activityWorldSize = { value: activity.size }
+      shader.uniforms.activityGridSize = { value: activity.grid }
+    }
     shader.vertexShader = 'varying vec3 vGround;\n' + shader.vertexShader
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
@@ -63,6 +73,9 @@ export function terrainMaterial(texture: THREE.Texture, pigment = { value: 1 }) 
     )
     shader.fragmentShader =
       'uniform float pigmentStrength;\nvarying vec3 vGround;\n' +
+      (activity
+        ? 'uniform sampler2D activityMap;\nuniform vec2 activityWorldSize;\nuniform vec2 activityGridSize;\n'
+        : '') +
       surfaceNoiseShader +
       '\n' +
       shader.fragmentShader
@@ -73,6 +86,7 @@ export function terrainMaterial(texture: THREE.Texture, pigment = { value: 1 }) 
       float visibleDetail = 1.0 - smoothstep(0.5, 3.0, length(fwidth(vGround.xz)));
       float mineral = surfaceNoise(vGround.xz * 0.6) * 0.65 + surfaceNoise(vGround.xz * 1.9) * 0.35;
       diffuseColor.rgb *= mix(1.0, 0.95 + mineral * 0.10, visibleDetail*pigmentStrength);
+      ${activity ? activityGroundShader : ''}
     `,
     )
     shader.fragmentShader = shader.fragmentShader.replace(

@@ -150,6 +150,19 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     )
       fail('invalid planned production')
     if (
+      r.publicWorks !== undefined &&
+      (!object(r.publicWorks) ||
+        (r.publicWorks.road !== undefined &&
+          (typeof r.publicWorks.road !== 'string' ||
+            !['gravel', 'paved', 'rail'].includes(r.publicWorks.road))) ||
+        (r.publicWorks.harbor !== undefined &&
+          (typeof r.publicWorks.harbor !== 'number' ||
+            !Number.isSafeInteger(r.publicWorks.harbor) ||
+            r.publicWorks.harbor < 1 ||
+            r.publicWorks.harbor > 3)))
+    )
+      fail('invalid public transport works')
+    if (
       !object(r.deposits) ||
       ['timber', 'stone', 'iron', 'coal'].some((g) => !number(r.deposits[g as keyof typeof r.deposits]))
     )

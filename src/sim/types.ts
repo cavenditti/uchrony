@@ -61,6 +61,7 @@ export interface Cell {
   riverFlow?: number
 }
 export interface Region {
+  publicWorks?: import('./transport-development').PublicWorks
   /** Present only on a local simulation district. */
   province?: number
   capitalReference?: number
@@ -249,6 +250,8 @@ export interface World {
   /** UI subscription only. Undefined publishes all details; null publishes summaries. */
   viewNation?: number | null
   viewBankLoans?: Record<number, number>
+  /** Read-only economic tile projection shared by every observer. */
+  viewLandscape?: import('./economic-landscape').EconomicLandscape
   /** Compact display records; avoids cloning a giant string-keyed site registry. */
   viewHomes?: {
     id: string
@@ -347,7 +350,11 @@ export type Command =
       mission: 'patrol' | 'escort' | 'blockade' | 'transport' | 'return'
     }
   | { type: 'embark'; army: number; fleet: number }
-  | { type: 'build'; region: number; building: 'farm' | 'industry' | 'road' | 'school' }
+  | {
+      type: 'build'
+      region: number
+      building: 'farm' | 'industry' | 'road' | 'school' | import('./public-works').TransportProject
+    }
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }
 export type WorkerRequest =

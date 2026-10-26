@@ -79,6 +79,14 @@ $$
 
 $d^*$ is the largest of the firm's forecast and its share of wholesaler demand or local subsistence/input orders. Manufacturing has fixed input coefficients $a_{ig}$: output cannot exceed labor/capital capacity, available inputs divided by $a_{ig}$, or input-purchase funding. Farm labor has diminishing returns through $A(1-e^{-L_f/A})$, with effective land $A$; technology and local conditions scale output. Extraction also requires remaining natural reserves.
 
+Local farm seasonality multiplies food capacity by
+
+$$
+s_{c,t}=1+a_c\sin\left(\frac{2\pi}{12}((t\bmod 12)-4+6\mathbf{1}_{\ell_c<0})\right).
+$$
+
+Here $\ell_c=1-2(r_c+0.5)/H$ is synthetic latitude, with row $r_c$ and map height $H$. Temperature is $29-47|\ell_c|-25\max(0,e_c-0.2)$ for elevation $e_c$. Terrain, moisture and temperature classify climate; amplitude $a_c$ is 0.08 for tropical, 0.12 for arid and 0.23 otherwise. The annual mean of this multiplier is one. These rules give opposite growing seasons to the two hemispheres; they do not simulate weather or individual crops.
+
 $$
 \begin{aligned}
 p^*&=\max\!\left(0.01,c_{\mathrm{replacement}}(1+\mu)\right)\\
@@ -197,6 +205,10 @@ $$
 Delivered quantity is bounded by seller stock, buyer cash and the remaining capacity of every corridor used. Freight receipts become carrier mixed income. Supplier selection considers price, effort, domestic preference and existing relationships; it is not a global cost-minimizing equilibrium.
 
 Mineral extraction depletes cell-level reserves. Timber regrows by 0.2% of the gap to its land-use-adjusted capacity each month. Resource abundance, geography and transport costs therefore shape specialization rather than granting every district identical opportunities.
+
+Funded provincial paving multiplies local road friction by 0.85 and capacity by 1.2; funded railways use 0.65 and 1.5. A paid harbor level $h\in\{0,1,2,3\}$ multiplies port capacity by $1+0.4h$. Construction requires technology, treasury and depot materials, and improves existing transport access. These are synthetic investment effects, not calibrated engineering capacities.
+
+The atlas projects employment and population onto dominant tile activities. Detailed farms, woods, mines, workshops, docks and representative motion are generated only for observed tiles and do not alter these accounts. Mixed activities and individual routines remain aggregated in the authoritative monthly model.
 
 ## Local markets and concentration
 

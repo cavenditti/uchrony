@@ -290,12 +290,12 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
       throw new Error('An agent may only recruit or invest in its own provinces.')
     if (order.kind === 'recruit') command = { type: 'recruit', nation, region: order.target }
     else {
-      if (!['farm', 'industry', 'road', 'school'].includes(order.text))
+      if (!['farm', 'industry', 'road', 'school', 'paved-road', 'railway', 'port'].includes(order.text))
         throw new Error('Unknown improvement.')
       command = {
         type: 'build',
         region: order.target,
-        building: order.text as 'farm' | 'industry' | 'road' | 'school',
+        building: order.text as Extract<Command, { type: 'build' }>['building'],
       }
     }
   }
@@ -1123,6 +1123,7 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
         deposits: region.deposits,
         unrest: region.unrest,
         infrastructure: region.infrastructure,
+        publicWorks: region.publicWorks,
         delegation: region.delegation,
         industry: region.industry,
         stocks: region.stocks,

@@ -1,3 +1,4 @@
+import { buildTransport } from './public-works'
 import { ensureResidentialSites, syncResidentialPopulation } from './residential-sites'
 import { arriveFreight } from './freight-transit'
 import { ensureAdaptiveWorld, syncSites, rebuildAdaptiveMesh, refreshAdaptiveTotals } from './adaptive-world'
@@ -738,6 +739,8 @@ function executeCommand(w: World, command: Command): string {
     const r = w.regions[command.region]
     if (!r) throw new Error('That province does not exist.')
     const n = w.nations[r.nation]
+    if (command.building === 'paved-road' || command.building === 'railway' || command.building === 'port')
+      return buildTransport(w, r.id, command.building)
     const cost = { farm: 450, industry: 900, road: 600, school: 500 }[command.building]
     if (!cost) throw new Error('Unknown building.')
     if (n.treasury < cost) return `Construction requires ${cost}k crowns in the treasury.`
@@ -762,7 +765,10 @@ function executeCommand(w: World, command: Command): string {
     if (command.building === 'farm') r.fertility = Math.min(1.2, r.fertility + 0.12)
     if (command.building === 'industry')
       w.economy!.producers[r.id].projects.push({ remaining: 6, capital: 0.18, cost })
-    if (command.building === 'road') r.infrastructure = Math.min(1.5, r.infrastructure + 0.2)
+    if (command.building === 'road') {
+      r.infrastructure = Math.min(1.5, r.infrastructure + 0.2)
+      r.publicWorks = { ...r.publicWorks, road: r.publicWorks?.road ?? 'gravel' }
+    }
     if (command.building === 'school') {
       r.literacy = Math.min(0.99, r.literacy + 0.08)
       for (const group of r.communities ?? []) group.literacy = Math.min(0.99, group.literacy + 0.08)
