@@ -1,0 +1,342 @@
+{
+  "date": "2026-10-26",
+  "commit": "b772bc7",
+  "scope": "Visual and numeric evaluation, not a new implementation or full endurance certification.",
+  "environment": {
+    "browser": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+    "cpuGpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+    "hardwareConcurrency": 12,
+    "crossOriginIsolated": true,
+    "fullAppViewport": [
+      1440,
+      1000
+    ],
+    "closeTourViewport": [
+      1440,
+      800
+    ],
+    "mobileViewport": [
+      390,
+      844
+    ],
+    "terrainDevicePixelRatioCap": 1.75,
+    "headed": true,
+    "externalModelServices": false,
+    "saveDirectory": "/private/tmp/uchrony-chrome-evaluation-20261026/saves",
+    "worldSeed": "A world unwritten",
+    "sourceCells": 129024
+  },
+  "fullAppPlayback": {
+    "durationSeconds": 120.22965500000282,
+    "startMonth": 3,
+    "endMonth": 7,
+    "requestedSpeed": 12,
+    "publishedMonthlyAdvances": 4,
+    "monthsPerSecond": 0.033269662131193055,
+    "drags": 722,
+    "zoomActions": 361,
+    "frameMs": {
+      "max": 1781.9700000000305,
+      "p50": 8,
+      "p95": 10,
+      "p99": 10
+    },
+    "framesOver1000ms": 4,
+    "framesOver100ms": 9,
+    "sampledMainThreadHeapPeakMiB": 475.6922054290771,
+    "replicatedSaves": 2,
+    "errors": [],
+    "contextLosses": 0,
+    "budgetMisses": [],
+    "qualificationNote": "Mixed close/regional/world zoom; repeated Home actions mean much of this run is overview. Frame intervals are requestAnimationFrame observations, not isolated GPU times. Heap excludes worker heaps, GPU and native browser allocations."
+  },
+  "closeTour": {
+    "durationSeconds": 30.140588000009302,
+    "drags": 62,
+    "worldMonth": 8,
+    "paused": true,
+    "scaleRange": [
+      13.446807861328129,
+      13.446807861328129
+    ],
+    "frameMs": {
+      "max": 26.33999999985099,
+      "p50": 8,
+      "p95": 10,
+      "p99": 17
+    },
+    "activeTilesRange": [
+      35,
+      55
+    ],
+    "maxCachedTiles": 128,
+    "maxMotionRecords": 355,
+    "maxActivityMeshes": 7,
+    "fullSceneDrawCallsRange": [
+      32,
+      56
+    ],
+    "fullSceneTrianglesRange": [
+      6050078,
+      6111314
+    ],
+    "liveGpuTexturesRange": [
+      11,
+      11
+    ],
+    "liveGpuProgramsRange": [
+      16,
+      16
+    ],
+    "liveGpuBuffersRange": [
+      291,
+      305
+    ],
+    "errors": []
+  },
+  "firstMonthApproximateLatencyMs": 38509.05500000715,
+  "widerCollectionPaintCpuMs": {
+    "max": 1908.560000002384,
+    "n": 364,
+    "p50": 9.224999994039536,
+    "p95": 12.044999986886978,
+    "p99": 1199.844999998808,
+    "total": 12472.37000003457
+  },
+  "numericModelCheck": {
+    "sourceSave": "/private/tmp/uchrony-chrome-evaluation-20261026/saves/334739b0-f3aa-4ba3-be42-4fd25b05dcf8.json",
+    "month": 8,
+    "cells": 129024,
+    "population": 171708135,
+    "regionalPopulation": 171708135,
+    "populationError": 0,
+    "jobs": 44459146.58198698,
+    "employment": 44459146.58198666,
+    "employmentError": 3.203749656677246e-07,
+    "projectionMs": 398.4227920000012,
+    "canonicalStateUnchanged": true,
+    "saveValid": true,
+    "geometry": {
+      "bodies": 76119,
+      "centersInRiver": 2036,
+      "footprintsTouchRiver": 3307,
+      "byRole": {
+        "farmhouse": {
+          "bodies": 36726,
+          "centersInRiver": 973
+        },
+        "barn": {
+          "bodies": 36726,
+          "centersInRiver": 777
+        },
+        "sawmill": {
+          "bodies": 340,
+          "centersInRiver": 3
+        },
+        "workshop": {
+          "bodies": 1890,
+          "centersInRiver": 282
+        },
+        "mine-office": {
+          "bodies": 437,
+          "centersInRiver": 1
+        }
+      },
+      "examples": [
+        {
+          "cell": 9951,
+          "role": "farmhouse",
+          "x": 1147.1867983774716,
+          "z": 270.13448245657713,
+          "region": "Bel Yardale"
+        },
+        {
+          "cell": 9951,
+          "role": "barn",
+          "x": 1148.1367983774717,
+          "z": 270.13448245657713,
+          "region": "Bel Yardale"
+        },
+        {
+          "cell": 10399,
+          "role": "farmhouse",
+          "x": 1146.4375562843488,
+          "z": 282.5976187657443,
+          "region": "Bel Yardale"
+        },
+        {
+          "cell": 10403,
+          "role": "farmhouse",
+          "x": 1194.660264701969,
+          "z": 282.0170578489236,
+          "region": "Norwick"
+        },
+        {
+          "cell": 10403,
+          "role": "barn",
+          "x": 1195.610264701969,
+          "z": 282.0170578489236,
+          "region": "Norwick"
+        },
+        {
+          "cell": 10846,
+          "role": "farmhouse",
+          "x": 1135.5749766261024,
+          "z": 294.63251240897984,
+          "region": "Aster Valcrest"
+        },
+        {
+          "cell": 10851,
+          "role": "farmhouse",
+          "x": 1195.1826440481661,
+          "z": 294.73250707774014,
+          "region": "Norwick"
+        },
+        {
+          "cell": 10851,
+          "role": "barn",
+          "x": 1196.1326440481662,
+          "z": 294.73250707774014,
+          "region": "Norwick"
+        },
+        {
+          "cell": 11276,
+          "role": "farmhouse",
+          "x": 918.9351598503848,
+          "z": 307.112159054345,
+          "region": "Bel Keldale"
+        },
+        {
+          "cell": 11276,
+          "role": "barn",
+          "x": 919.8851598503848,
+          "z": 307.112159054345,
+          "region": "Bel Keldale"
+        },
+        {
+          "cell": 11299,
+          "role": "farmhouse",
+          "x": 1195.111728161483,
+          "z": 307.42542381216197,
+          "region": "Norwick"
+        },
+        {
+          "cell": 11299,
+          "role": "barn",
+          "x": 1196.061728161483,
+          "z": 307.42542381216197,
+          "region": "Norwick"
+        }
+      ]
+    },
+    "scope": "Actual Chrome end-save. Building-body centers/corners tested against 0.5-map-unit samples of the same river curves/widths used by the renderer. Center hits are clear conflicts; corner hits are an approximate footprint check, not an exact polygon union. Sample buildings are virtual plans, not all simultaneously visible."
+  },
+  "animation": {
+    "moving": {
+      "size": [
+        2880,
+        1600
+      ],
+      "changedLuminancePixels": 24523,
+      "percent": 0.5321831597222222,
+      "identicalRGB": false
+    },
+    "paused": {
+      "size": [
+        2880,
+        1600
+      ],
+      "changedLuminancePixels": 0,
+      "percent": 0.0,
+      "identicalRGB": true
+    }
+  },
+  "mobile": {
+    "documentScrollWidth": 390,
+    "viewportWidth": 390,
+    "documentScrollHeight": 844,
+    "viewportHeight": 844,
+    "note": "Viewport emulation in desktop Chrome, not phone-hardware performance."
+  },
+  "visualAssessment": {
+    "verdict": "Useful visual foundation, not finished against the alive-world brief.",
+    "strengths": [
+      "Recognizable farms, quarries, workshops and docks; town houses remain modest in height.",
+      "Denser forests and climate-dependent foliage make land uses easier to read.",
+      "Crop textures persist across zoom; observed activity is disposable and economic totals remain conserved."
+    ],
+    "findings": [
+      {
+        "priority": "P1",
+        "title": "Activity buildings intersect rivers",
+        "observed": "Farms visibly overlap the river in the generated Greyport coast. Numeric center/footprint checks corroborate the issue.",
+        "numeric": {
+          "buildingBodies": 76119,
+          "centersInsideRiver": 2036,
+          "centerPercent": 2.674759258529408,
+          "approximateFootprintHits": 3307
+        },
+        "source": "src/map/activity-layout.ts:add/box",
+        "recommendation": "Use the same sampled river-clearance and footprint checks already used by cityLayout, and site farms/workshops along dry access paths.",
+        "screenshot": "/Users/carlo/Devel/personal/uchrony/.impeccable/review/living-chrome-2026-10-26/screenshots/07-coast-close.png"
+      },
+      {
+        "priority": "P1",
+        "title": "Simulation throughput is far below the requested speed",
+        "observed": "At requested 12x playback, the timed interval published four monthly advances in 120.23 seconds. This does not demonstrate massive full-engine scaling.",
+        "recommendation": "Profile monthly phases and snapshot construction on this saved world; the spatial worker pool alone does not parallelize the entire economy."
+      },
+      {
+        "priority": "P1",
+        "title": "Intermittent long update stalls",
+        "observed": "Four frame intervals exceeded one second; the worst in the timed run was 1781.97 ms. Whole-world paint calls reached 1908.56 ms in the wider graphics collection.",
+        "recommendation": "Profile and split expensive snapshot-to-scene work, retaining static geometry and changing only affected tiles. An A/B run is needed to attribute the incremental cost of the new feature."
+      },
+      {
+        "priority": "P1",
+        "title": "The countryside still looks systematically stamped",
+        "observed": "Farmhouse/barn pairs repeat near source-cell centers with narrow orientation variation; straight connections and dense crop rectangles expose the underlying grid. This is visible in generated geography, independently of the controlled fixture.",
+        "recommendation": "Vary compound count, orientation, age, clustering and access according to local roads, terrain and demand; retain undeveloped margins and irregular field boundaries.",
+        "screenshot": "/Users/carlo/Devel/personal/uchrony/.impeccable/review/living-chrome-2026-10-26/screenshots/05-town-close.png"
+      },
+      {
+        "priority": "P2",
+        "title": "Crop texture competes with geography at regional scale",
+        "observed": "High-frequency yellow field patches dominate the background and surround some woodland in the regional view.",
+        "recommendation": "Fade field coverage and boundaries with distance, while preserving close-scale furrows and soil variation.",
+        "screenshot": "/Users/carlo/Devel/personal/uchrony/.impeccable/review/living-chrome-2026-10-26/screenshots/02-capital-opening.png"
+      }
+    ]
+  },
+  "detector": {
+    "target": "src/components/WorldMap.tsx",
+    "findings": [],
+    "note": "Static markup scan does not validate WebGL scenery or its economic model."
+  },
+  "discardedEvidence": [
+    {
+      "file": "discarded-overview-tour.json",
+      "reason": "Recording opened a duplicate tab whose restored camera was at overview. It failed the intended close-view condition and is excluded."
+    },
+    {
+      "file": "videos/detail-transition.webm",
+      "reason": "The recording tab reset the camera; not accepted as evidence of a product LOD defect."
+    }
+  ],
+  "limits": [
+    "No before/after baseline, so whole-scene cost cannot all be attributed to the latest commit.",
+    "Two minutes of playback and 30 seconds of close panning do not establish long-run stability.",
+    "External state-agent generation was disabled; paid transport command rules were not manually exercised in this browser pass.",
+    "The cold Node projection measurement is from the month-eight save and is not comparable to the earlier warmed month-one measurements.",
+    "No product source changed during this evaluation."
+  ],
+  "evidenceDirectory": "/Users/carlo/Devel/personal/uchrony/.impeccable/review/living-chrome-2026-10-26",
+  "sourceHashes": {
+    "src/map/activity-layout.ts": "b34b0b7f06cdf7849c1da4458b193c20953c211d6a645d563ba5ae0c9d74025b",
+    "src/map/activity-scenery.ts": "0f2136cbbd773b3f10570a804c5b54d2dbe8fae611a64cf14c7684c63d607992",
+    "src/map/activity-material.ts": "c47cab3194f3a8fcb72ac29bed9448a6a0398ba732dc22a17df2a72f2e6cedc3",
+    "src/map/relief.ts": "8acaf23e04c09740f8b383fcd40bc60cfbdc997ed38257a579050f26826c1c0a",
+    "src/sim/economic-landscape.ts": "75540d336e221f40d418548f3cb1c9a0a6a74f8bd922df5583bacd28fa78e10f",
+    "tests/browser/map-soak-run.py": "10f2c6c5e777a6a71fad5eddcbec723730d9c30d74985b0c7b37864590450c69"
+  }
+}
