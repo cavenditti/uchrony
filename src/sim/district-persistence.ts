@@ -161,7 +161,8 @@ export function validateDistrictEconomy(w: World) {
     for (const g of GOODS) if (r.stocks[g] !== u.stocks[g]) fail('provincial depot stock')
   }
   const cityIds = new Set<number>(),
-    cityCells = new Set<number>()
+    cityCells = new Set<number>(),
+    citySites = new Set<string>()
   for (const c of s.cities) {
     if (
       !obj(c) ||
@@ -183,8 +184,30 @@ export function validateDistrictEconomy(w: World) {
     cityIds.add(c.id)
     if (c.absorbedBy !== undefined && !int(c.absorbedBy, 0, s.nextCity - 1)) fail('city succession')
     if (c.absorbedBy !== undefined) continue
+    if (c.sites !== undefined) {
+      if (
+        !Array.isArray(c.sites) ||
+        new Set(c.sites).size !== c.sites.length ||
+        c.sites.some(
+          (id) => !w.adaptive?.sites[id] || w.adaptive.sites[id].kind !== 'residential' || citySites.has(id),
+        ) ||
+        (c.sites.length &&
+          (!c.nucleusSite ||
+            !c.sites.includes(c.nucleusSite) ||
+            w.adaptive!.sites[c.nucleusSite].cell !== c.nucleus))
+      )
+        fail('city residential footprint')
+      let people = 0
+      for (const id of c.sites) {
+        const site = w.adaptive!.sites[id]
+        citySites.add(id)
+        if (!c.cells.includes(site.cell)) fail('city parcel is outside footprint')
+        people += site.residents ?? 0
+      }
+      if (people !== c.population) fail('city occupied population')
+    }
     for (const id of c.cells) {
-      if (!seen.has(id) || cityCells.has(id)) fail('city footprint')
+      if (!seen.has(id) || (!c.sites && cityCells.has(id))) fail('city footprint')
       cityCells.add(id)
     }
   }

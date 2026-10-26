@@ -1,6 +1,6 @@
 import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
 import type { SpatialBounds } from '../sim/adaptive-types'
-import { districtDensityScale, spatialState, type Settlement } from '../sim/spatial'
+import { districtDensityScale, spatialState, settlementPosition, type Settlement } from '../sim/spatial'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
@@ -568,7 +568,7 @@ export function WorldMap({
     ? settlements.filter((s) => s.region === picked.id).sort((a, b) => b.population - a.population)[0]
     : undefined
   const cityScreen = (city: Settlement) => {
-    const c = world.cells[city.cell],
+    const c = settlementPosition(world, city),
       elevation = terrainHeight(world, c.x, c.y) + 2
     return {
       x: (c.x - mapW / 2) * scale + view.x + size.w / 2,
@@ -593,7 +593,7 @@ export function WorldMap({
         }, undefined)
       : undefined
   const exploreCity = (city: Settlement) => {
-    const c = world.cells[city.cell],
+    const c = settlementPosition(world, city),
       targetScale = Math.max(6, Math.min(24, (size.w - 50) / 34, (size.h - 140) / 26))
     const zoom = targetScale / fit,
       elevation = terrainHeight(world, c.x, c.y) + 2
@@ -945,7 +945,11 @@ export function WorldMap({
       {closeCity && (
         <div className="city-view-caption" aria-label="City view">
           <h2>{closeCity.name}</h2>
-          {world.adaptive && onInspectDaily && <button onClick={() => { exploreCity(closeCity); onInspectDaily(closeCity.cell) }}>Inspect daily life</button>}
+          {world.adaptive && (onInspectArea || onInspectDaily) && <button onClick={() => {
+            exploreCity(closeCity)
+            if (closeCity.position && onInspectArea) onInspectArea({ x: closeCity.position.x - 500, y: closeCity.position.y - 500, size: 1000 })
+            else onInspectDaily?.(closeCity.cell)
+          }}>Inspect daily life</button>}
           <p>
             {compact(closeCity.population)} people ·{' '}
             {closeCity.capital

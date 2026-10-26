@@ -36,6 +36,9 @@ export interface City {
   parents: number[]
   absorbedBy?: number
   lastNameChange: number
+  /** Occupied physical parcels; several independent settlements may share one terrain sample. */
+  sites?: string[]
+  nucleusSite?: string
 }
 export interface DistrictEconomy {
   version: 1

@@ -390,7 +390,16 @@ test('lean residential display records preserve every recorded capacity and town
   assert.equal(view.viewHomes!.length, homes.length)
   assert.deepEqual(
     view.viewHomes,
-    homes.map(({ id, cell, pool, capacity }) => ({ id, cell, pool, capacity })),
+    homes.map(({ id, cell, pool, capacity, residents, x, y, parcel }) => ({
+      id,
+      cell,
+      pool,
+      capacity,
+      residents,
+      x,
+      y,
+      parcel,
+    })),
   )
   assert.deepEqual(view.adaptive!.sites, {})
   for (const settlement of spatialState(world).settlements)

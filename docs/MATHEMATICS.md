@@ -216,21 +216,38 @@ $x$ is the output gap; $r^*$ the neutral real rate. A price equation links expec
 
 ## Adaptive space and administration
 
-The physical quadtree and legal jurisdictions are separate. Original terrain polygons are clipped into square leaves; neighboring leaf widths differ by at most 2:1. Legacy centers are explicitly assigned 1 km spacing. This synthetic scale is not a historical calibration.
+The physical quadtree and legal jurisdictions are separate. Original land and water polygons are clipped into square leaves; neighboring leaf widths differ by at most 2:1. Legacy centers are explicitly assigned 1 km spacing. This synthetic scale is not a historical calibration.
 
 For additive stocks, restriction is $X_p=\sum_cX_c$. Accounts, contracts, firm identities and census cohorts remain in persistent closure records; refinement changes their spatial grouping, never their owners or balances. Because $f(\sum_iX_i)\ne\sum_i f(X_i)$ in general, heterogeneous household and firm records are retained rather than replaced with a mean agent.
 
 The refinement indicator is:
 
 $$
-\eta_n=\left(\frac{N_n}{12000}+\frac{J_n}{2500}\right)
+\eta_n=\left(\frac{N_n}{12000}+\frac{J_n}{2500}+M_n\right)
 \min\left(1,\frac{s_n^2}{1000^2}\right)
-+2\frac{\sigma(p)}{\bar p}+R_n.
++2\frac{\sigma(p)}{\bar p}+R_n+T_n.
 $$
 
-$N_n$ and $J_n$ are residents and paid jobs, $s_n$ is width in meters, and $R_n=1$ when a node wider than 4 km contains a river (zero otherwise). Refinement is reviewed every six months with 1/0.55 entry/exit thresholds and a twelve-month dwell period. The minimum-width setting is 125 m (128 m on the current power-of-two tree). These are declared numerical choices; camera position is absent. [AMReX conservation and coarse–fine interfaces](https://amrex-codes.github.io/amrex/docs_html/AmrCore.html#using-fluxregisters).
+$N_n$ and $J_n$ are residents and paid jobs, $s_n$ is width in meters, and $R_n=1$ when a node wider than 4 km contains a river (zero otherwise). Refinement is reviewed every six months with 1/0.55 entry/exit thresholds and a twelve-month dwell period. The minimum-width setting is 125 m (128 m on the current power-of-two tree). The moving-activity signal $M_n$ adds corridor traffic / 20,000 at endpoints and fleet crew / 300 plus hull count / 8 at their recorded location; this is not additional population. $T_n$ is the larger of area-weighted elevation SD / 0.12, moisture SD / 0.18, or 1.1 for a mixed land/water node, multiplied by $\min(1,(s_n/2000)^2)$. Only existing geographic data contribute. These are declared numerical choices; camera position is absent. [AMReX conservation and coarse–fine interfaces](https://amrex-codes.github.io/amrex/docs_html/AmrCore.html#using-fluxregisters).
 
-Municipalities and provinces periodically compare local mergers, splits and boundary transfers. Monthly cost combines travel time valued at one quarter of the hourly wage, office staffing and increasing administrative workload. A reform requires 36 months of expected savings to exceed its paid reorganization labor. Geometry must remain complete, connected and within one sovereign state. Permanent legal references and past national accounts survive the change. Initial boundary proposals use legacy terrain polygons; computational leaves can be much smaller.
+Municipalities and provinces annually compare local mergers, splits and boundary transfers. For population $N$, $o$ local service offices and monthly wage $w$, office workload costs $w[b+(o-1)+N/10^4+(N/80000)^{1.3}]$, with $b=4$ for municipalities and $20$ for provinces. Travel adds four annual return visits to the nearest retained office, valued at a quarter of the hourly wage. Mergers retain offices; independent profitable reforms can proceed together, each rechecking available workers and funds. A reform requires 36 months of expected savings to exceed its paid reorganization labor. Geometry must remain complete, connected and within one sovereign state. Permanent legal references and past national accounts survive the change. Initial boundary proposals use legacy terrain polygons; computational leaves can be much smaller.
+
+## Settlement formation and residential choice
+
+Town scenery requires occupied, connected development: village $N\ge500$, town $N\ge5000$, city $N\ge50000$. Developed parcels need density at least 300/km²; gaps up to 150 m connect only with a journey of at most 20 minutes. Empty plots cannot join settlements. These are classification conventions, not growth targets or a fitted definition of cities. [Degree of Urbanisation](https://human-settlement.emergency.copernicus.eu/degurbaDefinitions.php).
+
+For home $i$, accessible nonfarm work and locational utility are
+
+$$
+A_i=\sum_{j:\tau_{ji}\le60}(E_j+V_j)(1-f_j)e^{-\tau_{ji}/30},\qquad
+u_i=0.18\log(1+A_i/100)+0.12h_i-\frac{s_i}{600}-0.25(N_i/H_i)^2.
+$$
+
+$E,V$ are filled and unfilled jobs; $f$ is the food-employment share, $h$ habitat quality, $s$ walking minutes to the local market, $H$ housing capacity and $N$ occupants. Recursive tree queries screen sites within 6 km; actual workplace journeys use the transport network. The return journey is used for access; local retained contracts still use the aggregate commuting approximation below.
+
+Each month at most $\lfloor N(1-e^{-0.08/12})\rfloor$ residents per household pool consider relocation. Integer apportionment distributes this budget across homes. A move requires funded vacancy and $\Delta u>0.08+\tau_{ik}/600$; its batch shrinks until this remains true after crowding changes. Proposals compete for vacancies in descending gain order. These are bounded local improvements, not a global equilibrium solver. Inter-pool migrants use the existing demographic and financial transfers; within-pool moves change only recorded physical occupancy.
+
+Construction anticipates one year of willingness to move toward the best accessible existing site, net of nearby vacant and pending housing. It also responds to a 15% aggregate capacity buffer shortfall. Capacity cannot appear from preference alone: materials, wages and completion time still bind. The coefficients remain synthetic; this implements job access and congestion mechanisms, not a calibrated prediction of city counts. [Duranton–Puga: agglomeration mechanisms](https://www.nber.org/papers/w9931).
 
 ## Housing, commuting and daily inspection
 

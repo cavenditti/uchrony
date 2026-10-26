@@ -1,3 +1,5 @@
+import { settlementMigrationOptions } from './settlement-access'
+import { relocateResidentialResidents } from './residential-sites'
 import { householdNeed, BASE_PRICE } from './economy'
 import { GOODS } from './types'
 import { realService } from './public-services'
@@ -682,6 +684,7 @@ export function ageMilitaryPopulation(world: World) {
 }
 
 export function migrateCommunities(world: World) {
+  const housing = settlementMigrationOptions(world)
   // Plans are simultaneous: destination communities stay unchanged until every household has chosen.
   // Marginals give the same affinity as scanning every destination group for every comparison.
   const destinations = Object.fromEntries(
@@ -749,7 +752,13 @@ export function migrateCommunities(world: World) {
       (region) =>
         [
           region.id,
-          [...new Set([...region.neighbors, ...(sea.get(region.id)?.keys() ?? [])])]
+          [
+            ...new Set([
+              ...region.neighbors,
+              ...(housing.candidates.get(region.id) ?? []),
+              ...(sea.get(region.id)?.keys() ?? []),
+            ]),
+          ]
             .map((id) => economicRegion(world, id))
             .filter((to) => to && to.id !== region.id),
         ] as const,
@@ -824,15 +833,21 @@ export function migrateCommunities(world: World) {
                 : 0.7,
         rate = clamp((bestAppeal - appeal(region) - 0.025) * 0.012 + pressure * 0.01, 0, 0.018) * border,
         wanted = Math.floor(size * rate * (1 - group.rootedness * 0.4)),
-        maritime = !region.neighbors.includes(to.id),
+        maritime =
+          !region.neighbors.includes(to.id) && !(housing.candidates.get(region.id) ?? []).includes(to.id),
         capacity = maritime ? (sea.get(region.id)?.get(to.id) ?? 0) : Infinity,
-        amount = Math.min(wanted, capacity),
+        amount = Math.min(
+          wanted,
+          capacity,
+          world.adaptive && !refugee ? (housing.vacancies.get(to.id) ?? 0) : Infinity,
+        ),
         allocation = apportion(
           amount,
           [group.population.children * 0.9, group.population.adults * 1.2, group.population.elders * 0.4],
           AGES.map((age) => group.population[age]),
         )
       if (amount < 1) continue
+      if (world.adaptive && !refugee) housing.vacancies.set(to.id, housing.vacancies.get(to.id)! - amount)
       plans.push({
         from: region,
         to,
@@ -891,6 +906,10 @@ export function migrateCommunities(world: World) {
     if (plan.refugee) plan.to.populationDynamics!.refugees += amount
   }
   for (const region of economicRegions(world)) rollupPopulation(region)
+  relocateResidentialResidents(
+    world,
+    plans.map((p) => ({ from: p.from.id, to: p.to.id, people: communitySize(p.incoming!) })),
+  )
 }
 
 export function splitCommunity(

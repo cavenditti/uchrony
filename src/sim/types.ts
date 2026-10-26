@@ -250,7 +250,16 @@ export interface World {
   viewNation?: number | null
   viewBankLoans?: Record<number, number>
   /** Compact display records; avoids cloning a giant string-keyed site registry. */
-  viewHomes?: { id: string; cell: number; pool: number; capacity: number }[]
+  viewHomes?: {
+    id: string
+    cell: number
+    pool: number
+    capacity: number
+    residents?: number
+    x?: number
+    y?: number
+    parcel?: import('./adaptive-types').SpatialBounds
+  }[]
   economy?: EconomicSystem
   version: 1
   simulation?: SimulationSettings

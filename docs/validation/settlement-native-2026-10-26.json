@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "modelHash": "9c5b7de70ff9013eb7369c914a4bb46e06ca4601ab30a106dd26001aa546b4dc",
+  "seed": "Settlement dynamics 2026-10-26",
+  "requestedMonths": 24,
+  "completedMonths": 24,
+  "initialMonth": 0,
+  "checkpoint": null,
+  "llm": {
+    "policy": "forced-off",
+    "providerCalls": 0,
+    "source": "fresh-native"
+  },
+  "hardware": {
+    "cpu": "Apple M4 Pro",
+    "cores": 12,
+    "ramGiB": 24,
+    "platform": "darwin",
+    "release": "27.0.0"
+  },
+  "initialPopulation": 10350007,
+  "annual": [
+    {
+      "month": 1,
+      "population": 10365011,
+      "food": 1,
+      "prices": 1.0235240436977053,
+      "unemployment": 0.011315342570691111,
+      "states": 8,
+      "money": 260962.38199999987,
+      "ledgerResidual": 3.8835423765704036e-10,
+      "bankResidual": 1.1641532182693481e-09,
+      "gdpResidual": 5.4569682106375694e-12,
+      "goodsResidual": {
+        "food": -2.3283064365386963e-10,
+        "timber": -8.731149137020111e-11,
+        "stone": -3.8198777474462986e-10,
+        "iron": -1.709850039333105e-10,
+        "coal": -2.1827872842550278e-11,
+        "tools": 3.8198777474462986e-11,
+        "textiles": -5.275069270282984e-11,
+        "arms": 1.1880274541908875e-11
+      },
+      "leaves": 3835,
+      "sites": 6644,
+      "firms": 1366,
+      "reforms": 0,
+      "pools": 901,
+      "cohorts": 525066
+    },
+    {
+      "month": 12,
+      "population": 10521995,
+      "food": 0.9891977724815507,
+      "prices": 1.2327702890487509,
+      "unemployment": 0.053238117036593646,
+      "states": 8,
+      "money": 264925.9345723224,
+      "ledgerResidual": 1.2370549029583344e-10,
+      "bankResidual": 1.2223608791828156e-09,
+      "gdpResidual": 1.7280399333685637e-11,
+      "goodsResidual": {
+        "food": 5.820766091346741e-11,
+        "timber": 7.275957614183426e-12,
+        "stone": -1.0913936421275139e-11,
+        "iron": -1.3642420526593924e-11,
+        "coal": -1.0913936421275139e-11,
+        "tools": -2.000888343900442e-11,
+        "textiles": 1.2732925824820995e-11,
+        "arms": -1.014655026665423e-11
+      },
+      "leaves": 6714,
+      "sites": 8447,
+      "firms": 1780,
+      "reforms": 64,
+      "pools": 901,
+      "cohorts": 624998
+    },
+    {
+      "month": 24,
+      "population": 10654295,
+      "food": 0.9049408968412342,
+      "prices": 1.7996677167265345,
+      "unemployment": 0.120763500750943,
+      "states": 8,
+      "money": 267516.97249708755,
+      "ledgerResidual": 6.94626578479074e-11,
+      "bankResidual": 4.831235855817795e-09,
+      "gdpResidual": 1.8189894035458565e-12,
+      "goodsResidual": {
+        "food": -7.275957614183426e-10,
+        "timber": -4.001776687800884e-11,
+        "stone": 7.275957614183426e-12,
+        "iron": -1.000444171950221e-11,
+        "coal": -3.2741809263825417e-11,
+        "tools": 2.7284841053187847e-12,
+        "textiles": -3.183231456205249e-11,
+        "arms": -1.5631940186722204e-12
+      },
+      "leaves": 7279,
+      "sites": 9718,
+      "firms": 1755,
+      "reforms": 200,
+      "pools": 901,
+      "cohorts": 724996
+    }
+  ],
+  "restorations": 0,
+  "observerChecks": 3,
+  "failure": null,
+  "qualification": {
+    "conservation": "passed",
+    "continuation": "passed: separate exact canonical comparison from month 24 to 25 after encoded save restoration",
+    "observerIndependence": "passed",
+    "historicalAccuracy": "deferred; this two-year run does not establish long-run stability or city-size calibration",
+    "v5Behavior": "reported, not repaired"
+  },
+  "seconds": 68.94043316700001,
+  "peakHeapMiB": 604.4131546020508,
+  "monthlyMs": {
+    "median": 2971.671041999998,
+    "p95": 3514.486499999999,
+    "maximum": 4611.264999999992
+  },
+  "finalSaveBytes": 17742002,
+  "continuationCheck": {
+    "fromMonth": 24,
+    "toMonth": 25,
+    "canonicalHash": "f55b2807eaa4589b71b1d5d6e405bcb9b899ce20869b539e56d5433ba6438db8",
+    "continuation": "passed",
+    "initial": {
+      "month": 1,
+      "settlements": 133,
+      "settledPopulation": 2387931,
+      "parcels": 118,
+      "absorbedCities": 28,
+      "municipalMergers": 0,
+      "municipalSplits": 0
+    },
+    "final": {
+      "month": 24,
+      "settlements": 293,
+      "settledPopulation": 3172484,
+      "parcels": 3192,
+      "absorbedCities": 35,
+      "municipalMergers": 63,
+      "municipalSplits": 55
+    }
+  }
+}

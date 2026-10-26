@@ -1,7 +1,7 @@
 import { StringTable } from './string-table'
 import * as THREE from 'three'
 import type { World } from '../sim/types'
-import { spatialState } from '../sim/spatial'
+import { settlementPlaces } from './settlement-scenery'
 import { describeCity, cityLayout, type CityDescription, type CityPoint } from './city-layout'
 import type { RiverCurve } from './rivers'
 import { TerrainPicker } from './relief-picking'
@@ -75,14 +75,9 @@ export class CityScenery {
   }
 
   update(world: World) {
-    const places = world.adaptive ? (world.viewHomes ?? Object.values(world.adaptive.sites).filter((s) => s.kind === 'residential')).filter((s) => s.capacity > 200).map((s) => {
-      const count = world.localEconomy?.units[s.pool]?.residents[s.cell] ?? 0
-      return { id: s.id, region: world.cells[s.cell].region, cell: s.cell, name: '', population: count, capital: false, capacity: s.capacity,
-        kind: (count >= 40000 ? 'city' : count >= 8000 ? 'town' : 'village') as 'city' | 'town' | 'village' }
-    }) : spatialState(world).settlements
-    const seats = new Set(Object.values(world.adaptive?.jurisdictions ?? {}).filter((j) => j.retired === undefined).map((j) => j.seat))
+    const places = settlementPlaces(world)
     const cities = places.map((s) => {
-      const city = describeCity(world, s), civic = !world.adaptive || seats.has(s.cell)
+      const city = describeCity(world, s), civic = s.civic ?? true
       return { ...city, civic, key: `${city.key}:${civic}` }
     })
     if (cities.length === this.descriptions.length && cities.every((c, i) => c.key === this.descriptions[i].key)) return

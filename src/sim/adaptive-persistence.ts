@@ -1,7 +1,7 @@
-import { GOODS, type World } from './types'
-import { adaptiveMesh } from './adaptive-world'
+import { GOODS, population, type World } from './types'
+import { rebuildAdaptiveMesh } from './adaptive-world'
 import { STRATA } from './economic-types'
-import { cellPosition } from './physical-space'
+import { cellPolygon, pointInPolygon } from './physical-space'
 
 export function validateAdaptiveWorld(w: World) {
   const a = w.adaptive
@@ -31,6 +31,7 @@ export function validateAdaptiveWorld(w: World) {
     !object(a.tree) ||
     !Array.isArray(a.tree.leaves) ||
     !object(a.tree.changed) ||
+    (a.tree.domain !== undefined && a.tree.domain !== 'world') ||
     !Array.isArray(a.boundaries) ||
     !Array.isArray(a.names) ||
     !Array.isArray(a.commuting) ||
@@ -71,16 +72,66 @@ export function validateAdaptiveWorld(w: World) {
       (site.retired !== undefined && (!date(site.retired) || site.retired < site.founded)) ||
       (site.openingBuilt !== undefined && !finite(site.openingBuilt)) ||
       (site.investedValue !== undefined && !finite(site.investedValue)) ||
-      !finite(site.x) ||
-      !finite(site.y)
+      !finite(site.x, -Infinity) ||
+      !finite(site.y, -Infinity)
     )
       fail('invalid site or ownership')
-    const p = cellPosition(w, site.cell)
-    if (Math.hypot(p.x - site.x, p.y - site.y) > 1000) fail('site is outside its physical cell')
+    if (!pointInPolygon(site, cellPolygon(w, site.cell))) fail('site is outside its physical cell')
   }
   for (const id of w.localEconomy!.active)
     for (const c of w.localEconomy!.units[id].cells)
       if (a.sites[`home:${c}`]?.pool !== id) fail('residents have no persistent home site')
+  if (a.residentialVersion !== undefined) {
+    if (a.residentialVersion !== 1 || !Number.isSafeInteger(a.nextResidence) || a.nextResidence! < 0)
+      fail('invalid residential version or sequence')
+    const pools = new Map<number, number>(),
+      cells = new Map<number, number>()
+    for (const site of Object.values(a.sites)) {
+      if (site.kind !== 'residential') continue
+      const sequence = /^residence:(\d+)$/.exec(site.id)
+      if (sequence && Number(sequence[1]) >= a.nextResidence!)
+        fail('residential sequence would overwrite a parcel')
+      const p = site.parcel!
+      if (
+        !Number.isSafeInteger(site.residents) ||
+        !finite(site.residents) ||
+        !p ||
+        !finite(p.x, -Infinity) ||
+        !finite(p.y, -Infinity) ||
+        !finite(p.size, 1) ||
+        site.x < p.x ||
+        site.x > p.x + p.size ||
+        site.y < p.y ||
+        site.y > p.y + p.size ||
+        site.entity !== `residents:${site.pool}` ||
+        !w.localEconomy!.units[site.pool].cells.includes(site.cell)
+      )
+        fail('invalid residential occupancy, geometry or owner')
+      if (
+        sequence &&
+        ![
+          p,
+          { x: p.x + p.size, y: p.y },
+          { x: p.x, y: p.y + p.size },
+          { x: p.x + p.size, y: p.y + p.size },
+        ].every((point) => pointInPolygon(point, cellPolygon(w, site.cell)))
+      )
+        fail('residential parcel crosses its source land')
+      if (site.retired !== undefined) {
+        if (site.residents || site.capacity) fail('retired residence still holds occupants or capacity')
+        continue
+      }
+      pools.set(site.pool, (pools.get(site.pool) ?? 0) + site.residents!)
+      cells.set(site.cell, (cells.get(site.cell) ?? 0) + site.residents!)
+    }
+    for (const id of w.localEconomy!.active) {
+      const unit = w.localEconomy!.units[id]
+      if ((pools.get(id) ?? 0) !== population(unit)) fail('residential population differs from census')
+      for (const cell of unit.cells)
+        if ((cells.get(cell) ?? 0) !== (unit.residents[cell] ?? 0))
+          fail('residential projection differs from physical occupancy')
+    }
+  }
   for (const level of ['municipality', 'province']) {
     const seen = new Set<number>()
     for (const [id, j] of Object.entries(a.jurisdictions)) {
@@ -96,6 +147,11 @@ export function validateAdaptiveWorld(w: World) {
         !Array.isArray(j.cells) ||
         !j.cells.length ||
         !j.cells.includes(j.seat) ||
+        (j.serviceSeats !== undefined &&
+          (!Array.isArray(j.serviceSeats) ||
+            !j.serviceSeats.includes(j.seat) ||
+            new Set(j.serviceSeats).size !== j.serviceSeats.length ||
+            j.serviceSeats.some((c) => !j.cells.includes(c)))) ||
         !Array.isArray(j.successors) ||
         !Array.isArray(j.predecessors) ||
         j.account !== `government:${j.nation}` ||
@@ -237,5 +293,5 @@ export function validateAdaptiveWorld(w: World) {
       fail('invalid freight ownership or journey')
     shipments.add(shipment.id)
   }
-  adaptiveMesh(w) // restores cut-cell coverage and 2:1 interfaces without changing authority
+  rebuildAdaptiveMesh(w, a.mode, true) // validate saved geometry rather than trusting a previously cached mesh
 }

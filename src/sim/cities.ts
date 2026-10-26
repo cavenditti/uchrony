@@ -1,3 +1,5 @@
+import { settlementComponents, settledResidentsByCell } from './settlement-morphology'
+import { optimizeResidentialLocations } from './settlement-access'
 import { clamp, population, type World } from './types'
 import { neighbors } from './hex'
 import { landscapeAt } from './landscape'
@@ -7,6 +9,8 @@ import { updateResidentCounts } from './districts'
 import { regionalFirms } from './firms'
 import type { City, DistrictActivity } from './district-types'
 import { MODEL_PARAMETERS } from './model-parameters'
+import { cellPolygon, polygonArea } from './physical-space'
+import { SETTLEMENT, isVisibleSettlement, settlementKind } from './settlement-model'
 
 /** Built land changes slowly. Population growth alone does not instantly pave a cell. */
 export function evolveCities(w: World, initialize = false) {
@@ -14,6 +18,7 @@ export function evolveCities(w: World, initialize = false) {
   if (!local) return
   if (initialize && !local.cities.length)
     for (const site of w.spatial?.settlements ?? []) {
+      if (!isVisibleSettlement(site.population)) continue
       local.cities.push({
         id: local.nextCity++,
         name: site.name,
@@ -22,7 +27,7 @@ export function evolveCities(w: World, initialize = false) {
         nucleus: site.cell,
         cells: [site.cell],
         population: site.population,
-        kind: site.kind,
+        kind: settlementKind(site.population),
         parents: [],
         lastNameChange: w.month,
       })
@@ -37,27 +42,10 @@ export function evolveCities(w: World, initialize = false) {
       jobs[f.cell ?? u.center] +=
         f.employment * (f.laborMix ? f.laborMix.tools + f.laborMix.textiles + f.laborMix.arms : 0.2)
     }
+  for (const id of local.active) updateResidentCounts(local.units[id])
+  if (w.adaptive && !initialize) optimizeResidentialLocations(w)
   for (const id of local.active) {
     const u = local.units[id]
-    updateResidentCounts(u)
-    // Within a coarse district, at most 0.3% relocate each month. Built housing,
-    // employment and amenity compete with crowding; topography remains fixed.
-    if (!initialize && u.cells.length > 1) {
-      const score = (c: number) =>
-        Math.log1p(jobs[c] * 2 + (local.built[c] ?? 0) * 6000) +
-        landscapeAt(w.cells[c]).habitat * 2 -
-        Math.log1p((u.residents[c] ?? 0) / 8000) * 1.5
-      const best = [...u.cells].sort((a, b) => score(b) - score(a) || a - b)[0]
-      let room = Math.floor(population(u) * 0.003)
-      for (const c of u.cells)
-        if (c !== best && score(best) > score(c) + 0.15 && room > 0) {
-          const vacancy = w.adaptive ? Math.max(0, Math.floor((w.adaptive.sites[`home:${best}`]?.capacity ?? 0) - (u.residents[best] ?? 0))) : Infinity
-          const amount = Math.min(room, vacancy, Math.floor((u.residents[c] ?? 0) * 0.003))
-          u.residents[c] -= amount
-          u.residents[best] += amount
-          room -= amount
-        }
-    }
     for (const c of u.cells) residents[c] = u.residents[c] ?? 0
     const industry = w.economy?.firms ? regionalFirms(w, id).filter((f) => f.active) : []
     const production = { food: 0, mining: 0, factory: 0 }
@@ -100,37 +88,60 @@ export function evolveCities(w: World, initialize = false) {
       const demand = clamp((residents[c] + jobs[c] * 2) / MODEL_PARAMETERS.fullBuiltPopulationPerCell)
       const target =
         habitat < 0.06 ? demand * 0.1 : clamp(demand + spread * 0.15 * Math.min(1, residents[c] / 1000))
-      if (!initialize && !w.adaptive) local.built[c] = clamp(oldBuilt[c] + clamp(target - oldBuilt[c], -0.003, 0.006))
+      if (!initialize && !w.adaptive)
+        local.built[c] = clamp(oldBuilt[c] + clamp(target - oldBuilt[c], -0.003, 0.006))
     }
-  const former = new Set(local.cities.filter((c) => c.absorbedBy === undefined).flatMap((c) => c.cells))
-  const remaining = new Set(
-    local.active
-      .flatMap((id) => local.units[id].cells)
-      .filter((c) => (local.built[c] ?? 0) >= (former.has(c) ? 0.12 : 0.24) && residents[c] >= 300),
-  )
-  const components: number[][] = []
-  for (const start of [...remaining].sort((a, b) => a - b)) {
-    if (!remaining.delete(start)) continue
-    const cells = [start]
-    for (let i = 0; i < cells.length; i++)
-      for (const next of neighbors(cells[i], w.width, w.height)) if (remaining.delete(next)) cells.push(next)
-    components.push(cells.sort((a, b) => a - b))
+  const physical = w.adaptive?.residentialVersion === 1 ? settlementComponents(w) : undefined
+  let components: number[][]
+  if (physical) components = physical.map((p) => p.cells)
+  else {
+    const former = new Set(local.cities.filter((c) => c.absorbedBy === undefined).flatMap((c) => c.cells))
+    const remaining = new Set(
+      local.active
+        .flatMap((id) => local.units[id].cells)
+        .filter(
+          (c) =>
+            (local.built[c] ?? 0) >= (former.has(c) ? 0.12 : 0.24) &&
+            residents[c] / (polygonArea(cellPolygon(w, c)) / 1e6) >= SETTLEMENT.minimumDensity,
+        ),
+    )
+    components = []
+    for (const start of [...remaining].sort((a, b) => a - b)) {
+      if (!remaining.delete(start)) continue
+      const cells = [start]
+      for (let i = 0; i < cells.length; i++)
+        for (const next of neighbors(cells[i], w.width, w.height))
+          if (remaining.delete(next)) cells.push(next)
+      if (isVisibleSettlement(cells.reduce((sum, cell) => sum + residents[cell], 0)))
+        components.push(cells.sort((a, b) => a - b))
+    }
   }
+  const componentBySite = new Map<string, number>()
+  physical?.forEach((part, i) => part.sites.forEach((site) => componentBySite.set(site.id, i)))
   const active = local.cities.filter((c) => c.absorbedBy === undefined),
     claimed = new Set<number>(),
     componentAt = new Int32Array(w.cells.length).fill(-1)
   components.forEach((cells, i) => cells.forEach((cell) => (componentAt[cell] = i)))
   const home = new Map<number, number>()
   for (const city of active) {
-    const nucleus = componentAt[city.nucleus]
+    const nucleus = physical
+      ? (componentBySite.get(city.nucleusSite ?? `home:${city.nucleus}`) ?? -1)
+      : componentAt[city.nucleus]
     if (nucleus >= 0) {
       home.set(city.id, nucleus)
       continue
     }
     const overlap = new Map<number, number>()
-    for (const cell of city.cells)
-      if (componentAt[cell] >= 0)
-        overlap.set(componentAt[cell], (overlap.get(componentAt[cell]) ?? 0) + residents[cell])
+    if (physical) {
+      for (const id of city.sites ?? city.cells.map((c) => `home:${c}`)) {
+        const part = componentBySite.get(id)
+        if (part !== undefined)
+          overlap.set(part, (overlap.get(part) ?? 0) + (w.adaptive!.sites[id]?.residents ?? 0))
+      }
+    } else
+      for (const cell of city.cells)
+        if (componentAt[cell] >= 0)
+          overlap.set(componentAt[cell], (overlap.get(componentAt[cell]) ?? 0) + residents[cell])
     const largest = [...overlap].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]
     if (largest) home.set(city.id, largest[0])
   }
@@ -140,7 +151,8 @@ export function evolveCities(w: World, initialize = false) {
       .sort((a, b) => a.founded - b.founded || b.population - a.population || a.id - b.id)
     let city = overlaps[0]
     if (!city) {
-      const nucleus = [...cells].sort((a, b) => residents[b] - residents[a] || a - b)[0]
+      const nucleus =
+        physical?.[part].nucleus.cell ?? [...cells].sort((a, b) => residents[b] - residents[a] || a - b)[0]
       const region = w.regions[w.cells[nucleus].region]
       const suffix = ['Ford', 'Cross', 'Vale', 'Heath', 'Bank', 'Mere', 'Ridge', 'Field'][
         hashSeed(`${w.seed}:place:${nucleus}`) % 8
@@ -179,21 +191,29 @@ export function evolveCities(w: World, initialize = false) {
     city.cells = cells
     if (!cells.includes(city.nucleus))
       city.nucleus = [...cells].sort((a, b) => residents[b] - residents[a] || a - b)[0]
-    city.population = cells.reduce((sum, c) => sum + residents[c], 0)
-    city.kind = city.population >= 40000 ? 'city' : city.population >= 8000 ? 'town' : 'village'
+    if (physical) {
+      city.sites = physical[part].sites.map((s) => s.id)
+      if (!city.nucleusSite || !city.sites.includes(city.nucleusSite))
+        city.nucleusSite = physical[part].nucleus.id
+      city.nucleus = w.adaptive!.sites[city.nucleusSite].cell
+    }
+    city.population = physical?.[part].population ?? cells.reduce((sum, c) => sum + residents[c], 0)
+    city.kind = settlementKind(city.population)
   }
   // Shrinking settlements keep their identities and names, available for later revival.
   for (const city of active)
     if (!claimed.has(city.id)) {
       city.cells = []
+      if (city.sites) city.sites = []
       city.population = 0
     }
   const cityAt = new Map<number, City>()
   for (const city of local.cities)
     if (city.absorbedBy === undefined) for (const c of city.cells) cityAt.set(c, city)
+  const settled = settledResidentsByCell(w)
   for (const id of local.active) {
     const u = local.units[id]
-    const urban = u.cells.reduce((sum, c) => sum + (cityAt.has(c) ? residents[c] : 0), 0)
+    const urban = u.cells.reduce((sum, c) => sum + (settled.get(c) ?? 0), 0)
     u.urban = population(u) ? urban / population(u) : 0
     for (const g of u.communities ?? []) g.urban = u.urban
     const city = cityAt.get(u.center)

@@ -1,5 +1,5 @@
 import { commutesAt } from './commute-ledger'
-import { adaptiveMesh } from './adaptive-world'
+import { queryAdaptiveLeaves, queryAdaptiveSitesInBounds } from './adaptive-grid'
 import { cellPosition } from './physical-space'
 import { activeJurisdictions } from './jurisdictions'
 import { hashSeed } from './random'
@@ -107,14 +107,10 @@ export function inspectWorld(w: World, request: InspectionRequest): InspectionSn
     throw new Error('Invalid inspection bounds')
   if (request.month !== undefined && request.month !== w.month)
     throw new Error('The requested month is no longer current; refresh inspection.')
-  const inBounds = (p: { x: number; y: number }) =>
-    p.x >= b.x && p.y >= b.y && p.x <= b.x + b.size && p.y <= b.y + b.size
-  const members = Object.values(w.adaptive.sites)
-    .filter((s) => s.retired === undefined && inBounds(s))
-    .sort((x, y) => x.id.localeCompare(y.id))
+  const members = queryAdaptiveSitesInBounds(w, b)
   const firmJobs = new Map((w.economy?.firms ?? []).map((f) => [`firm:${f.id}`, f.active ? f.employment : 0]))
   const counts = (s: (typeof members)[number]) =>
-    s.kind === 'residential' ? (w.localEconomy!.units[s.pool].residents[s.cell] ?? 0) : 0
+    s.kind === 'residential' ? (s.residents ?? w.localEconomy!.units[s.pool].residents[s.cell] ?? 0) : 0
   const people = members.reduce((sum, s) => sum + counts(s), 0)
   const memberCells = new Set(members.map((s) => s.cell))
   // Bounds on returned geometry are visual sampling only; totals always cover every selected site.
@@ -202,7 +198,7 @@ export function inspectWorld(w: World, request: InspectionRequest): InspectionSn
       })
     }
   }
-  const nodes = adaptiveMesh(w).leaves.filter(
+  const nodes = queryAdaptiveLeaves(w, b).filter(
     (n) =>
       n.bounds.x < b.x + b.size &&
       n.bounds.x + n.bounds.size > b.x &&

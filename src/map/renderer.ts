@@ -1,7 +1,7 @@
 import { activeJurisdictions } from '../sim/jurisdictions'
 import { landscapeRasters } from './landscape-raster'
 import { riverCurves, riverPaths } from './rivers'
-import { spatialState, districtDensityScale } from '../sim/spatial'
+import { spatialState, districtDensityScale, settlementPosition } from '../sim/spatial'
 import { HEX, neighbors } from '../sim/hex'
 import { clamp, type World, type Layer } from '../sim/types'
 import { buildGeometry, type MapGeometry, type Ring } from './geometry'
@@ -382,7 +382,7 @@ export function drawPlaceLabels(
   )
   for (const settlement of settlements) {
     const { capital, kind } = settlement,
-      c = world.cells[settlement.cell]
+      c = settlementPosition(world, settlement)
     if (
       layer === 'terrain' &&
       scale < 0.65 &&

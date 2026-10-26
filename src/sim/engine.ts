@@ -1,3 +1,4 @@
+import { ensureResidentialSites, syncResidentialPopulation } from './residential-sites'
 import { arriveFreight } from './freight-transit'
 import { ensureAdaptiveWorld, syncSites, rebuildAdaptiveMesh, refreshAdaptiveTotals } from './adaptive-world'
 import { reviewAdministration, reconcileJurisdictionSovereignty } from './jurisdictions'
@@ -5,12 +6,7 @@ import { advanceLandUse } from './land-use'
 import { MODEL_PARAMETERS } from './model-parameters'
 import { realService, nationalRealService } from './public-services'
 import { economicRegions, provinceId } from './local-units'
-import {
-  ensureDistrictEconomy,
-  linkDistrictPeople,
-  aggregateDistricts,
-  refreshEndowment,
-} from './districts'
+import { ensureDistrictEconomy, linkDistrictPeople, aggregateDistricts, refreshEndowment } from './districts'
 import { evolveCities } from './cities'
 import { refreshSpatial } from './spatial'
 import { inventoryFlow, marketStore, recordUse, reconcileGDP } from './national-accounts'
@@ -522,6 +518,8 @@ export function tick(w: World): World {
   ensureDistrictEconomy(w)
   if (converting) evolveCities(w, true)
   ensureAdaptiveWorld(w)
+  ensureResidentialSites(w)
+  syncResidentialPopulation(w)
   w.month++
   w.totals.births = 0
   w.totals.deaths = 0
@@ -559,9 +557,12 @@ export function tick(w: World): World {
   linkDistrictPeople(w)
   reconcileJurisdictionSovereignty(w)
   reviewAdministration(w)
+  syncResidentialPopulation(w)
   advanceLandUse(w)
+  refreshAdaptiveTotals(w)
   finishEconomyMonth(w)
-  if (w.adaptive?.transit) w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
+  if (w.adaptive?.transit)
+    w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
   evolveCities(w)
   aggregateDistricts(w)
   syncSites(w)
@@ -615,6 +616,8 @@ export function applyCommand(w: World, command: Command): string {
     linkDistrictPeople(w)
     aggregateDistricts(w)
   }
+  syncResidentialPopulation(w)
+  if (w.adaptive) refreshAdaptiveTotals(w)
   if (w.economy?.accounts) {
     reconcileGDP(w)
     summarize(w, false)

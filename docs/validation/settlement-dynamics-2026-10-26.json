@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-26",
+  "sourceModelHash": "9c5b7de70ff9013eb7369c914a4bb46e06ca4601ab30a106dd26001aa546b4dc",
+  "tests": {
+    "regressionBatch": 61,
+    "additionalBatch": 11,
+    "financeAndCensusBatch": 22,
+    "distinctTests": 87,
+    "note": "Seven settlement tests occur in both the 61-test and 11-test batches. The latter adds job-access attraction; all eight settlement tests were rerun after fixture and validation changes. The other new tests check formulas and inspection replies.",
+    "build": "passed",
+    "fullSuite": "Interrupted intermediate-source run; not a full-suite pass. Its three observed failures were same-origin endpoint permission, an intermediate save shape and an obsolete city label expectation; all affected files pass fresh focused reruns.",
+    "isolatedStagedSnapshot": {
+      "build": "passed",
+      "targetedTests": 23,
+      "note": "Exact staged source exported to an isolated directory and tested without unrelated palette, relief or river edits. These checks overlap the 87 distinct tests above."
+    }
+  },
+  "browser": {
+    "seed": "Settlement browser 2026-10-26",
+    "stats": {
+      "month": 1,
+      "oldCapacityMarkers": 2906,
+      "settlements": 128,
+      "renderedPatches": 142,
+      "municipalities": 181,
+      "minDisplayedPopulation": 5705,
+      "largest": [
+        {
+          "name": "Aurel",
+          "population": 63181,
+          "position": {
+            "x": 74000,
+            "y": 50229.473419497444
+          }
+        },
+        {
+          "name": "Dunmere",
+          "population": 63147,
+          "position": {
+            "x": 71000,
+            "y": 24248.711305964283
+          }
+        },
+        {
+          "name": "Weswick",
+          "population": 60379,
+          "position": {
+            "x": 15500,
+            "y": 19918.58428704209
+          }
+        },
+        {
+          "name": "Isenhaven",
+          "population": 56172,
+          "position": {
+            "x": 96500,
+            "y": 26846.7875173176
+          }
+        }
+      ]
+    },
+    "viewports": [
+      [
+        1280,
+        577
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "runtimeErrors": 0,
+    "saveErrors": 0,
+    "webglContextLosses": 0,
+    "providerCalls": 0,
+    "llmForcedOff": true,
+    "verified": [
+      "town overview",
+      "city close-up",
+      "daily-life inspection",
+      "mathematical guide rendered with no KaTeX errors",
+      "disk and IndexedDB save acknowledgements",
+      "fresh restore at month 1",
+      "no page overflow at phone width"
+    ],
+    "artifactDirectory": "/private/tmp/uchrony-settlement-browser-20261026",
+    "sourceBoundary": "Browser screenshots include a separate uncommitted map-palette trial. The scoped mechanics commit was built and tested independently without those styling changes."
+  },
+  "nativeRun": "settlement-native-2026-10-26.json",
+  "limits": [
+    "Settlement count increased over two years; concentration toward a few centers is not historically calibrated or established by this run.",
+    "The source terrain hexes and surveyed transport graph remain geographic input; dynamic quadtree cells and persistent residential parcels operate over them.",
+    "Jurisdiction boundaries still follow source polygons.",
+    "The US benchmark fixes and a new 200-year qualification remain deferred."
+  ]
+}

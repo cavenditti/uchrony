@@ -30,7 +30,12 @@ export function validateSpatial(w: World) {
     !Array.isArray(s.settlements) ||
     !Array.isArray(s.districts) ||
     s.districts.length > w.cells.length ||
-    s.settlements.length > (w.localEconomy ? w.cells.length : w.regions.length * 8) ||
+    s.settlements.length >
+      (w.adaptive?.residentialVersion === 1
+        ? Object.keys(w.adaptive.sites).length
+        : w.localEconomy
+          ? w.cells.length
+          : w.regions.length * 8) ||
     s.splits.length > w.cells.length * 2
   )
     fail()
@@ -111,7 +116,7 @@ export function validateSpatial(w: World) {
       !Number.isInteger(p.cell) ||
       !w.cells[p.cell] ||
       w.cells[p.cell].region !== p.region ||
-      sites.has(p.cell) ||
+      (sites.has(p.cell) && !p.nucleusSite) ||
       !Number.isInteger(p.region) ||
       !w.regions[p.region] ||
       !['city', 'town', 'village'].includes(p.kind) ||
@@ -124,11 +129,39 @@ export function validateSpatial(w: World) {
     sites.add(p.cell)
     urban[p.region] -= p.population
   }
-  if (!w.adaptive && (w.localEconomy ? urban.reduce((a, b) => a + b, 0) !== 0 : urban.some((x) => x !== 0))) fail()
+  if (!w.adaptive && (w.localEconomy ? urban.reduce((a, b) => a + b, 0) !== 0 : urban.some((x) => x !== 0)))
+    fail()
   if (w.adaptive) {
     for (const settlement of s.settlements) {
-      const j = w.adaptive.jurisdictions[settlement.id]
-      if (!j || j.retired !== undefined || j.level !== 'municipality' || j.seat !== settlement.cell) fail()
+      if (settlement.id.startsWith('municipality:')) {
+        // Read old exports without erasing any state; spatialState supplies the
+        // corrected view and the next monthly refresh stores physical cities.
+        const j = w.adaptive.jurisdictions[settlement.id]
+        if (!j || j.retired !== undefined || j.level !== 'municipality' || j.seat !== settlement.cell) fail()
+      } else {
+        const city = w.localEconomy?.cities.find((c) => `city:${c.id}` === settlement.id)
+        if (
+          !city ||
+          city.absorbedBy !== undefined ||
+          city.nucleus !== settlement.cell ||
+          city.population !== settlement.population ||
+          city.cells.length !== settlement.cells?.length ||
+          city.cells.some((c, i) => c !== settlement.cells![i])
+        )
+          fail()
+        if (city!.sites) {
+          const site = w.adaptive.sites[city!.nucleusSite!]
+          if (
+            !site ||
+            settlement.nucleusSite !== city!.nucleusSite ||
+            settlement.siteIds?.length !== city!.sites.length ||
+            city!.sites.some((id, i) => id !== settlement.siteIds![i]) ||
+            settlement.position?.x !== site.x ||
+            settlement.position?.y !== site.y
+          )
+            fail()
+        }
+      }
     }
   }
 }

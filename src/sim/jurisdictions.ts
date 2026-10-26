@@ -41,7 +41,7 @@ function connected(w: World, cells: number[]) {
 export interface ReformProposal {
   level: Jurisdiction['level']
   from: string[]
-  replacements: { name: string; cells: number[]; seat: number }[]
+  replacements: { name: string; cells: number[]; seat: number; serviceSeats?: number[] }[]
   reason: string
 }
 /** Validate everything before writing any geometry. Legal accounts, sites and historic region handles survive. */
@@ -63,6 +63,11 @@ export function applyAdministrativeReform(w: World, proposal: ReformProposal, co
     if (
       !replacement.name.trim() ||
       !replacement.cells.includes(replacement.seat) ||
+      (replacement.serviceSeats !== undefined &&
+        (!replacement.serviceSeats.length ||
+          new Set(replacement.serviceSeats).size !== replacement.serviceSeats.length ||
+          !replacement.serviceSeats.includes(replacement.seat) ||
+          replacement.serviceSeats.some((c) => !replacement.cells.includes(c)))) ||
       !connected(w, replacement.cells)
     )
       throw new Error('Administrative seat must serve connected territory')
@@ -136,14 +141,18 @@ export function serviceTravel(w: World, seat: number, allowed: Set<number>) {
 }
 function monthlyCost(
   w: World,
-  jurisdictions: Pick<Jurisdiction, 'seat' | 'cells' | 'level'>[],
+  jurisdictions: Pick<Jurisdiction, 'seat' | 'serviceSeats' | 'cells' | 'level'>[],
   nation: number,
 ) {
   const cells = new Set(jurisdictions.flatMap((j) => j.cells))
   const wage = w.economy!.producers[w.nations[nation].capital]?.wage ?? 0.01
   let cost = 0
   for (const j of jurisdictions) {
-    const travel = serviceTravel(w, j.seat, cells)
+    const seats = j.serviceSeats ?? [j.seat]
+    const travel = new Map<number, number>()
+    for (const seat of seats)
+      for (const [cell, minutes] of serviceTravel(w, seat, cells))
+        travel.set(cell, Math.min(travel.get(cell) ?? Infinity, minutes))
     // Four return visits per year, valued at a quarter of the hourly wage; offices require paid clerks.
     cost += j.cells.reduce(
       (sum, c) =>
@@ -151,7 +160,9 @@ function monthlyCost(
       0,
     )
     const served = j.cells.reduce((sum, c) => sum + residents(w, c), 0)
-    cost += wage * ((j.level === 'province' ? 20 : 4) + served / 10000 + (served / 80000) ** 1.3)
+    cost +=
+      wage *
+      ((j.level === 'province' ? 20 : 4) + (seats.length - 1) + served / 10000 + (served / 80000) ** 1.3)
   }
   return cost
 }
@@ -180,10 +191,14 @@ export function reviewAdministration(w: World) {
           const other = a.jurisdictions[id]
           if (other.nation !== nation.id || other.retired !== undefined) continue
           const cells = [...j.cells, ...other.cells]
+          const seat = residents(w, j.seat) >= residents(w, other.seat) ? j.seat : other.seat
           const merged = {
             name: residents(w, j.seat) >= residents(w, other.seat) ? j.name : other.name,
             cells,
-            seat: seatFor(w, cells),
+            seat,
+            serviceSeats: [
+              ...new Set([...(j.serviceSeats ?? [j.seat]), ...(other.serviceSeats ?? [other.seat])]),
+            ].sort((a, b) => a - b),
             level,
           }
           const saving = base + monthlyCost(w, [other], nation.id) - monthlyCost(w, [merged], nation.id)
@@ -193,14 +208,16 @@ export function reviewAdministration(w: World) {
                 level,
                 from: [j.id, other.id],
                 replacements: [merged],
-                reason: 'Shared administration reduces service and office costs.',
+                reason: 'Shared administration reduces overhead while retaining local service offices.',
               },
               saving,
               work,
             })
           // A boundary can move without merging the jurisdictions.
           for (const cell of j.cells.filter(
-            (c) => c !== j.seat && neighbors(c, w.width, w.height).some((n) => owners.get(n) === other.id),
+            (c) =>
+              !(j.serviceSeats ?? [j.seat]).includes(c) &&
+              neighbors(c, w.width, w.height).some((n) => owners.get(n) === other.id),
           )) {
             const first = { ...j, cells: j.cells.filter((c) => c !== cell) },
               second = { ...other, cells: [...other.cells, cell] }
@@ -234,12 +251,23 @@ export function reviewAdministration(w: World) {
             const rest = j.cells.filter((c) => !part.includes(c))
             if (connected(w, part) && connected(w, rest)) {
               const split = [
-                { name: j.name, seat: j.seat, cells: rest, level },
+                {
+                  name: j.name,
+                  seat: j.seat,
+                  cells: rest,
+                  level,
+                  serviceSeats: [
+                    ...new Set([j.seat, ...(j.serviceSeats ?? []).filter((c) => rest.includes(c))]),
+                  ],
+                },
                 {
                   name: `${w.regions[w.cells[second].region].name} district`,
                   seat: second,
                   cells: part,
                   level,
+                  serviceSeats: [
+                    ...new Set([second, ...(j.serviceSeats ?? []).filter((c) => part.includes(c))]),
+                  ],
                 },
               ]
               const saving = base - monthlyCost(w, split, nation.id)
@@ -258,35 +286,38 @@ export function reviewAdministration(w: World) {
           }
         }
       }
-      const best = candidates.sort(
+      // Independent improvements can proceed together. A source retired by an
+      // earlier proposal cannot be reused by a stale candidate in this review.
+      for (const best of candidates.sort(
         (x, y) => y.saving - x.saving || x.proposal.from[0].localeCompare(y.proposal.from[0]),
-      )[0]
-      if (!best) continue
-      const pool = w.localEconomy!.units[w.nations[nation.id].capital],
-        hh = w.economy!.households[pool.id],
-        wage = w.economy!.producers[pool.id].wage
-      const available = STRATA.reduce(
-        (s, stratum) => s + Math.max(0, hh[stratum].laborForce - hh[stratum].employed),
-        0,
-      )
-      const cost = best.work * wage
-      if (available < best.work || nation.treasury < cost || wage <= 0) continue
-      // Planning validated connectivity; apply the same full validation before paying workers.
-      applyAdministrativeReform(w, best.proposal, cost)
-      for (const stratum of STRATA) {
-        const h = hh[stratum],
-          jobs = (best.work * Math.max(0, h.laborForce - h.employed)) / available
-        const paid = transfer(
-          w,
-          governmentAccount(nation.id),
-          householdAccount(pool.id, stratum),
-          jobs * wage,
-          'administrative reorganization wages',
+      )) {
+        if (best.proposal.from.some((id) => a.jurisdictions[id].retired !== undefined)) continue
+        const pool = w.localEconomy!.units[w.nations[nation.id].capital],
+          hh = w.economy!.households[pool.id],
+          wage = w.economy!.producers[pool.id].wage
+        const available = STRATA.reduce(
+          (s, stratum) => s + Math.max(0, hh[stratum].laborForce - hh[stratum].employed),
+          0,
         )
-        h.employed += paid / wage
-        h.income += paid
-        nation.spending += paid
-        recordWages(w, pool.id, governmentAccount(nation.id), paid, true)
+        const cost = best.work * wage
+        if (available < best.work || nation.treasury < cost || wage <= 0) continue
+        // Planning validated connectivity; apply the same full validation before paying workers.
+        applyAdministrativeReform(w, best.proposal, cost)
+        for (const stratum of STRATA) {
+          const h = hh[stratum],
+            jobs = (best.work * Math.max(0, h.laborForce - h.employed)) / available
+          const paid = transfer(
+            w,
+            governmentAccount(nation.id),
+            householdAccount(pool.id, stratum),
+            jobs * wage,
+            'administrative reorganization wages',
+          )
+          h.employed += paid / wage
+          h.income += paid
+          nation.spending += paid
+          recordWages(w, pool.id, governmentAccount(nation.id), paid, true)
+        }
       }
     }
   }
@@ -316,12 +347,16 @@ export function reconcileJurisdictionSovereignty(w: World) {
           for (const next of neighbors(component[i], w.width, w.height))
             if (remaining.delete(next)) component.push(next)
         const id = `${old.level}:reform:${a.nextJurisdiction++}`
+        const seat = component.includes(old.seat) ? old.seat : seatFor(w, component)
         created.push({
           ...old,
           id,
           nation,
           cells: component,
-          seat: component.includes(old.seat) ? old.seat : seatFor(w, component),
+          seat,
+          ...(old.serviceSeats
+            ? { serviceSeats: [...new Set([seat, ...old.serviceSeats.filter((c) => component.includes(c))])] }
+            : {}),
           founded: w.month,
           revised: w.month,
           retired: undefined,

@@ -6,9 +6,12 @@ import { recordWages } from './national-accounts'
 import { collectedTaxRate } from './macroeconomy'
 import { WAGE_SKILL } from './firms'
 import { cellPosition } from './physical-space'
+import { queryAdaptiveSites } from './adaptive-grid'
+import { syncSites, refreshAdaptiveTotals } from './adaptive-world'
 import { neighbors } from './hex'
 import { MinHeap } from './heap'
 import type { World } from './types'
+import type { PhysicalSite } from './adaptive-types'
 
 /** Shortest traversable commuting route. Mode and terrain set travel time, not mesh depth. */
 interface TravelTree {
@@ -47,6 +50,26 @@ export function commuteRoute(w: World, from: number, to: number, limit = 90) {
     cells,
     mode: cells.some((c) => tree.motorized.has(c)) ? tree.mode : ('walk' as const),
   }
+}
+
+/** Door-to-door access uses persistent meter positions, including travel inside one source hex.
+ * Inter-cell roads remain surveyed physical links; remeshing never adds a free road. */
+export function commuteSiteRoute(
+  w: World,
+  from: Pick<PhysicalSite, 'cell' | 'x' | 'y'>,
+  to: Pick<PhysicalSite, 'cell' | 'x' | 'y'>,
+  limit = 90,
+) {
+  const walk = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    (Math.hypot(a.x - b.x, a.y - b.y) / 1000 / 4) * 60
+  if (from.cell === to.cell) {
+    const minutes = walk(from, to)
+    return minutes <= limit ? { minutes, cells: [from.cell], mode: 'walk' as const } : null
+  }
+  const access = walk(from, cellPosition(w, from.cell)) + walk(to, cellPosition(w, to.cell))
+  if (access > limit) return null
+  const route = commuteRoute(w, from.cell, to.cell, limit)
+  return route && route.minutes + access <= limit ? { ...route, minutes: route.minutes + access } : null
 }
 function calculateRoutes(
   w: World,
@@ -111,6 +134,9 @@ export function recordLocalJob(
 /** One simultaneous search round after local retained contracts; every payment settles at residence. */
 export function matchCommuters(w: World) {
   if (!w.adaptive || !w.economy?.firms) return
+  // Newly opened/closed workplaces must enter the active grid before candidate search.
+  syncSites(w)
+  refreshAdaptiveTotals(w)
   routeCaches.delete(w)
   const regions = economicRegions(w),
     firms = w.economy.firms.filter((f) => f.active && (f.labor?.unfilled ?? 0) > 1e-8)
@@ -125,24 +151,13 @@ export function matchCommuters(w: World) {
     }[]
   }
   const offers: Offer[] = []
-  const buckets = new Map<string, typeof firms>()
-  for (const firm of firms) {
-    const workplace = w.localEconomy!.units[localFirmRegion(firm)]
-    const p = cellPosition(w, firm.cell ?? workplace.center)
-    const key = `${Math.floor(p.x / 6000)}:${Math.floor(p.y / 6000)}`
-    const list = buckets.get(key) ?? []
-    list.push(firm)
-    buckets.set(key, list)
-  }
+  const bySite = new Map(firms.map((firm) => [`firm:${firm.id}`, firm]))
   const incoming = new Map<number, number>()
   for (const r of regions) {
     const origin = cellPosition(w, r.center)
-    const candidates: typeof firms = []
-    const bx = Math.floor(origin.x / 6000),
-      by = Math.floor(origin.y / 6000)
-    for (let x = bx - 1; x <= bx + 1; x++)
-      for (let y = by - 1; y <= by + 1; y++) candidates.push(...(buckets.get(`${x}:${y}`) ?? []))
-    candidates.sort((a, b) => a.id - b.id)
+    const candidates = queryAdaptiveSites(w, origin, 6000, (site) => bySite.has(site.id))
+      .map((site) => bySite.get(site.id)!)
+      .sort((a, b) => a.id - b.id)
     const available = candidates
       .filter((f) => {
         const workplace = w.localEconomy!.units[localFirmRegion(f)]

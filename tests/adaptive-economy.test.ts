@@ -20,7 +20,12 @@ test('housing requires paid labor and real materials, and capacity appears only 
   ensureAdaptiveWorld(w)
   beginEconomyMonth(w)
   const home = Object.values(w.adaptive!.sites).find(
-      (s) => s.kind === 'residential' && w.localEconomy!.units[s.pool].residents[s.cell] > 1000,
+      // A one-cell pool has no spare neighboring housing that could satisfy this
+      // shortage without investment; the ten spaces really must be constructed.
+      (s) =>
+        s.kind === 'residential' &&
+        w.localEconomy!.units[s.pool].cells.length === 1 &&
+        w.localEconomy!.units[s.pool].residents[s.cell] > 1000,
     )!,
     r = w.localEconomy!.units[home.pool],
     sponsor = w.economy!.producers[home.pool],

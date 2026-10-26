@@ -497,7 +497,7 @@ test('blocked freight cannot originate loans for undeliverable goods', async () 
   auditBanks(w)
 })
 
-test('dispersed farming density stays rural while concentrated neighboring districts form a city', async () => {
+test('dispersed farming density stays rural while neighboring concentrations form a town', async () => {
   const { aggregateDistricts } = await import('../src/sim/districts')
   const w = generateWorld('Rural land use')
   ensureDistrictEconomy(w)
@@ -554,7 +554,7 @@ test('dispersed farming density stays rural while concentrated neighboring distr
   const city = local.cities.find((c) => c.absorbedBy === undefined && c.cells.includes(a.center))!
   assert(city && city.cells.includes(b.center))
   assert.equal(city.population, 40000)
-  assert.equal(city.kind, 'city')
+  assert.equal(city.kind, 'town')
   assert.equal(
     w.regions.reduce((sum, r) => sum + population(r), 0),
     before,

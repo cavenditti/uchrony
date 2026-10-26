@@ -35,7 +35,7 @@ export function ensureAdaptiveWorld(w: World) {
     metersPerMapUnit: METERS_PER_MAP_UNIT,
     minimumSpan: 125,
     mode: 'adaptive',
-    tree: { leaves: [], changed: {}, month: -1 },
+    tree: { leaves: [], changed: {}, month: -1, domain: 'world' },
     sites: {},
     jurisdictions: {},
     nextJurisdiction: 0,
@@ -150,6 +150,11 @@ export function syncSites(w: World) {
       created.capitalReference = firm.capital
     }
     const site = a.sites[id]
+    const cell = firm.cell ?? pool.center
+    if (site.cell !== cell) {
+      site.cell = cell
+      Object.assign(site, cellPosition(w, cell))
+    }
     // Investment/depreciation is settled by the firm's existing material and wage ledger.
     // Refinement never changes this capacity; a new firm has a real opening balance sheet.
     if (site.capitalReference > 0)
@@ -160,7 +165,9 @@ export function syncSites(w: World) {
   }
 }
 function sitePopulation(w: World, site: PhysicalSite) {
-  return site.kind === 'residential' ? (w.localEconomy!.units[site.pool]?.residents[site.cell] ?? 0) : 0
+  return site.kind === 'residential' && site.retired === undefined
+    ? (site.residents ?? w.localEconomy!.units[site.pool]?.residents[site.cell] ?? 0)
+    : 0
 }
 export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstruct = false): AdaptiveMesh {
   const a = w.adaptive!,
@@ -170,11 +177,23 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
   for (const id of prior) for (let i = 1; i < id.length; i++) priorBranches.add(id.slice(0, i))
   const sites = Object.values(a.sites).filter((s) => s.retired === undefined)
   const jobs = new Map((w.economy?.firms ?? []).map((f) => [`firm:${f.id}`, f.active ? f.employment : 0]))
+  // Mobile activity is a refinement signal, never an extra population/account entry.
+  const activity = new Map<number, number>()
+  for (const fleet of w.warfare?.fleets ?? [])
+    if (w.cells[fleet.cell] && fleet.hull > 0)
+      activity.set(
+        fleet.cell,
+        (activity.get(fleet.cell) ?? 0) + fleet.soldiers / 300 + (fleet.warships + fleet.transports) / 8,
+      )
+  for (const corridor of w.corridors ?? [])
+    if (corridor.traffic > 0)
+      for (const cell of [corridor.a, corridor.b])
+        activity.set(cell, (activity.get(cell) ?? 0) + corridor.traffic / 20000)
   const fragments = w.cells
-    .filter((c) => c.terrain !== 'water')
+    .filter((c) => !reconstruct || a.tree.domain === 'world' || c.terrain !== 'water')
     .map((c) => {
       const polygon = cellPolygon(w, c.id)
-      return { cell: c.id, polygon, area: polygonArea(polygon) }
+      return { cell: c.id, water: c.terrain === 'water', polygon, area: polygonArea(polygon) }
     })
   const makeNode = (
     id: string,
@@ -190,9 +209,45 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
     const variation =
       Math.sqrt(prices.reduce((sum, p) => sum + (p - mean) ** 2, 0) / Math.max(1, prices.length)) /
       Math.max(0.001, mean)
+    let landArea = 0,
+      waterArea = 0,
+      elevation = 0,
+      elevation2 = 0,
+      moisture = 0,
+      moisture2 = 0,
+      movingActivity = 0
+    for (const piece of pieces) {
+      const cell = w.cells[piece.cell]
+      if (piece.water) waterArea += piece.area
+      else landArea += piece.area
+      elevation += cell.elevation * piece.area
+      elevation2 += cell.elevation ** 2 * piece.area
+      moisture += cell.moisture * piece.area
+      moisture2 += cell.moisture ** 2 * piece.area
+      const pressure = activity.get(piece.cell)
+      if (pressure) {
+        const p = cellPosition(w, piece.cell)
+        if (
+          p.x >= bounds.x &&
+          p.x < bounds.x + bounds.size &&
+          p.y >= bounds.y &&
+          p.y < bounds.y + bounds.size
+        )
+          movingActivity += pressure
+      }
+    }
+    const area = Math.max(1, landArea + waterArea)
+    // Only known source variation contributes: finer cells cannot invent terrain or ore.
+    const terrainError =
+      Math.max(
+        Math.sqrt(Math.max(0, elevation2 / area - (elevation / area) ** 2)) / 0.12,
+        Math.sqrt(Math.max(0, moisture2 / area - (moisture / area) ** 2)) / 0.18,
+        landArea > 0 && waterArea > 0 ? 1.1 : 0,
+      ) * Math.min(1, (bounds.size / 2000) ** 2)
     const rivers = pieces.some((p) => w.cells[p.cell].river)
     const indicator =
-      (residents / 12000 + work / 2500) * Math.min(1, (bounds.size / 1000) ** 2) +
+      (residents / 12000 + work / 2500 + movingActivity) * Math.min(1, (bounds.size / 1000) ** 2) +
+      terrainError +
       variation * 2 +
       (rivers && bounds.size > 4000 ? 1 : 0)
     return {
@@ -203,7 +258,8 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
       pools,
       population: residents,
       jobs: work,
-      landArea: pieces.reduce((s, p) => s + p.area, 0),
+      landArea,
+      waterArea,
       indicator,
     }
   }
@@ -233,7 +289,7 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
   }
   visit('r', root, fragments, sites)
   // Enforce a 2:1 neighbor ratio without touching any economic state.
-  let interfaces = meshInterfaces(leaves)
+  let interfaces = meshInterfaces(leaves, false)
   for (;;) {
     const byId = new Map(leaves.map((n) => [n.id, n]))
     const split = new Set<string>()
@@ -260,10 +316,13 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
               ),
             )
       }
-    interfaces = meshInterfaces(leaves)
+    interfaces = meshInterfaces(leaves, false)
   }
   leaves.sort((x, y) => x.id.localeCompare(y.id))
+  interfaces = meshInterfaces(leaves)
   if (reconstruct) {
+    if (leaves.length !== prior.size || leaves.some((n) => !prior.has(n.id)))
+      throw new Error('Saved spatial partition contains leaves outside the domain')
     const mesh = { leaves, interfaces, revision: a.revision }
     meshCache.set(w, { revision: a.revision, mesh })
     return mesh
@@ -276,6 +335,7 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
   for (const [id, month] of Object.entries(a.tree.changed))
     if (w.month - month > 24) delete a.tree.changed[id]
   a.tree.leaves = next
+  a.tree.domain = 'world'
   a.tree.month = w.month
   a.mode = mode
   a.revision++

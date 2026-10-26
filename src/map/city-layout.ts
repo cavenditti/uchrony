@@ -43,12 +43,12 @@ export type CityLayout = {
   angle: number
 }
 
-const homeCapacity = new WeakMap<NonNullable<World['viewHomes']>, Float64Array>()
+const homeCapacity = new WeakMap<NonNullable<World['viewHomes']>, Map<string, NonNullable<World['viewHomes']>[number]>>()
 
 /** Stable visual identities do not depend on district IDs or monthly population totals. */
 export function describeCity(
   world: Pick<World, 'seed' | 'cells' | 'regions'> & Partial<Pick<World, 'adaptive' | 'viewHomes'>>,
-  site: Settlement & { capacity?: number },
+  site: Settlement & { capacity?: number; parcel?: import('../sim/adaptive-types').SpatialBounds },
 ): CityDescription {
   const cell = world.cells[site.cell],
     seed = hashSeed(`${world.seed}:townscape:1:${site.id}`)
@@ -58,20 +58,23 @@ export function describeCity(
       : hashSeed(`${world.seed}:architecture:${world.regions[site.region]?.culture ?? 0}`) % 4
   let capacities = world.viewHomes && homeCapacity.get(world.viewHomes)
   if (world.viewHomes && !capacities) {
-    capacities = new Float64Array(world.cells.length).fill(NaN)
-    for (const home of world.viewHomes) capacities[home.cell] = home.capacity
+    capacities = new Map(world.viewHomes.map((home) => [home.id, home]))
     homeCapacity.set(world.viewHomes, capacities)
   }
-  const recorded = capacities?.[site.cell]
-  const capacity = site.capacity ?? (recorded !== undefined && !Number.isNaN(recorded) ? recorded : world.adaptive?.sites[`home:${site.cell}`]?.capacity)
-  const radius = capacity !== undefined ? Math.min(8.2, Math.max(0.8, Math.sqrt(capacity * 40 / Math.PI) / world.adaptive!.metersPerMapUnit)) :
+  const homeId = site.nucleusSite ?? `home:${site.cell}`
+  const recorded = capacities?.get(homeId) ?? world.adaptive?.sites[homeId]
+  const capacity = site.capacity ?? recorded?.capacity
+  const extent = site.parcel ?? recorded?.parcel
+  const scale = world.adaptive?.metersPerMapUnit ?? 1
+  const position = site.position ?? (recorded?.x !== undefined && recorded.y !== undefined ? { x: recorded.x, y: recorded.y } : undefined)
+  const radius = capacity !== undefined ? Math.min(extent ? extent.size / (2 * scale) : 8.2, Math.max(0.35, Math.sqrt(capacity * 40 / Math.PI) / scale)) :
     (site.kind === 'city' ? 15 : site.kind === 'town' ? 10 : 5.5) * (0.92 + reliefRandom(seed) * 0.16)
   return {
     id: site.id,
     cell: site.cell,
-    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${style}:${Math.round(capacity ?? 0)}`,
-    x: cell.x,
-    z: cell.y,
+    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${style}:${Math.round(capacity ?? 0)}:${position?.x ?? cell.x}:${position?.y ?? cell.y}:${radius}`,
+    x: position ? position.x / scale : cell.x,
+    z: position ? position.y / scale : cell.y,
     radius,
     seed,
     kind: site.kind,

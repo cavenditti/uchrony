@@ -149,8 +149,17 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
     ...(world.adaptive
       ? {
           viewHomes: Object.values(world.adaptive.sites)
-            .filter((site) => site.kind === 'residential')
-            .map(({ id, cell, pool, capacity }) => ({ id, cell, pool, capacity })),
+            .filter((site) => site.kind === 'residential' && site.retired === undefined)
+            .map(({ id, cell, pool, capacity, residents, x, y, parcel }) => ({
+              id,
+              cell,
+              pool,
+              capacity,
+              residents,
+              x,
+              y,
+              parcel,
+            })),
         }
       : {}),
     ...(detailNation !== undefined ? { viewNation: detailNation, viewBankLoans: bankLoans } : {}),

@@ -1,0 +1,141 @@
+{
+  "date": "2026-10-26",
+  "seed": "Adaptive grid qualification 2026-10-26",
+  "command": "node --expose-gc --import tsx tests/qualify-adaptive-grid.ts",
+  "scope": "Offline geometry, conservation and recursive search; timings include no rendering or long-run simulation. Per-mode heap is sampled after explicit GC when enabled, not peak browser memory.",
+  "results": [
+    {
+      "scale": "regional",
+      "sourceCells": 8064,
+      "sites": 4593,
+      "initializedMs": 738,
+      "sampledHeapMiB": 121,
+      "modes": [
+        {
+          "mode": "coarse",
+          "heapAfterGcMiB": 83,
+          "leaves": 112,
+          "interfaces": 202,
+          "fragments": 9987,
+          "remeshMs": 53,
+          "fortyQueriesWithExhaustiveVerificationMs": 7,
+          "found": 2702,
+          "landAreaM2": 3147136317.352656,
+          "waterAreaM2": 3836492538.76507
+        },
+        {
+          "mode": "fine",
+          "heapAfterGcMiB": 155,
+          "leaves": 27262,
+          "interfaces": 53887,
+          "fragments": 68525,
+          "remeshMs": 279,
+          "fortyQueriesWithExhaustiveVerificationMs": 39,
+          "found": 2702,
+          "landAreaM2": 3147136317.35266,
+          "waterAreaM2": 3836492538.765065
+        },
+        {
+          "mode": "adaptive",
+          "heapAfterGcMiB": 121,
+          "leaves": 13217,
+          "interfaces": 27002,
+          "fragments": 42258,
+          "remeshMs": 241,
+          "fortyQueriesWithExhaustiveVerificationMs": 18,
+          "found": 2702,
+          "landAreaM2": 3147136317.352659,
+          "waterAreaM2": 3836492538.765062
+        }
+      ]
+    },
+    {
+      "scale": "world",
+      "sourceCells": 129024,
+      "sites": 70998,
+      "initializedMs": 9005,
+      "sampledHeapMiB": 1320,
+      "modes": [
+        {
+          "mode": "coarse",
+          "heapAfterGcMiB": 887,
+          "leaves": 1705,
+          "interfaces": 3324,
+          "fragments": 163668,
+          "remeshMs": 1339,
+          "fortyQueriesWithExhaustiveVerificationMs": 126,
+          "found": 2583,
+          "landAreaM2": 51331057733.111374,
+          "waterAreaM2": 60407003964.77284
+        },
+        {
+          "mode": "fine",
+          "heapAfterGcMiB": 2019,
+          "leaves": 428495,
+          "interfaces": 854843,
+          "fragments": 1096612,
+          "remeshMs": 6612,
+          "fortyQueriesWithExhaustiveVerificationMs": 819,
+          "found": 2583,
+          "landAreaM2": 51331057733.11127,
+          "waterAreaM2": 60407003964.773445
+        },
+        {
+          "mode": "adaptive",
+          "heapAfterGcMiB": 1320,
+          "leaves": 144838,
+          "interfaces": 295492,
+          "fragments": 523690,
+          "remeshMs": 4677,
+          "fortyQueriesWithExhaustiveVerificationMs": 351,
+          "found": 2583,
+          "landAreaM2": 51331057733.11125,
+          "waterAreaM2": 60407003964.77259
+        }
+      ]
+    }
+  ],
+  "firstWorldMonth": {
+    "command": "node --cpu-prof --import tsx tests/performance.ts --scale world --months 1 --repeats 1",
+    "seed": "performance-ledger",
+    "sourceCells": 129024,
+    "communities": 21000,
+    "tickMilliseconds": 48235,
+    "note": "Single offline first-month sample during coordinated integration. Includes migration/startup; not steady-state browser throughput. CPU inclusive samples overlap and must not be added.",
+    "inclusiveCpuSampleSeconds": {
+      "produce": 16.26,
+      "matchCommuters": 14.46,
+      "ledgerTransfer": 11.72,
+      "advanceLandUse": 4.09,
+      "evolveCities": 3.31,
+      "queryAdaptiveSites": 2.99,
+      "residentialDemand": 2.97,
+      "optimizeResidentialLocations": 2.87
+    }
+  },
+  "verification": {
+    "build": "passed",
+    "gridAndAdaptiveFocusedTests": {
+      "uniqueTests": 20,
+      "status": "passed on final focused run and corrected housing-fixture rerun"
+    },
+    "topologyTests": 7,
+    "autosaveTests": {
+      "passed": 10,
+      "note": "Temporary localhost server required an unrestricted test run; initial restricted bind failed with EPERM."
+    },
+    "banksFirmsGdpTests": {
+      "passed": 18,
+      "note": "Fresh rerun passed after an intermediate integration snapshot failed."
+    },
+    "largestMapRegression": "passed three monthly ticks, population accounting, validation and save/restore",
+    "fullRegression": {
+      "status": "interrupted intermediate-source run; not a full-suite pass",
+      "tests": 318,
+      "passed": 314,
+      "failed": 3,
+      "cancelled": 1,
+      "note": "Stopped obsolete 1200-month simulation snapshot after coordinated source changes. The three observed endpoint-permission, intermediate-save and legacy-classification failures passed scoped reruns. Final settlement qualification and fresh two-year conservation/save-continuation results are recorded separately in settlement-dynamics-2026-10-26.json."
+    }
+  }
+}

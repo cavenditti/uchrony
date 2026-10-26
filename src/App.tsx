@@ -1202,8 +1202,9 @@ export default function App() {
               one of them.
             </p>
             <p>
-              Municipalities and provinces can reorganize over a continuous landscape. Adaptive spatial
-              resolution preserves the same people, firms, goods and accounts. Close inspection shows
+              Towns emerge from occupied development and merge as their neighborhoods connect. Housing grows
+              through paid construction, and households seek accessible jobs. Administrative borders and
+              spatial resolution evolve while preserving people, firms, goods and accounts. Close inspection shows
               representative daily activity from the recorded population and paid jobs.
             </p>
             <p>

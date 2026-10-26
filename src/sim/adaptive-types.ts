@@ -22,6 +22,10 @@ export interface PhysicalSite extends PointMeters {
   capitalReference: number
   retired?: number
   investedValue?: number
+  /** Exact occupancy at a persistent physical parcel; independent of numerical leaves. */
+  residents?: number
+  /** Physical building plot in meters, retained through numerical split/merge. */
+  parcel?: SpatialBounds
 }
 export interface Jurisdiction {
   id: string
@@ -29,6 +33,8 @@ export interface Jurisdiction {
   name: string
   nation: number
   seat: number
+  /** Local service offices can survive a legal merger; residents need not travel to one capital. */
+  serviceSeats?: number[]
   cells: number[]
   founded: number
   revised: number
@@ -66,7 +72,7 @@ export interface AdaptiveWorld {
   metersPerMapUnit: number
   minimumSpan: number
   mode: 'adaptive' | 'coarse' | 'fine'
-  tree: { leaves: string[]; changed: Record<string, number>; month: number }
+  tree: { leaves: string[]; changed: Record<string, number>; month: number; domain?: 'world' }
   sites: Record<string, PhysicalSite>
   jurisdictions: Record<string, Jurisdiction>
   nextJurisdiction: number
@@ -89,9 +95,13 @@ export interface AdaptiveWorld {
   construction?: { site: string; capacity: number; cost: number; remaining: number }[]
   migration: { source: 'legacy'; month: number; assumptions: string[] }
   reviewMonth: number
+  residentialVersion?: 1
+  nextResidence?: number
 }
 export interface SpatialFragment {
+  /** Stable source geography, not the identity of the active numerical cell. */
   cell: number
+  water?: boolean
   polygon: PointMeters[]
   area: number
 }
@@ -104,13 +114,18 @@ export interface AdaptiveNode {
   population: number
   jobs: number
   landArea: number
+  waterArea?: number
   indicator: number
 }
 export interface SpatialInterface {
   id: string
   a: string
   b: string
+  /** Actual shared domain boundary, excluding gaps outside the imported geography. */
   length: number
+  landLength?: number
+  waterLength?: number
+  coastLength?: number
 }
 export interface AdaptiveMesh {
   leaves: AdaptiveNode[]
