@@ -8,7 +8,7 @@ import { planHousingInvestment } from './housing-investment'
 import { MODEL_PARAMETERS } from './model-parameters'
 
 /** Housing-space development has physical inputs and paid labor. No imputed rent removes cash. */
-export function advanceLandUse(w: World) {
+export function advanceLandUse(w: World, prepared?: ReturnType<typeof settlementAccess>) {
   const a = w.adaptive
   if (!a || !w.economy || !w.localEconomy) return
   a.construction ??= []
@@ -22,8 +22,8 @@ export function advanceLandUse(w: World) {
   }
   a.construction = a.construction.filter((p) => p.remaining > 0)
   const pending = new Set(a.construction.map((p) => p.site))
+  const access = prepared ?? settlementAccess(w)
   const homes = residentialPools(w),
-    access = settlementAccess(w),
     demand = residentialDemand(w, access)
   for (const id of w.localEconomy.active) {
     const r = w.localEconomy.units[id],

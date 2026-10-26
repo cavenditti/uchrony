@@ -4,6 +4,7 @@ import type { PhysicalSite, SpatialBounds, PointMeters } from './adaptive-types'
 import { cellPolygon, pointInPolygon } from './physical-space'
 import { queryAdaptiveLeaves } from './adaptive-grid'
 import { SETTLEMENT } from './settlement-model'
+import { MODEL_PARAMETERS } from './model-parameters'
 
 export function occupiedResidents(w: World, site: PhysicalSite) {
   if (site.kind !== 'residential' || site.retired !== undefined) return 0
@@ -16,7 +17,11 @@ export function occupiedResidents(w: World, site: PhysicalSite) {
  * known built footprint rather than borrowing another parcel's investment.
  */
 export function compactResidence(site: PhysicalSite, retained = false) {
-  const opening = site.openingBuilt ?? 0
+  const opening =
+    (site.openingBuilt ?? 0) +
+    ((site.investedValue ?? 0) > 0
+      ? Math.max(0, site.capacity - site.openingCapacity) / MODEL_PARAMETERS.fullBuiltPopulationPerCell
+      : 0)
   return (
     opening >= (retained ? SETTLEMENT.retainedBuiltCover : SETTLEMENT.entryBuiltCover) ||
     (site.id.startsWith('residence:') && (site.investedValue ?? 0) > 0)

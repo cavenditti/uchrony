@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-26",
+  "cpu": "Apple M4 Pro",
+  "availableCores": 12,
+  "scope": "Influence-field kernel only; preparation includes generation for World scenario. Does not establish full-engine throughput.",
+  "results": [
+    {
+      "scenario": "dense-65536-homes",
+      "homes": 65536,
+      "treeNodes": 26368,
+      "batches": 1024,
+      "workers": 8,
+      "preparationMs": 13,
+      "serialMs": 4866,
+      "parallelMs": 705,
+      "speedup": 6.9,
+      "identical": true,
+      "snapshotMB": 3.24
+    },
+    {
+      "scenario": "dense-1048576-homes",
+      "homes": 1048576,
+      "treeNodes": 26368,
+      "batches": 16384,
+      "workers": 8,
+      "preparationMs": 22,
+      "serialMs": 106557,
+      "parallelMs": 12129,
+      "speedup": 8.79,
+      "identical": true,
+      "snapshotMB": 33.29
+    },
+    {
+      "scenario": "world-129024-terrain-samples",
+      "homes": 58728,
+      "treeNodes": 1400,
+      "batches": 58728,
+      "workers": 8,
+      "preparationMs": 32125,
+      "serialMs": 317,
+      "parallelMs": 55,
+      "speedup": 5.74,
+      "identical": true,
+      "snapshotMB": 9.14
+    }
+  ],
+  "measurementNotes": "Single warmed comparisons on Apple M4 Pro; other regression and browser validation overlapped this run. Timings are diagnostic, not isolated or statistical throughput estimates. Outputs were compared element-for-element."
+}

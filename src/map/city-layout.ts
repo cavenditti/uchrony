@@ -20,6 +20,7 @@ export type CityBuilding = CityPoint & {
   representedCapacity?: number
 }
 export type CityDescription = {
+  streetPattern?: 'market' | 'planned' | 'spine'
   form?: UrbanForm
   id: string
   cell: number
@@ -58,6 +59,7 @@ export function describeCity(
   world: Pick<World, 'seed' | 'cells' | 'regions'> & Partial<Pick<World, 'adaptive' | 'viewHomes'>>,
   site: Settlement & {
     form?: UrbanForm
+    civic?: boolean
     capacity?: number
     parcel?: import('../sim/adaptive-types').SpatialBounds
   },
@@ -90,9 +92,10 @@ export function describeCity(
       : (site.kind === 'city' ? 15 : site.kind === 'town' ? 10 : 5.5) * (0.92 + reliefRandom(seed) * 0.16)
   return {
     form: site.form,
+    civic: site.civic,
     id: site.id,
     cell: site.cell,
-    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${style}:${Math.round(capacity ?? 0)}:${position?.x ?? cell.x}:${position?.y ?? cell.y}:${radius}:${JSON.stringify(site.form)}`,
+    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${site.civic}:${style}:${Math.round(capacity ?? 0)}:${position?.x ?? cell.x}:${position?.y ?? cell.y}:${radius}:${JSON.stringify(site.form)}`,
     x: position ? position.x / scale : cell.x,
     z: position ? position.y / scale : cell.y,
     radius: site.form ? site.form.parcel.size / (2 * scale) : radius,
@@ -165,8 +168,9 @@ export function cityLayout(
   }
   const dry = (p: CityPoint, setback = 1) =>
     isLand(p) && channels.every(({ a, b, width }) => distanceTo(p, a, b) > width + setback)
-  if (city.form) return parcelLayout(city, dry)
-  const pattern = (['market', 'planned', 'spine'] as const)[Math.floor(random(71) * 3) % 3]
+  if (city.form) return parcelLayout(city, dry, (template) => cityLayout(world, template, rivers))
+  const pattern =
+    city.streetPattern ?? (['market', 'planned', 'spine'] as const)[Math.floor(random(71) * 3) % 3]
   let angle = random(1) * Math.PI * 2
   if (pattern === 'spine' && channels.length) {
     const nearest = [...channels].sort((a, b) => distanceTo(city, a.a, a.b) - distanceTo(city, b.a, b.b))[0]

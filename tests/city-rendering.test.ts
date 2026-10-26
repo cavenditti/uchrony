@@ -223,7 +223,7 @@ test('scenery time freezes while disabled and resumes without hidden-tab catch-u
   assert.equal(motion.time, uniform, 'animation updates do not allocate replacement uniforms')
 })
 
-test('funded capacity raises floor area and height within the same parcel, with distinct work and garden forms', () => {
+test('funded capacity changes neighborhood density without forcing decorative samples into towers', () => {
   const scale = 1024 / CELL_SIZE,
     center = { x: world.cells[site.cell].x * scale, y: world.cells[site.cell].y * scale }
   const parcel = { x: center.x - 256, y: center.y - 256, size: 512 }
@@ -241,20 +241,14 @@ test('funded capacity raises floor area and height within the same parcel, with 
   assert.equal(low.city.form!.district, 'gardens')
   assert.equal(dense.city.form!.district, 'center')
   assert.equal(industry.city.form!.district, 'industrial')
-  assert(dense.buildings.length > low.buildings.length)
-  assert(
-    Math.max(...dense.buildings.map((b) => b.height)) > Math.max(...low.buildings.map((b) => b.height)) * 3,
-  )
-  assert(
-    new Set(dense.buildings.map((b) => b.width.toFixed(3))).size > 8,
-    'frontages vary instead of repeating one house',
-  )
-  assert(
-    dense.buildings.every(
-      (b) => Math.hypot(Math.abs(b.x * scale - center.x) - 256, Math.abs(b.z * scale - center.y) - 256) > 60,
-    ),
-    'the outer silhouette does not stamp parcel corners',
-  )
+  assert(dense.buildings.length >= low.buildings.length)
+  const footprints = (layout: ReturnType<typeof cityLayout>) =>
+    layout.buildings.map(({ x, z, width, depth, angle }) => ({ x, z, width, depth, angle }))
+  assert.deepEqual(footprints(low), footprints(dense), 'growth preserves existing street-front lots')
+  assert.deepEqual(low.streets, dense.streets)
+  assert(dense.buildings.every((b) => (b.storeys ?? 1) <= 6))
+  assert(low.buildings.every((b) => (b.storeys ?? 1) <= 6))
+  assert(new Set(dense.buildings.map((b) => b.width.toFixed(3))).size > 3)
   assert(industry.buildings.some((b) => b.use === 'workshop'))
   assert(
     industry.buildings.filter((b) => b.use === 'workshop').every((b) => b.representedCapacity === undefined),
@@ -268,11 +262,59 @@ test('funded capacity raises floor area and height within the same parcel, with 
       assert(b.z - b.depth / 2 >= parcel.y / scale && b.z + b.depth / 2 <= (parcel.y + parcel.size) / scale)
     }
   }
-  const core = dense.buildings.filter((b) => Math.hypot(b.x * scale - center.x, b.z * scale - center.y) < 100)
-  const edge = dense.buildings.filter((b) => Math.hypot(b.x * scale - center.x, b.z * scale - center.y) > 180)
-  assert(core.length && edge.length, 'both central and peripheral buildings are represented')
-  assert(
-    core.reduce((s, b) => s + b.storeys!, 0) / core.length >
-      edge.reduce((s, b) => s + b.storeys!, 0) / edge.length,
-  )
+  assert(dense.streets.length > 0)
+  assert(dense.square.length > 0, 'the existing civic square remains readable')
+})
+
+test('extreme capacity and clipped decorative lots cannot explode building height', () => {
+  const scale = 1024 / CELL_SIZE
+  const center = { x: world.cells[site.cell].x * scale, y: world.cells[site.cell].y * scale }
+  for (const size of [128, 512, 850]) {
+    const parcel = { x: center.x - size / 2, y: center.y - size / 2, size }
+    for (const capacity of [500, 30000, 1000000]) {
+      const form = urbanForm(capacity, parcel, center, scale, 'urban', true, 0, size)
+      const description = describeCity(
+        { ...world, adaptive: { metersPerMapUnit: scale, sites: {} } as World['adaptive'] },
+        { ...site, capacity, position: center, parcel, form },
+      )
+      const layout = cityLayout(world, description)
+      assert(layout.buildings.length > 0)
+      assert(
+        layout.buildings.every((b) => (b.storeys ?? 1) <= 6 + 1e-9),
+        'visible housing stays below six illustrated storeys',
+      )
+      assert(
+        layout.buildings.every((b) => b.height <= Math.min(b.width, b.depth) * 1.15 + 1e-9),
+        'no narrow needle towers',
+      )
+      const represented = layout.buildings.reduce((sum, b) => sum + (b.representedCapacity ?? 0), 0)
+      assert(Math.abs(represented - capacity) < 1e-7, 'rendering does not remove housing capacity')
+    }
+  }
+})
+
+test('adaptive neighborhoods retain different street traditions, larger houses and stable plans', () => {
+  const scale = 1024 / CELL_SIZE
+  const center = { x: world.cells[site.cell].x * scale, y: world.cells[site.cell].y * scale }
+  const parcel = { x: center.x - 425, y: center.y - 425, size: 850 }
+  const forms = new Set<string>()
+  for (let i = 0; i < 40; i++) {
+    const form = urbanForm(18000, parcel, center, scale, 'urban', true, 0, 850)
+    const description = describeCity(
+      { ...world, adaptive: { metersPerMapUnit: scale, sites: {} } as World['adaptive'] },
+      { ...site, id: `living-town:${i}`, capacity: 18000, position: center, parcel, form },
+    )
+    const layout = cityLayout(world, description)
+    forms.add(layout.pattern)
+    assert.deepEqual(cityLayout(world, description), layout)
+    assert(layout.buildings.length < 100, 'avoid a carpet of tiny repeated lots')
+    assert(
+      layout.buildings.some((b) => Math.max(b.width, b.depth) * scale > 40),
+      'readable house footprints',
+    )
+    assert(layout.streets.length > 0)
+    const neighborhood = cityLayout(world, { ...description, civic: false })
+    assert.equal(neighborhood.square.length, 0, 'satellite patches do not repeat the civic square')
+  }
+  assert.deepEqual(forms, new Set(['market', 'planned', 'spine']))
 })

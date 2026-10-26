@@ -359,20 +359,22 @@ export class CityScenery {
       )
     for (const b of layout.buildings) {
       const floor = this.height(b.x, b.z),
-        corners = rectangle(b.x, b.z, b.width + 0.18, b.depth + 0.18, b.angle)
+        footing = city.form ? 0.5 / city.form.metersPerMapUnit : 0.09,
+        lift = city.form ? 0.2 / city.form.metersPerMapUnit : 0.04,
+        corners = rectangle(b.x, b.z, b.width + footing * 2, b.depth + footing * 2, b.angle)
       const floors = corners.map((p) => this.height(p.x, p.z)),
         high = Math.max(...floors)
       if (high - Math.min(...floors) > 1.4) continue
-      const base = high + 0.04
+      const base = high + lift
       const wall = new THREE.Color(palette.walls).multiplyScalar(0.94 + b.tone * 0.1)
       const roof = new THREE.Color(palette.roof).multiplyScalar(0.88 + b.tone * 0.22)
       trim.push({
         x: b.x,
         y: floor + (base - floor) / 2,
         z: b.z,
-        w: b.width + 0.1,
-        h: Math.max(0.12, base - floor),
-        d: b.depth + 0.1,
+        w: b.width + footing,
+        h: Math.max(lift, base - floor),
+        d: b.depth + footing,
         a: b.angle,
         color: new THREE.Color(palette.trim),
       })
@@ -399,18 +401,36 @@ export class CityScenery {
           a: b.angle,
           color: roof,
         })
-        const bands = Math.min(16, Math.floor(b.storeys ?? 1))
-        for (let floor = 1; floor < bands; floor++)
-          trim.push({
-            x: b.x,
-            y: base + (b.height * floor) / bands,
-            z: b.z,
-            w: b.width * 1.015,
-            h: cap * 0.22,
-            d: b.depth * 1.015,
-            a: b.angle,
-            color: wall.clone().multiplyScalar(0.75),
-          })
+        const bands = Math.max(1, Math.min(5, Math.round(b.storeys ?? 2)))
+        const facade = (u: number, v: number) => ({
+          x: b.x + u * Math.cos(b.angle) + v * Math.sin(b.angle),
+          z: b.z - u * Math.sin(b.angle) + v * Math.cos(b.angle),
+        })
+        const columns = b.use === 'workshop' ? 3 : 2 + Number(b.width > b.depth * 1.2)
+        for (const side of [-1, 1])
+          for (let row = 0; row < bands; row++)
+            for (let column = 0; column < columns; column++) {
+              const p = facade(((column + 0.5) / columns - 0.5) * b.width * 0.78, side * b.depth * 0.505)
+              trim.push({
+                ...p,
+                y: base + ((row + 0.58) / bands) * b.height,
+                w: b.width * 0.105,
+                h: Math.min((b.height / bands) * 0.3, b.width * 0.12),
+                d: b.depth * 0.018,
+                a: b.angle,
+                color: new THREE.Color(palette.trim).multiplyScalar(0.55),
+              })
+            }
+        const door = facade(-b.width * 0.12, b.depth * 0.51)
+        trim.push({
+          ...door,
+          y: base + (b.height / bands) * 0.22,
+          w: b.width * 0.14,
+          h: (b.height / bands) * 0.44,
+          d: b.depth * 0.025,
+          a: b.angle,
+          color: new THREE.Color(palette.trim).multiplyScalar(0.55),
+        })
         continue
       }
       const offset = (u: number, v: number) => ({
@@ -538,7 +558,40 @@ export class CityScenery {
       floor = this.height(p.x, p.z),
       stone = new THREE.Color(palette.walls),
       roof = new THREE.Color(palette.roof)
-    if (layout.square.length && city.civic !== false) {
+    if (layout.square.length && city.civic !== false && city.form) {
+      const plaza = layout.plaza,
+        base = this.height(plaza.x, plaza.z)
+      const span = Math.min(...layout.square.map((p) => Math.hypot(p.x - plaza.x, p.z - plaza.z)))
+      const width = Math.min(span * 0.62, city.radius * 0.2)
+      parts.cylinder.push({
+        x: plaza.x,
+        y: base + width * 0.07,
+        z: plaza.z,
+        w: width,
+        h: width * 0.14,
+        d: width,
+        color: new THREE.Color(palette.walls),
+      })
+      parts.cylinder.push({
+        x: plaza.x,
+        y: base + width * 0.15,
+        z: plaza.z,
+        w: width * 0.73,
+        h: width * 0.06,
+        d: width * 0.73,
+        color: new THREE.Color(illuminated.river),
+      })
+      parts.cylinder.push({
+        x: plaza.x,
+        y: base + width * 0.5,
+        z: plaza.z,
+        w: width * 0.12,
+        h: width * 0.75,
+        d: width * 0.12,
+        color: new THREE.Color(palette.walls),
+      })
+    }
+    if (layout.square.length && city.civic !== false && !city.form) {
       const civic = (u: number, v: number) => ({
         x: p.x + u * Math.cos(layout.angle) + v * Math.sin(layout.angle),
         z: p.z - u * Math.sin(layout.angle) + v * Math.cos(layout.angle),
@@ -763,9 +816,9 @@ export class CityScenery {
           x: p.x,
           y: y + 28 * unit,
           z: p.z,
-          w: 14 * unit,
-          h: 28 * unit,
-          d: 14 * unit,
+          w: 28 * unit,
+          h: 32 * unit,
+          d: 28 * unit,
           color: new THREE.Color(illuminated.foliage),
         })
         continue

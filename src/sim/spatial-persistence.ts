@@ -129,8 +129,9 @@ export function validateSpatial(w: World) {
     sites.add(p.cell)
     urban[p.region] -= p.population
   }
-  if (!w.adaptive && (w.localEconomy ? urban.reduce((a, b) => a + b, 0) !== 0 : urban.some((x) => x !== 0)))
-    fail()
+  // Physical urban occupancy includes developed plots below the naming threshold.
+  // Only old region-only exports equate every urban resident with a city label.
+  if (!w.adaptive && !w.localEconomy && urban.some((x) => x !== 0)) fail()
   if (w.adaptive) {
     for (const settlement of s.settlements) {
       if (settlement.id.startsWith('municipality:')) {

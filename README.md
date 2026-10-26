@@ -106,6 +106,8 @@ src/App.tsx            Playback, selection, autosave, import/export, keyboard co
 tests/                 Behavioral and long-horizon invariant tests
 ```
 
+Residential growth follows reachable jobs, funded public offices, housing vacancies and paid construction. Cities are labels on dense occupied footprints: their names and identities do not drive the economy. On supported browsers, the simulation worker distributes spatial influence queries across a shared-memory worker pool, splitting dense urban cells into small batches. Other economic and political phases retain deterministic serial settlement. Local dev and preview enable the required shared-memory headers; unsupported hosts use the same serial solver. See [adaptive-grid architecture and validation](docs/ADAPTIVE_GRID.md#parallel-influence-and-dense-settlements).
+
 The simulation engine is independent of React and the DOM. A dedicated Web Worker owns playback timing and advances the world in short slices while the main thread renders the interface. Snapshots are coalesced (at most two per second at 60×); model completions and screen rendering do not acknowledge or gate the clock. The selected speed is a target bounded by available CPU throughput. Model randomness comes from saved pseudorandom state; accepted LLM narratives and effects are saved as historical facts. Future LLM generations are external inputs and can differ even with the same request seed. Rendering animation never changes simulation results.
 
 The UI uses React, TypeScript, Vite, Canvas, Lucide icons, and self-hosted Alegreya fonts. No map imagery or remote fonts are fetched at runtime. Third-party packages retain their own licenses.

@@ -1,5 +1,5 @@
 import { settlementComponents, settledResidentsByCell } from './settlement-morphology'
-import { optimizeResidentialLocations } from './settlement-access'
+import { optimizeResidentialLocations, settlementAccess } from './settlement-access'
 import { clamp, population, type World } from './types'
 import { neighbors } from './grid'
 import { landscapeAt } from './landscape'
@@ -13,26 +13,13 @@ import { cellPolygon, polygonArea } from './physical-space'
 import { SETTLEMENT, isVisibleSettlement, settlementKind } from './settlement-model'
 
 /** Built land changes slowly. Population growth alone does not instantly pave a cell. */
-export function evolveCities(w: World, initialize = false) {
+export function advanceSettlements(
+  w: World,
+  initialize = false,
+  access?: ReturnType<typeof settlementAccess>,
+) {
   const local = w.localEconomy
   if (!local) return
-  if (initialize && !local.cities.length)
-    for (const site of w.spatial?.settlements ?? []) {
-      if (!isVisibleSettlement(site.population)) continue
-      local.cities.push({
-        id: local.nextCity++,
-        name: site.name,
-        aliases: [],
-        founded: w.month,
-        nucleus: site.cell,
-        cells: [site.cell],
-        population: site.population,
-        kind: settlementKind(site.population),
-        parents: [],
-        lastNameChange: w.month,
-      })
-      local.built[site.cell] = Math.max(local.built[site.cell] ?? 0, 0.25)
-    }
   const residents = new Float64Array(w.cells.length),
     jobs = new Float64Array(w.cells.length)
   for (const f of w.economy?.firms ?? [])
@@ -43,7 +30,7 @@ export function evolveCities(w: World, initialize = false) {
         f.employment * (f.laborMix ? f.laborMix.tools + f.laborMix.textiles + f.laborMix.arms : 0.2)
     }
   for (const id of local.active) updateResidentCounts(local.units[id])
-  if (w.adaptive && !initialize) optimizeResidentialLocations(w)
+  if (w.adaptive && !initialize) optimizeResidentialLocations(w, access)
   for (const id of local.active) {
     const u = local.units[id]
     for (const c of u.cells) residents[c] = u.residents[c] ?? 0
@@ -79,29 +66,46 @@ export function evolveCities(w: World, initialize = false) {
         const stock = local.reserves[c].timber
         local.reserves[c].timber = stock + Math.max(0, capacity - stock) * 0.002
       }
-  const oldBuilt = { ...local.built }
+  if (!initialize && !w.adaptive) {
+    const oldBuilt = { ...local.built }
+    for (const id of local.active)
+      for (const c of local.units[id].cells) {
+        const habitat = landscapeAt(w.cells[c]).habitat
+        const adjacent = neighbors(c, w.width, w.height).filter((n) => w.cells[n].terrain !== 'water')
+        const spread = adjacent.reduce((sum, n) => sum + (oldBuilt[n] ?? 0), 0) / Math.max(1, adjacent.length)
+        const demand = clamp((residents[c] + jobs[c] * 2) / MODEL_PARAMETERS.fullBuiltPopulationPerCell)
+        const target =
+          habitat < 0.06 ? demand * 0.1 : clamp(demand + spread * 0.15 * Math.min(1, residents[c] / 1000))
+        if (!initialize && !w.adaptive)
+          local.built[c] = clamp(oldBuilt[c] + clamp(target - oldBuilt[c], -0.003, 0.006))
+      }
+  }
+  const settled = settledResidentsByCell(w)
+  for (const id of local.active) {
+    const u = local.units[id]
+    const urban = u.cells.reduce((sum, c) => sum + (settled.get(c) ?? 0), 0)
+    u.urban = population(u) ? urban / population(u) : 0
+    for (const g of u.communities ?? []) g.urban = u.urban
+  }
+}
+
+/** Observer projection only: names and ancestry never determine physical activity. */
+export function refreshCityLabels(w: World) {
+  const local = w.localEconomy
+  if (!local) return
+  const residents = new Float64Array(w.cells.length)
   for (const id of local.active)
-    for (const c of local.units[id].cells) {
-      const habitat = landscapeAt(w.cells[c]).habitat
-      const adjacent = neighbors(c, w.width, w.height).filter((n) => w.cells[n].terrain !== 'water')
-      const spread = adjacent.reduce((sum, n) => sum + (oldBuilt[n] ?? 0), 0) / Math.max(1, adjacent.length)
-      const demand = clamp((residents[c] + jobs[c] * 2) / MODEL_PARAMETERS.fullBuiltPopulationPerCell)
-      const target =
-        habitat < 0.06 ? demand * 0.1 : clamp(demand + spread * 0.15 * Math.min(1, residents[c] / 1000))
-      if (!initialize && !w.adaptive)
-        local.built[c] = clamp(oldBuilt[c] + clamp(target - oldBuilt[c], -0.003, 0.006))
-    }
+    for (const c of local.units[id].cells) residents[c] = local.units[id].residents[c] ?? 0
   const physical = w.adaptive?.residentialVersion === 1 ? settlementComponents(w) : undefined
   let components: number[][]
   if (physical) components = physical.map((p) => p.cells)
   else {
-    const former = new Set(local.cities.filter((c) => c.absorbedBy === undefined).flatMap((c) => c.cells))
     const remaining = new Set(
       local.active
         .flatMap((id) => local.units[id].cells)
         .filter(
           (c) =>
-            (local.built[c] ?? 0) >= (former.has(c) ? 0.12 : 0.24) &&
+            (local.built[c] ?? 0) >= 0.24 &&
             residents[c] / (polygonArea(cellPolygon(w, c)) / 1e6) >= SETTLEMENT.minimumDensity,
         ),
     )
@@ -145,10 +149,19 @@ export function evolveCities(w: World, initialize = false) {
     const largest = [...overlap].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]
     if (largest) home.set(city.id, largest[0])
   }
+  const byComponent = new Map<number, City[]>()
+  for (const city of active) {
+    const part = home.get(city.id)
+    if (part === undefined) continue
+    const members = byComponent.get(part) ?? []
+    members.push(city)
+    byComponent.set(part, members)
+  }
+  const usedNames = new Set(local.cities.map((c) => c.name))
   for (const [part, cells] of components.entries()) {
-    const overlaps = active
-      .filter((c) => !claimed.has(c.id) && home.get(c.id) === part)
-      .sort((a, b) => a.founded - b.founded || b.population - a.population || a.id - b.id)
+    const overlaps = (byComponent.get(part) ?? []).sort(
+      (a, b) => a.founded - b.founded || b.population - a.population || a.id - b.id,
+    )
     let city = overlaps[0]
     if (!city) {
       const nucleus =
@@ -159,7 +172,8 @@ export function evolveCities(w: World, initialize = false) {
       ]
       const base = region.name
       let name = `${base} ${suffix}`
-      if (local.cities.some((c) => c.name === name)) name += ` ${local.nextCity + 1}`
+      if (usedNames.has(name)) name += ` ${local.nextCity + 1}`
+      usedNames.add(name)
       city = {
         id: local.nextCity++,
         name,
@@ -210,12 +224,8 @@ export function evolveCities(w: World, initialize = false) {
   const cityAt = new Map<number, City>()
   for (const city of local.cities)
     if (city.absorbedBy === undefined) for (const c of city.cells) cityAt.set(c, city)
-  const settled = settledResidentsByCell(w)
   for (const id of local.active) {
     const u = local.units[id]
-    const urban = u.cells.reduce((sum, c) => sum + (settled.get(c) ?? 0), 0)
-    u.urban = population(u) ? urban / population(u) : 0
-    for (const g of u.communities ?? []) g.urban = u.urban
     const city = cityAt.get(u.center)
     const suffix =
       u.activity === 'mining'
@@ -229,4 +239,10 @@ export function evolveCities(w: World, initialize = false) {
               : 'district'
     u.name = city?.name ?? `${w.regions[u.province].name} ${suffix}`
   }
+}
+
+/** Compatibility entry point for fixtures and legacy initialization. */
+export function evolveCities(w: World, initialize = false) {
+  advanceSettlements(w, initialize)
+  refreshCityLabels(w)
 }

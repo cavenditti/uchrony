@@ -7,7 +7,8 @@ import { MODEL_PARAMETERS } from './model-parameters'
 import { realService, nationalRealService } from './public-services'
 import { economicRegions, provinceId } from './local-units'
 import { ensureDistrictEconomy, linkDistrictPeople, aggregateDistricts, refreshEndowment } from './districts'
-import { evolveCities } from './cities'
+import { evolveCities, advanceSettlements, refreshCityLabels } from './cities'
+import { settlementAccess } from './settlement-access'
 import { refreshSpatial } from './spatial'
 import { inventoryFlow, marketStore, recordUse, reconcileGDP } from './national-accounts'
 import { beginEconomyMonth, fundGovernment, finishEconomyMonth } from './macroeconomy'
@@ -220,7 +221,7 @@ function demographics(w: World) {
       0.08,
       1.5,
     )
-    r.urban = clamp(r.urban + (r.industry * 0.5 - r.urban) * 0.001, 0.03, 0.92)
+    if (!w.adaptive) r.urban = clamp(r.urban + (r.industry * 0.5 - r.urban) * 0.001, 0.03, 0.92)
     r.devastation = clamp(r.devastation - 0.008)
     if (r.foodCoverage < 0.75 && w.month % 6 === r.id % 6 && pop > 1000)
       event(
@@ -558,12 +559,16 @@ export function tick(w: World): World {
   reconcileJurisdictionSovereignty(w)
   reviewAdministration(w)
   syncResidentialPopulation(w)
-  advanceLandUse(w)
+  syncSites(w)
+  refreshAdaptiveTotals(w)
+  const access = settlementAccess(w)
+  advanceLandUse(w, access)
   refreshAdaptiveTotals(w)
   finishEconomyMonth(w)
   if (w.adaptive?.transit)
     w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
-  evolveCities(w)
+  advanceSettlements(w, false, access)
+  refreshCityLabels(w)
   aggregateDistricts(w)
   syncSites(w)
   if (w.month % 6 === 0) rebuildAdaptiveMesh(w)

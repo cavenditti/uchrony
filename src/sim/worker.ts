@@ -1,3 +1,5 @@
+import { browserInfluencePool } from './influence-runtime'
+import { setInfluenceExecutor } from './settlement-influence'
 import { inspectWorld } from './inspection'
 import { OFF_POLICY, samePermission, type LlmPolicySnapshot } from './llm-policy'
 import { SnapshotMailbox } from './snapshot-mailbox'
@@ -65,6 +67,9 @@ let agentError = ''
 let mapKey = ''
 let geographyPublished = false
 const send = (message: WorkerResponse) => self.postMessage(message)
+const spatialPool = browserInfluencePool()
+const spatialReady = spatialPool?.warmup() ?? Promise.resolve()
+if (spatialPool) setInfluenceExecutor((input) => spatialPool.solve(input))
 const status = (state: StorytellerStatus['state'], message: string) =>
   send({ type: 'storyteller', status: { state, message, model: models.model } })
 function agentStatus() {
@@ -89,6 +94,7 @@ function agentStatus() {
 // Observer subscription never enters the canonical world or its random stream.
 let detailNation: number | null = null
 let revision = 0
+let playbackIntent = 0
 const backends = [diskBackend(), browserBackend()]
 const byteStorage = new ByteStorageClient()
 const storage = new WorldStorage([byteStorage.backend('disk'), byteStorage.backend('browser')], (status) =>
@@ -193,6 +199,7 @@ function reset() {
   geographyPublished = false
   mailbox.reset()
   storage.reset()
+  playbackIntent++
   playback.stop()
   for (const job of jobs.values()) job.controller.abort()
   jobs.clear()
@@ -550,8 +557,12 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     }
     const action = data
     if (action.type === 'playback') {
-      if (world && action.running) playback.start(action.speed)
-      else {
+      const intent = ++playbackIntent
+      if (world && action.running) {
+        await spatialReady
+        if (intent !== playbackIntent) return
+        playback.start(action.speed)
+      } else {
         playback.stop()
         publish()
       }
@@ -587,6 +598,9 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       message = 'World restored. Simulation is paused.'
       void connection().then(schedule)
     } else if (action.type === 'step') {
+      const target = world
+      await spatialReady
+      if (world !== target) return
       if (!world) throw new Error('Generate a world first.')
       for (let i = 0; i < Math.min(120, Math.max(1, Math.floor(action.count))); i++) tick(world)
     } else if (action.type === 'command') {

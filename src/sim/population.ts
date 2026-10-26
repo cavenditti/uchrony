@@ -460,11 +460,9 @@ export function updateCommunityDemography(world: World, region: Region) {
           Math.log(21),
       )
     }
-    group.urban = clamp(
-      group.urban + (clamp(region.industry * 0.5, 0.03, 0.92) - group.urban) * 0.001,
-      0.01,
-      0.98,
-    )
+    group.urban = world.adaptive
+      ? region.urban
+      : clamp(group.urban + (clamp(region.industry * 0.5, 0.03, 0.92) - group.urban) * 0.001, 0.01, 0.98)
     const movement = world.demography!.identities[group.movement],
       dissatisfaction =
         movement.orientation === 'reform' && nation.policies.citizenship === 'heritage'

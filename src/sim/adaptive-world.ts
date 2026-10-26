@@ -246,6 +246,7 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
     const rivers = pieces.some((p) => w.cells[p.cell].river)
     const indicator =
       (residents / 12000 + work / 2500 + movingActivity) * Math.min(1, (bounds.size / 1000) ** 2) +
+      members.length / 64 +
       terrainError +
       variation * 2 +
       (rivers && bounds.size > 4000 ? 1 : 0)

@@ -20,7 +20,7 @@ const cells = Array.from({ length: width * height }, (_, id) => ({
   region: 0,
 }))
 const ids = [815, 817, 819],
-  capacities = [1200, 18000, 1600],
+  capacities = [1200, 180000, 1600],
   activities = ['agricultural', 'urban', 'industrial']
 const sites = Object.fromEntries(
   ids.map((id, i) => {
@@ -88,7 +88,7 @@ function render() {
     w = canvas.clientWidth,
     h = canvas.clientHeight,
     aspect = w / h,
-    span = aspect < 1 ? 72 : 72
+    span = aspect < 1 ? 72 : 60
   renderer.setSize(w, h, false)
   camera.left = -span / 2
   camera.right = span / 2
@@ -115,7 +115,7 @@ window.addEventListener('resize', render)
 document.querySelector('output')!.textContent = settlementPlaces(world)
   .map((s) => {
     const layout = cityLayout(world, describeCity(world, s))
-    return `${s.form!.district}: ${s.capacity} housing places; ${layout.buildings.length} drawn buildings; tallest ${Math.max(...layout.buildings.map((b) => b.storeys ?? 1)).toFixed(1)} represented floors`
+    return `${s.form!.district}: ${s.capacity} housing places; ${layout.buildings.length} drawn buildings; tallest ${Math.max(...layout.buildings.map((b) => b.storeys ?? 1)).toFixed(1)} visible floors`
   })
   .join('\n')
 render()
