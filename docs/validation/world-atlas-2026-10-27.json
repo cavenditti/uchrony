@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-27",
+  "scope": "Persistent world atlas and task-specific model assignments",
+  "build": {
+    "command": "npm run build",
+    "result": "passed",
+    "note": "Existing large-chunk advisory remains."
+  },
+  "focusedTests": {
+    "command": "node --import tsx --test --test-concurrency=2 tests/almanac.test.ts tests/model-assignments.test.ts tests/llm-policy.test.ts tests/history-targets.test.ts tests/history-variety.test.ts tests/narrative.test.ts tests/view-storage.test.ts tests/playback.test.ts",
+    "passed": 41,
+    "failed": 0,
+    "note": "Shared working-tree run, including a separate pending save-recovery regression."
+  },
+  "simulationSmoke": {
+    "scenario": "Regional frontier world; advance twelve months, validate archive each month, compare archive after save and restore",
+    "months": 12,
+    "entries": 352,
+    "facts": 409,
+    "archiveBytes": 280453,
+    "result": "passed",
+    "note": "Shared working-tree functional smoke check with pending frontier simulation work; not a long-run performance qualification. Final UI-only corrections followed this check."
+  },
+  "browser": {
+    "fixture": "tests/browser/almanac.html",
+    "viewports": [
+      "1440x1000",
+      "390x844"
+    ],
+    "checks": [
+      "Production worker queries populate the atlas and linked dossiers",
+      "Mock-provider account is accepted with source links",
+      "Task model and throughput priority persist in the isolated model service",
+      "Controls disable during a delayed assignment save",
+      "Mobile back navigation restores search focus",
+      "Historian question field has shared typography and visible focus",
+      "Atlas and assignment controls fit the phone viewport"
+    ],
+    "note": "The fixture-only test control header can overflow at phone width. No live providers or user worlds were used."
+  },
+  "limitations": [
+    "The unrestricted full test run was interrupted for resource contention; only the named focused suite is qualified.",
+    "Real model prose quality, pricing and speed were not benchmarked.",
+    "Recorded evidence persists; events discarded before an old save gained an atlas cannot be reconstructed.",
+    "Geographic classifications are heuristic. Narrative traditions do not introduce new simulation mechanics."
+  ],
+  "isolatedCommit": {
+    "build": "passed",
+    "focusedTests": {
+      "passed": 40,
+      "failed": 0
+    },
+    "note": "Only atlas/model-assignment changes applied to HEAD; unrelated simulation, map and save-recovery edits excluded. The browser fixture uses the existing settled generator so it does not depend on pending frontier work."
+  }
+}

@@ -1,3 +1,7 @@
+import { join } from 'node:path'
+import { ModelService } from './model-settings'
+import { MODEL_TASKS, isWritingTask, type ModelTask } from '../src/sim/model-tasks'
+import { writingPrompt, writingSchema } from './world-writing'
 import { globalLlmPolicy, type LlmPolicy } from './llm-policy'
 import { narrativeProjection } from '../src/sim/narrative'
 import { HISTORY_PATTERNS_SCHEMA } from '../src/sim/history-repertoire'
@@ -41,6 +45,9 @@ export function storytellerMiddleware(
   mode = 'development',
   policy: LlmPolicy = globalLlmPolicy,
   provider: typeof fetch = fetch,
+  service = new ModelService(
+    mode === 'test' ? undefined : join(process.cwd(), '.uchrony', 'model-settings.json'),
+  ),
 ) {
   let active = 0
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
@@ -50,11 +57,27 @@ export function storytellerMiddleware(
       return
     }
     const env = loadEnv(mode, process.cwd(), ''),
-      key = env.OPENROUTER_API_KEY?.trim(),
-      historyModel = env.OPENROUTER_MODEL?.trim() || DEFAULT_HISTORY_MODEL,
-      decisionModel = env.OPENROUTER_DECISION_MODEL?.trim() || 'mistralai/ministral-8b-2512',
-      strategyModel = env.OPENROUTER_STRATEGY_MODEL?.trim() || historyModel,
-      refereeModel = env.OPENROUTER_REFEREE_MODEL?.trim() || strategyModel
+      key = env.OPENROUTER_API_KEY?.trim()
+    await service.initialize(env)
+    if (path === '/api/history/models') {
+      try {
+        if (
+          (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) ||
+          req.headers['sec-fetch-site'] === 'cross-site'
+        ) {
+          reply(res, 403, { error: 'Use the simulation origin.' })
+          return
+        }
+        if (req.method === 'GET') {
+          await service.refreshCatalog()
+          reply(res, 200, service.snapshot())
+        } else if (req.method === 'POST') reply(res, 200, await service.update(await readBody(req)))
+        else reply(res, 405, { error: 'Use GET or POST.' })
+      } catch (error) {
+        reply(res, 400, { error: error instanceof Error ? error.message : 'Invalid model assignments.' })
+      }
+      return
+    }
     if (path === '/api/history/policy' || path === '/api/history/policy-events') {
       try {
         if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) {
@@ -68,9 +91,13 @@ export function storytellerMiddleware(
             Connection: 'keep-alive',
           })
           const unsubscribe = policy.subscribe((value) => res.write(`data: ${JSON.stringify(value)}\n\n`))
+          const unsubscribeModels = service.subscribe((settings) =>
+            res.write(`event: models\ndata: ${JSON.stringify(settings)}\n\n`),
+          )
           const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000)
           res.on('close', () => {
             unsubscribe()
+            unsubscribeModels()
             clearInterval(heartbeat)
           })
         } else if (req.method === 'GET') reply(res, 200, policy.snapshot())
@@ -88,16 +115,19 @@ export function storytellerMiddleware(
     if (path.endsWith('/status') && req.method === 'GET') {
       reply(res, 200, {
         configured: !!key,
-        model: historyModel,
-        decisionModel,
-        strategyModel,
-        refereeModel,
+        model: service.assignment('history').model,
+        decisionModel: service.assignment('decision').model,
+        strategyModel: service.assignment('strategy').model,
+        refereeModel: service.assignment('referee').model,
+        writing: service.snapshot().settings,
         policy: policy.snapshot(),
       })
       return
     }
-    const role =
-      path === '/api/history/generate'
+    const writingTask = path.startsWith('/api/history/write/') ? path.slice('/api/history/write/'.length) : ''
+    const role: ModelTask | null = isWritingTask(writingTask)
+      ? writingTask
+      : path === '/api/history/generate'
         ? 'history'
         : path === '/api/history/details'
           ? 'details'
@@ -162,24 +192,20 @@ export function storytellerMiddleware(
         reply(res, 400, { error: 'Missing simulation context.' })
         return
       }
-      const model =
-          role === 'decision'
-            ? decisionModel
-            : role === 'strategy'
-              ? strategyModel
-              : role === 'referee'
-                ? refereeModel
-                : historyModel,
-        system =
-          role === 'history'
+      const assignment = service.assignment(role),
+        model = assignment.model,
+        system = isWritingTask(role)
+          ? writingPrompt(role)
+          : role === 'history'
             ? SYSTEM_PROMPT + (context.repertoireVersion === 1 ? '\n' + REPERTOIRE_PROMPT : '')
             : role === 'details'
               ? DETAILS_PROMPT
               : role === 'referee'
                 ? REFEREE_PROMPT
                 : STATE_PROMPT,
-        schema =
-          role === 'history'
+        schema = isWritingTask(role)
+          ? writingSchema(role)
+          : role === 'history'
             ? context.repertoireVersion === 1
               ? {
                   type: 'object',
@@ -215,18 +241,34 @@ export function storytellerMiddleware(
             }),
           },
         ],
-        budget =
-          role === 'decision'
-            ? 1600
-            : role === 'details'
-              ? 800
-              : role === 'history'
-                ? 4000
-                : role === 'referee'
-                  ? 6500
-                  : 5000
+        budget = MODEL_TASKS[role].tokens
+      const known = service.models.find((m) => m.id === model)
+      if (known && !known.json && !known.structured)
+        throw new Error('The assigned model does not support JSON responses.')
+      if (known?.context && Buffer.byteLength(JSON.stringify(messages)) + budget > known.context)
+        throw new Error(
+          'This context exceeds the selected model’s conservative input allowance. Choose a larger context model.',
+        )
+      const perform: typeof provider = async (url, init) => {
+        service.reserve()
+        const started = Date.now()
+        try {
+          const response = await provider(url, init)
+          const body = response.ok
+            ? await response
+                .clone()
+                .json()
+                .catch(() => undefined)
+            : undefined
+          service.measure(model, Date.now() - started, body)
+          return response
+        } catch (error) {
+          service.measure(model, Date.now() - started)
+          throw error
+        }
+      }
       let response = await policy.dispatch(policyGeneration, controller, () =>
-        provider('https://openrouter.ai/api/v1/chat/completions', {
+        perform('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           signal: controller.signal,
           headers: {
@@ -236,6 +278,7 @@ export function storytellerMiddleware(
           },
           body: JSON.stringify({
             model,
+            provider: { sort: assignment.preference },
             temperature: role === 'referee' ? 0.25 : 0.65,
             max_tokens: budget,
             reasoning: { enabled: false },
@@ -251,12 +294,14 @@ export function storytellerMiddleware(
         const diagnostic = await response.text()
         if (response.status === 400 && /schema|response_format|structured/i.test(diagnostic))
           response = await policy.dispatch(policyGeneration, controller, () =>
-            provider('https://openrouter.ai/api/v1/chat/completions', {
+            perform('https://openrouter.ai/api/v1/chat/completions', {
               method: 'POST',
               signal: controller.signal,
               headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 model,
+                provider: { sort: assignment.preference },
+                reasoning: { enabled: false },
                 max_tokens: budget,
                 messages: [
                   ...messages,

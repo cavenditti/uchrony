@@ -242,6 +242,8 @@ export interface HistoryPoint {
   nations: { id: number; population: number; gdp: number; territory: number; treasury: number }[]
 }
 export interface World {
+  almanac?: import('./almanac-types').Almanac
+  viewPlaces?: import('./almanac-types').PlaceLabel[]
   adaptive?: import('./adaptive-types').AdaptiveWorld
   modelProvenance?: import('./llm-policy').ModelProvenance
   localEconomy?: import('./district-types').DistrictEconomy
@@ -363,6 +365,9 @@ export type Command =
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }
 export type WorkerRequest =
+  | { type: 'places'; query: import('./almanac-types').PlaceQuery }
+  | { type: 'world-writing'; request: import('./almanac-types').WritingRequest }
+  | { type: 'models-changed' }
   | { type: 'view-focus'; nation: number | null }
   | { type: 'inspect'; request: import('./inspection').InspectionRequest }
   | { type: 'llm-policy'; enabled: boolean }
@@ -391,6 +396,8 @@ export type WorkerRequest =
   | { type: 'agent-strategy'; nation: number }
   | { type: 'event-details'; event: number }
 export type WorkerResponse =
+  | { type: 'places'; result: import('./almanac-types').PlaceResult }
+  | { type: 'world-writing'; id: string; state: 'loading' | 'done' | 'error'; message?: string }
   | { type: 'inspection'; snapshot: import('./inspection').InspectionSnapshot }
   | { type: 'inspection-error'; request: number; message: string }
   | { type: 'llm-policy'; policy: import('./llm-policy').LlmPolicySnapshot }

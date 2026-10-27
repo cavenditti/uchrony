@@ -49,7 +49,7 @@ export function cellAt(x: number, y: number, width: number, height: number): num
 
 /** Physical movement may be diagonal, but cannot squeeze between two blocked
  * corners or embark/disembark across a point contact. Ports use shared faces. */
-export function movementNeighbors(
+export function geographicNeighbors(
   cells: readonly { terrain: string }[],
   id: number,
   width: number,
@@ -74,3 +74,6 @@ export function movementNeighbors(
 
 export const stepDistance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.hypot(a.x - b.x, a.y - b.y) / CELL_SIZE
+
+/** Travel shares geographic adjacency until additional movement rules apply. */
+export const movementNeighbors = geographicNeighbors

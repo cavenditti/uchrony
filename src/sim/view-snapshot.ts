@@ -1,3 +1,4 @@
+import { placeLabels } from './almanac'
 import { urbanBlocks } from './urban-blocks'
 import { economicLandscape } from './economic-landscape'
 import { clamp, GOODS, type Inventory, type Army, type World } from './types'
@@ -148,6 +149,8 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
   return {
     ...rest,
     viewOnly: true,
+    almanac: undefined,
+    viewPlaces: placeLabels(world),
     viewLandscape: economicLandscape(world),
     ...(world.adaptive
       ? {

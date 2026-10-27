@@ -1,3 +1,6 @@
+import { advanceAlmanac, queryPlaces, writingContext, acceptWriting } from './almanac'
+import { defaultModelSettings, isWritingTask, type ModelTask } from './model-tasks'
+import type { WritingRequest } from './almanac-types'
 import { browserInfluencePool } from './influence-runtime'
 import { setInfluenceExecutor } from './settlement-influence'
 import { inspectWorld } from './inspection'
@@ -34,7 +37,7 @@ import type { World, WorkerRequest, WorkerResponse } from './types'
 import type { StorytellerStatus } from './history-types'
 import type { AgentServiceStatus } from './statecraft-types'
 
-type Role = 'history' | 'details' | 'decision' | 'strategy' | 'referee'
+type Role = ModelTask
 interface Job {
   key: string
   role: Role
@@ -54,6 +57,9 @@ let models = {
   strategyModel: 'deepseek/deepseek-v4.1-flash',
   refereeModel: 'deepseek/deepseek-v4.1-flash',
 }
+let writingSettings = defaultModelSettings()
+let nextWritingAt = 0
+const writingQueue = new Map<string, WritingRequest>()
 const detailQueue = new Map<number, World>()
 const jobs = new Map<string, Job>(),
   retryAt = new Map<string, number>(),
@@ -133,7 +139,9 @@ function applyLlmPolicy(policy: LlmPolicySnapshot, publishPolicy = true) {
     for (const job of jobs.values()) job.controller.abort()
     for (const id of detailQueue.keys())
       send({ type: 'event-detail', event: id, state: 'error', message: 'LLM assistance is off.' })
-    for (const job of jobs.values())
+    for (const job of jobs.values()) {
+      if (isWritingTask(job.role))
+        send({ type: 'world-writing', id: job.key, state: 'error', message: 'Model permission changed.' })
       if (job.role === 'details')
         send({
           type: 'event-detail',
@@ -141,8 +149,12 @@ function applyLlmPolicy(policy: LlmPolicySnapshot, publishPolicy = true) {
           state: 'error',
           message: 'Model permission changed.',
         })
+    }
     jobs.clear()
     detailQueue.clear()
+    for (const request of writingQueue.values())
+      send({ type: 'world-writing', id: request.id, state: 'error', message: 'Model permission changed.' })
+    writingQueue.clear()
     retryAt.clear()
     agentError = ''
     agentStatus()
@@ -156,6 +168,17 @@ policyEvents.onmessage = (event) => {
   applyLlmPolicy(JSON.parse(event.data))
   if (llmPolicy.enabled) void connection().then(schedule)
 }
+policyEvents.addEventListener('models', (event) => {
+  writingSettings = JSON.parse((event as MessageEvent).data)
+  models = {
+    model: writingSettings.assignments.history.model,
+    decisionModel: writingSettings.assignments.decision.model,
+    strategyModel: writingSettings.assignments.strategy.model,
+    refereeModel: writingSettings.assignments.referee.model,
+  }
+  nextWritingAt = Date.now() + writingSettings.backgroundInterval * 1000
+  agentStatus()
+})
 policyEvents.onerror = () => {
   // Fail closed when this worker can no longer observe the global switch.
   applyLlmPolicy({ ...llmPolicy, enabled: false })
@@ -167,6 +190,7 @@ async function connection() {
       throw new Error('The model service is unavailable. Local simulation and events are continuing.')
     const config = await response.json()
     models = { ...models, ...config }
+    if (config.writing) writingSettings = config.writing
     connected = !!config.configured
     applyLlmPolicy(config.policy ?? { ...OFF_POLICY, generation: llmPolicy.generation })
     status(
@@ -204,6 +228,8 @@ function reset() {
   for (const job of jobs.values()) job.controller.abort()
   jobs.clear()
   detailQueue.clear()
+  writingQueue.clear()
+  nextWritingAt = 0
   decisionSignals.clear()
   lastLaunch.clear()
   nextBackgroundAt = 0
@@ -247,8 +273,9 @@ async function launch(
   if (role === 'history') lastHistoryMonth = world.month
   agentStatus()
   if (role === 'history') status('generating', 'A historical account is being developed in the background.')
-  const endpoint =
-    role === 'history'
+  const endpoint = isWritingTask(role)
+    ? `/api/history/write/${role}`
+    : role === 'history'
       ? '/api/history/generate'
       : role === 'details'
         ? '/api/history/details'
@@ -285,6 +312,7 @@ async function launch(
         return
       try {
         accept(result.proposal, result.model)
+        if (!isWritingTask(role)) advanceAlmanac(world, true)
         const provenance = (world.modelProvenance ??= {
           accepted: 0,
           lastMonth: world.month,
@@ -311,6 +339,7 @@ async function launch(
     )
     if (role === 'strategy') lastStrategy.set(nation, Date.now())
     if (role === 'history') status('ready', 'A historical draft is ready for a suitable moment.')
+    if (isWritingTask(role)) send({ type: 'world-writing', id: key, state: 'done' })
     if (role === 'details') send({ type: 'event-detail', event: Number(key.split(':')[1]), state: 'done' })
     // Coalesce completions; never serialize a multi-megabyte world once per agent reply.
     if (!backgroundPublish)
@@ -322,10 +351,11 @@ async function launch(
     if (job.controller.signal.aborted || world !== job.world) return
     const message = error instanceof Error ? error.message : 'Model request failed.'
     retryAt.set(key, Date.now() + 20000)
+    if (isWritingTask(role)) send({ type: 'world-writing', id: key, state: 'error', message })
     if (role === 'history') status('error', `${message} Local events are continuing.`)
     else if (role === 'details')
       send({ type: 'event-detail', event: Number(key.split(':')[1]), state: 'error', message })
-    else {
+    else if (!isWritingTask(role)) {
       agentError =
         role === 'referee'
           ? 'Diplomatic developments are delayed. Existing commitments remain in force.'
@@ -353,6 +383,28 @@ function schedule() {
       now - (lastLaunch.get(key) ?? -Infinity) >= interval &&
       now >= nextBackgroundAt,
     opportunity = world.historical?.opportunity
+  const requestedWriting = [...writingQueue.values()].find(
+    (r) => !jobs.has(r.id) && (retryAt.get(r.id) ?? 0) <= now,
+  )
+  if (requestedWriting && jobs.size < 4 && now >= nextBackgroundAt) {
+    writingQueue.delete(requestedWriting.id)
+    startWriting(current, requestedWriting)
+  }
+  if (writingSettings.backgroundWriting && now >= nextWritingAt && now >= nextBackgroundAt && jobs.size < 3) {
+    const pending = Object.values(current.almanac?.entries ?? {}).find(
+      (p) =>
+        p.naming === 'pending' &&
+        !jobs.has(`writing:culture:${p.id}`) &&
+        (retryAt.get(`writing:culture:${p.id}`) ?? 0) <= now &&
+        !jobs.has(`writing:naming:${p.id}`) &&
+        (retryAt.get(`writing:naming:${p.id}`) ?? 0) <= now,
+    )
+    if (pending) {
+      nextWritingAt = now + writingSettings.backgroundInterval * 1000
+      const task = current.almanac?.languages[pending.language] ? 'naming' : 'culture'
+      startWriting(current, { id: `writing:${task}:${pending.id}`, task, place: pending.id })
+    }
+  }
   if (opportunity && current.month >= lastHistoryMonth + 24 && eligible('history', 90000))
     void launch('history', 'history', -1, historicalContext(current), (value, model) => {
       receiveHistoricalEvent(current, opportunity.id, value, model)
@@ -478,8 +530,53 @@ function schedule() {
     )
   }
 }
+function startWriting(current: World, request: WritingRequest) {
+  const context = writingContext(current, request)
+  send({ type: 'world-writing', id: request.id, state: 'loading' })
+  void launch(request.task, request.id, -1, context, (value, model) =>
+    acceptWriting(current, context, value, model),
+  )
+}
 self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
   try {
+    if (data.type === 'places') {
+      if (world) send({ type: 'places', result: queryPlaces(world, data.query) })
+      return
+    }
+    if (data.type === 'models-changed') {
+      await connection()
+      nextWritingAt = 0
+      schedule()
+      return
+    }
+    if (data.type === 'world-writing') {
+      const r = data.request
+      if (!world || !llmPolicy.enabled || !connected) {
+        send({
+          type: 'world-writing',
+          id: r.id,
+          state: 'error',
+          message: 'Enable LLM assistance and connect a model to request an account.',
+        })
+        return
+      }
+      if (writingQueue.size >= 12) {
+        send({
+          type: 'world-writing',
+          id: r.id,
+          state: 'error',
+          message: 'The reading queue is full. Try again after an account finishes.',
+        })
+        return
+      }
+      if (!isWritingTask(r.task) || !world.almanac?.entries[r.place] || (r.question?.length ?? 0) > 500)
+        throw new Error('Invalid writing request.')
+      writingQueue.set(r.id, r)
+      retryAt.delete(r.id)
+      send({ type: 'world-writing', id: r.id, state: 'loading' })
+      schedule()
+      return
+    }
     if (data.type === 'view-focus') {
       detailNation = data.nation
       if (world) mailbox.publish()
@@ -580,6 +677,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         scale,
       )
       mapKey = geographyKey(world.cells)
+      advanceAlmanac(world, true)
       ensurePopulation(world)
       ensureHistory(world)
       ensureStatecraft(world)
@@ -590,6 +688,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       reset()
       world = restored
       mapKey = geographyKey(world.cells)
+      advanceAlmanac(world, true)
       ensureWarfare(world)
       ensurePopulation(world)
       ensureHistory(world)
@@ -607,6 +706,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       if (!world) throw new Error('Generate a world first.')
       message = applyCommand(world, action.command)
       summarize(world, false)
+      advanceAlmanac(world, true)
     } else if (action.type === 'retry-history') {
       retryAt.clear()
       lastLaunch.clear()
@@ -661,7 +761,15 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     send({
       type: 'error',
       message: error instanceof Error ? error.message : 'The action could not complete.',
-      recoverable: ['advise', 'withdraw-advice', 'agent-strategy', 'llm-policy'].includes(data.type),
+      recoverable: [
+        'advise',
+        'withdraw-advice',
+        'agent-strategy',
+        'llm-policy',
+        'places',
+        'world-writing',
+        'models-changed',
+      ].includes(data.type),
     })
   }
 }

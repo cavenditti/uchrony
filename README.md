@@ -146,3 +146,9 @@ The **About & mathematics** popup under the World menu presents the complete mod
 
 
 Resident districts now run local populations, household accounts, firms, resource extraction and markets. Quadtree boundaries adapt to urban and industrial activity; conservative reorganization preserves people, inventories, deposits, loan claims and equipment. Paid transport connects local markets. Connected built-up footprints grow, shrink and merge, keeping earlier city names and ancestry. The province inspector exposes local market accounts and inventories, while About & mathematics documents the rules and limits. Provinces remain administrative jurisdictions; military operations still use their graph. Existing provincial worlds convert on their first monthly step. These mechanisms are synthetic and require calibration; see [the model](docs/MODEL.md) and [validation](docs/VALIDATION.md).
+
+### Named places and local memory
+
+**Places** opens a searchable atlas of named rivers, peaks, terrain features, settlements and public actors. Each dossier preserves earlier names, connections and dated local or provincial records beyond the recent chronicle. Optional descriptions, histories, reports, traditions and historian answers use saved evidence; imagined traditions are identified separately. Old saves retain their surviving records and gain an atlas when loaded.
+
+**World menu → Model assignments** selects models independently for twelve writing and simulation tasks. It shows advertised capabilities and prices, observed request performance, provider speed/price preferences, background cadence and a shared session call limit. Assignments are saved locally and never enable model permission by themselves. See [the atlas and model-assignment contract](docs/WORLD_ATLAS.md) for persistence, source distinctions, limitations and validation.

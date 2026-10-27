@@ -1,3 +1,4 @@
+import { recordWorldEvent } from './event-memory'
 import { marketStore, armyStore, fleetStore, recordGift, recordUse } from './national-accounts'
 import { publicExpense, publicGoods } from './ledger'
 import { clamp, population, relation, type Army, type World } from './types'
@@ -24,7 +25,7 @@ export const transportSeats = (f: Fleet) => Math.floor((f.transports * 800 + f.w
 export const cargoCapacity = (f: Fleet, passengers = 0) =>
   Math.max(0, (f.transports * 400 + f.warships * 25) * f.hull - passengers * 0.45)
 export function warEvent(w: World, title: string, detail: string, nation: number, region?: number) {
-  w.events.unshift({
+  recordWorldEvent(w, {
     id: w.nextEvent++,
     month: w.month,
     type: 'war',
@@ -33,7 +34,7 @@ export function warEvent(w: World, title: string, detail: string, nation: number
     nation,
     ...(region === undefined ? {} : { region }),
   })
-  w.events = w.events.slice(0, 240)
+
 }
 /** New formations start without supplies or an embarkation; their people are accounted separately. */
 export function initialArmyOperations(): ArmyOperations {

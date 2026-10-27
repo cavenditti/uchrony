@@ -1,3 +1,4 @@
+import { validateAlmanac } from './almanac-persistence'
 import { validateAdaptiveWorld } from './adaptive-persistence'
 import { unpackWorldSave } from './save-codec'
 import { validateDistrictEconomy } from './district-persistence'
@@ -478,6 +479,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   validateGeopolitics(w)
   validateSovereignty(w)
   validatePressures(w)
+  if (w.almanac !== undefined) validateAlmanac(w, w.almanac)
   if (w.historical !== undefined) validateHistoryState(w, w.historical)
   validateWarfare(w, validateLegs)
   validateStatecraft(w)

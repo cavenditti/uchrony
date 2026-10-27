@@ -384,5 +384,16 @@ export function drawPlaceLabels(
     }
     place(settlement.name, c.x, c.y + 12 / scale, capital || kind === 'city' ? 11 : 10, 'city')
   }
-  for (const label of cache.seaLabels) place(label.name, label.x, label.y, 13, 'sea')
+  if (scale >= 1.5) {
+    let count = 0
+    for (const label of world.viewPlaces ?? []) {
+      if (count >= 90) break
+      const c = world.cells[label.cell]
+      if (!c || (['peak', 'pass', 'valley'].includes(label.kind) && scale < 3)) continue
+      if (place(label.name, c.x, c.y, label.kind === 'sea' || label.kind === 'range' ? 12 : 10, 'sea'))
+        count++
+    }
+  }
+  if (!world.viewPlaces?.some((p) => p.kind === 'sea'))
+    for (const label of cache.seaLabels) place(label.name, label.x, label.y, 13, 'sea')
 }

@@ -1,3 +1,5 @@
+import { advanceAlmanac } from './almanac'
+import { recordWorldEvent } from './event-memory'
 import { buildTransport } from './public-works'
 import { ensureResidentialSites, syncResidentialPopulation } from './residential-sites'
 import { arriveFreight } from './freight-transit'
@@ -121,7 +123,7 @@ export function event(
   nation?: number,
   region?: number,
 ) {
-  w.events.unshift({
+  recordWorldEvent(w, {
     id: w.nextEvent++,
     month: w.month,
     type,
@@ -130,7 +132,7 @@ export function event(
     ...(nation !== undefined ? { nation } : {}),
     ...(region !== undefined ? { region } : {}),
   })
-  w.events = w.events.slice(0, 240)
+
 }
 
 function fiscalPolicy(w: World) {
@@ -576,6 +578,7 @@ export function tick(w: World): World {
   else refreshAdaptiveTotals(w)
   summarize(w)
   refreshSpatial(w)
+  advanceAlmanac(w)
   return w
 }
 

@@ -1,3 +1,4 @@
+import { recordWorldEvent } from './event-memory'
 import { linkDistrictPeople, aggregateDistricts } from './districts'
 import { publicTransfer, transferDebt } from './ledger'
 import { previousResearchOutput } from './public-services'
@@ -95,7 +96,7 @@ const alive = (world: World, id: number) =>
   !!world.nations[id] && world.regions.some((region) => region.nation === id)
 function log(world: World, title: string, detail: string, nation: number, visibility: Visibility = 'public') {
   if (visibility === 'secret') return
-  world.events.unshift({
+  recordWorldEvent(world, {
     id: world.nextEvent++,
     month: world.month,
     type: 'diplomacy',
@@ -103,7 +104,7 @@ function log(world: World, title: string, detail: string, nation: number, visibi
     detail,
     nation,
   })
-  world.events = world.events.slice(0, 240)
+
 }
 function sanction(world: World, nation: number, message: string, severity = 1) {
   const state = ensureStatecraft(world),

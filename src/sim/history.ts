@@ -1,3 +1,4 @@
+import { recordWorldEvent } from './event-memory'
 import { transfer, governmentAccount, householdAccount, producerAccount } from './ledger'
 import { simulationSettings } from './settings'
 import { parseHistoryPatterns } from './history-repertoire'
@@ -257,8 +258,8 @@ function record(
             ? 'economy'
             : 'world',
     id = world.nextEvent++
-  world.events.unshift({ id, month: world.month, type, title, detail, nation, region, historical })
-  world.events = world.events.slice(0, 240)
+  recordWorldEvent(world, { id, month: world.month, type, title, detail, nation, region, historical })
+
   installEffects(world, id, title, region, effectsToInstall, historical.source === 'openrouter')
   return id
 }
@@ -291,8 +292,8 @@ export function applyRefereeEffects(
 ) {
   const id = world.nextEvent++
   if (!secret) {
-    world.events.unshift({ id, month: world.month, type: 'diplomacy', title, detail, nation })
-    world.events = world.events.slice(0, 240)
+    recordWorldEvent(world, { id, month: world.month, type: 'diplomacy', title, detail, nation })
+
   }
   installEffects(
     world,

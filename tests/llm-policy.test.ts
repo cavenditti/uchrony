@@ -33,6 +33,9 @@ const endpoints = [
   'statecraft/decision',
   'statecraft/strategy',
   'statecraft/referee',
+  ...['naming', 'culture', 'description', 'biography', 'tradition', 'chronicle', 'historian'].map(
+    (role) => `history/write/${role}`,
+  ),
 ]
 
 test('production endpoints default off with credentials; manual roles cannot enable calls', async () => {

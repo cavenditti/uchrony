@@ -5114,3 +5114,78 @@ select option {
 .local-inspection select, .local-inspection input { width: 100%; min-width: 0; }
 .local-inspection-map { display: block; width: 100%; max-height: 230px; background: #172a2b; overflow: hidden; }
 .local-inspection ol { padding-left: 1.2rem; font-size: 0.85rem; line-height: 1.8; }
+
+/* Atlas records inherit the cabinet dossier, with a searchable index and a reading column. */
+.place-atlas { position: absolute; z-index: 24; inset: 16px 16px 82px auto; width: min(920px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; display: flex; flex-direction: column; overflow: hidden; }
+.place-atlas-heading { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.place-atlas-heading h2 { margin: 0; font: 500 25px/1.2 Alegreya, Georgia, serif; }
+.place-atlas-body { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 0; flex: 1; }
+.place-index { padding: 16px; border-right: 1px solid var(--line); overflow: auto; }
+.place-index .select-label { margin-bottom: 12px; }
+.place-index-rows { display: flex; flex-direction: column; }
+.place-index-rows button { display: flex; justify-content: space-between; gap: 12px; text-align: left; padding: 10px 8px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); }
+.place-index-rows button.selected, .place-index-rows button:hover { background: var(--selected-state, #31403f); }
+.place-index-rows button span { overflow-wrap: anywhere; }
+.place-index-rows small { color: var(--muted); flex-shrink: 0; }
+.place-pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+.place-dossier { overflow: auto; padding: 24px; min-width: 0; }
+.place-title { display: flex; gap: 16px; justify-content: space-between; align-items: start; }
+.place-title h3, .place-empty h3 { font: 500 30px/1.2 Alegreya, Georgia, serif; margin: 0; overflow-wrap: anywhere; }
+.place-subtitle { color: var(--muted); margin: 8px 0 20px; }
+.place-attributes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; margin-bottom: 24px; }
+.place-attributes div { min-width: 0; }
+.place-attributes dt { color: var(--muted); text-transform: capitalize; font-size: 11px; }
+.place-attributes dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.place-dossier h4 { font: 500 21px/1.2 Alegreya, Georgia, serif; margin: 28px 0 12px; }
+.place-dossier h5 { font: 500 19px/1.3 Alegreya, Georgia, serif; margin: 8px 0; }
+.place-dossier p { line-height: 1.6; max-width: 70ch; overflow-wrap: anywhere; }
+.place-dossier small, .place-fact time { color: var(--muted); font-size: 11px; }
+.place-dossier details { margin: 12px 0; }
+.place-dossier summary { cursor: pointer; color: var(--accent); }
+.place-name-history { padding-left: 18px; }
+.place-connections .text-button { display: flex; justify-content: space-between; gap: 20px; width: 100%; border-bottom: 1px solid var(--line); text-align: left; }
+.place-connections span { color: var(--muted); font-size: 11px; }
+.place-account, .place-fact { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.place-writing { padding: 20px 0; }
+.place-writing .select-label { margin-bottom: 12px; }
+.place-writing textarea { min-height: 82px; resize: vertical; }
+.place-back { display: none; }
+.assignments-dialog { width: min(980px, calc(100vw - 32px)); max-width: 980px; }
+.model-assignments { min-width: 0; }
+.model-assignments > p { max-width: 70ch; }
+.assignment-group { margin-top: 28px; }
+.assignment-group h3 { font: 500 23px/1.2 Alegreya, Georgia, serif; margin: 0 0 12px; }
+.assignment-row { display: grid; grid-template-columns: minmax(160px, .8fr) minmax(0, 1.2fr); gap: 24px; padding: 18px 0; border-top: 1px solid var(--line); }
+.assignment-row label { font-weight: 600; }
+.assignment-row p { margin: 6px 0; color: var(--muted); font-size: 12px; }
+.assignment-choice select { width: 100%; min-width: 0; }
+.assignment-preference { display: flex; align-items: center; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 11px; }
+.assignment-preference select { flex: 1; width: 50%; }
+.assignment-row .model-evidence { font-size: 11px; line-height: 1.5; }
+.writing-budget { margin: 24px 0; padding: 16px; border: 1px solid var(--line); }
+.writing-budget legend { font: 500 20px/1.2 Alegreya, Georgia, serif; padding: 0 8px; }
+.writing-budget .check-label { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.writing-budget input[type=checkbox] { width: auto; }
+.writing-budget p { color: var(--muted); font-size: 12px; }
+.assignment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 20px; }
+@media (max-width: 650px) {
+  .place-atlas { inset: 8px 8px 76px; width: auto; }
+  .place-atlas-body { display: block; overflow: auto; }
+  .place-index { border: 0; height: 100%; }
+  .place-dossier { display: none; padding: 18px; }
+  .has-place .place-index { display: none; }
+  .has-place .place-dossier { display: block; }
+  .place-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 18px; }
+  .place-title h3 { font-size: 27px; }
+  .assignment-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .assignments-dialog { padding: 24px 18px; }
+  .writing-budget .form-columns { display: block; }
+  .writing-budget .select-label { margin-bottom: 12px; }
+  .assignment-actions .button { width: 100%; }
+}
+.fixture-models { max-width: 960px; margin: 0 auto; padding: 24px; height: 100%; overflow: auto; }
+
+.assignment-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.place-writing textarea { display: block; width: 100%; min-width: 0; padding: 9px 11px; font: inherit; line-height: 1.5; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; caret-color: var(--accent); }
+.place-writing textarea::placeholder { color: var(--muted); opacity: 1; }
+.place-writing textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

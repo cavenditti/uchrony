@@ -1,3 +1,4 @@
+import { advanceAlmanac } from './almanac'
 import { seedLandscape, settlementWeight } from './landscape'
 import { refreshSpatial } from './spatial'
 import { WORLD_SCALES, worldScale, type WorldScale } from './scale'
@@ -541,5 +542,6 @@ export function generateWorld(
   world.totals.population = world.nations.reduce((sum, n) => sum + n.population, 0)
   ensureIntelligence(world)
   refreshSpatial(world)
+  advanceAlmanac(world)
   return world
 }

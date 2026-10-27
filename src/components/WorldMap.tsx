@@ -44,7 +44,7 @@ interface Props {
   showRoutes: boolean
   showArmies: boolean
   running: boolean
-  focus: { region: number; key: number; nation?: number; settlement?: string } | null
+  focus: { region: number; key: number; nation?: number; settlement?: string; cell?: number } | null
   onInspectDaily?: (cell: number) => void
   onInspectArea?: (bounds: SpatialBounds) => void
   onInspectionViewport?: (bounds: SpatialBounds) => void
@@ -228,7 +228,7 @@ export function WorldMap({
     reset()
   }, [mapKey, reset])
   useEffect(() => {
-    if (!focus || !world.regions[focus.region]) return
+    if (!focus || (focus.cell === undefined && !world.regions[focus.region])) return
     if (focus.settlement) {
       const city = spatialState(world).settlements.find((s) => s.id === focus.settlement)
       if (city) {
@@ -236,7 +236,8 @@ export function WorldMap({
         return
       }
     }
-    const c = world.cells[world.regions[focus.region].center]
+    const c = world.cells[focus.cell ?? world.regions[focus.region].center]
+    if (!c) return
     // Focus within the map area left visible beside a dossier (or above its
     // mobile sheet), rather than hiding the selected place behind the panel.
     const narrow = size.w <= 760,

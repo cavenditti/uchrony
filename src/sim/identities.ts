@@ -1,3 +1,4 @@
+import { recordWorldEvent } from './event-memory'
 import { economicRegions } from './local-units'
 import { random } from './random'
 import { allForces } from './forces'
@@ -26,7 +27,7 @@ function choose(state: { rng: number }, weights: Map<number, number>) {
   return weights.keys().next().value as number
 }
 function note(world: World, region: Region, title: string, detail: string) {
-  world.events.unshift({
+  recordWorldEvent(world, {
     id: world.nextEvent++,
     month: world.month,
     type: 'population',
@@ -35,7 +36,7 @@ function note(world: World, region: Region, title: string, detail: string) {
     nation: region.nation,
     region: region.id,
   })
-  world.events = world.events.slice(0, 240)
+
 }
 
 export function beginPopulationMonth(world: World) {

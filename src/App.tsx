@@ -1,3 +1,6 @@
+import { ModelAssignments } from './components/ModelAssignments'
+import { PlaceAtlas } from './components/PlaceAtlas'
+import type { PlaceQuery, PlaceResult } from './sim/almanac-types'
 import { LocalInspection } from './components/LocalInspection'
 import { inspectionAround, type InspectionSnapshot } from './sim/inspection'
 import { InspectionMailbox } from './inspection-mailbox'
@@ -69,6 +72,17 @@ const tabLayer: Partial<Record<Tab, Layer>> = {
 }
 
 export default function App() {
+  const [placesOpen, setPlacesOpen] = useState(false)
+  const [placeResult, setPlaceResult] = useState<PlaceResult | null>(null)
+  const [writingJobs, setWritingJobs] = useState<Record<string, { state: string; message?: string }>>({})
+  const [placeRefresh, setPlaceRefresh] = useState(0)
+  const placeSequence = useRef(0)
+  const queryAtlas = useCallback((query: Omit<PlaceQuery, 'id'>) => {
+    worker.current?.postMessage({
+      type: 'places',
+      query: { ...query, id: ++placeSequence.current },
+    } satisfies WorkerRequest)
+  }, [])
   const [inspection, setInspection] = useState<InspectionSnapshot | null>(null)
   const inspectionSequence = useRef(0)
   const inspectionMailbox = useRef<InspectionMailbox | null>(null)
@@ -91,7 +105,7 @@ export default function App() {
     [showArmies, setShowArmies] = useState(false)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null),
     [busy, setBusy] = useState(false)
-  const [modal, setModal] = useState<'new' | 'help' | 'model' | 'conditions' | null>(null),
+  const [modal, setModal] = useState<'new' | 'help' | 'model' | 'conditions' | 'assignments' | null>(null),
     [stateSearch, setStateSearch] = useState(''),
     [showStates, setShowStates] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false),
@@ -104,7 +118,9 @@ export default function App() {
   const [mapKey, setMapKey] = useState('')
   const [conditions, setConditions] = useState<SimulationSettings>({ ...DEFAULT_SETTINGS }),
     [newConditions, setNewConditions] = useState<SimulationSettings>({ ...DEFAULT_SETTINGS })
-  const [focus, setFocus] = useState<{ region: number; key: number; nation?: number } | null>(null),
+  const [focus, setFocus] = useState<{ region: number; key: number; nation?: number; cell?: number } | null>(
+      null,
+    ),
     [orderedArmy, setOrderedArmy] = useState<number | null>(null)
   const [savedAt, setSavedAt] = useState('Not saved yet'),
     [restoreWarning, setRestoreWarning] = useState<string | null>(null)
@@ -138,6 +154,10 @@ export default function App() {
   const send = useCallback((data: WorkerRequest) => {
     if (data.type === 'generate' || data.type === 'load' || data.type === 'import') {
       setPendingDetails([])
+      setPlacesOpen(false)
+      setPlaceResult(null)
+      placeSequence.current++
+      setWritingJobs({})
       setShowStates(false)
       setInspectorOpen(false)
       setOverviewOpen(false)
@@ -169,6 +189,15 @@ export default function App() {
     ensureSaveWorker.current = connectWriter
     connectWriter()
     instance.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+      if (data.type === 'places') {
+        if (data.result.request === placeSequence.current) setPlaceResult(data.result)
+        return
+      }
+      if (data.type === 'world-writing') {
+        setWritingJobs((jobs) => ({ ...jobs, [data.id]: { state: data.state, message: data.message } }))
+        if (data.state === 'done') setPlaceRefresh((n) => n + 1)
+        return
+      }
       if (data.type === 'startup-error') {
         setStartupError(data.message)
         return
@@ -348,7 +377,10 @@ export default function App() {
       if (modal) return
       if (e.key === 'Escape') {
         if (closeMenus()) return
-        if (orderedArmy !== null) setOrderedArmy(null)
+        if (placesOpen) {
+          setPlacesOpen(false)
+          document.querySelector<HTMLButtonElement>('[aria-label="Open places and histories"]')?.focus()
+        } else if (orderedArmy !== null) setOrderedArmy(null)
         else if (showStates) {
           setShowStates(false)
           stateToggle.current?.focus()
@@ -397,7 +429,7 @@ export default function App() {
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [modal, orderedArmy, showStates, overviewOpen, inspectorOpen])
+  }, [modal, orderedArmy, showStates, overviewOpen, inspectorOpen, placesOpen])
   useEffect(() => {
     if (showStates) searchInput.current?.focus()
   }, [showStates])
@@ -411,6 +443,7 @@ export default function App() {
   }, [])
   const chooseTab = (next: Tab) => {
     closeMenus()
+    setPlacesOpen(false)
     setInspectorOpen(true)
     setOverviewOpen(false)
     setShowStates(false)
@@ -531,6 +564,20 @@ export default function App() {
             <BookOpen size={16} />
             <span>Chronicle</span>
           </button>
+          <button
+            className={`header-link ${placesOpen ? 'active' : ''}`}
+            aria-label="Open places and histories"
+            aria-expanded={placesOpen}
+            onClick={() => {
+              setPlacesOpen((open) => !open)
+              setInspectorOpen(false)
+              setOverviewOpen(false)
+              setShowStates(false)
+            }}
+          >
+            <Compass size={16} />
+            <span>Places</span>
+          </button>
           <details className="header-popover" data-menu>
             <summary
               className={`header-link activity-trigger ${restoreWarning || storyteller.state === 'error' || agents.error ? 'has-warning' : ''}`}
@@ -633,6 +680,15 @@ export default function App() {
               <p>
                 This world: {world.modelProvenance?.source === 'native' ? 'native simulation' : world.modelProvenance?.source === 'model-assisted' ? `${world.modelProvenance.accepted} accepted model responses` : 'earlier model use unknown'}.
               </p>
+              <button
+                onClick={() => {
+                  closeMenus()
+                  setModal('assignments')
+                }}
+              >
+                <Settings2 size={16} />
+                Model assignments
+              </button>
               <hr />
               <button
                 onClick={() => {
@@ -1015,6 +1071,34 @@ export default function App() {
             </div>
           </details>
         </div>
+        {placesOpen && (
+          <PlaceAtlas
+            result={placeResult}
+            startYear={world.startYear}
+            currentMonth={world.month}
+            enabled={llmPolicy.enabled}
+            jobs={writingJobs}
+            refresh={placeRefresh}
+            onQuery={queryAtlas}
+            onWrite={(request) =>
+              worker.current?.postMessage({ type: 'world-writing', request } satisfies WorkerRequest)
+            }
+            onClose={() => {
+              setPlacesOpen(false)
+              requestAnimationFrame(() =>
+                document
+                  .querySelector<HTMLButtonElement>('[aria-label="Open places and histories"]')
+                  ?.focus(),
+              )
+            }}
+            onLocate={(cell) => {
+              const r = world.cells[cell]?.region
+              setFocus({ region: r ?? -1, cell, key: Date.now() })
+              setPlacesOpen(false)
+              requestAnimationFrame(() => document.querySelector<HTMLCanvasElement>('.world-canvas')?.focus())
+            }}
+          />
+        )}
       </main>
       {toast && (
         <div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'}>
@@ -1040,7 +1124,7 @@ export default function App() {
       <dialog
         ref={dialogRef}
         aria-labelledby="dialog-title"
-        className={`app-dialog ${modal === 'help' ? 'help-dialog' : modal === 'model' ? 'mathematics-dialog' : ''}`}
+        className={`app-dialog ${modal === 'help' ? 'help-dialog' : modal === 'model' ? 'mathematics-dialog' : modal === 'assignments' ? 'assignments-dialog' : ''}`}
         onCancel={() => setModal(null)}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -1065,7 +1149,11 @@ export default function App() {
             <X size={20} />
           </button>
         </div>
-        {modal === 'new' ? (
+        {modal === 'assignments' ? (
+          <ModelAssignments
+            onSaved={() => worker.current?.postMessage({ type: 'models-changed' } satisfies WorkerRequest)}
+          />
+        ) : modal === 'new' ? (
           <form
             onSubmit={(e) => {
               e.preventDefault()

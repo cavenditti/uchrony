@@ -1,3 +1,4 @@
+import { recordWorldEvent } from './event-memory'
 import { balance, balances, changeDeposit, ensureEconomy, governmentAccount } from './ledger'
 import { clamp, type World } from './types'
 import type { Bank, EconomicStratum, Loan } from './economic-types'
@@ -252,7 +253,7 @@ export function settleBanks(w: World) {
         const n = w.nations[Number(loan.borrower.split(':')[1])]
         n.legitimacy = clamp(n.legitimacy - 4, 0, 100)
         n.stability = clamp(n.stability - 3, 5, 99)
-        w.events.unshift({
+        recordWorldEvent(w, {
           id: w.nextEvent++,
           month: w.month,
           type: 'economy',
@@ -260,7 +261,7 @@ export function settleBanks(w: World) {
           title: `${n.shortName} restructures its debt`,
           detail: 'Unpaid interest triggers a matched borrower liability and bank asset write-down.',
         })
-        w.events = w.events.slice(0, 240)
+
       }
     }
   }
