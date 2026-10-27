@@ -1,4 +1,11 @@
-import { foreignIntelligence, perceivedPower, knownMap, domesticAuthority } from './intelligence'
+import {
+  foreignIntelligence,
+  perceivedPower,
+  knownMap,
+  domesticAuthority,
+  intelligenceService,
+} from './intelligence'
+import { frontierValue } from './territorial-expansion'
 import { hashSeed, random } from './random'
 import { clamp, type Nation, type World } from './types'
 import { simulationSettings } from './settings'
@@ -129,6 +136,27 @@ export function ensureAmbition(world: World, nation: Nation, align = false) {
   }
 }
 
+/** Strategic incentives use received reports, never hidden foreign accounts. */
+export function reportedExpansionInterests(world: World, nation: Nation, other: number) {
+  const report = intelligenceService(world, nation.id).dossiers.find((d) => d.nation === other)
+  const cultural =
+    (report?.politics?.culture !== undefined && report.politics.culture === nation.identity?.culture
+      ? 0.6
+      : 0) +
+    (report?.politics?.language !== undefined && report.politics.language === nation.identity?.language
+      ? 0.4
+      : 0)
+  const own = world.regions.filter((r) => r.nation === nation.id)
+  const resources = (['iron', 'coal', 'timber'] as const).map((good) => {
+    const supply = own.reduce((sum, r) => sum + r.production[good], 0)
+    const foreign = report?.economy?.values[good]?.estimate ?? 0
+    return clamp(foreign / Math.max(1, supply) - 0.5)
+  })
+  const food = nation.foodCoverage < 1 && (report?.economy?.values.food?.estimate ?? 0) >= 1 ? 1 : 0
+  const output = clamp(((report?.economy?.values.output?.estimate ?? 0) / Math.max(1, nation.gdp)) * 0.5)
+  return { cultural, economic: clamp(Math.max(...resources, food) * 0.7 + output * 0.3) }
+}
+
 export function strategicPressures(world: World, nation: Nation) {
   const own = world.regions.filter((r) => r.nation === nation.id),
     power = perceivedPower(world, nation.id, nation.id),
@@ -139,6 +167,17 @@ export function strategicPressures(world: World, nation: Nation) {
     ),
     drives = nation.character?.leader.politics?.drives
   return {
+    frontierOpportunities: knownMap(world, nation.id)
+      .filter((r) => r.nation === -1 && neighbors.has(r.id))
+      .map((r) => ({
+        region: r.id,
+        ...frontierValue(world, nation, world.regions[r.id]),
+        influence:
+          world.sovereignty?.frontiers?.find((p) => p.region === r.id && p.nation === nation.id)?.influence ??
+          0,
+      }))
+      .sort((a, b) => b.score - a.score || a.region - b.region)
+      .slice(0, 8),
     authority: domesticAuthority(world, nation.id),
     doctrine: nation.character?.leader.politics,
     constraints: {
@@ -159,6 +198,7 @@ export function strategicPressures(world: World, nation: Nation) {
         })
       return {
         nation: other.id,
+        expansionInterests: reportedExpansionInterests(world, nation, other.id),
         bordering: border,
         treaty: other.relation?.treaty,
         opinion: other.relation?.opinion,

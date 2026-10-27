@@ -11,6 +11,7 @@ import {
 } from './intelligence'
 import { foreignPolicyMandate, sharedInstitution } from './institutions'
 import { sovereigntyAssessment } from './strategic-assessment'
+import { reportedExpansionInterests } from './ambitions'
 import { clamp, population, relation, type Army, type Nation, type World } from './types'
 import { random, hashSeed } from './random'
 import { takeCivilianAdults } from './population'
@@ -311,12 +312,14 @@ export function advanceGeopolitics(world: World) {
             0,
           ),
           superiority = power / Math.max(500, perceivedPower(world, n.id, other.id) + deterrence * 0.6),
+          interests = reportedExpansionInterests(world, n, other.id),
           motive =
             drives.ambition * 0.35 +
             drives.dominance * 0.45 +
             drives.opportunism * 0.2 +
             Math.max(0, -rel.opinion) / 160 +
-            rel.grievance / 150,
+            rel.grievance / 150 +
+            (interests.economic * 0.35 + interests.cultural * 0.4) * (0.35 + drives.ambition * 0.65),
           score =
             motive + Math.min(0.4, (ratio - 1) * 0.2) - Math.max(0, 1 - superiority) * 0.6 - threat * 0.15
         return { other, score, superiority }

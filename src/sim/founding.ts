@@ -1,4 +1,6 @@
 import { recordWorldEvent } from './event-memory'
+import { crossedPeriodMonth } from './simulation-period'
+import { claimIndependentProvince, frontierValue } from './territorial-expansion'
 import { habitableLand } from './terrain-access'
 import { subdivideHousing } from './building-lots'
 import { neighbors } from './grid'
@@ -209,30 +211,9 @@ function settleFounding(
   w.localEconomy!.built[cell] = 700 / 12000
 
   if (region.nation === -1) {
-    region.nation = nation
-    for (const id of w.localEconomy!.active) {
-      const unit = w.localEconomy!.units[id]
-      if (unit.province === region.id) {
-        unit.nation = nation
-        for (const group of unit.communities!) group.host = nation
-      }
-    }
-    for (const level of ['province', 'municipality'] as const) {
-      const id = `${level}:${region.id}`
-      w.adaptive!.jurisdictions[id] = {
-        id,
-        level,
-        name: region.name,
-        nation,
-        seat: cell,
-        cells: [...region.cells],
-        founded: w.month,
-        revised: w.month,
-        predecessors: [],
-        successors: [],
-        account: governmentAccount(nation),
-      }
-    }
+    claimIndependentProvince(w, region, nation, false)
+    for (const level of ['province', 'municipality'] as const)
+      w.adaptive!.jurisdictions[`${level}:${region.id}`].seat = cell
   }
   if (w.adaptive!.buildingVersion === 1) subdivideHousing(w, site)
   source.migration -= FOUNDING.people
@@ -258,9 +239,9 @@ function settleFounding(
   return `Founded a settlement in ${region.name}. 600 people moved from ${source.name}; the camp used 120 treasury, 40 timber, 20 stone and 5 tools, and carries 94 food.`
 }
 
-/** Governments assess nearby open land yearly; the same material constraints apply to manual orders. */
+/** Governments review productive and culturally related frontiers twice a year. */
 export function advanceFounding(w: World) {
-  if (w.settlementStart !== 'frontier') return
+  if (!w.localEconomy || !w.adaptive || !w.economy) return
   let founded = 0
   let components: SettlementComponent[] | undefined
   const refreshLabels = (nation: number) => {
@@ -280,9 +261,8 @@ export function advanceFounding(w: World) {
   }
   for (const n of w.nations) {
     if (
-      (w.month - 1) % 12 !== n.id % 3 ||
+      !crossedPeriodMonth(w.month, 1 + n.id % 3, 6) ||
       !n.ai ||
-      n.policies.priority === 'military' ||
       n.foodCoverage < 0.95 ||
       n.stability < 40 ||
       w.relations.some((r) => r.treaty === 'war' && (r.a === n.id || r.b === n.id))
@@ -292,7 +272,7 @@ export function advanceFounding(w: World) {
       .filter((r) => r.nation === -1 && r.neighbors.some((id) => w.regions[id].nation === n.id))
       .sort(
         (a, b) =>
-          b.fertility + b.deposits.timber * 0.15 - (a.fertility + a.deposits.timber * 0.15) || a.id - b.id,
+          frontierValue(w, n, b).score - frontierValue(w, n, a).score || a.id - b.id,
       )
     for (const r of candidates) {
       try {

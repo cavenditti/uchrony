@@ -1,4 +1,5 @@
 import { recordRequisition } from './national-accounts'
+import { advanceAlmanac } from './almanac'
 import { publicTransfer } from './ledger'
 import { MAX_ARMIES } from './military-limits'
 import { MAX_STATE_IDENTITIES } from './types'
@@ -35,6 +36,7 @@ export interface ProvincialAuthority {
   warned: number
 }
 export interface SovereigntyState {
+  frontiers?: import('./frontier-politics').FrontierProgress[]
   provinces: ProvincialAuthority[]
   successors: { nation: number; parent: number; movement: number }[]
 }
@@ -251,6 +253,8 @@ function transferAuthority(world: World, report: ProvincialAuthority) {
     successor.id,
     `New responsibilities: ${title}. Secure food, pay the guard and establish legitimate institutions; success is not guaranteed.`,
   )
+  // The event may refer to a new nation even before the next full monthly tick.
+  advanceAlmanac(world, true)
 }
 
 /** Loss of authority develops monthly from actual protection, organized support and available resources. */

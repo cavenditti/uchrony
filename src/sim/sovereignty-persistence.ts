@@ -57,4 +57,28 @@ export function validateSovereignty(world: World) {
       fail()
     successors.add(entry.nation)
   }
+  if (state.frontiers !== undefined) {
+    if (!Array.isArray(state.frontiers) || state.frontiers.length > world.regions.length) fail()
+    const regions = new Set<number>()
+    for (const entry of state.frontiers) {
+      if (
+        !entry ||
+        !integer(entry.region, 0, world.regions.length - 1) ||
+        regions.has(entry.region) ||
+        !integer(entry.since, 0, world.month) ||
+        !integer(entry.updated, entry.since, world.month) ||
+        !integer(entry.nation, -1, world.nations.length - 1) ||
+        !unit(entry.influence) ||
+        !integer(entry.mandate, 0, world.month) ||
+        !integer(entry.prosperity, 0, world.month) ||
+        !(
+          entry.city === null ||
+          (integer(entry.city, 0, (world.localEconomy?.nextCity ?? 0) - 1) &&
+            world.localEconomy?.cities.some((city) => city.id === entry.city))
+        )
+      )
+        fail()
+      regions.add(entry.region)
+    }
+  }
 }

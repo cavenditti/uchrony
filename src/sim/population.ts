@@ -1,5 +1,6 @@
 import { simulationMonths, periodFlow, periodRate } from './simulation-period'
 import { landComponents } from './land-connectivity'
+import { identityHomelands } from './identity-geography'
 import { habitableLand } from './terrain-access'
 import { governance } from './governance'
 import { settlementMigrationOptions } from './settlement-access'
@@ -24,7 +25,7 @@ import { stratumPeople, householdAccount, transfer } from './ledger'
 import { MODEL_PARAMETERS } from './model-parameters'
 import { apportion } from './allocation'
 export { apportion } from './allocation'
-import { hashSeed, random } from './random'
+import { hashSeed } from './random'
 import { allForces } from './forces'
 import type { Fleet } from './military-types'
 import { effectMultiplier, effectValue } from './effects'
@@ -254,27 +255,7 @@ export function ensurePopulation(world: World) {
       identities: [],
       lastEvolution: world.month,
     }
-    const rng = world.demography,
-      count = Math.min(world.regions.length, Math.max(4, Math.round(Math.sqrt(world.regions.length)))),
-      seeds = [world.regions[Math.floor(random(rng) * world.regions.length)]]
-    while (seeds.length < count) {
-      let candidate = world.regions[0],
-        best = -1
-      for (const region of world.regions) {
-        const at = world.cells[region.center],
-          distance = Math.min(
-            ...seeds.map((seed) => {
-              const cell = world.cells[seed.center]
-              return Math.hypot(cell.x - at.x, cell.y - at.y)
-            }),
-          )
-        if (distance > best) {
-          best = distance
-          candidate = region
-        }
-      }
-      seeds.push(candidate)
-    }
+    const { seeds, owner } = identityHomelands(world, world.demography)
     const languages = seeds.map((seed, index) =>
         registerIdentity(world, 'language', `${seed.name} speech`, seed.id, index < 3 ? [] : [index % 3]),
       ),
@@ -305,16 +286,13 @@ export function ensurePopulation(world: World) {
     const span = world.cells.reduce((max, cell) => Math.max(max, cell.x), 1)
     for (const region of world.regions) {
       const at = world.cells[region.center],
-        nearest = seeds
-          .map((seed, index) => ({
-            index,
-            distance: Math.hypot(world.cells[seed.center].x - at.x, world.cells[seed.center].y - at.y),
-          }))
-          .sort((a, b) => a.distance - b.distance || a.index - b.index),
-        first = nearest[0].index,
-        second = nearest[1].index,
+        first = owner[region.id],
+        border = region.neighbors.filter((id) => owner[id] !== first).sort((a, b) => a - b),
+        second = border.length ? owner[border[0]] : first,
+        // Small border communities, not a large foreign minority in every province.
+        minority = border.length ? 0.02 + (hashSeed(`${world.seed}:border:${region.id}`) % 201) / 10000 : 0,
         faith = Math.min(3, Math.floor((at.x / span) * 4)),
-        shares = [0.72, 0.18, 0.1],
+        shares = [0.9 - minority, minority, 0.1],
         counts = AGES.map((age) => apportion(region.population[age], shares)),
         primary = region.urban > 0.5 ? 0 : region.industry > 0.6 ? 4 : (region.id % 3) + 1
       region.communities = [

@@ -46,6 +46,7 @@ import { advanceGeopolitics } from './geopolitics'
 import { advanceIntelligence, configureIntelligence } from './intelligence'
 import { advanceDiplomaticOffices, foreignOfficeContext } from './diplomatic-friction'
 import { advanceSovereignty } from './sovereignty'
+import { advanceFrontierPolitics } from './frontier-politics'
 import { reinforceArmies } from './military-personnel'
 import { advancePressures } from './pressures'
 import { validateSettings } from './settings'
@@ -619,6 +620,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   advanceArmies(w)
   reinforceArmies(w)
   advanceSovereignty(w)
+  advanceFrontierPolitics(w)
   linkDistrictPeople(w)
   reconcileJurisdictionSovereignty(w)
   reviewAdministration(w)
