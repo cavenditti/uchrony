@@ -290,11 +290,10 @@ export class ReliefMap {
       )
       this.overlayUpdates.invalidate()
     }
-    this.scenery.visible = next.scale > 0.38
-    this.cities.group.visible = next.scale > 0.38
     this.cities.view(this.camera, next.w, next.h, next.scale)
     this.activities.view(this.camera, next.w, next.h, next.scale)
-    this.sun.castShadow = next.scale >= 3
+    this.sun.shadow.intensity = THREE.MathUtils.smoothstep(next.scale, 2.5, 4)
+    this.sun.castShadow = this.sun.shadow.intensity > 0
     if (this.sun.castShadow) {
       const extent = Math.min(300, Math.max(35, (next.w / next.scale) * 0.7))
       this.sun.target.position.copy(target)

@@ -44,14 +44,14 @@ The crop and extraction ground treatment is enabled on the Terrain layer. Themat
 
 ## Observation and runtime bounds
 
-Detailed activity models appear at map scale 3 and above. `ActivityScenery` estimates the visible grid area, projects candidate tiles and prioritizes those nearest the screen center. Its budgets are:
+Activity structures fade in across map scales 1.5–3. `ActivityScenery` estimates the visible grid area and projects candidate tiles with a conservative margin. Every visible facility is retained; moving the camera no longer deletes facilities that fall outside a nearest-64 selection. Its budgets are:
 
-- At most **64 detailed tiles** in the activity scene.
+- Activity geometry covers the **visible terrain**, with work proportional to viewport size, zoom and the local scenery. There is no fixed tile cutoff.
 - At most **128 cached tile plans**, with least-recently-used plans removed.
-- At most **384 representative motion records**. Each record can contain multiple geometry instances, so this is not a limit of 384 rendered parts.
+- Extra woodland and workers/carts use deterministic detail thresholds and a continuous opaque fade. Their density increases with projected area. All parts of a compound model share the threshold; camera position never changes the sample. Mills and boats remain structural. There is no fixed motion-record cutoff.
 - Static and moving parts are grouped into instanced batches by five geometry shapes, with up to ten activity meshes in total.
 
-The existing town renderer has its own cache and detail behavior. World-wide simulation, economic projection, compact ground texture and transport indexing still have world-dependent costs. The observation bounds apply to the new detailed models and their motion; they are not a claim that the entire world has constant runtime cost.
+The town renderer retains every building silhouette, streets, planted scenery and civic landmarks in shared batches. Only facade refinements use the existing near-camera cache. World-wide simulation, economic projection, town structure, compact ground texture and transport indexing have world-dependent costs. Retaining full silhouettes and visible activity structures costs more geometry than the former sampled overview; fixed cache and draw-call bounds do not imply constant runtime or unchanged GPU cost.
 
 Workers, carts, mill sails and boats provide representative movement, not individually simulated people, shipments or machines. Activity animation updates at most 15 times per second of shared scenery time. Pausing or reducing motion freezes that shared time in the application. Rebuilding or evicting a scene plan discards only presentation data.
 
@@ -60,7 +60,7 @@ Workers, carts, mill sails and boats provide representative movement, not indivi
 Run the focused source checks from the project root:
 
 ```sh
-node --import tsx --test tests/living-world.test.ts
+node --import tsx --test tests/living-world.test.ts tests/renderer-placement.test.ts tests/lod-stability.test.ts
 ```
 
 The tests cover seasonality, observer invariance, projected population and employment totals, distinct activity geometry, detail/cache/motion bounds and funded transport persistence and rejection conditions. Their presence is not a claim of historical calibration or a performance benchmark.

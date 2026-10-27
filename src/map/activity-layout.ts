@@ -24,6 +24,7 @@ export interface DetailPiece {
   role: string
   water?: boolean
   baseY?: number
+  detailThreshold?: number
 }
 export interface DetailMotion {
   kind: 'mill' | 'cart' | 'worker' | 'boat'
@@ -58,6 +59,7 @@ export function activityLayout(
   height?: (x: number, z: number) => number,
 ): ActivityPlan {
   const terrainHeightAt = height
+  let detailThreshold = -1
   const cell = w.cells[id],
     use = TILE_ACTIVITIES[land.activity[id]],
     climate = localClimate(w, cell),
@@ -92,7 +94,21 @@ export function activityLayout(
           !footprint(x, z, width, depth, turn).every((p) => renderedLand(w, p.x, p.z))))
     )
       return
-    pieces.push({ shape, x, z, y, w: width, h: height, d: depth, angle: turn, color, role, water, baseY })
+    pieces.push({
+      shape,
+      x,
+      z,
+      y,
+      w: width,
+      h: height,
+      d: depth,
+      angle: turn,
+      color,
+      role,
+      water,
+      baseY,
+      detailThreshold,
+    })
   }
   const timber = '#826144',
     stone = '#c5b394',
@@ -177,6 +193,7 @@ export function activityLayout(
       )
   }
   const tree = (x: number, z: number, i: number, orchard = false) => {
+    detailThreshold = orchard ? -1 : random(i + 1853)
     const v = random(i + 710),
       size = orchard ? 0.22 : 0.34 + v * 0.24,
       h = orchard ? 0.5 : 0.8 + v * 0.7
@@ -224,6 +241,7 @@ export function activityLayout(
         'broadleaf',
         v * 6,
       )
+    detailThreshold = -1
   }
   if (use === 'forest' || use === 'timber') {
     const count = use === 'forest' ? 180 : 110

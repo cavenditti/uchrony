@@ -11,6 +11,7 @@ import { landSurface } from '../../src/map/land-surface'
 import type { TerrainPicker } from '../../src/map/relief-picking'
 import type { ActivityScenery } from '../../src/map/activity-scenery'
 import type { CityScenery } from '../../src/map/city-scenery'
+import type { WebGLRenderer } from 'three'
 
 const generated = generateWorld('Living landscape browser', 2, 4),
   width = 16,
@@ -160,6 +161,18 @@ const focusOn = (x: number, y: number, span: number) => {
 Object.assign(window, {
   rendererReview: {
     focusOn,
+    metrics: () => {
+      const scene = relief as unknown as { renderer: WebGLRenderer; activities: ActivityScenery }
+      return {
+        world: world === fixture ? 'controlled' : 'generated',
+        cells: world.cells.length,
+        focus,
+        zoom: canvas.clientHeight / focus.span,
+        activities: scene.activities.stats,
+        memory: { ...scene.renderer.info.memory },
+        render: { ...scene.renderer.info.render },
+      }
+    },
     snapshot: () => {
       const scene = relief as unknown as {
         picker: TerrainPicker

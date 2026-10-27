@@ -32,7 +32,7 @@ type Piece = {
 }
 type CityEntry = { key: string; group: THREE.Group; used: number }
 
-/** Six visible townscapes and twelve cached, regardless of the total world size. */
+/** Complete town structure with a bounded cache for nearby facade refinements. */
 export class CityScenery {
   readonly group = new THREE.Group()
   private descriptions: CityDescription[] = []
@@ -115,8 +115,7 @@ export class CityScenery {
         city.id,
         buildings.reduce((size, { building: b }) => Math.max(size, b.width, b.depth, b.height), 0),
       )
-      const count = Math.min(32, buildings.length)
-      return Array.from({ length: count }, (_, i) => buildings[Math.floor((i * buildings.length) / count)])
+      return buildings
     })
     const shapes = ['box', 'hip', 'gable', 'box', 'box'] as const
     const totals = [0, 0, 0, 0, 0]
@@ -193,7 +192,66 @@ export class CityScenery {
     this.overviewMatrices = this.overview.children.map((mesh) =>
       ((mesh as THREE.InstancedMesh).instanceMatrix.array as Float32Array).slice(),
     )
+    // Streets, gardens, trees and civic landmarks are persistent town structure.
+    // Combine them into shared batches instead of tying their existence to one
+    // of the small near-camera facade caches.
+    const features = cities.filter((c) => !c.building).map((c) => this.build(c, true))
+    this.mergeFeatures(features)
     this.group.add(this.overview)
+  }
+
+  private mergeFeatures(groups: THREE.Group[]) {
+    const instances = new Map<string, THREE.InstancedMesh[]>()
+    const surfaces: THREE.Mesh[] = []
+    for (const group of groups)
+      for (const object of group.children) {
+        if (object instanceof THREE.InstancedMesh) {
+          const key = `${object.geometry.uuid}:${(object.material as THREE.Material).uuid}`
+          const list = instances.get(key) ?? []
+          list.push(object)
+          instances.set(key, list)
+        } else if (object instanceof THREE.Mesh) surfaces.push(object)
+      }
+    for (const list of instances.values()) {
+      const merged = new THREE.InstancedMesh(
+        list[0].geometry,
+        list[0].material,
+        list.reduce((n, m) => n + m.count, 0),
+      )
+      const colors = new Float32Array(merged.count * 3)
+      let offset = 0
+      for (const mesh of list) {
+        merged.instanceMatrix.array.set(mesh.instanceMatrix.array, offset * 16)
+        if (mesh.instanceColor) colors.set(mesh.instanceColor.array, offset * 3)
+        offset += mesh.count
+      }
+      merged.instanceColor = new THREE.InstancedBufferAttribute(colors, 3)
+      merged.castShadow = list[0].castShadow
+      merged.receiveShadow = true
+      merged.computeBoundingSphere()
+      this.overview.add(merged)
+    }
+    if (surfaces.length) {
+      const geometry = new THREE.BufferGeometry()
+      for (const name of ['position', 'normal', 'color', 'surfaceKind']) {
+        const size = surfaces[0].geometry.getAttribute(name).itemSize
+        const array = new Float32Array(
+          surfaces.reduce((n, mesh) => n + mesh.geometry.getAttribute(name).array.length, 0),
+        )
+        let offset = 0
+        for (const mesh of surfaces) {
+          const source = mesh.geometry.getAttribute(name).array
+          array.set(source, offset)
+          offset += source.length
+        }
+        geometry.setAttribute(name, new THREE.BufferAttribute(array, size))
+      }
+      geometry.computeBoundingSphere()
+      const surface = new THREE.Mesh(geometry, this.groundMaterial)
+      surface.receiveShadow = true
+      this.overview.add(surface)
+    }
+    for (const group of groups) this.release(group)
   }
 
   private height(x: number, z: number) {
@@ -252,7 +310,7 @@ export class CityScenery {
     )) {
       let entry = this.cache.get(city.id)
       if (!entry) {
-        // There are at most six near-camera towns. Each layout has a finite parcel budget.
+        // Facade caches cover six legacy towns or sixteen recorded housing sites.
         entry = { key: city.key, group: this.build(city), used: ++this.clock }
         this.cache.set(city.id, entry)
         this.group.add(entry.group)
@@ -279,7 +337,7 @@ export class CityScenery {
   private hideOverview(id: string, hide: boolean) {
     const range = this.ranges.get(id)
     if (!range) return
-    this.overview.children.forEach((object, index) => {
+    this.overview.children.slice(0, range.length).forEach((object, index) => {
       const mesh = object as THREE.InstancedMesh,
         array = mesh.instanceMatrix.array
       const [start, count] = range[index]
@@ -312,7 +370,7 @@ export class CityScenery {
     group.add(mesh)
   }
 
-  private build(city: CityDescription) {
+  private build(city: CityDescription, featuresOnly = false) {
     const layout = cityLayout(this.geography, city, this.rivers),
       palette = PALETTES[city.style]
     const group = new THREE.Group()
@@ -344,15 +402,15 @@ export class CityScenery {
       for (const quad of streetRibbon(points, width)) face(quad, color, kind, kind === 0 ? 0.065 : 0.06)
     }
     // Slightly separate surfaces at junctions instead of coplanar z-fighting.
-    face(layout.square, paving, 0, 0.075)
-    for (const street of layout.streets)
+    if (featuresOnly) face(layout.square, paving, 0, 0.075)
+    for (const street of featuresOnly ? layout.streets : [])
       stroke(
         street.points,
         street.width,
         street.width < 0.7 ? paving.clone().multiplyScalar(0.87) : paving,
         street.width < 0.7 ? 1 : 0,
       )
-    for (const b of layout.buildings) {
+    for (const b of featuresOnly ? [] : layout.buildings) {
       const placement = this.placement(city, b)
       if (!placement) continue
       const { floor, footing, lift, base } = placement
@@ -529,302 +587,320 @@ export class CityScenery {
           })
       }
     }
-    for (const bridge of layout.bridges) {
-      const { a, b, width } = bridge,
-        length = Math.hypot(b.x - a.x, b.z - a.z),
-        angle = -Math.atan2(b.z - a.z, b.x - a.x)
-      const x = (a.x + b.x) / 2,
-        z = (a.z + b.z) / 2,
-        y = Math.max(this.height(a.x, a.z), this.height(b.x, b.z)) + 0.25
-      const stone = new THREE.Color(palette.trim)
-      trim.push({ x, y, z, w: length, h: 0.25, d: width, a: angle, color: stone })
-      for (const side of [-1, 1]) {
-        const dx = (-(b.z - a.z) / length) * width * 0.47 * side,
-          dz = ((b.x - a.x) / length) * width * 0.47 * side
-        trim.push({ x: x + dx, y: y + 0.3, z: z + dz, w: length, h: 0.38, d: 0.08, a: angle, color: stone })
+    if (featuresOnly) {
+      for (const bridge of layout.bridges) {
+        const { a, b, width } = bridge,
+          length = Math.hypot(b.x - a.x, b.z - a.z),
+          angle = -Math.atan2(b.z - a.z, b.x - a.x)
+        const x = (a.x + b.x) / 2,
+          z = (a.z + b.z) / 2,
+          y = Math.max(this.height(a.x, a.z), this.height(b.x, b.z)) + 0.25
+        const stone = new THREE.Color(palette.trim)
+        trim.push({ x, y, z, w: length, h: 0.25, d: width, a: angle, color: stone })
+        for (const side of [-1, 1]) {
+          const dx = (-(b.z - a.z) / length) * width * 0.47 * side,
+            dz = ((b.x - a.x) / length) * width * 0.47 * side
+          trim.push({ x: x + dx, y: y + 0.3, z: z + dz, w: length, h: 0.38, d: 0.08, a: angle, color: stone })
+        }
       }
-    }
-    const p = layout.plaza,
-      floor = Math.max(this.height(p.x, p.z), ...layout.square.map((p) => this.height(p.x, p.z))),
-      stone = new THREE.Color(palette.walls),
-      roof = new THREE.Color(palette.roof)
-    if (layout.square.length && city.civic !== false && city.form) {
-      const plaza = layout.plaza,
-        base = this.height(plaza.x, plaza.z)
-      const span = Math.min(...layout.square.map((p) => Math.hypot(p.x - plaza.x, p.z - plaza.z)))
-      const width = Math.min(span * 0.62, city.radius * 0.2)
-      parts.cylinder.push({
-        x: plaza.x,
-        y: base + width * 0.07,
-        z: plaza.z,
-        w: width,
-        h: width * 0.14,
-        d: width,
-        color: new THREE.Color(palette.walls),
-      })
-      parts.cylinder.push({
-        x: plaza.x,
-        y: base + width * 0.15,
-        z: plaza.z,
-        w: width * 0.73,
-        h: width * 0.06,
-        d: width * 0.73,
-        color: new THREE.Color(illuminated.river),
-      })
-      parts.cylinder.push({
-        x: plaza.x,
-        y: base + width * 0.5,
-        z: plaza.z,
-        w: width * 0.12,
-        h: width * 0.75,
-        d: width * 0.12,
-        color: new THREE.Color(palette.walls),
-      })
-    }
-    if (layout.square.length && city.civic !== false && !city.form) {
-      const civic = (u: number, v: number) => ({
-        x: p.x + u * Math.cos(layout.angle) + v * Math.sin(layout.angle),
-        z: p.z - u * Math.sin(layout.angle) + v * Math.cos(layout.angle),
-      })
-      const hallPoint = civic(0, -1.9),
-        towerPoint = civic(1.05, -1.9)
-      // Civic centerpiece: a public hall, courtyard monument, and a city-specific skyline.
-      const hall = {
-        x: hallPoint.x,
-        y: floor + 0.85,
-        z: hallPoint.z,
-        w: 2.9,
-        h: 1.7,
-        d: 0.9,
-        a: layout.angle,
-        color: stone,
-      }
-      parts.box.push(hall)
-      parts.gable.push({ ...hall, y: floor + 2, h: 0.6, w: 3.1, d: 1.1, color: roof })
-      const portico = civic(0, -1.25)
-      trim.push({ ...portico, y: floor + 1.38, w: 2.55, h: 0.14, d: 0.48, a: layout.angle, color: stone })
-      for (let i = 0; i < 5; i++) {
-        const column = civic(-1.1 + i * 0.55, -1.13)
-        parts.cylinder.push({ ...column, y: floor + 0.65, w: 0.12, h: 1.3, d: 0.12, color: stone })
-      }
-      const towerX = towerPoint.x,
-        towerZ = towerPoint.z
-      const towerHeight = city.capital ? 5.4 : 4.2
-      parts.box.push({
-        x: towerX,
-        y: floor + towerHeight / 2,
-        z: towerZ,
-        w: 0.72,
-        h: towerHeight,
-        d: 0.72,
-        a: layout.angle,
-        color: stone,
-      })
-      for (const level of [towerHeight * 0.55, towerHeight - 0.25])
-        trim.push({
-          x: towerX,
-          y: floor + level,
-          z: towerZ,
-          w: 0.85,
-          h: 0.13,
-          d: 0.85,
-          a: layout.angle,
-          color: stone.clone().multiplyScalar(0.86),
-        })
-      if (layout.landmark === 'dome')
-        parts.dome.push({
-          x: towerX,
-          y: floor + towerHeight,
-          z: towerZ,
-          w: 1.2,
-          h: 1.2,
-          d: 1.2,
-          color: new THREE.Color('#398f96'),
-        })
-      else if (layout.landmark === 'belfry')
-        parts.cone.push({
-          x: towerX,
-          y: floor + towerHeight + 0.6,
-          z: towerZ,
-          w: 1,
-          h: 1.2,
-          d: 1,
-          color: roof,
-        })
-      else {
-        for (let i = 0; i < 4; i++)
-          trim.push({
-            x: towerX + (i % 2 ? 0.32 : -0.32),
-            y: floor + towerHeight + 0.1,
-            z: towerZ + (i > 1 ? 0.32 : -0.32),
-            w: 0.24,
-            h: 0.35,
-            d: 0.24,
-            color: stone,
-          })
-      }
-      // One restrained gold finial marks the civic silhouette, not every roof.
-      if (layout.landmark !== 'keep')
+      const p = layout.plaza,
+        floor = Math.max(this.height(p.x, p.z), ...layout.square.map((p) => this.height(p.x, p.z))),
+        stone = new THREE.Color(palette.walls),
+        roof = new THREE.Color(palette.roof)
+      if (layout.square.length && city.civic !== false && city.form) {
+        const plaza = layout.plaza,
+          base = this.height(plaza.x, plaza.z)
+        const span = Math.min(...layout.square.map((p) => Math.hypot(p.x - plaza.x, p.z - plaza.z)))
+        const width = Math.min(span * 0.62, city.radius * 0.2)
         parts.cylinder.push({
+          x: plaza.x,
+          y: base + width * 0.07,
+          z: plaza.z,
+          w: width,
+          h: width * 0.14,
+          d: width,
+          color: new THREE.Color(palette.walls),
+        })
+        parts.cylinder.push({
+          x: plaza.x,
+          y: base + width * 0.15,
+          z: plaza.z,
+          w: width * 0.73,
+          h: width * 0.06,
+          d: width * 0.73,
+          color: new THREE.Color(illuminated.river),
+        })
+        parts.cylinder.push({
+          x: plaza.x,
+          y: base + width * 0.5,
+          z: plaza.z,
+          w: width * 0.12,
+          h: width * 0.75,
+          d: width * 0.12,
+          color: new THREE.Color(palette.walls),
+        })
+      }
+      if (layout.square.length && city.civic !== false && !city.form) {
+        const civic = (u: number, v: number) => ({
+          x: p.x + u * Math.cos(layout.angle) + v * Math.sin(layout.angle),
+          z: p.z - u * Math.sin(layout.angle) + v * Math.cos(layout.angle),
+        })
+        const hallPoint = civic(0, -1.9),
+          towerPoint = civic(1.05, -1.9)
+        // Civic centerpiece: a public hall, courtyard monument, and a city-specific skyline.
+        const hall = {
+          x: hallPoint.x,
+          y: floor + 0.85,
+          z: hallPoint.z,
+          w: 2.9,
+          h: 1.7,
+          d: 0.9,
+          a: layout.angle,
+          color: stone,
+        }
+        parts.box.push(hall)
+        parts.gable.push({ ...hall, y: floor + 2, h: 0.6, w: 3.1, d: 1.1, color: roof })
+        const portico = civic(0, -1.25)
+        trim.push({ ...portico, y: floor + 1.38, w: 2.55, h: 0.14, d: 0.48, a: layout.angle, color: stone })
+        for (let i = 0; i < 5; i++) {
+          const column = civic(-1.1 + i * 0.55, -1.13)
+          parts.cylinder.push({ ...column, y: floor + 0.65, w: 0.12, h: 1.3, d: 0.12, color: stone })
+        }
+        const towerX = towerPoint.x,
+          towerZ = towerPoint.z
+        const towerHeight = city.capital ? 5.4 : 4.2
+        parts.box.push({
           x: towerX,
-          y: floor + towerHeight + (layout.landmark === 'dome' ? 0.78 : 1.3),
+          y: floor + towerHeight / 2,
           z: towerZ,
-          w: 0.075,
-          h: 0.35,
-          d: 0.075,
-          color: new THREE.Color(illuminated.gold),
-        })
-      // Market canopies and an open central basin retain the square as negative space.
-      for (let i = 0; i < 4; i++) {
-        const market = civic(-1.5 + i * 0.9, 1.8),
-          x = market.x,
-          z = market.z,
-          y = this.height(x, z)
-        trim.push({
-          x,
-          y: y + 0.3,
-          z,
-          w: 0.58,
-          h: 0.6,
-          d: 0.08,
+          w: 0.72,
+          h: towerHeight,
+          d: 0.72,
           a: layout.angle,
-          color: new THREE.Color(palette.trim),
+          color: stone,
         })
-        trim.push({
-          x,
-          y: y + 0.65,
-          z,
-          w: 0.8,
-          h: 0.09,
-          d: 0.65,
-          a: layout.angle,
-          color: new THREE.Color(i % 2 ? palette.roof : '#ead7a7'),
-        })
-        for (let j = 0; j < 2; j++) {
-          const crate = civic(-1.5 + i * 0.9 + (j - 0.5) * 0.28, 1.8)
+        for (const level of [towerHeight * 0.55, towerHeight - 0.25])
           trim.push({
-            ...crate,
-            y: y + 0.35,
-            w: 0.22,
-            h: 0.18,
-            d: 0.24,
+            x: towerX,
+            y: floor + level,
+            z: towerZ,
+            w: 0.85,
+            h: 0.13,
+            d: 0.85,
             a: layout.angle,
-            color: new THREE.Color(j ? '#8e9a57' : '#ba7650'),
+            color: stone.clone().multiplyScalar(0.86),
+          })
+        if (layout.landmark === 'dome')
+          parts.dome.push({
+            x: towerX,
+            y: floor + towerHeight,
+            z: towerZ,
+            w: 1.2,
+            h: 1.2,
+            d: 1.2,
+            color: new THREE.Color('#398f96'),
+          })
+        else if (layout.landmark === 'belfry')
+          parts.cone.push({
+            x: towerX,
+            y: floor + towerHeight + 0.6,
+            z: towerZ,
+            w: 1,
+            h: 1.2,
+            d: 1,
+            color: roof,
+          })
+        else {
+          for (let i = 0; i < 4; i++)
+            trim.push({
+              x: towerX + (i % 2 ? 0.32 : -0.32),
+              y: floor + towerHeight + 0.1,
+              z: towerZ + (i > 1 ? 0.32 : -0.32),
+              w: 0.24,
+              h: 0.35,
+              d: 0.24,
+              color: stone,
+            })
+        }
+        // One restrained gold finial marks the civic silhouette, not every roof.
+        if (layout.landmark !== 'keep')
+          parts.cylinder.push({
+            x: towerX,
+            y: floor + towerHeight + (layout.landmark === 'dome' ? 0.78 : 1.3),
+            z: towerZ,
+            w: 0.075,
+            h: 0.35,
+            d: 0.075,
+            color: new THREE.Color(illuminated.gold),
+          })
+        // Market canopies and an open central basin retain the square as negative space.
+        for (let i = 0; i < 4; i++) {
+          const market = civic(-1.5 + i * 0.9, 1.8),
+            x = market.x,
+            z = market.z,
+            y = this.height(x, z)
+          trim.push({
+            x,
+            y: y + 0.3,
+            z,
+            w: 0.58,
+            h: 0.6,
+            d: 0.08,
+            a: layout.angle,
+            color: new THREE.Color(palette.trim),
+          })
+          trim.push({
+            x,
+            y: y + 0.65,
+            z,
+            w: 0.8,
+            h: 0.09,
+            d: 0.65,
+            a: layout.angle,
+            color: new THREE.Color(i % 2 ? palette.roof : '#ead7a7'),
+          })
+          for (let j = 0; j < 2; j++) {
+            const crate = civic(-1.5 + i * 0.9 + (j - 0.5) * 0.28, 1.8)
+            trim.push({
+              ...crate,
+              y: y + 0.35,
+              w: 0.22,
+              h: 0.18,
+              d: 0.24,
+              a: layout.angle,
+              color: new THREE.Color(j ? '#8e9a57' : '#ba7650'),
+            })
+          }
+        }
+        parts.ring.push({ x: p.x, y: floor + 0.22, z: p.z + 0.25, w: 0.9, h: 1, d: 0.9, color: stone })
+        parts.cylinder.push({
+          x: p.x,
+          y: floor + 0.21,
+          z: p.z + 0.25,
+          w: 0.78,
+          h: 0.025,
+          d: 0.78,
+          color: new THREE.Color(illuminated.river),
+        })
+        parts.cylinder.push({
+          x: p.x,
+          y: floor + 0.5,
+          z: p.z + 0.25,
+          w: 0.13,
+          h: 0.65,
+          d: 0.13,
+          color: stone,
+        })
+        for (const side of [-1, 1]) {
+          const flag = civic(side * 2.4, 0.5),
+            y = this.height(flag.x, flag.z)
+          parts.cylinder.push({
+            ...flag,
+            y: y + 1.1,
+            w: 0.055,
+            h: 2.2,
+            d: 0.055,
+            color: new THREE.Color('#7e6e51'),
+          })
+          parts.flag.push({
+            x: flag.x + 0.39,
+            y: y + 1.88,
+            z: flag.z,
+            w: 0.78,
+            h: 0.46,
+            d: 1,
+            color: new THREE.Color(palette.roof),
           })
         }
       }
-      parts.ring.push({ x: p.x, y: floor + 0.22, z: p.z + 0.25, w: 0.9, h: 1, d: 0.9, color: stone })
-      parts.cylinder.push({
-        x: p.x,
-        y: floor + 0.21,
-        z: p.z + 0.25,
-        w: 0.78,
-        h: 0.025,
-        d: 0.78,
-        color: new THREE.Color(illuminated.river),
-      })
-      parts.cylinder.push({ x: p.x, y: floor + 0.5, z: p.z + 0.25, w: 0.13, h: 0.65, d: 0.13, color: stone })
-      for (const side of [-1, 1]) {
-        const flag = civic(side * 2.4, 0.5),
-          y = this.height(flag.x, flag.z)
-        parts.cylinder.push({
-          ...flag,
-          y: y + 1.1,
-          w: 0.055,
-          h: 2.2,
-          d: 0.055,
-          color: new THREE.Color('#7e6e51'),
-        })
-        parts.flag.push({
-          x: flag.x + 0.39,
-          y: y + 1.88,
-          z: flag.z,
-          w: 0.78,
-          h: 0.46,
-          d: 1,
-          color: new THREE.Color(palette.roof),
-        })
+      for (const garden of layout.gardens) {
+        const corners = rectangle(garden.x, garden.z, garden.width, garden.depth, garden.angle)
+        const heights = corners.map((p) => this.height(p.x, p.z))
+        if (Math.max(...heights) - Math.min(...heights) > 0.6) continue
+        face(corners, new THREE.Color('#7f9a70'), 2, 0.08)
+        for (let j = 0; j < 3; j++) {
+          const v = (j - 1) * garden.depth * 0.25,
+            x = garden.x + v * Math.sin(garden.angle),
+            z = garden.z + v * Math.cos(garden.angle)
+          trim.push({
+            x,
+            y: this.height(x, z) + 0.12,
+            z,
+            w: garden.width * 0.8,
+            h: 0.18,
+            d: 0.13,
+            a: garden.angle,
+            color: new THREE.Color(j % 2 ? '#a0b27e' : '#467b58'),
+          })
+        }
+        // A low boundary wall defines the planted parcel without closing the street.
+        for (const side of [-1, 1]) {
+          const u = (side * garden.width) / 2,
+            x = garden.x + u * Math.cos(garden.angle),
+            z = garden.z - u * Math.sin(garden.angle)
+          trim.push({
+            x,
+            y: this.height(x, z) + 0.12,
+            z,
+            w: 0.07,
+            h: 0.24,
+            d: garden.depth,
+            a: garden.angle,
+            color: new THREE.Color(palette.trim),
+          })
+        }
       }
-    }
-    for (const garden of layout.gardens) {
-      const corners = rectangle(garden.x, garden.z, garden.width, garden.depth, garden.angle)
-      const heights = corners.map((p) => this.height(p.x, p.z))
-      if (Math.max(...heights) - Math.min(...heights) > 0.6) continue
-      face(corners, new THREE.Color('#7f9a70'), 2, 0.08)
-      for (let j = 0; j < 3; j++) {
-        const v = (j - 1) * garden.depth * 0.25,
-          x = garden.x + v * Math.sin(garden.angle),
-          z = garden.z + v * Math.cos(garden.angle)
-        trim.push({
-          x,
-          y: this.height(x, z) + 0.12,
-          z,
-          w: garden.width * 0.8,
-          h: 0.18,
-          d: 0.13,
-          a: garden.angle,
-          color: new THREE.Color(j % 2 ? '#a0b27e' : '#467b58'),
-        })
-      }
-      // A low boundary wall defines the planted parcel without closing the street.
-      for (const side of [-1, 1]) {
-        const u = (side * garden.width) / 2,
-          x = garden.x + u * Math.cos(garden.angle),
-          z = garden.z - u * Math.sin(garden.angle)
-        trim.push({
-          x,
-          y: this.height(x, z) + 0.12,
-          z,
-          w: 0.07,
-          h: 0.24,
-          d: garden.depth,
-          a: garden.angle,
-          color: new THREE.Color(palette.trim),
-        })
-      }
-    }
-    const planted = layout.trees.filter(
-      (p) =>
-        !layout.gardens.some(
-          (g) => Math.hypot(g.x - p.x, g.z - p.z) < Math.hypot(g.width, g.depth) / 2 + 0.4,
-        ),
-    )
-    for (const p of planted) {
-      const y = this.height(p.x, p.z)
-      if (city.form) {
-        const unit = 1 / city.form.metersPerMapUnit
+      const planted = layout.trees.filter(
+        (p) =>
+          !layout.gardens.some(
+            (g) => Math.hypot(g.x - p.x, g.z - p.z) < Math.hypot(g.width, g.depth) / 2 + 0.4,
+          ),
+      )
+      for (const p of planted) {
+        const y = this.height(p.x, p.z)
+        if (city.form) {
+          const unit = 1 / city.form.metersPerMapUnit
+          trim.push({
+            x: p.x,
+            y: y + 12 * unit,
+            z: p.z,
+            w: 1.3 * unit,
+            h: 24 * unit,
+            d: 1.3 * unit,
+            color: new THREE.Color('#66533c'),
+          })
+          parts.tree.push({
+            x: p.x,
+            y: y + 28 * unit,
+            z: p.z,
+            w: 28 * unit,
+            h: 32 * unit,
+            d: 28 * unit,
+            color: new THREE.Color(illuminated.foliage),
+          })
+          continue
+        }
+        const slender = Math.sin(p.x * 12.9 + p.z * 7.8) > 0.25
         trim.push({
           x: p.x,
-          y: y + 12 * unit,
+          y: y + 0.45,
           z: p.z,
-          w: 1.3 * unit,
-          h: 24 * unit,
-          d: 1.3 * unit,
+          w: 0.13,
+          h: 0.9,
+          d: 0.13,
           color: new THREE.Color('#66533c'),
         })
-        parts.tree.push({
-          x: p.x,
-          y: y + 28 * unit,
-          z: p.z,
-          w: 28 * unit,
-          h: 32 * unit,
-          d: 28 * unit,
-          color: new THREE.Color(illuminated.foliage),
-        })
-        continue
+        for (let j = 0; j < 3; j++)
+          parts.tree.push({
+            x: p.x + (slender ? 0 : Math.cos(j * 2.4) * 0.22),
+            y: y + (slender ? 1.15 + j * 0.26 : 0.95 + j * 0.13),
+            z: p.z + (slender ? 0 : Math.sin(j * 2.4) * 0.22),
+            w: slender ? 0.47 - j * 0.08 : 0.78,
+            h: slender ? 1.3 : 0.95,
+            d: slender ? 0.47 - j * 0.08 : 0.78,
+            color: new THREE.Color(illuminated.foliage).multiplyScalar(0.86 + j * 0.12),
+          })
       }
-      const slender = Math.sin(p.x * 12.9 + p.z * 7.8) > 0.25
-      trim.push({ x: p.x, y: y + 0.45, z: p.z, w: 0.13, h: 0.9, d: 0.13, color: new THREE.Color('#66533c') })
-      for (let j = 0; j < 3; j++)
-        parts.tree.push({
-          x: p.x + (slender ? 0 : Math.cos(j * 2.4) * 0.22),
-          y: y + (slender ? 1.15 + j * 0.26 : 0.95 + j * 0.13),
-          z: p.z + (slender ? 0 : Math.sin(j * 2.4) * 0.22),
-          w: slender ? 0.47 - j * 0.08 : 0.78,
-          h: slender ? 1.3 : 0.95,
-          d: slender ? 0.47 - j * 0.08 : 0.78,
-          color: new THREE.Color(illuminated.foliage).multiplyScalar(0.86 + j * 0.12),
-        })
     }
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(ground, 3))
@@ -834,7 +910,8 @@ export class CityScenery {
     const groundMesh = new THREE.Mesh(geometry, this.groundMaterial)
     groundMesh.receiveShadow = true
     groundMesh.material.side = THREE.DoubleSide
-    group.add(groundMesh)
+    if (ground.length) group.add(groundMesh)
+    else geometry.dispose()
     for (const shape of Object.keys(parts) as (keyof typeof parts)[])
       this.addInstances(
         group,

@@ -7,7 +7,7 @@ import { economicLandscape, TILE_ACTIVITIES } from '../src/sim/economic-landscap
 import { localClimate } from '../src/sim/climate'
 import { viewSnapshot } from '../src/sim/view-snapshot'
 import { activityLayout } from '../src/map/activity-layout'
-import { ActivityScenery, ACTIVITY_CACHE_LIMIT, ACTIVITY_DETAIL_LIMIT } from '../src/map/activity-scenery'
+import { ActivityScenery, ACTIVITY_CACHE_LIMIT } from '../src/map/activity-scenery'
 import { TerrainPicker } from '../src/map/relief-picking'
 import { corridorProfile } from '../src/sim/corridors'
 import { transportNetwork } from '../src/sim/transport'
@@ -127,9 +127,9 @@ test('detail and moving-instance budgets stay bounded while touring the map', ()
       camera.lookAt(c.x, 0, c.y)
       camera.updateMatrixWorld()
       scenery.view(camera, 800, 800, 14)
-      assert(scenery.stats.visible <= ACTIVITY_DETAIL_LIMIT)
+      assert(scenery.stats.visible <= 100, 'the viewport bounds activity work')
       assert(scenery.stats.cached <= ACTIVITY_CACHE_LIMIT)
-      assert(scenery.stats.moving <= 384)
+      assert(scenery.stats.moving <= 600, 'screen-sized detail remains bounded')
       assert(
         scenery.group.children.length <= 10,
         'props and actors are instanced, not a draw call per person',

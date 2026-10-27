@@ -14,13 +14,20 @@ import {
 import { TerrainPicker } from './relief-picking'
 import { architectureMaterial } from './city-materials'
 import { activityPose } from './activity-motion'
+import { reliefRandom } from './relief-field'
+import { sceneryBucket, sceneryDensity, sceneryLodMaterial } from './scenery-lod'
 
-type Actor = { shape: DetailShape; motion: DetailMotion; matrix: THREE.Matrix4; color: string }
+type Actor = {
+  shape: DetailShape
+  motion: DetailMotion
+  matrix: THREE.Matrix4
+  color: string
+  threshold: number
+}
 
-export const ACTIVITY_DETAIL_LIMIT = 64
 export const ACTIVITY_CACHE_LIMIT = 128
-/** Only observed tiles get models. The source grid is its own spatial index;
- * detail meshes, motion and caches have fixed budgets regardless of world size. */
+/** Structures cover the visible terrain. Fine detail is sampled by projected
+ * size, never by a nearest-N cutoff that can delete an on-screen facility. */
 export class ActivityScenery {
   readonly group = new THREE.Group()
   private world: World
@@ -40,14 +47,20 @@ export class ActivityScenery {
     cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 8),
     crown: new THREE.IcosahedronGeometry(0.5, 1),
   }
-  private material = architectureMaterial('wall')
-  private roofMaterial = architectureMaterial('roof')
+  private density = { value: 1 }
+  private visibility = { value: 1 }
+  private material = sceneryLodMaterial(architectureMaterial('wall'), this.density, this.visibility)
+  private roofMaterial = sceneryLodMaterial(architectureMaterial('roof'), this.density, this.visibility)
+  private depthMaterial = sceneryLodMaterial(
+    new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }),
+    this.density,
+    this.visibility,
+  )
   private actors: Actor[] = []
   private animated: { mesh: THREE.InstancedMesh; actors: Actor[] }[] = []
   private composed = new THREE.Matrix4()
   private motionTick = -1
   private time = 0
-  private detailed = false
   constructor(
     world: World,
     private picker: TerrainPicker,
@@ -73,8 +86,9 @@ export class ActivityScenery {
     return this.picker.heightAt(x, z)
   }
   view(camera: THREE.Camera, width: number, height: number, scale: number) {
-    this.detailed = scale >= (this.detailed ? 2.6 : 3)
-    if (!this.detailed) {
+    this.density.value = sceneryDensity(scale)
+    this.visibility.value = THREE.MathUtils.smoothstep(scale, 1.5, 3)
+    if (!this.visibility.value) {
       this.group.visible = false
       this.visible = []
       this.current = ''
@@ -100,7 +114,7 @@ export class ActivityScenery {
       right = Math.min(this.world.width - 1, Math.ceil(Math.max(...xs) / CELL_SIZE) + 1),
       top = Math.max(0, Math.floor(Math.min(...zs) / CELL_SIZE) - 1),
       bottom = Math.min(this.world.height - 1, Math.ceil(Math.max(...zs) / CELL_SIZE) + 1),
-      candidates: { id: number; score: number }[] = []
+      ids: number[] = []
     for (let r = top; r <= bottom; r++)
       for (let q = left; q <= right; q++) {
         const id = r * this.world.width + q,
@@ -111,17 +125,10 @@ export class ActivityScenery {
           my = ((CELL_SIZE + 8) * scale * 2) / height
         if (this.projection.z < -1 || this.projection.z > 1) continue
         if (Math.abs(this.projection.x) > 1 + mx || Math.abs(this.projection.y) > 1 + my) continue
-        candidates.push({
-          id,
-          score: (this.projection.x ** 2 + this.projection.y ** 2) * (this.visible.includes(id) ? 0.85 : 1),
-        })
+        ids.push(id)
       }
-    candidates.sort((a, b) => a.score - b.score || a.id - b.id)
-    const ids = candidates
-      .slice(0, ACTIVITY_DETAIL_LIMIT)
-      .map((c) => c.id)
-      .sort((a, b) => a - b)
-    const key = `${this.world.month}:${ids.join(',')}:${this.land.month}`
+    const bucket = sceneryBucket(this.density.value)
+    const key = `${this.world.month}:${ids.join(',')}:${this.land.month}:${bucket}`
     if (key === this.current) return
     this.current = key
     this.visible = ids
@@ -141,8 +148,8 @@ export class ActivityScenery {
         this.plans.set(id, cached)
       }
       cached.used = this.clock
-      pieces.push(...cached.plan.pieces)
-      motions.push(...cached.plan.motions)
+      pieces.push(...cached.plan.pieces.filter((p) => (p.detailThreshold ?? -1) < bucket))
+      motions.push(...cached.plan.motions.filter((m) => this.motionThreshold(m) < bucket))
     }
     this.clearMeshes()
     const color = new THREE.Color()
@@ -150,9 +157,13 @@ export class ActivityScenery {
       const list = pieces.filter((p) => p.shape === shape)
       if (!list.length) continue
       const mesh = new THREE.InstancedMesh(
-        this.geometries[shape],
+        this.geometries[shape].clone(),
         shape === 'roof' ? this.roofMaterial : this.material,
         list.length,
+      )
+      mesh.geometry.setAttribute(
+        'detailThreshold',
+        new THREE.InstancedBufferAttribute(new Float32Array(list.map((p) => p.detailThreshold ?? -1)), 1),
       )
       list.forEach((p, i) => {
         this.dummy.position.set(p.x, (p.baseY ?? (p.water ? 0 : this.height(p.x, p.z))) + p.y, p.z)
@@ -163,15 +174,20 @@ export class ActivityScenery {
         mesh.setColorAt(i, color.set(p.color))
       })
       mesh.castShadow = shape !== 'box'
+      mesh.customDepthMaterial = this.depthMaterial
       mesh.receiveShadow = true
       mesh.computeBoundingSphere()
       this.group.add(mesh)
     }
-    for (const motion of motions.slice(0, 384)) this.addMotion(motion)
+    for (const motion of motions) this.addMotion(motion)
     for (const shape of Object.keys(this.geometries) as DetailShape[]) {
       const actors = this.actors.filter((a) => a.shape === shape)
       if (!actors.length) continue
-      const mesh = new THREE.InstancedMesh(this.geometries[shape], this.material, actors.length)
+      const mesh = new THREE.InstancedMesh(this.geometries[shape].clone(), this.material, actors.length)
+      mesh.geometry.setAttribute(
+        'detailThreshold',
+        new THREE.InstancedBufferAttribute(new Float32Array(actors.map((a) => a.threshold)), 1),
+      )
       actors.forEach((a, i) => mesh.setColorAt(i, color.set(a.color)))
       mesh.frustumCulled = false
       this.animated.push({ mesh, actors })
@@ -183,6 +199,13 @@ export class ActivityScenery {
     }
     this.motionTick = -1
     this.animate(this.time)
+  }
+  private motionThreshold(m: DetailMotion) {
+    // A windmill rotor is part of its structure; roads and people receive
+    // deterministic detail samples that remain the same when the camera pans.
+    return m.kind === 'mill' || m.kind === 'boat'
+      ? -1
+      : reliefRandom(Math.round(m.x * 1024 + m.z * 8192 + m.phase * 32768))
   }
   private addMotion(motion: DetailMotion) {
     const add = (
@@ -200,7 +223,13 @@ export class ActivityScenery {
       this.dummy.rotation.set(0, 0, rz)
       this.dummy.scale.set(w, h, d)
       this.dummy.updateMatrix()
-      this.actors.push({ shape, color, motion, matrix: this.dummy.matrix.clone() })
+      this.actors.push({
+        shape,
+        color,
+        motion,
+        matrix: this.dummy.matrix.clone(),
+        threshold: this.motionThreshold(motion),
+      })
     }
     if (motion.kind === 'mill')
       for (let i = 0; i < 4; i++) {
@@ -255,8 +284,10 @@ export class ActivityScenery {
   }
   private clearMeshes() {
     for (const child of this.group.children) {
-      if (child instanceof THREE.InstancedMesh) child.dispose()
-      else
+      if (child instanceof THREE.InstancedMesh) {
+        child.geometry.dispose()
+        child.dispose()
+      } else
         child.traverse((part) => {
           if (part instanceof THREE.Mesh) (part.material as THREE.Material).dispose()
         })
@@ -271,5 +302,6 @@ export class ActivityScenery {
     Object.values(this.geometries).forEach((g) => g.dispose())
     this.material.dispose()
     this.roofMaterial.dispose()
+    this.depthMaterial.dispose()
   }
 }

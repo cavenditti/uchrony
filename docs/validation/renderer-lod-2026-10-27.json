@@ -1,0 +1,159 @@
+{
+  "date": "2026-10-27",
+  "positioningCommit": "d9ed6b8",
+  "scope": "Camera-driven LoD continuity; exact staged renderer files built in an isolated checkout.",
+  "checks": {
+    "productionBuild": "passed; existing chunk-size advisory",
+    "focusedTests": 42,
+    "newRegressions": 3,
+    "measurements": [
+      {
+        "maxCachedCities": 12,
+        "maxVisibleCities": 6,
+        "retainedBytes": 2708168,
+        "cameraChanges100ms": 8.529958000000079
+      },
+      {
+        "lodPan5Ms": 124.71062500000005,
+        "visible": 440,
+        "cached": 128,
+        "moving": 172,
+        "instances": 9584
+      }
+    ]
+  },
+  "browser": {
+    "engine": "Chromium",
+    "runtimeErrors": [],
+    "consoleMessages": [],
+    "desktopViewport": [
+      1440,
+      1000
+    ],
+    "phoneViewport": [
+      390,
+      844
+    ],
+    "controlled": {
+      "steps": 80,
+      "zooms": [
+        1.5,
+        1.6,
+        2,
+        2.5,
+        2.8,
+        3,
+        3.4,
+        5,
+        8,
+        12,
+        13,
+        20
+      ],
+      "maxGeometries": 18,
+      "maxActivityInstances": 15040,
+      "maxActivityCells": 144,
+      "end": {
+        "activities": {
+          "cached": 128,
+          "instances": 4445,
+          "moving": 97,
+          "visible": 144
+        },
+        "cells": 192,
+        "focus": {
+          "span": 240,
+          "x": 96,
+          "y": 66
+        },
+        "world": "controlled",
+        "zoom": 3.3541666666666665
+      }
+    },
+    "generated": {
+      "steps": 24,
+      "zooms": [
+        2,
+        3,
+        4,
+        8,
+        16
+      ],
+      "maxGeometries": 18,
+      "maxActivityInstances": 46394,
+      "maxActivityCells": 1187,
+      "end": {
+        "activities": {
+          "cached": 128,
+          "instances": 12354,
+          "moving": 492,
+          "visible": 137
+        },
+        "cells": 8064,
+        "focus": {
+          "span": 80,
+          "x": 846,
+          "y": 690
+        },
+        "world": "generated",
+        "zoom": 10.0625
+      }
+    },
+    "phoneGenerated": {
+      "steps": 21,
+      "zooms": [
+        2,
+        3,
+        5,
+        8,
+        12
+      ],
+      "maxGeometries": 18,
+      "maxActivityInstances": 18324,
+      "maxActivityCells": 464,
+      "end": {
+        "activities": {
+          "cached": 128,
+          "instances": 4696,
+          "moving": 168,
+          "visible": 36
+        },
+        "cells": 8064,
+        "focus": {
+          "span": 50,
+          "x": 846,
+          "y": 690
+        },
+        "world": "generated",
+        "zoom": 12.98
+      }
+    }
+  },
+  "screenshots": [
+    "docs/validation/renderer-lod-wide-2026-10-27.png",
+    "docs/validation/renderer-lod-generated-2026-10-27.png",
+    "docs/validation/renderer-lod-phone-2026-10-27.png"
+  ],
+  "sourceSha256": {
+    "src/map/activity-layout.ts": "1286278283525dfb7fa6c39900d99574218dae6a0c239f87fd5e201ddf31dbd4",
+    "src/map/activity-scenery.ts": "51138847b4288c6bd8ab00dd8c0df375a7fb9b3d170542a15ddd5b7b8d5a5b68",
+    "src/map/city-scenery.ts": "ceeb1ce28195ee61406353db365f6a334a2cb07b9710922e4e6f817d0ec2783e",
+    "src/map/relief.ts": "6586589a88f71ad2ec901cf02a573a17f58981bacae93e1bb6d16316f6860bea",
+    "src/map/scenery-lod.ts": "e02fa12a0321c83ea19dc46f89011e12a47fd65e5d17d3c2990f354b22f9a748",
+    "tests/browser/living-world.ts": "1998f14f3f7a80bd15ed5555a8d919e4e3b48f52263ec52ba87727f653221405",
+    "tests/living-world.test.ts": "620d15c104713b84712bdfb8057834c100d68ca5eac42688332f0567ca0d80c0",
+    "tests/lod-stability.test.ts": "e659e1f6daf823161c1edec5e083fa1c61f39e7dc934effa55d96f688d4547a7",
+    "tests/renderer-placement.test.ts": "916645de8eded3d975d74bc46bcf942212ad28bb99e5ac66fbf52c670a5360b7"
+  },
+  "commands": [
+    "npm run build",
+    "node --import tsx --test tests/renderer-placement.test.ts tests/lod-stability.test.ts tests/city-rendering.test.ts tests/relief.test.ts tests/living-world.test.ts tests/road-curves.test.ts tests/river-rendering.test.ts",
+    "npx vite build --config tests/browser/living-world.config.ts --outDir /private/tmp/uchrony-lod-browser"
+  ],
+  "limits": [
+    "Fixture/regional camera checks, not every saved world or world-scale endurance.",
+    "Complete town silhouettes and viewport activity replace fixed sampled geometry budgets; GPU workload may increase.",
+    "Town retained-byte measurement excludes shared shapes, materials, terrain, textures, shadows and total browser memory.",
+    "Pan-test duration includes scene traversal and assertions; browser tours are correctness checks, not a frame-rate benchmark."
+  ]
+}
