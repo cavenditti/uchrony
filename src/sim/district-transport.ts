@@ -54,8 +54,9 @@ function localPath(profile: CorridorProfile, start: number, end: number, allowed
     previous = new Map<number, number>(),
     heap = new MinHeap()
   heap.push(start, 0)
+  const current = { id: 0, cost: 0 }
   while (heap.size) {
-    const current = heap.pop()
+    heap.popInto(current)
     if (current.cost !== distances.get(current.id)) continue
     if (current.id === end) break
     for (const next of profile.adjacent[current.id]) {
@@ -146,14 +147,22 @@ export function districtNetwork(w: World): DistrictNetwork {
 function nearby(graph: Map<number, DistrictLink[]>, from: number, maxCost: number) {
   const distance = new Map([[from, 0]]),
     previous = new Map<number, { from: number; edge: DistrictLink }>(),
+    children = new Map<number, number[]>(),
     heap = new MinHeap(),
     reached: number[] = []
   heap.push(from, 0)
+  const current = { id: 0, cost: 0 }
   while (heap.size) {
-    const current = heap.pop()
+    heap.popInto(current)
     if (current.cost !== distance.get(current.id)) continue
     if (current.cost > maxCost) break
-    if (current.id !== from) reached.push(current.id)
+    if (current.id !== from) {
+      reached.push(current.id)
+      const parent = previous.get(current.id)!.from,
+        siblings = children.get(parent) ?? []
+      siblings.push(current.id)
+      children.set(parent, siblings)
+    }
     for (const edge of graph.get(current.id) ?? []) {
       const cost = current.cost + edge.cost
       if (cost < (distance.get(edge.to) ?? Infinity)) {
@@ -163,7 +172,7 @@ function nearby(graph: Map<number, DistrictLink[]>, from: number, maxCost: numbe
       }
     }
   }
-  return { distance, previous, reached }
+  return { distance, previous, reached, children }
 }
 export function tradeDistricts(w: World, network = districtNetwork(w)) {
   const system = w.localEconomy!,
@@ -212,21 +221,30 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
           ? 0
           : w.nations[a].policies.tariff / 100
     }
-  const tariffFor = (buyer: number, seller: number) =>
-    tariffs[system.units[buyer].nation * nationCount + system.units[seller].nation]
+  const tariffFor = (buyer: number, seller: number) => {
+    const a = system.units[buyer].nation,
+      b = system.units[seller].nation
+    return a < 0 ? 0 : b < 0 ? w.nations[a].policies.tariff / 100 : tariffs[a * nationCount + b]
+  }
   // Within goods clearing, loan principal can only increase and bank lending
   // capacity can only fall. A rejected limit cannot become fundable until the
   // buyer receives deposits or requests a higher limit. Cache only rejections;
   // every actual origination still passes the bank's complete balance-sheet check.
   const rejectedCredit = new Map<number, number>()
-  const creditLimit = (id: number) =>
-    Math.max(
+  const creditLimits = new Map<number, number>()
+  const creditLimit = (id: number) => {
+    let limit = creditLimits.get(id)
+    if (limit !== undefined) return limit
+    limit = Math.max(
       1,
       GOODS.reduce(
         (sum, g) => sum + (householdNeed(system.units[id], g) * system.units[id].prices[g]) / 1000,
         0,
       ) * 6,
     )
+    creditLimits.set(id, limit)
+    return limit
+  }
   const pathFor = (buyer: number, seller: number) => {
     const search = paths.get(buyer)!,
       chain: DistrictLink[] = [],
@@ -306,6 +324,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     buyer.prices[good] *= Math.exp(
       Math.max(-0.06, Math.min(0.06, Math.log(targetPrice / Math.max(0.01, buyer.prices[good])))),
     )
+    creditLimits.delete(buyerId)
     exportable.get(sellerId)![good] -= amount
     system.shipments.push({
       from: sellerId,
@@ -347,7 +366,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
           id,
           8 +
             system.units[id].infrastructure * 5 +
-            w.nations[system.units[id].nation].technologies.logistics * 2,
+            (w.nations[system.units[id].nation]?.technologies.logistics ?? 0) * 2,
         ),
       )
     return paths.get(id)!
@@ -391,14 +410,15 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       )
         continue
       const found = search(buyer.id)
-      // Dijkstra settlement order places a predecessor before its descendants.
-      // Propagate exhausted paths once through this tree before sorting offers;
-      // rebuilding a closed journey for every commodity cannot enable a shipment.
-      const reachable = new Set([buyer.id])
+      // A closed path rules out its entire descendant subtree. Walk only open
+      // branches instead of scanning every distant seller again for every good.
+      // Offers are still sorted by delivered price and ID before any settlement.
+      const pending = [...(found.children.get(buyer.id) ?? [])]
       const candidates: { id: number; cost: number }[] = []
-      for (const id of found.reached) {
+      while (pending.length) {
+        const id = pending.pop()!
         const prev = found.previous.get(id)!
-        if (!reachable.has(prev.from) || (linkRemaining.get(prev.edge) ?? prev.edge.capacity) < 1e-6) continue
+        if ((linkRemaining.get(prev.edge) ?? prev.edge.capacity) < 1e-6) continue
         let open = true
         for (const [edge, count] of prev.edge.usage)
           if (remaining[edge] / count < 1e-6) {
@@ -406,7 +426,8 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
             break
           }
         if (!open) continue
-        reachable.add(id)
+        const children = found.children.get(id)
+        if (children) pending.push(...children)
         if (exportable.get(id)![good] > 1e-6)
           candidates.push({
             id,

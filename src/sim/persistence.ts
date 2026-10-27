@@ -16,7 +16,7 @@ import { MAX_STATE_IDENTITIES } from './types'
 import { validateSovereignty } from './sovereignty-persistence'
 import { validatePressures } from './pressure-persistence'
 import { GOODS, FIELDS, type World, type RouteLeg } from './types'
-import { movementNeighbors, adjacentCells, CELL_SIZE, GRID_TOPOLOGY } from './grid'
+import { geographicNeighbors as movementNeighbors, adjacentCells, CELL_SIZE, GRID_TOPOLOGY } from './grid'
 import { validateHistoryState, validateHistoricalRecord } from './history-schema'
 import { validateStatecraft } from './statecraft-persistence'
 import { validatePopulation } from './population-persistence'
@@ -49,6 +49,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     fail(
       'this world uses the retired hex grid. Create a new square-grid world; your existing save file is unchanged',
     )
+  if (w.settlementStart !== undefined && w.settlementStart !== 'frontier') fail('invalid settlement start')
   if (w.generatorVersion !== 5) fail('unsupported geography generator')
   if (
     typeof w.seed !== 'string' ||
@@ -57,6 +58,15 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
     !Number.isInteger(w.month)
   )
     fail('invalid seed or simulation date')
+  if (
+    w.fastForward !== undefined &&
+    (!object(w.fastForward) ||
+      !Number.isInteger(w.fastForward.months) || !number(w.fastForward.months, 1, w.month) ||
+      !Number.isInteger(w.fastForward.lastMonth) || !number(w.fastForward.lastMonth, 1, w.month) ||
+      !Number.isInteger(w.fastForward.phase) || !number(w.fastForward.phase, 0, 5) ||
+      w.fastForward.phase > w.fastForward.months ||
+      (w.fastForward.phase > 0 && w.fastForward.lastMonth !== w.month))
+  ) fail('invalid fast-forward provenance')
   if (
     !number(w.startYear, 1, 10000) ||
     !number(w.rng, 0, 4294967295) ||
@@ -118,7 +128,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       !object(r) ||
       r.id !== i ||
       typeof r.name !== 'string' ||
-      !nationId(r.nation) ||
+      !(r.nation === -1 || nationId(r.nation)) ||
       !nationId(r.culture) ||
       !cellId(r.center) ||
       !terrain(r.terrain) ||

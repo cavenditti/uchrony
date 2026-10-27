@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-26",
+  "scope": "Frontier starts, conserved founding, individual housing footprints, connected occupied settlements, coarse economic pools and visible quadtrees. Bounded correctness and browser checks; not a long-run economic or frame-rate qualification.",
+  "model": {
+    "initialPeoplePerState": 2500,
+    "initialSettlementsPerState": 1,
+    "unclaimedPopulation": "Mostly empty, with deterministic scattered independent rural communities",
+    "lotSpanMeters": 16,
+    "minimumLeafSpanMeters": 8,
+    "terrainSampleSpanMeters": 1024,
+    "economics": "Existing district accounts, markets, firms and dated cohorts remain authoritative; building subdivision does not create economic agents",
+    "morphology": "City labels follow connected occupied building footprints; empty buildings cannot bridge settlements",
+    "compatibility": "New app worlds use frontier starts. Existing settled worlds preserve coarse housing supports."
+  },
+  "tests": [
+    {
+      "suite": "tests/frontier-settlements.test.ts",
+      "passed": 7,
+      "failed": 0,
+      "covers": "Opening supplies, mostly empty unclaimed land, exact founding transfers and paid inputs, invalid orders, autonomous decisions, independent settlement classification, twelve-month save continuation and legacy starts"
+    },
+    {
+      "suite": "tests/building-lots.test.ts tests/view-storage.test.ts",
+      "passed": 15,
+      "failed": 0,
+      "covers": "Conservation, unchanged economic pools, 8 m refinement, exact building picking, geometry persistence, occupied-lot mergers, funded outward surveys and lean display/save storage"
+    },
+    {
+      "suite": "tests/building-lots.test.ts tests/city-rendering.test.ts tests/relief.test.ts",
+      "passed": 21,
+      "failed": 0,
+      "covers": "Final canonical 3D building geometry, suppression of duplicate decorative activity buildings, legacy town rendering and relief geometry",
+      "note": "Includes the four building-lot tests already counted in the previous batch."
+    },
+    {
+      "suite": "Earlier frontier economy, districts, geopolitics, intelligence and adaptive-economy regression batch",
+      "passed": 53,
+      "failed": 0,
+      "note": "Run before the final building renderer changes. Legacy settled behavior remains available."
+    }
+  ],
+  "productionBuild": "passed: TypeScript and Vite; existing large-chunk warning remains",
+  "diffWhitespaceCheck": "passed",
+  "regionalGrowth": {
+    "seed": "Quadtree urban validation",
+    "before": {
+      "month": 0,
+      "states": 8,
+      "settlements": 8,
+      "people": 22911,
+      "buildings": 3601,
+      "economicPools": 218,
+      "leaves": 57048,
+      "unclaimedProvinces": 174
+    },
+    "after": {
+      "month": 6,
+      "settlements": 15,
+      "buildings": 4217,
+      "leaves": 61263
+    },
+    "perMonthDiagnosticSeconds": [3.619, 4.951, 4.003, 1.061, 1.1, 1.379],
+    "note": "Node run validated each month. Timings overlap other work and are not controlled benchmarks."
+  },
+  "worldInitialization": {
+    "states": 32,
+    "settlements": 32,
+    "people": 99843,
+    "buildings": 18525,
+    "economicPools": 1731,
+    "leaves": 514662,
+    "generationPreparationAndValidationSeconds": 36.410,
+    "note": "Single concurrent diagnostic run. Profiling sparse rural refinement and balance propagation remains necessary before increasing default world size or population."
+  },
+  "browser": {
+    "fixture": "/tests/browser/quadtree.html",
+    "isolation": "Real simulation in a dedicated worker, without app saves or model calls",
+    "finalViewport": [509, 853],
+    "checked": [
+      "Individual roofs and adaptive cells visible at metre scale",
+      "Aurel Heath selects a recorded building with 6 residents and 7 displayed spaces",
+      "Optional 3D uses matching footprints, without duplicate activity farmhouses",
+      "Both presentations frame the complete occupied cluster",
+      "Six months complete in the browser; the settlement list grows from 8 to 15",
+      "New Lormere Vale is visible with 607 residents",
+      "A new Lormere home selects 7 residents and inspection targets its exact 16 m lot"
+    ],
+    "screenshot": "frontier-buildings-2026-10-26.png",
+    "toolingNote": "Headless screenshots timed out after zooming. Final visual and interaction checks succeeded using the actual in-app browser; no app hang was reproduced there. Earlier desktop geometry was inspected at 1440 by 1000."
+  },
+  "limits": [
+    "Founding still claims a province, the current sovereignty unit.",
+    "Individual physical footprints currently represent housing; economic firms and accounts remain aggregated.",
+    "Terrain sampling and the existing long-run food/employment calibration are unchanged.",
+    "No new century-scale or sustained World-scale simulation qualification."
+  ]
+}

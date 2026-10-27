@@ -120,7 +120,9 @@ export function cohortDeaths(
   multiplier = 1,
 ) {
   ensureAges(group, month)
-  let deaths = 0
+  let deaths = 0,
+    write = 0
+  const totals = { children: 0, adults: 0, elders: 0 }
   for (const c of group.ageCohorts!) {
     const age = (month - c[0]) / 12,
       probability =
@@ -132,8 +134,13 @@ export function cohortDeaths(
       c[sex] -= dead
       deaths += dead
     }
+    if (c[1] + c[2] > 0) {
+      group.ageCohorts![write++] = c
+      totals[ageClass(c[0], month)] += c[1] + c[2]
+    }
   }
-  refreshAges(group, month)
+  group.ageCohorts!.length = write
+  group.population = totals
   return deaths
 }
 /** Desired surviving family size, not a world population target. Education changes
@@ -155,11 +162,19 @@ export function cohortBirths(
   multiplier = 1,
 ) {
   ensureAges(group, month)
-  let expected = 0
-  for (const [born, female] of group.ageCohorts!) {
+  let expected = 0,
+    write = 0
+  const totals = { children: 0, adults: 0, elders: 0 }
+  for (const c of group.ageCohorts!) {
+    const [born, female, male] = c
     const age = (month - born) / 12
     if (age >= 15 && age < 50) expected += (female * P.fertilityAnnual[Math.floor((age - 15) / 5)]) / 12
+    if (female + male > 0) {
+      write++
+      totals[ageClass(born, month)] += female + male
+    }
   }
+  const hadEmpty = write < group.ageCohorts!.length
   const scheduleTFR = 5 * P.fertilityAnnual.reduce((sum, rate) => sum + rate, 0)
   const modifier = (desiredFertility(group) / scheduleTFR) * (1 - shortage * 0.8) * multiplier
   const births = expectedInteger(rng, expected * Math.max(0, modifier))
@@ -171,7 +186,13 @@ export function cohortBirths(
       existing[2] += births - female
     } else group.ageCohorts!.push([month, female, births - female])
   }
-  refreshAges(group, month)
+  if (hadEmpty) {
+    write = 0
+    for (const c of group.ageCohorts!) if (c[1] + c[2] > 0) group.ageCohorts![write++] = c
+    group.ageCohorts!.length = write
+  }
+  totals.children += births
+  group.population = totals
   return births
 }
 export function participatingLabor(group: PopulationCommunity) {

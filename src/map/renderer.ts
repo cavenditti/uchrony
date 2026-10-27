@@ -76,18 +76,33 @@ function districtAtlas(world: World) {
   return cached
 }
 
-const administrationCache = new WeakMap<World['cells'], Map<string, { signature: string; edges: MapGeometry['edges'] }>>()
+const administrationCache = new WeakMap<
+  World['cells'],
+  Map<string, { signature: string; edges: MapGeometry['edges'] }>
+>()
 function administrativeEdges(world: World, level: 'municipality' | 'province') {
   if (!world.adaptive) return level === 'municipality' ? districtAtlas(world).edges : []
   const records = activeJurisdictions(world, level)
   const signature = `${world.adaptive.boundaries.length}:${records.map((j) => j.id).join('|')}`
   let cache = administrationCache.get(world.cells)
-  if (!cache) { cache = new Map(); administrationCache.set(world.cells, cache) }
+  if (!cache) {
+    cache = new Map()
+    administrationCache.set(world.cells, cache)
+  }
   const prior = cache.get(level)
   if (prior?.signature === signature) return prior.edges
   const owners = new Int32Array(world.cells.length).fill(-1)
-  records.forEach((j, i) => j.cells.forEach((c) => { owners[c] = i }))
-  const geometry = buildGeometry(world.cells.map((c) => ({ ...c, region: owners[c.id] })), world.width, world.height, records.length)
+  records.forEach((j, i) =>
+    j.cells.forEach((c) => {
+      owners[c] = i
+    }),
+  )
+  const geometry = buildGeometry(
+    world.cells.map((c) => ({ ...c, region: owners[c.id] })),
+    world.width,
+    world.height,
+    records.length,
+  )
   cache.set(level, { signature, edges: geometry.edges })
   return geometry.edges
 }
@@ -159,6 +174,7 @@ export function drawAtlas(
   scale: number,
   relief = false,
   linework = true,
+  quadtree = false,
 ) {
   ctx.drawImage(cache.ocean, 0, 0, cache.worldWidth, cache.worldHeight)
   ctx.save()
@@ -173,7 +189,7 @@ export function drawAtlas(
       ctx.fillStyle = n.color
       ctx.fill(shape)
     }
-  } else if (layer === 'population') {
+  } else if (layer === 'population' && !quadtree) {
     const spatial = spatialState(world),
       districts = districtAtlas(world)
     const density = districtDensityScale(world)
@@ -196,9 +212,10 @@ export function drawAtlas(
           : `rgb(${191 - t * 81},${122 + t * 56},${105 + t * 27})`
       ctx.fill(districts.paths[i], 'evenodd')
     })
-  } else if (layer !== 'terrain')
+  } else if (layer !== 'terrain' && !(layer === 'population' && quadtree))
     for (const r of world.regions) {
-      let fill = world.nations[r.nation].color
+      if (r.nation < 0 && ['political', 'trade', 'military'].includes(layer)) continue
+      let fill = world.nations[r.nation]?.color ?? terrainColors[r.terrain]
       const axis = identityAxis(layer)
       if (axis) fill = identityColor(dominantIdentity(r, axis))
       if (layer === 'prosperity') {
@@ -334,7 +351,7 @@ export function drawPlaceLabels(
     ctx.fillText(text, x, y)
     return true
   }
-  if (['political', 'terrain', 'military'].includes(layer)) {
+  if (['political', 'terrain', 'military'].includes(layer) && (project || scale < 4)) {
     const nations = [...world.nations].sort(
       (a, b) => (b.id === selected ? 1 : 0) - (a.id === selected ? 1 : 0) || b.population - a.population,
     )

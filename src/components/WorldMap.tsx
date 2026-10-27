@@ -1,4 +1,3 @@
-import { mapUrbanBlockAt } from '../map/quadtree'
 import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
 import type { SpatialBounds } from '../sim/adaptive-types'
 import { districtDensityScale, spatialState, settlementPosition, type Settlement } from '../sim/spatial'
@@ -25,9 +24,11 @@ import {
 import type { ReliefMap } from '../map/relief'
 import { terrainHeight } from '../map/relief-field'
 import { resizeCanvas } from '../map/render-budget'
-import { CELL_SIZE } from '../sim/grid'
+import { CELL_SIZE, CELL_METERS } from '../sim/grid'
 import { contains, zoomAt } from '../map/geometry'
 import { buildAtlas, drawAtlas, drawPlaceLabels, terrainColors } from '../map/renderer'
+import { drawQuadtree } from '../map/quadtree-renderer'
+import { mapLeafAt, mapBuildingAt, mapUrbanBlockAt } from '../map/quadtree'
 import { freightOverlay, drawFreight } from '../map/trade'
 import { population, type World, type Layer } from '../sim/types'
 import { dominantIdentity, identityAxis, identityColor } from '../map/identity'
@@ -48,6 +49,7 @@ interface Props {
   onInspectDaily?: (cell: number) => void
   onInspectArea?: (bounds: SpatialBounds) => void
   onInspectionViewport?: (bounds: SpatialBounds) => void
+  onFound?: (cell: number) => void
   onSelect: (region: number) => void
   onLayer: (layer: Layer) => void
   onInspect: (region: number, section: Tab) => void
@@ -80,6 +82,7 @@ export function WorldMap({
   running,
   focus,
   onSelect,
+  onFound,
   onInspectDaily,
   onInspectArea,
   onInspectionViewport,
@@ -95,7 +98,7 @@ export function WorldMap({
     holderRef = useRef<HTMLDivElement>(null)
   const reliefCanvasRef = useRef<HTMLCanvasElement>(null)
   const reliefRef = useRef<ReliefMap | null>(null)
-  const [presentation, setPresentation] = useState<'relief' | 'atlas'>('relief')
+  const [presentation, setPresentation] = useState<'relief' | 'atlas'>('atlas')
   const [tilt, setTilt] = useState(true)
   const [reliefReady, setReliefReady] = useState<string | null>(null)
   const [reliefError, setReliefError] = useState(false)
@@ -155,10 +158,10 @@ export function WorldMap({
   const quantitativeLegend =
     layer === 'population'
       ? {
-          label: 'District people / cell · log scale',
+          label: isRelief ? 'District people / cell · log scale' : 'Residents / km² · quadtree cells',
           colors: '#c7d1a4, #3a7661',
-          ticks: [0, populationScale.midpoint, populationScale.maximum].map((n) =>
-            Math.round(n).toLocaleString(),
+          ticks: (isRelief ? [0, populationScale.midpoint, populationScale.maximum] : [0, 1000, 60000]).map(
+            (n) => Math.round(n).toLocaleString(),
           ),
         }
       : layer === 'prosperity'
@@ -286,6 +289,7 @@ export function WorldMap({
   }, [focus])
 
   useEffect(() => {
+    if (presentation !== 'relief') return
     let active = true
     setReliefReady(null)
     setReliefError(false)
@@ -297,8 +301,12 @@ export function WorldMap({
       setPresentation('atlas')
     }
     canvas.addEventListener('webglcontextlost', lost)
-    void import('../map/relief')
-      .then(({ ReliefMap }) => {
+    // Blender scenery models load beside the 3D module; a failed load keeps primitives.
+    void Promise.all([
+      import('../map/relief'),
+      import('../map/scenery-models').then(({ loadSceneryModels }) => loadSceneryModels()),
+    ])
+      .then(([{ ReliefMap }]) => {
         if (!active) return
         try {
           reliefRef.current = new ReliefMap(canvas, world, atlas)
@@ -321,7 +329,7 @@ export function WorldMap({
       reliefRef.current?.dispose()
       reliefRef.current = null
     }
-  }, [atlas])
+  }, [atlas, presentation])
 
   useEffect(() => {
     if (!isRelief || !reliefRef.current) return
@@ -351,7 +359,21 @@ export function WorldMap({
     ctx.clearRect(0, 0, size.w, size.h)
     ctx.translate(offsetX, offsetY)
     ctx.scale(scale, scale)
-    drawAtlas(ctx, atlas, world, layer, scale)
+    drawAtlas(ctx, atlas, world, layer, scale, false, true, !!world.adaptive)
+    const meters = world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT
+    drawQuadtree(
+      ctx,
+      world,
+      layer,
+      scale,
+      {
+        x: (-offsetX / scale) * meters,
+        y: (-offsetY / scale) * meters,
+        width: (size.w / scale) * meters,
+        height: (size.h / scale) * meters,
+      },
+      atlas.land,
+    )
     baseRef.current = base
   }, [world, layer, size.w, size.h, offsetX, offsetY, atlas, scale, isRelief])
 
@@ -432,9 +454,17 @@ export function WorldMap({
             }
           ctx.stroke()
         }
-        if (hover && hover.id !== region) {
+        if (hover) {
+          const cell = !isRelief && mapLeafAt(world, hover.point)
           ctx.fillStyle = '#f5efd72b'
-          ctx.fill(atlas.provinces[hover.id], 'evenodd')
+          if (cell) {
+            const b = cell.bounds,
+              meters = world.adaptive!.metersPerMapUnit
+            ctx.fillRect(b.x / meters, b.y / meters, b.size / meters, b.size / meters)
+            ctx.lineWidth = 1.2 / scale
+            ctx.strokeStyle = '#f1ca79'
+            ctx.strokeRect(b.x / meters, b.y / meters, b.size / meters, b.size / meters)
+          } else if (hover.id !== region) ctx.fill(atlas.provinces[hover.id], 'evenodd')
         }
         ctx.restore()
         if (showArmies || layer === 'military') drawWarfare(ctx, world, nation, !(isRelief && scale >= 3))
@@ -564,11 +594,20 @@ export function WorldMap({
         y <= b.maxY &&
         contains(atlas.geometry.provinces[id], x, y)
       )
-        return { id, x: clientX - rect.left, y: clientY - rect.top, point: { x: x * METERS_PER_MAP_UNIT, y: y * METERS_PER_MAP_UNIT } }
+        return {
+          id,
+          x: clientX - rect.left,
+          y: clientY - rect.top,
+          point: { x: x * METERS_PER_MAP_UNIT, y: y * METERS_PER_MAP_UNIT },
+        }
     }
     return null
   }
-  const maxZoom = isRelief ? Math.max(32, 36 / fit) : 32
+  const maxZoom = Math.max(32, 160 / fit)
+  const hoveredLeaf = !isRelief && hover ? mapLeafAt(world, hover.point) : undefined
+  const pickedLeaf = !isRelief && picked ? mapLeafAt(world, picked.point) : undefined
+  const pickedBuilding = !isRelief && picked ? mapBuildingAt(world, picked.point) : undefined
+  const hoveredBuilding = !isRelief && hover ? mapBuildingAt(world, hover.point) : undefined
   const pickedBlock = !isRelief && picked ? mapUrbanBlockAt(world, picked.point) : undefined
   const placeContextTop = picked ? Math.max(70, Math.min(picked.y + 14, size.h - 540)) : 70
   const blockCentres =
@@ -582,18 +621,18 @@ export function WorldMap({
     : undefined
   const cityScreen = (city: Settlement) => {
     const c = settlementPosition(world, city),
-      elevation = terrainHeight(world, c.x, c.y) + 2
+      elevation = isRelief ? terrainHeight(world, c.x, c.y) + 2 : 0
     return {
       x: (c.x - mapW / 2) * scale + view.x + size.w / 2,
       y:
         (c.y - mapH / 2) * scale * verticalFactor -
-        elevation * scale * (tilt ? Math.cos(Math.PI * 0.29) : 0) +
+        elevation * scale * (isRelief && tilt ? Math.cos(Math.PI * 0.29) : 0) +
         view.y +
         size.h / 2,
     }
   }
   const closeCity =
-    isRelief && scale >= 6
+    scale >= 6
       ? settlements.reduce<Settlement | undefined>((best, s) => {
           const p = cityScreen(s)
           if (p.x < 0 || p.x > size.w || p.y < 80 || p.y > size.h - 70) return best
@@ -606,15 +645,34 @@ export function WorldMap({
         }, undefined)
       : undefined
   const exploreCity = (city: Settlement) => {
-    const c = settlementPosition(world, city),
-      targetScale = Math.max(6, Math.min(24, (size.w - 50) / 34, (size.h - 140) / 26))
+    const c = { ...settlementPosition(world, city) }
+    const lots = new Set(city.siteIds ?? [])
+    const homes = world.viewHomes?.filter((h) => lots.has(h.id) && h.building && h.parcel) ?? []
+    let targetScale = Math.max(6, Math.min(24, (size.w - 50) / 34, (size.h - 140) / 26))
+    if (homes.length) {
+      const minX = Math.min(...homes.map((h) => h.parcel!.x)),
+        minY = Math.min(...homes.map((h) => h.parcel!.y))
+      const maxX = Math.max(...homes.map((h) => h.parcel!.x + h.parcel!.size)),
+        maxY = Math.max(...homes.map((h) => h.parcel!.y + h.parcel!.size))
+      c.x = (minX + maxX) / 2 / METERS_PER_MAP_UNIT
+      c.y = (minY + maxY) / 2 / METERS_PER_MAP_UNIT
+      targetScale = Math.max(
+        6,
+        Math.min(
+          160,
+          ((size.w - 90) * METERS_PER_MAP_UNIT) / Math.max(150, maxX - minX),
+          ((size.h - 180) * METERS_PER_MAP_UNIT) / Math.max(150, (maxY - minY) * verticalFactor),
+        ),
+      )
+    }
     const zoom = targetScale / fit,
-      elevation = terrainHeight(world, c.x, c.y) + 2
+      elevation = isRelief ? terrainHeight(world, c.x, c.y) + (homes.length ? 0 : 2) : 0
     setView({
       zoom,
       x: (mapW / 2 - c.x) * targetScale,
       y:
-        ((mapH / 2 - c.y) * verticalFactor + elevation * (tilt ? Math.cos(Math.PI * 0.29) : 0)) * targetScale,
+        ((mapH / 2 - c.y) * verticalFactor + elevation * (isRelief && tilt ? Math.cos(Math.PI * 0.29) : 0)) *
+        targetScale,
     })
     setPicked(null)
   }
@@ -625,7 +683,7 @@ export function WorldMap({
     const angle = mode === 'relief' && nextTilt ? Math.PI * 0.29 : Math.PI / 2
     const nextFactor = Math.sin(angle),
       nextFit = Math.min(size.w / mapW, size.h / (mapH * nextFactor)) * 0.94
-    const nextScale = mode === 'atlas' ? Math.min(scale, nextFit * 32) : scale
+    const nextScale = scale
     const elevation = mode === 'relief' ? terrainHeight(world, cx, cy) : 0
     setView({
       zoom: nextScale / nextFit,
@@ -633,6 +691,7 @@ export function WorldMap({
       y: ((mapH / 2 - cy) * nextFactor + elevation * Math.cos(angle)) * nextScale,
     })
     setPresentation(mode)
+    if (mode === 'atlas') setReliefReady(null)
     setTilt(nextTilt)
     setPicked(null)
   }
@@ -870,15 +929,29 @@ export function WorldMap({
               </div>
             </div>
           ) : layer === 'terrain' ? (
-            <div className="terrain-legend">
-              {Object.entries(terrainColors)
-                .filter(([name]) => name !== 'water')
-                .map(([name, fill]) => (
-                  <span key={name}>
-                    <i style={{ background: fill }} />
-                    {name}
+            <div className="quadtree-legend">
+              <div className="terrain-legend">
+                {Object.entries(terrainColors)
+                  .filter(([name]) => name !== 'water')
+                  .map(([name, fill]) => (
+                    <span key={name}>
+                      <i style={{ background: fill }} />
+                      {name}
+                    </span>
+                  ))}
+              </div>
+              {!isRelief && (
+                <>
+                  <span>Cells divide around development, down to individual buildings.</span>
+                  <span>
+                    <i className="urban-key occupied" /> Occupied homes · lanes and varied footprints
                   </span>
-                ))}
+                  <span>
+                    <i className="urban-key vacant" /> Vacant housing <i className="urban-key building" />{' '}
+                    Construction
+                  </span>
+                </>
+              )}
             </div>
           ) : layer === 'trade' ? (
             <div className="symbol-legend">
@@ -917,11 +990,9 @@ export function WorldMap({
       <div className="map-scale">
         <span />
         <small>
-          {(((65 / scale) * (world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT)) / 1000).toLocaleString(
-            undefined,
-            { maximumFractionDigits: 1 },
-          )}{' '}
-          km
+          {(65 * METERS_PER_MAP_UNIT) / scale < 1000
+            ? `${Math.round((65 * METERS_PER_MAP_UNIT) / scale)} m`
+            : `${((65 * METERS_PER_MAP_UNIT) / scale / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`}
         </small>
       </div>
       <div className="map-view-switch" role="group" aria-label="Map presentation">
@@ -935,19 +1006,19 @@ export function WorldMap({
           </button>
         )}
         <button
+          aria-pressed={presentation === 'atlas'}
+          title="Quadtree cells and evolving urban land"
+          onClick={() => changePresentation('atlas')}
+        >
+          <MapIcon size={15} /> Quadtree
+        </button>
+        <button
           aria-pressed={presentation === 'relief'}
-          disabled={reliefError || reliefReady !== mapKey}
+          disabled={reliefError}
           title={reliefError ? '3D graphics unavailable on this device' : 'Three-dimensional landscape'}
           onClick={() => changePresentation('relief')}
         >
-          <Mountain size={15} /> 3D
-        </button>
-        <button
-          aria-pressed={presentation === 'atlas'}
-          title="Flat cartographic view"
-          onClick={() => changePresentation('atlas')}
-        >
-          <MapIcon size={15} /> Atlas
+          <Mountain size={15} /> {presentation === 'relief' && !isRelief ? 'Loading…' : '3D'}
         </button>
         {isRelief && (
           <button
@@ -962,10 +1033,10 @@ export function WorldMap({
       </div>
       {reliefError && (
         <div className="map-render-note" role="status">
-          3D unavailable · Atlas view active
+          3D unavailable · Quadtree view active
         </div>
       )}
-      {closeCity && (
+      {closeCity && !legendOpen && (
         <div className="city-view-caption" aria-label="City view">
           <h2>{closeCity.name}</h2>
           {world.adaptive && (onInspectArea || onInspectDaily) && (
@@ -1031,14 +1102,38 @@ export function WorldMap({
               <X size={16} />
             </button>
           </div>
-          <button className="place-owner" onClick={() => onInspect(picked.id, 'diplomacy')}>
-            {world.nations[world.regions[picked.id].nation].name}
-            <ArrowUpRight size={13} />
-          </button>
+          {world.regions[picked.id].nation < 0 ? (
+            <span className="place-owner">Unclaimed land</span>
+          ) : (
+            <button className="place-owner" onClick={() => onInspect(picked.id, 'diplomacy')}>
+              {world.nations[world.regions[picked.id].nation].name}
+              <ArrowUpRight size={13} />
+            </button>
+          )}
           <p>
             {compact(population(world.regions[picked.id]))} people <span>·</span>{' '}
             {world.regions[picked.id].terrain}
           </p>
+          {pickedLeaf && (
+            <div className="picked-cell">
+              <span>
+                {pickedBuilding
+                  ? `Building · ${pickedBuilding.residents} residents · ${Math.floor(pickedBuilding.capacity)} spaces`
+                  : `${pickedLeaf.bounds.size.toLocaleString()} m cell · ${compact(pickedLeaf.population)} residents · ${compact(pickedLeaf.jobs)} jobs`}
+              </span>
+              {onInspectArea && (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    onInspectArea(pickedBuilding?.parcel ?? pickedLeaf.bounds)
+                    setPicked(null)
+                  }}
+                >
+                  {pickedBuilding ? 'Inspect building' : 'Inspect this cell'} <ArrowUpRight size={14} />
+                </button>
+              )}
+            </div>
+          )}
           {pickedBlock && (
             <div className="picked-cell">
               <span>
@@ -1072,6 +1167,25 @@ export function WorldMap({
               )}
             </div>
           )}
+          {onFound &&
+            !pickedBuilding &&
+            (world.regions[picked.id].nation < 0 || world.regions[picked.id].nation === nation) && (
+              <div className="found-settlement">
+                <button
+                  onClick={() => {
+                    const q = Math.floor(picked.point.x / CELL_METERS),
+                      r = Math.floor(picked.point.y / CELL_METERS)
+                    onFound(r * world.width + q)
+                  }}
+                >
+                  <Plus size={15} /> Found settlement · {world.nations[nation].shortName}
+                </button>
+                <small>
+                  Move 600 settlers from nearby. Costs 120 treasury, 40 timber, 20 stone, 5 tools and 94 food.
+                  Claims the surrounding province.
+                </small>
+              </div>
+            )}
           <div className="place-quick-actions">
             {(
               [
@@ -1080,14 +1194,16 @@ export function WorldMap({
                 { id: 'military', label: 'Forces', icon: Swords },
                 { id: 'diplomacy', label: 'Diplomacy', icon: Handshake },
               ] as const
-            ).map(({ id, label, icon: Icon }) => (
-              <button key={id} onClick={() => onInspect(picked.id, id)}>
-                <Icon size={15} />
-                {label}
-              </button>
-            ))}
+            )
+              .filter(({ id }) => world.regions[picked.id].nation >= 0 || id === 'population')
+              .map(({ id, label, icon: Icon }) => (
+                <button key={id} onClick={() => onInspect(picked.id, id)}>
+                  <Icon size={15} />
+                  {label}
+                </button>
+              ))}
           </div>
-          {isRelief && pickedCity && (
+          {pickedCity && (
             <button className="city-explore" onClick={() => exploreCity(pickedCity)}>
               <ScanSearch size={16} /> Explore {pickedCity.name}
             </button>
@@ -1126,9 +1242,13 @@ export function WorldMap({
             <MapPin size={12} />
             {world.regions[hover.id].name}
           </strong>
-          <span>{world.nations[world.regions[hover.id].nation].name}</span>
+          <span>{world.nations[world.regions[hover.id].nation]?.name ?? 'Unclaimed land'}</span>
           <small>
-            {population(world.regions[hover.id]).toLocaleString()} people · {world.regions[hover.id].terrain}
+            {hoveredBuilding
+              ? `Building · ${hoveredBuilding.residents} residents · ${Math.floor(hoveredBuilding.capacity)} spaces`
+              : hoveredLeaf
+                ? `${hoveredLeaf.bounds.size.toLocaleString()} m cell · ${Math.round(hoveredLeaf.population).toLocaleString()} residents`
+                : `${population(world.regions[hover.id]).toLocaleString()} people · ${world.regions[hover.id].terrain}`}
           </small>
         </div>
       )}

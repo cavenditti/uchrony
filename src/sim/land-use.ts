@@ -7,9 +7,15 @@ import { residentialDemand, settlementAccess } from './settlement-access'
 import { residentialPools, createResidentialParcel } from './residential-sites'
 import { planHousingInvestment } from './housing-investment'
 import { MODEL_PARAMETERS } from './model-parameters'
+import { coarseHousingDemand } from './housing-demand'
 
 /** Housing-space development has physical inputs and paid labor. No imputed rent removes cash. */
-export function advanceLandUse(w: World, prepared?: ReturnType<typeof settlementAccess>) {
+export function advanceLandUse(
+  w: World,
+  prepared?: ReturnType<typeof settlementAccess>,
+  coarse = false,
+  aggregateDemand = coarse,
+) {
   const a = w.adaptive
   if (!a || !w.economy || !w.localEconomy) return
   a.construction ??= []
@@ -25,7 +31,7 @@ export function advanceLandUse(w: World, prepared?: ReturnType<typeof settlement
   const pending = new Set(a.construction.map((p) => p.site))
   const access = prepared ?? settlementAccess(w)
   const homes = residentialPools(w),
-    demand = residentialDemand(w, access)
+    demand = aggregateDemand ? coarseHousingDemand(w, access) : residentialDemand(w, access)
   for (const id of w.localEconomy.active) {
     const r = w.localEconomy.units[id],
       p = w.economy.producers[id],
@@ -49,12 +55,15 @@ export function advanceLandUse(w: World, prepared?: ReturnType<typeof settlement
         access,
         pending,
         256,
+        !coarse,
       )
       if (!investment) continue
       site = investment.site
       const { plot, spaces, inputs } = investment
       if (plot) {
         site = createResidentialParcel(w, id, plot.cell, plot.point, plot.parcel)
+        if (plot.building) site.building = plot.building
+        if (plot.lanes?.length) (a.lanes ??= []).push(...plot.lanes)
         homes.get(id)!.push(site)
       }
       const labor = inputs.labor

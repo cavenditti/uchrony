@@ -1,4 +1,8 @@
+import { landComponents } from './land-connectivity'
+import { habitableLand } from './terrain-access'
+import { governance } from './governance'
 import { settlementMigrationOptions } from './settlement-access'
+import { cloneCommunity } from './population-clone'
 import { relocateResidentialResidents } from './residential-sites'
 import { householdNeed, BASE_PRICE } from './economy'
 import { GOODS } from './types'
@@ -48,8 +52,37 @@ const SOCIAL = [
 ] as const
 export const communitySize = (group: PopulationCommunity) =>
   group.population.children + group.population.adults + group.population.elders
-export const communityKey = (group: PopulationCommunity) =>
-  `${group.culture}:${group.language}:${group.belief}:${group.movement}:${group.allegiance}:${group.stratum ?? 'laborer'}${group.locality === undefined ? '' : ':local:' + group.locality}`
+type CommunityIdentity = Pick<
+  PopulationCommunity,
+  'culture' | 'language' | 'belief' | 'movement' | 'allegiance' | 'stratum' | 'locality'
+>
+const communityKeys = new WeakMap<PopulationCommunity, CommunityIdentity & { key: string }>()
+export function communityKey(group: PopulationCommunity) {
+  const previous = communityKeys.get(group)
+  if (
+    previous &&
+    previous.culture === group.culture &&
+    previous.language === group.language &&
+    previous.belief === group.belief &&
+    previous.movement === group.movement &&
+    previous.allegiance === group.allegiance &&
+    previous.stratum === group.stratum &&
+    previous.locality === group.locality
+  )
+    return previous.key
+  const key = `${group.culture}:${group.language}:${group.belief}:${group.movement}:${group.allegiance}:${group.stratum ?? 'laborer'}${group.locality === undefined ? '' : ':local:' + group.locality}`
+  communityKeys.set(group, {
+    culture: group.culture,
+    language: group.language,
+    belief: group.belief,
+    movement: group.movement,
+    allegiance: group.allegiance,
+    stratum: group.stratum,
+    locality: group.locality,
+    key,
+  })
+  return key
+}
 export function emptyDynamics(): PopulationDynamics {
   return {
     immigrants: 0,
@@ -101,16 +134,33 @@ export function identityDistribution(groups: PopulationCommunity[], axis: Identi
 }
 export function rollupPopulation(region: Region) {
   region.communities = coalesceCommunities(region.communities!)
-  for (const age of AGES)
-    region.population[age] = region.communities.reduce((sum, group) => sum + group.population[age], 0)
+  let children = 0,
+    adults = 0,
+    elders = 0,
+    health = 0,
+    literacy = 0,
+    urban = 0,
+    contentment = 0
+  for (const group of region.communities) {
+    children += group.population.children
+    adults += group.population.adults
+    elders += group.population.elders
+    const count = communitySize(group)
+    health += group.health * count
+    literacy += group.literacy * count
+    urban += group.urban * count
+    contentment += group.contentment * count
+  }
+  region.population.children = children
+  region.population.adults = adults
+  region.population.elders = elders
   const total = population(region)
-  if (total)
-    for (const field of ['health', 'literacy', 'urban'] as const)
-      region[field] =
-        region.communities.reduce((sum, group) => sum + group[field] * communitySize(group), 0) / total
-  if (total)
-    region.happiness =
-      region.communities.reduce((sum, group) => sum + group.contentment * communitySize(group), 0) / total
+  if (total) {
+    region.health = health / total
+    region.literacy = literacy / total
+    region.urban = urban / total
+    region.happiness = contentment / total
+  }
 }
 export function communityIndex(groups: PopulationCommunity[]) {
   const index = new Map<string, PopulationCommunity>()
@@ -127,7 +177,7 @@ export function addCommunity(
   const key = communityKey(incoming)
   const existing = index ? index.get(key) : groups.find((group) => communityKey(group) === key)
   if (!existing) {
-    const added = structuredClone(incoming)
+    const added = cloneCommunity(incoming)
     groups.push(added)
     index?.set(key, added)
     return
@@ -140,6 +190,7 @@ export function addCommunity(
 }
 /** Equal identities may converge after allegiance changes; combine their actual people and weighted conditions. */
 export function coalesceCommunities(groups: PopulationCommunity[]) {
+  if (groups.length < 2) return groups.filter((group) => communitySize(group) > 0)
   const indexed = new Map<string, PopulationCommunity>()
   for (const group of groups) {
     const count = communitySize(group)
@@ -159,7 +210,7 @@ export function coalesceCommunities(groups: PopulationCommunity[]) {
   return [...indexed.values()]
 }
 function copyPopulation(group: PopulationCommunity, counts: Cohorts): PopulationCommunity {
-  if (group.ageCohorts) return extractAges(structuredClone(group), counts)
+  if (group.ageCohorts) return extractAges(cloneCommunity(group), counts)
   return { ...group, population: { ...counts } }
 }
 function seedGroup(
@@ -325,7 +376,7 @@ export function ensurePopulation(world: World) {
   if (initializing) {
     for (const region of world.regions)
       for (const group of region.communities!) {
-        const language = world.nations[region.nation].identity!.language
+        const language = world.nations[region.nation]?.identity?.language ?? group.language
         if (group.knownLanguage !== language) {
           group.knownLanguage = language
           group.fluency = group.language === language ? 1 : 0.15 + group.urban * 0.2
@@ -376,7 +427,7 @@ export function discrimination(
   protection = (world.historical?.societies.find((society) => society.nation === region.nation)?.pluralism ??
     50) / 100,
 ) {
-  const nation = world.nations[region.nation],
+  const nation = governance(world, region.nation),
     identity = nation.identity!,
     policies = nation.policies
   return (
@@ -415,7 +466,7 @@ export function populationTension(world: World, region: Region) {
   )
 }
 export function updateCommunityDemography(world: World, region: Region) {
-  const nation = world.nations[region.nation],
+  const nation = governance(world, region.nation),
     mortality = effectMultiplier(world, 'mortality', nation.id, region.id),
     fertility = effectMultiplier(world, 'birthRate', nation.id, region.id),
     shortage = 1 - region.foodCoverage,
@@ -434,7 +485,7 @@ export function updateCommunityDemography(world: World, region: Region) {
       group.grievance = clamp(group.grievance + 0.12)
       group.host = region.nation
     }
-    const language = nation.identity!.language
+    const language = region.nation < 0 ? group.language : nation.identity!.language
     if (group.knownLanguage !== language) {
       group.knownLanguage = language
       group.fluency = group.language === language ? 1 : 0.1
@@ -589,7 +640,7 @@ export function removeSoldiers(world: World, army: Army, amount: number) {
 export function returnArmyPeople(world: World, army: Army, region: Region) {
   ensurePopulation(world)
   for (const source of army.communities!) {
-    const group = structuredClone(source)
+    const group = cloneCommunity(source)
     if (world.localEconomy) group.locality = region.id
     group.host = region.nation
     if (group.allegiance !== region.nation) group.loyalty *= 0.75
@@ -681,7 +732,7 @@ export function ageMilitaryPopulation(world: World) {
   for (const home of homes) settleCivilianCensus(world, home)
 }
 
-export function migrateCommunities(world: World) {
+export function migrateCommunities(world: World, months = 1) {
   const housing = settlementMigrationOptions(world)
   // Plans are simultaneous: destination communities stay unchanged until every household has chosen.
   // Marginals give the same affinity as scanning every destination group for every comparison.
@@ -710,6 +761,17 @@ export function migrateCommunities(world: World) {
           belief,
           culture,
           people: Math.max(1, population(region)),
+          appeal: Object.fromEntries(
+            STRATA.map((s) => [
+              s,
+              region.happiness * 0.35 +
+                region.health * 0.2 +
+                region.foodCoverage * 0.2 +
+                region.infrastructure * 0.1 +
+                economicAppeal(world, region, s),
+            ]),
+          ) as Record<EconomicStratum, number>,
+          crowding: 0.04 * Math.log1p(population(region) / Math.max(1, region.cells.length * 12000)),
           protection:
             (world.historical?.societies.find((society) => society.nation === region.nation)?.pluralism ??
               50) / 100,
@@ -745,6 +807,7 @@ export function migrateCommunities(world: World) {
     incoming?: PopulationCommunity
     assets: number
   }[] = []
+  const land = landComponents(world)
   const candidatesByRegion = Object.fromEntries(
     economicRegions(world).map(
       (region) =>
@@ -752,17 +815,35 @@ export function migrateCommunities(world: World) {
           region.id,
           [
             ...new Set([
-              ...region.neighbors,
+              ...region.neighbors.filter((id) => {
+                const other = economicRegion(world, id)
+                return other && land[region.center] >= 0 && land[region.center] === land[other.center]
+              }),
               ...(housing.candidates.get(region.id) ?? []),
               ...(sea.get(region.id)?.keys() ?? []),
             ]),
           ]
             .map((id) => economicRegion(world, id))
-            .filter((to) => to && to.id !== region.id),
+            .filter(
+              (to) => to && to.id !== region.id && to.cells.some((id) => habitableLand(world.cells[id])),
+            ),
         ] as const,
     ),
   )
-  for (const region of economicRegions(world))
+  for (const region of economicRegions(world)) {
+    const travelCosts = new Map<number, number>()
+    if (world.localEconomy)
+      for (const to of [region, ...candidatesByRegion[region.id]])
+        travelCosts.set(
+          to.id,
+          destinations[to.id].crowding +
+            (Math.hypot(
+              world.cells[to.center].q - world.cells[region.center].q,
+              world.cells[to.center].r - world.cells[region.center].r,
+            ) *
+              0.002) /
+              (1 + to.infrastructure),
+        )
     for (const group of region.communities!) {
       const size = communitySize(group)
       if (!size) continue
@@ -780,21 +861,9 @@ export function migrateCommunities(world: World) {
                 (destination.culture.get(group.culture) ?? 0) * 0.2) /
               destination.people
           return (
-            to.happiness * 0.35 +
-            to.health * 0.2 +
-            to.foodCoverage * 0.2 +
-            to.infrastructure * 0.1 +
-            economicAppeal(world, to, group.stratum ?? 'laborer') +
+            destination.appeal[group.stratum ?? 'laborer'] +
             compatible * 0.12 -
-            (world.localEconomy
-              ? 0.04 * Math.log1p(population(to) / Math.max(1, to.cells.length * 12000)) +
-                (Math.hypot(
-                  world.cells[to.center].q - world.cells[region.center].q,
-                  world.cells[to.center].r - world.cells[region.center].r,
-                ) *
-                  0.002) /
-                  (1 + to.infrastructure)
-              : 0) +
+            (travelCosts.get(to.id) ?? 0) +
             destination.attraction +
             destination.prestige -
             to.devastation * 0.6 -
@@ -807,8 +876,8 @@ export function migrateCommunities(world: World) {
         if (!(
           candidate.nation === region.nation ||
           refugee ||
-          (world.nations[region.nation].policies.migration !== 'closed' &&
-            world.nations[candidate.nation].policies.migration !== 'closed' &&
+          (governance(world, region.nation).policies.migration !== 'closed' &&
+            governance(world, candidate.nation).policies.migration !== 'closed' &&
             relation(world, region.nation, candidate.nation)?.treaty !== 'war')
         ))
           continue
@@ -822,29 +891,34 @@ export function migrateCommunities(world: World) {
       const border =
           to.nation === region.nation
             ? 1
-            : world.nations[to.nation].policies.migration === 'closed'
+            : governance(world, to.nation).policies.migration === 'closed'
               ? refugee
                 ? 0.025
                 : 0
-              : world.nations[to.nation].policies.migration === 'controlled'
+              : governance(world, to.nation).policies.migration === 'controlled'
                 ? 0.3
                 : 0.7,
         rate = clamp((bestAppeal - appeal(region) - 0.025) * 0.012 + pressure * 0.01, 0, 0.018) * border,
-        wanted = Math.floor(size * rate * (1 - group.rootedness * 0.4)),
+        wanted = Math.floor(
+          size * (months === 1 ? rate : 1 - (1 - rate) ** months) * (1 - group.rootedness * 0.4),
+        ),
         maritime =
-          !region.neighbors.includes(to.id) && !(housing.candidates.get(region.id) ?? []).includes(to.id),
-        capacity = maritime ? (sea.get(region.id)?.get(to.id) ?? 0) : Infinity,
+          (!region.neighbors.includes(to.id) ||
+            land[region.center] < 0 ||
+            land[region.center] !== land[to.center]) &&
+          !(housing.candidates.get(region.id) ?? []).includes(to.id),
+        capacity = maritime ? (sea.get(region.id)?.get(to.id) ?? 0) * months : Infinity,
         amount = Math.min(
           wanted,
           capacity,
           world.adaptive && !refugee ? (housing.vacancies.get(to.id) ?? 0) : Infinity,
-        ),
-        allocation = apportion(
-          amount,
-          [group.population.children * 0.9, group.population.adults * 1.2, group.population.elders * 0.4],
-          AGES.map((age) => group.population[age]),
         )
       if (amount < 1) continue
+      const allocation = apportion(
+        amount,
+        [group.population.children * 0.9, group.population.adults * 1.2, group.population.elders * 0.4],
+        AGES.map((age) => group.population[age]),
+      )
       if (world.adaptive && !refugee) housing.vacancies.set(to.id, housing.vacancies.get(to.id)! - amount)
       plans.push({
         from: region,
@@ -858,6 +932,7 @@ export function migrateCommunities(world: World) {
       })
       if (maritime) sea.get(region.id)!.set(to.id, capacity - amount)
     }
+  }
   relocateHouseholdClaims(
     world,
     plans.map((p) => ({
@@ -876,7 +951,7 @@ export function migrateCommunities(world: World) {
   for (const plan of plans) {
     const incoming = plan.incoming!,
       amount = communitySize(incoming),
-      language = world.nations[plan.to.nation].identity!.language
+      language = world.nations[plan.to.nation]?.identity?.language ?? plan.source.language
     if (world.localEconomy) incoming.locality = plan.to.id
     incoming.host = plan.to.nation
     incoming.rootedness *= 0.65
@@ -943,7 +1018,7 @@ function economicAppeal(world: World, region: Region, stratum: EconomicStratum) 
 }
 
 /** Slow family-group occupational mobility, independently of cultural identity. */
-export function advanceEconomicStrata(world: World) {
+export function advanceEconomicStrata(world: World, months = 1) {
   const e = world.economy
   if (!e) return
   for (const r of economicRegions(world)) {
@@ -975,9 +1050,15 @@ export function advanceEconomicStrata(world: World) {
         opportunity = Math.min(1, cashPerPerson / 0.1)
       }
       if (to === from || !size) continue
+      const rate = MODEL_PARAMETERS.mobilityMonthly * clamp(opportunity)
       const amount = Math.min(
         size,
-        expectedInteger(world, size * MODEL_PARAMETERS.mobilityMonthly * clamp(opportunity)),
+        expectedInteger(
+          world,
+          months === 1
+            ? size * MODEL_PARAMETERS.mobilityMonthly * clamp(opportunity)
+            : size * (1 - (1 - rate) ** months),
+        ),
       )
       if (!amount) continue
       const parts = apportion(

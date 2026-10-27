@@ -1,4 +1,5 @@
-import { matchCommuters } from './commuting'
+import { governance } from './governance'
+import { matchCommuters, knownCommuteCandidates } from './commuting'
 import { MODEL_PARAMETERS as P } from './model-parameters'
 import { economicRegions } from './local-units'
 import { tradeDistricts } from './district-transport'
@@ -99,14 +100,15 @@ export function reserveTarget(r: Region, good: Good) {
   return householdNeed(r, good) * (good === 'food' ? 2.4 : 3) + inputs * 2
 }
 
-export function produce(world: World) {
+export function produce(world: World, coarse = false) {
   ensureFirms(world)
   if (world.adaptive) {
+    const known = coarse ? knownCommuteCandidates(world) : undefined
     world.adaptive.commuting = []
     world.adaptive.commutingRows = []
     world.adaptive.commuteRoutes = {}
     for (const r of economicRegions(world)) hireFirms(world, r)
-    matchCommuters(world)
+    matchCommuters(world, known)
   }
   for (const r of economicRegions(world)) {
     for (const g of GOODS) if (!r.prices[g]) r.prices[g] = BASE_PRICE[g]
@@ -174,7 +176,7 @@ export function transportGraph(
           )
         })
   const allowed = (a: Region, b: Region) =>
-    militaryAccess ? militaryAccess[b.nation] : !wars[a.nation].has(b.nation)
+    militaryAccess ? b.nation < 0 || militaryAccess[b.nation] : !wars[a.nation]?.has(b.nation)
   for (const link of transportNetwork(world).links) {
     const a = world.regions[link.from],
       b = world.regions[link.to]
@@ -391,7 +393,7 @@ export function trade(world: World) {
         world.regions.length <= 300
           ? Infinity
           : Math.round(
-              16 + buyer.infrastructure * 16 + world.nations[buyer.nation].technologies.logistics * 8,
+              16 + buyer.infrastructure * 16 + governance(world, buyer.nation).technologies.logistics * 8,
             )
       let newcomers = 0
       const candidates = markets
@@ -440,7 +442,7 @@ export function trade(world: World) {
           return
         }
         const international = seller.nation !== buyer.nation
-        const nBuyer = world.nations[buyer.nation]
+        const nBuyer = governance(world, buyer.nation)
         const unitPrice = seller.prices[g] / 1000
         const freightRate = Math.min(0.5, plan.cost * 0.001) * unitPrice
         const agreement = treaty(buyer.nation, seller.nation)

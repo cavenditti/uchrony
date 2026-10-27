@@ -1,11 +1,11 @@
-import { multiCentreHousingDemand } from './housing-demand'
 import type { World } from './types'
 import { population } from './types'
 import type { PhysicalSite } from './adaptive-types'
-import { queryAdaptiveSites } from './adaptive-grid'
-import { commuteSiteRoute } from './commuting'
+import { snapshotSiteSearch } from './adaptive-grid'
+import { commuteSiteMinutes, withCommuteCostSnapshot, snapshotSiteAccessibility } from './commuting'
 import { settlementInfluence } from './settlement-influence'
 import { SETTLEMENT } from './settlement-model'
+import { multiCentreHousingDemand } from './housing-demand'
 import { apportion } from './allocation'
 import { occupiedResidents, residentialPools, syncResidentialPopulation } from './residential-sites'
 
@@ -16,12 +16,14 @@ const MONTHLY_MOVING_HAZARD = 1 - Math.exp(-SETTLEMENT.annualMovingHazard / 12)
  * the economic alternatives remain exact owners, never an averaged bank account.
  * Travel uses physical distance for screening and network time for final moves.
  */
-export function settlementAccess(w: World) {
+export function settlementAccess(w: World, coarse = false) {
   const pools = residentialPools(w)
   const homes = (pool: number) => pools.get(pool) ?? []
   const occupied = (home: PhysicalSite) => occupiedResidents(w, home)
   const vacancy = (home: PhysicalSite) => Math.max(0, Math.floor(home.capacity - occupied(home)))
-  const baseUtility = settlementInfluence(w, pools)
+  // Coarse housing decisions use local crowding; regional location preferences
+  // are surveyed again at the six-month boundary.
+  const baseUtility = coarse ? (_home: PhysicalSite) => 0 : settlementInfluence(w, pools)
   const utility = (home: PhysicalSite, people = occupied(home)) =>
     baseUtility(home) - 0.25 * (people / Math.max(1, home.capacity)) ** 2
   return { homes, occupied, vacancy, baseUtility, utility }
@@ -31,6 +33,9 @@ export function settlementAccess(w: World) {
  * real domestic travel network. Existing long-distance/sea migration stays separate.
  */
 export function settlementMigrationOptions(w: World) {
+  return withCommuteCostSnapshot(w, () => migrationOptions(w))
+}
+function migrationOptions(w: World) {
   const local = w.localEconomy,
     a = w.adaptive
   const candidates = new Map<number, number[]>(),
@@ -38,6 +43,12 @@ export function settlementMigrationOptions(w: World) {
   if (!local || !a) return { candidates, vacancies }
   syncResidentialPopulation(w)
   const pools = residentialPools(w)
+  const accessibleFrom = snapshotSiteAccessibility(w, SETTLEMENT.accessMinutes)
+  const search = snapshotSiteSearch(
+    w,
+    (s) => s.kind === 'residential' && s.capacity - occupiedResidents(w, s) >= 1,
+  )
+  const vacantPoolsByNation = new Map<number, Set<number>>()
   for (const [id, homes] of pools) {
     vacancies.set(
       id,
@@ -46,14 +57,27 @@ export function settlementMigrationOptions(w: World) {
         0,
       ),
     )
+    if (vacancies.get(id)! > 0) {
+      const nation = local.units[id].nation,
+        available = vacantPoolsByNation.get(nation) ?? new Set<number>()
+      available.add(id)
+      vacantPoolsByNation.set(nation, available)
+    }
   }
   for (const id of local.active) {
     const r = local.units[id],
       found = new Set<number>()
+    const available = vacantPoolsByNation.get(r.nation)
+    // Frontier towns often own every habitable vacancy in their state. Searching
+    // every building in that town cannot discover a different housing pool.
+    if (!available || (available.size === 1 && available.has(id))) {
+      candidates.set(id, [])
+      continue
+    }
     for (const home of pools.get(id) ?? []) {
       if (!occupiedResidents(w, home)) continue
-      for (const target of queryAdaptiveSites(
-        w,
+      const accessible = accessibleFrom(home)
+      for (const target of search(
         home,
         SEARCH_METERS,
         (s) =>
@@ -63,7 +87,7 @@ export function settlementMigrationOptions(w: World) {
           s.capacity - occupiedResidents(w, s) >= 1 &&
           local.units[s.pool]?.nation === r.nation,
       ))
-        if (commuteSiteRoute(w, home, target, SETTLEMENT.accessMinutes)) found.add(target.pool)
+        if (!found.has(target.pool) && accessible(target)) found.add(target.pool)
     }
     candidates.set(
       id,
@@ -84,7 +108,7 @@ export function residentialDemand(w: World, access = settlementAccess(w)) {
  * retains its original pool/claims; inter-pool moves use migrateCommunities.
  * Largest remainders avoid freezing all small rural cells through per-cell floors.
  */
-export function optimizeResidentialLocations(w: World, prepared?: ReturnType<typeof settlementAccess>) {
+export function optimizeResidentialLocations(w: World, prepared?: ReturnType<typeof settlementAccess>, months = 1) {
   if (!w.adaptive || !w.localEconomy) return
   syncResidentialPopulation(w)
   const access = prepared ?? settlementAccess(w)
@@ -92,7 +116,8 @@ export function optimizeResidentialLocations(w: World, prepared?: ReturnType<typ
     const r = w.localEconomy.units[id],
       homes = access.homes(id)
     if (homes.length < 2) continue
-    const budgets = apportion(Math.floor(population(r) * MONTHLY_MOVING_HAZARD), homes.map(access.occupied))
+    const hazard = months === 1 ? MONTHLY_MOVING_HAZARD : 1 - (1 - MONTHLY_MOVING_HAZARD) ** months
+    const budgets = apportion(Math.floor(population(r) * hazard), homes.map(access.occupied))
     const plans: { from: PhysicalSite; to: PhysicalSite; wanted: number; gain: number; minutes: number }[] =
       []
     // All origins have the same destination ranking at this snapshot. Sort once,
@@ -108,11 +133,11 @@ export function optimizeResidentialLocations(w: World, prepared?: ReturnType<typ
         const gain = score - originUtility
         if (gain <= SETTLEMENT.movingFriction) break
         if (to === from || Math.hypot(to.x - from.x, to.y - from.y) > SEARCH_METERS) continue
-        const route = commuteSiteRoute(w, from, to, SETTLEMENT.accessMinutes)
-        if (!route) continue
-        const net = gain - SETTLEMENT.movingFriction - route.minutes / 600
+        const minutes = commuteSiteMinutes(w, from, to, SETTLEMENT.accessMinutes)
+        if (minutes === null) continue
+        const net = gain - SETTLEMENT.movingFriction - minutes / 600
         if (net <= 0) continue
-        plans.push({ from, to, wanted: budgets[i], gain: net, minutes: route.minutes })
+        plans.push({ from, to, wanted: budgets[i], gain: net, minutes })
         break
       }
     }

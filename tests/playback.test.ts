@@ -83,3 +83,61 @@ test('fatal local simulation errors stop playback and report the actual error', 
   assert.equal(failure, expected)
   clock.stop()
 })
+
+test('Max has no pacing cap, publishes completed intervals and yields to pause', (t) => {
+  let now = 0,
+    months = 0,
+    paints = 0
+  t.mock.method(performance, 'now', () => now)
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const clock = new Playback(
+    (speed) => {
+      assert.equal(speed, 'max')
+      months++
+      now += 2
+      return months % 6 === 0
+    },
+    () => {
+      paints++
+      assert.equal(months % 6, 0)
+    },
+    (error) => {
+      throw error
+    },
+  )
+  clock.start('max')
+  t.mock.timers.tick(1)
+  assert.equal(months, 4, 'eight milliseconds of work yields before the interval ends')
+  assert.equal(paints, 0)
+  t.mock.timers.tick(1)
+  assert.equal(months, 6)
+  assert.equal(paints, 1)
+  clock.stop()
+  t.mock.timers.tick(1000)
+  assert.equal(months, 6)
+})
+
+test('changing from Max to normal cancels the old clock and restores normal pacing', (t) => {
+  let now = 0
+  const speeds: unknown[] = []
+  t.mock.method(performance, 'now', () => now)
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const clock = new Playback(
+    (speed) => {
+      speeds.push(speed)
+    },
+    () => {},
+    (e) => {
+      throw e
+    },
+  )
+  clock.start('max')
+  clock.start(1)
+  now = 999
+  t.mock.timers.tick(999)
+  assert.deepEqual(speeds, [])
+  now = 1000
+  t.mock.timers.tick(1)
+  assert.deepEqual(speeds, [1])
+  clock.stop()
+})

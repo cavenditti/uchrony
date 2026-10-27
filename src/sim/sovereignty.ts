@@ -17,7 +17,7 @@ import { ensureHistory } from './history'
 import { ensureWarfare, warEvent } from './navy'
 import { allForces } from './forces'
 import { sharedInstitution } from './institutions'
-import { provincialRealService } from './public-services'
+import { provincialServiceLookup } from './public-services'
 
 export interface ProvincialAuthority {
   region: number
@@ -260,7 +260,9 @@ export function advanceSovereignty(world: World) {
   const state = ensureSovereignty(world),
     indexed = new Map(state.provinces.map((report) => [report.region, report])),
     pending: ProvincialAuthority[] = []
+  const provincialService = provincialServiceLookup(world)
   for (const r of world.regions) {
+    if (r.nation < 0) continue
     const n = world.nations[r.nation],
       groups = r.communities!,
       adult = Math.max(1, r.population.adults),
@@ -353,10 +355,8 @@ export function advanceSovereignty(world: World) {
             0.15 *
               (1 -
                 Math.exp(
-                  -(
-                    provincialRealService(world, r, 'administration') +
-                    provincialRealService(world, r, 'policing')
-                  ) / Math.max(1, population(r) * 0.00001),
+                  -(provincialService(r, 'administration') + provincialService(r, 'policing')) /
+                    Math.max(1, population(r) * 0.00001),
                 )),
         ) *
         (1 - (r.unrest / 100) * 0.3) *

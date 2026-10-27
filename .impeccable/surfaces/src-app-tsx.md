@@ -11,6 +11,8 @@ Mode: Operate. A desktop-first simulation workspace with mobile inspection suppo
 
 ## Direction contract
 
+Playback extension, 27 October 2026: retain the floating slate clock and brass play/pause action. Replace its speed selector with direct 1×, 2×, 4× and Max buttons, with a persistent selected state. Max explicitly identifies approximate six-month simulation; preserve the approximation disclosure after returning to normal play. Keep monthly stepping and the annual-step menu. Below 760px put the date/status above a compact control row; preserve map access and keyboard shortcuts. No palette, typography or global layout changes.
+
 Urban detail extension, 27 October 2026: preserve the cabinet-map composition. Selecting developed land exposes a 128 m block summary and an Inspect block action inside the existing place context; building and numerical-cell inspection remain available. Close city captions explain metropolitan membership or incorporation. Keep slate, brass, existing type roles and mobile wrapping; no new permanent panel, map layer or palette. Code-led extension of the existing direction. Finish with desktop/mobile captures and an independent finish review.
 
 THESIS: The cabinet map table puts geographic consequences at the center, with state dossiers and decisions at arm's reach.
@@ -63,6 +65,24 @@ FINISH: The first independent review requested finer Atlas coastline weight and 
 
 The subsequent 3D estuary refinement retains rich inland blue while matching the existing sea pigment, ripples and roughness near actual outlets. Banks fade before open water. The transition follows drainage through tributary joins; it is an illustrated mixing zone, with no sediment simulation, new global token or additional texture. Atlas keeps its cartographic strokes.
 
+
+## Quadtree and dynamic urban land — 26 October 2026
+
+Carlo requested less bloat and a stronger focus on the quadtree and fully dynamic urban areas, with more diverse terrain generation eventually. The default flat map now exposes the authoritative adaptive partition and physical developed parcels. Density, vacancy, and funded construction remain visible independently of city names. Dense occupied footprints receive finer cells; camera movement only changes visibility. Existing land-use, relocation, and city-continuity mechanisms supply changes. 3D is optional and allocated on demand. The terrain generator remains unchanged in this pass.
+
+- Frontier urban land now consists of persistent building footprints on small lots. City names follow occupied connections; no enclosing city rectangle is painted. Quadtree detail reaches 8 m, while economics retain larger districts. Map picks distinguish the building footprint from its numerical cell, and close zoom uses metres. Political wilderness is unclaimed rather than tinted as a neutral state; founding shows its people, supply cost and province claim before the action.
+
+## Organic growth and ground roads — 27 October 2026
+
+New frontier development extends the cabinet map table with persistent buildings of varied sizes, freely positioned along local lanes and established trade-road frontages. Street growth favors gentle grades and contour directions using the existing terrain samples. Compact settlements use smaller setbacks and greater housing capacity toward their center; footprints and parcel sizes vary independently of the quadtree partition. Occupied buildings use stable roof-pigment variation, with vacancy and funded construction retaining their distinct marks. The quadtree indexes this geometry and can refine to 8 m; economic accounts remain in their larger pools, and existing saves retain their recorded footprints.
+
+Local lanes and land trade routes default to procedural dirt paths painted into the flat map and the relief terrain overlay, with soft shoulders and broken wheel wear. These ground marks remain visible with the freight overlay off and replace extruded road scenery. The Trade layer can add a tonnage-based highlight; shipping remains dashed. This is a scoped, code-led refinement: slate controls, brass actions, Alegreya lettering, thematic meanings, and global design tokens remain unchanged. No shipping raster assets or replacement visual identity are introduced.
+
+Implementation evidence is in `src/sim/urban-growth.ts`, `src/sim/building-lots.ts`, `src/map/quadtree-renderer.ts`, `src/map/ground-roads.ts`, `src/map/relief.ts`, and `src/map/trade.ts`. The local review captures are in `.impeccable/review/organic-growth/`; they document the rendered fixtures, not historical calibration or long-run simulation qualification.
+
+## Smooth land routes — 27 October 2026
+
+Land trade roads soften ordinary bends within the traversed cells while keeping junctions, ports, province centers, and surveyed building and lane connections fixed. Dirt paint and quantity highlights share the same curves, and cargo follows their sampled length. The existing soft shoulders and broken wheel wear remain the material language in both flat and relief views; this presentation refinement introduces no global tokens, road meshes, or shipping raster assets. Routing, freight costs, and recorded settlement geometry retain their existing simulation meaning. Source and validation details are recorded in [map rendering](../../docs/MAP_RENDERING.md); the local visual review captures are in `.impeccable/review/smooth-roads/`.
 
 ## Urban-centre inspection extension — 27 October 2026
 

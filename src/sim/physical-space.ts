@@ -75,7 +75,56 @@ export function nodeBounds(root: SpatialBounds, address: string) {
 export function quadrant(p: PointMeters, b: SpatialBounds) {
   return Number(p.x >= b.x + b.size / 2) + 2 * Number(p.y >= b.y + b.size / 2)
 }
+
+/** Fine square leaves need area and source ownership on every tick, but their
+ * four polygon vertices only for an actual geometry query. Keep those vertices
+ * lazy instead of allocating millions of identical rectangle corner objects. */
+class SquareFragment implements SpatialFragment {
+  readonly area: number
+  private points?: PointMeters[]
+  constructor(
+    readonly cell: number,
+    readonly water: boolean | undefined,
+    readonly bounds: SpatialBounds,
+  ) {
+    this.area = bounds.size ** 2
+  }
+  get polygon() {
+    const { x, y, size } = this.bounds
+    return (this.points ??= [
+      { x, y },
+      { x: x + size, y },
+      { x: x + size, y: y + size },
+      { x, y: y + size },
+    ])
+  }
+}
+
 export function splitFragments(fragments: SpatialFragment[], bounds: SpatialBounds) {
+  // Once refinement is wholly inside one aligned terrain sample, clipping a
+  // rectangle against its four quadrants is exact. Irregular/clipped fragments
+  // retain the general polygon path below.
+  if (fragments.length === 1) {
+    const f = fragments[0]
+    const aligned =
+      f instanceof SquareFragment
+        ? f.bounds.x === bounds.x && f.bounds.y === bounds.y && f.bounds.size === bounds.size
+        : f.area === bounds.size ** 2 &&
+          f.polygon.length === 4 &&
+          f.polygon.every(
+            (p) =>
+              (p.x === bounds.x || p.x === bounds.x + bounds.size) &&
+              (p.y === bounds.y || p.y === bounds.y + bounds.size),
+          )
+    if (aligned)
+      return [0, 1, 2, 3].map((q) => [
+        new SquareFragment(f.cell, f.water, {
+          x: bounds.x + ((q % 2) * bounds.size) / 2,
+          y: bounds.y + (Math.floor(q / 2) * bounds.size) / 2,
+          size: bounds.size / 2,
+        }),
+      ])
+  }
   const output: SpatialFragment[][] = [[], [], [], []]
   // Dyadic sample boundaries align with the tree. Most fragments therefore
   // belong wholly to one child, with no clipping or polygon allocation needed.
@@ -100,7 +149,11 @@ export function splitFragments(fragments: SpatialFragment[], bounds: SpatialBoun
   return output
 }
 /** Each coarse/fine face is represented once; geometry never creates a trading partner. */
-export function meshInterfaces(nodes: AdaptiveNode[], physical = true): SpatialInterface[] {
+export function meshInterfaces(
+  nodes: AdaptiveNode[],
+  physical = true,
+  adjacent?: (a: AdaptiveNode, b: AdaptiveNode) => void,
+): SpatialInterface[] {
   type Edge = { node: AdaptiveNode; start: number; end: number; side: number }
   const axes = [new Map<number, Edge[]>(), new Map<number, Edge[]>()]
   for (const node of nodes) {
@@ -126,25 +179,28 @@ export function meshInterfaces(nodes: AdaptiveNode[], physical = true): SpatialI
           b = right[j],
           length = Math.min(a.end, b.end) - Math.max(a.start, b.start)
         if (length > 1e-6) {
-          const ids = [a.node.id, b.node.id].sort()
-          if (!physical) result.push({ id: ids.join('|'), a: ids[0], b: ids[1], length })
+          if (adjacent) adjacent(a.node, b.node)
           else {
-            const x = faceIntervals(a.node, dimension, a.side),
-              y = faceIntervals(b.node, dimension, b.side)
-            const landLength = intervalOverlap(x.land, y.land),
-              waterLength = intervalOverlap(x.water, y.water),
-              coastLength = intervalOverlap(x.land, y.water) + intervalOverlap(x.water, y.land)
-            const contact = landLength + waterLength + coastLength
-            if (contact > 1e-6)
-              result.push({
-                id: ids.join('|'),
-                a: ids[0],
-                b: ids[1],
-                length: contact,
-                landLength,
-                waterLength,
-                coastLength,
-              })
+            const ids = [a.node.id, b.node.id].sort()
+            if (!physical) result.push({ id: ids.join('|'), a: ids[0], b: ids[1], length })
+            else {
+              const x = faceIntervals(a.node, dimension, a.side),
+                y = faceIntervals(b.node, dimension, b.side)
+              const landLength = intervalOverlap(x.land, y.land),
+                waterLength = intervalOverlap(x.water, y.water),
+                coastLength = intervalOverlap(x.land, y.water) + intervalOverlap(x.water, y.land)
+              const contact = landLength + waterLength + coastLength
+              if (contact > 1e-6)
+                result.push({
+                  id: ids.join('|'),
+                  a: ids[0],
+                  b: ids[1],
+                  length: contact,
+                  landLength,
+                  waterLength,
+                  coastLength,
+                })
+            }
           }
         }
         if (a.end <= b.end) i++
@@ -152,6 +208,75 @@ export function meshInterfaces(nodes: AdaptiveNode[], physical = true): SpatialI
       }
     }
   return result.sort((a, b) => a.id.localeCompare(b.id))
+}
+
+/** Balancing needs only the offending leaves, not allocated/sorted interfaces. */
+export function unbalancedMeshNodes(nodes: AdaptiveNode[]) {
+  const split = new Set<string>()
+  if (!nodes.length) return split
+  const depth = nodes.reduce((max, n) => Math.max(max, n.id.length - 1), 0)
+  if (depth <= 16) {
+    // Quadtree addresses are Morton intervals. Binary-search the leaf across
+    // each face, avoiding four edge objects per leaf and a global face sort.
+    // A fine face cannot straddle a coarser neighbour's dyadic boundary, so its
+    // midpoint finds every neighbour that could violate the 2:1 rule.
+    const ordered = nodes.every((node, i) => i === 0 || nodes[i - 1].id < node.id)
+      ? nodes
+      : [...nodes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    const starts = new Float64Array(ordered.length),
+      ends = new Float64Array(ordered.length)
+    for (let i = 0; i < ordered.length; i++) {
+      const id = ordered[i].id,
+        span = 4 ** (depth - id.length + 1)
+      starts[i] = (parseInt(id.slice(1), 4) || 0) * span
+      ends[i] = starts[i] + span
+    }
+    const extent = 2 ** depth,
+      rootSize = nodes[0].bounds.size * 2 ** (nodes[0].id.length - 1),
+      unit = rootSize / extent
+    const spread = (value: number) => {
+      value = (value | (value << 8)) & 0x00ff00ff
+      value = (value | (value << 4)) & 0x0f0f0f0f
+      value = (value | (value << 2)) & 0x33333333
+      return (value | (value << 1)) & 0x55555555
+    }
+    const check = (x: number, y: number, size: number) => {
+      if (x < 0 || y < 0 || x >= extent || y >= extent) return
+      const code = (spread(x) | (spread(y) << 1)) >>> 0
+      let lo = 0,
+        hi = ordered.length
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1
+        if (starts[mid] <= code) lo = mid + 1
+        else hi = mid
+      }
+      const index = lo - 1
+      if (index >= 0 && code < ends[index] && ordered[index].bounds.size > size * 2)
+        split.add(ordered[index].id)
+    }
+    for (const node of nodes) {
+      const { x, y, size } = node.bounds,
+        q = x / unit,
+        r = y / unit,
+        span = size / unit,
+        midX = Math.floor(q + span / 2),
+        midY = Math.floor(r + span / 2)
+      // An offending neighbour is at least four times larger. Its face must
+      // align with that coarser lattice; interior fine faces cannot touch it.
+      const coarseSpan = span * 4
+      if (q % coarseSpan === 0) check(q - 1, midY, size)
+      if ((q + span) % coarseSpan === 0) check(q + span, midY, size)
+      if (r % coarseSpan === 0) check(midX, r - 1, size)
+      if ((r + span) % coarseSpan === 0) check(midX, r + span, size)
+    }
+    return split
+  }
+  // Retain general support for trees deeper than the 32-bit Morton domain.
+  meshInterfaces(nodes, false, (a, b) => {
+    if (a.bounds.size > b.bounds.size * 2) split.add(a.id)
+    if (b.bounds.size > a.bounds.size * 2) split.add(b.id)
+  })
+  return split
 }
 
 type Interval = [number, number]

@@ -1,5 +1,6 @@
 import { adaptiveMesh } from './adaptive-world'
 import { MinHeap } from './heap'
+import { SpatialBuckets } from './spatial-buckets'
 import { nodeBounds, pointInPolygon, quadrant, rootBounds } from './physical-space'
 import type {
   AdaptiveMesh,
@@ -34,30 +35,54 @@ function index(w: World): Index {
   // A totals refresh mutates leaf membership in place. Reuse the topology: its
   // branches reference those live leaves, and no site lists are copied here.
   if (previous?.mesh === mesh) return previous.index
-  const byId = new Map(mesh.leaves.map((n) => [n.id, n])),
-    adjacency = new Map<string, SpatialInterface[]>()
+  const byId = new Map(mesh.leaves.map((n) => [n.id, n]))
+  let adjacency: Map<string, SpatialInterface[]> | undefined
   const root = rootBounds(w)
   const branches: Branch[] = [{ id: 'r', bounds: root, children: [] }]
   const slots = new Map([['r', 0]])
   for (const leaf of mesh.leaves) {
-    adjacency.set(leaf.id, [])
     let parent = 0
     for (let length = 2; length <= leaf.id.length; length++) {
       const id = leaf.id.slice(0, length)
       if (!slots.has(id)) {
         slots.set(id, branches.length)
         branches[parent].children.push(branches.length)
-        branches.push({ id, bounds: nodeBounds(root, id), children: [] })
+        const bounds = branches[parent].bounds,
+          q = Number(id.at(-1)),
+          size = bounds.size / 2
+        branches.push({
+          id,
+          bounds:
+            length === leaf.id.length
+              ? leaf.bounds
+              : {
+                  x: bounds.x + (q % 2) * size,
+                  y: bounds.y + Math.floor(q / 2) * size,
+                  size,
+                },
+          children: [],
+        })
       }
       parent = slots.get(id)!
     }
     branches[parent].leaf = leaf
   }
-  for (const face of mesh.interfaces) {
-    adjacency.get(face.a)!.push(face)
-    adjacency.get(face.b)!.push(face)
+  const result: Index = {
+    mesh,
+    leaves: mesh.leaves,
+    byId,
+    branches,
+    get adjacency() {
+      if (!adjacency) {
+        adjacency = new Map(mesh.leaves.map((leaf) => [leaf.id, [] as SpatialInterface[]]))
+        for (const face of mesh.interfaces) {
+          adjacency.get(face.a)!.push(face)
+          adjacency.get(face.b)!.push(face)
+        }
+      }
+      return adjacency
+    },
   }
-  const result = { mesh, leaves: mesh.leaves, byId, adjacency, branches }
   cache.set(w, { mesh, index: result })
   return result
 }
@@ -186,6 +211,32 @@ export function queryAdaptiveSites(
     } else pending.push(...branch.children)
   }
   return result.sort((a, b) => a.id.localeCompare(b.id))
+}
+
+/** A phase-local point index for repeated searches over a fixed set of sites.
+ * Membership comes from the live mesh, including its exact land checks. Build a
+ * new snapshot after moving, adding or retiring sites; never cache across phases. */
+export function snapshotSiteSearch(w: World, predicate: (s: PhysicalSite) => boolean) {
+  const buckets = new SpatialBuckets<PhysicalSite>(1024)
+  const indexed = new Set<PhysicalSite>()
+  for (const leaf of adaptiveMesh(w).leaves)
+    for (const id of leaf.sites) {
+      const site = w.adaptive!.sites[id]
+      if (site && site.retired === undefined && !indexed.has(site) && predicate(site)) {
+        indexed.add(site)
+        buckets.insert(site, site.x, site.y)
+      }
+    }
+  return (point: PointMeters, radius: number, accept?: (s: PhysicalSite) => boolean) => {
+    validPoint(point)
+    if (!Number.isFinite(radius) || radius < 0) throw new Error('Invalid spatial radius')
+    const result: PhysicalSite[] = []
+    buckets.visit(point.x - radius, point.y - radius, point.x + radius, point.y + radius, (site) => {
+      if ((site.x - point.x) ** 2 + (site.y - point.y) ** 2 <= radius ** 2 && (!accept || accept(site)))
+        result.push(site)
+    })
+    return result.sort((a, b) => a.id.localeCompare(b.id))
+  }
 }
 
 /** Best-first search with a geometric lower bound, retaining ties for stable ID ordering. */

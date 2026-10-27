@@ -1,3 +1,4 @@
+import { governance } from './governance'
 import { localClimate } from './climate'
 import { recordLocalJob } from './commuting'
 import { extractDistrictResource } from './districts'
@@ -139,8 +140,9 @@ export function ensureFirms(w: World) {
     e.firmExits = 0
   }
   if (!first) return e.firms!
+  const initialized = new Set<number>()
   for (const r of economicRegions(w)) {
-    if (regionalFirms(w, r.id).length) continue
+    if (initialized.has(r.id)) continue
     const opening = w.localEconomy ? Math.min(3, Math.ceil(population(r) / 10000)) : 3
     if (!opening) continue
     const funds = e.producers[r.id].cash * 0.6,
@@ -155,6 +157,7 @@ export function ensureFirms(w: World) {
       if (f.active)
         transfer(w, producerAccount(r.id), firmAccount(id), funds / opening, 'opening enterprise equity')
     }
+    initialized.add(r.id)
   }
   return e.firms!
 }
@@ -202,7 +205,7 @@ export function hireFirms(w: World, r: Region) {
       : 0
   const expectedInflation = e.banking?.policy?.expectedInflation ?? 0.02
   const plans = new Map<number, { opening: number; retained: number; wanted: number }>()
-  const n = w.nations[r.nation]
+  const n = governance(w, r.nation)
   const serviceShare =
     (n.policies.education + n.policies.military + n.policies.research + 30) /
     Math.max(1, n.policies.education + n.policies.military + n.policies.research + n.policies.welfare + 30)
@@ -318,7 +321,7 @@ export function hireFirms(w: World, r: Region) {
       h.employed += actual
       h.income += paid
       h.taxes += tax
-      w.nations[r.nation].income += tax
+      if (r.nation >= 0) w.nations[r.nation].income += tax
       recordLocalJob(w, r.id, f.id, s, actual, paid)
       f.employment += actual
       f.payroll += paid
@@ -344,7 +347,7 @@ export function hireFirms(w: World, r: Region) {
   return jobs
 }
 function baseLaborMix(w: World, r: Region, f?: CompetitiveFirm): Inventory {
-  const n = w.nations[r.nation]
+  const n = governance(w, r.nation)
   const farm = clamp(
     0.58 -
       r.urban * 0.18 +
@@ -380,7 +383,7 @@ export function firmCapacity(
   active: number,
   mix = f.laborMix ?? baseLaborMix(w, r, f),
 ) {
-  const n = w.nations[r.nation],
+  const n = governance(w, r.nation),
     t = n.technologies,
     abundance = simulationSettings(w).abundance
   const eff =
@@ -644,7 +647,7 @@ function invest(w: World, r: Region, f: CompetitiveFirm) {
   hh.income += paid
   hh.taxes += tax
   hh.employed += amount * labor
-  w.nations[r.nation].income += tax
+  if (r.nation >= 0) w.nations[r.nation].income += tax
   recordWages(w, r.id, firmAccount(f.id), paid)
   const cost = amount * unitCost
   recordOwnCapital(w, r.id, firmAccount(f.id), cost)
@@ -668,7 +671,7 @@ export function finishFirms(w: World) {
         Math.max(0, f.profit) * collectedTaxRate(w, r),
         'enterprise profit tax',
       )
-      w.nations[r.nation].income += f.taxes
+      if (r.nation >= 0) w.nations[r.nation].income += f.taxes
       const owners = f.owners ?? { [householdAccount(r.id, 'owner')]: 1 },
         shares = Object.values(owners).reduce((a, b) => a + b, 0)
       const distribution = Math.max(0, f.profit - f.taxes) * 0.45

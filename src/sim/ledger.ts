@@ -2,8 +2,105 @@ import { economicRegion } from './local-units'
 import { recordService, recordGoodsSale, marketStore, economicNation } from './national-accounts'
 import type { Good } from './types'
 import { inventory, population, type World } from './types'
-import { ensureBanking, settleBankTransfer, issueBankLoan, auditBanks } from './banking'
-import { STRATA, type EconomicStratum, type HouseholdAccount, type ProducerAccount } from './economic-types'
+import {
+  ensureBanking,
+  settleBankTransfer,
+  settleBankAccounts,
+  accountBank,
+  issueBankLoan,
+  auditBanks,
+} from './banking'
+import {
+  STRATA,
+  type EconomicStratum,
+  type HouseholdAccount,
+  type ProducerAccount,
+  type LedgerEntry,
+  type Bank,
+} from './economic-types'
+
+type AccountAddress = { kind: string; id: number; group: EconomicStratum; field: 'cash' | 'treasury' }
+const addresses = new WeakMap<World, Map<string, AccountAddress>>()
+function accountAddress(w: World, account: string) {
+  let index = addresses.get(w)
+  if (!index) addresses.set(w, (index = new Map()))
+  let address = index.get(account)
+  if (!address) {
+    const [kind, id, group] = account.split(':')
+    address = {
+      kind,
+      id: Number(id),
+      group: group as EconomicStratum,
+      field: kind === 'government' || kind === 'province' || kind === 'institution' ? 'treasury' : 'cash',
+    }
+    index.set(account, address)
+  }
+  return address
+}
+// Cache addresses only: account objects can be replaced by district remapping,
+// government changes, or restored state, even within the same month.
+function accountHolder(w: World, address: AccountAddress): { cash?: number; treasury?: number } | undefined {
+  const { kind, id, group } = address
+  if (kind === 'government') return w.nations[id]
+  if (kind === 'province') return w.regions[id]?.delegation
+  if (kind === 'institution') return w.institutions?.organizations.find((o) => o.id === id)
+  if (kind === 'producer') return w.economy?.producers[id]
+  if (kind === 'firm') return w.economy?.firms?.[id]
+  if (kind === 'household') return w.economy?.households[id]?.[group]
+  if (kind === 'credit') return w.economy?.credit
+  throw new Error(`Unknown settlement account: ${kind}:${id}`)
+}
+
+interface EntryBatch {
+  count: number
+  from: string[]
+  to: string[]
+  amount: number[]
+  category: string[]
+}
+const entryBatches = new WeakMap<World, Map<LedgerEntry[], EntryBatch>>()
+/** A synchronous tick never exposes intermediate history. Keep its bounded
+ * transaction tail in reusable columns and materialize entries before returning,
+ * including on failure. Intermediate history must not be read inside this scope.
+ * Ad-hoc commands still expose their entries immediately. */
+export function withBatchedLedgerEntries<T>(w: World, run: () => T): T {
+  if (entryBatches.has(w)) return run()
+  const batches = new Map<LedgerEntry[], EntryBatch>()
+  entryBatches.set(w, batches)
+  try {
+    return run()
+  } finally {
+    for (const [entries, batch] of batches) {
+      entries.splice(0, Math.max(0, entries.length + batch.count - 1024))
+      for (let i = Math.max(0, batch.count - 1024); i < batch.count; i++) {
+        const slot = i % 1024
+        entries.push({
+          from: batch.from[slot],
+          to: batch.to[slot],
+          amount: batch.amount[slot],
+          category: batch.category[slot],
+        })
+      }
+    }
+    entryBatches.delete(w)
+  }
+}
+function appendEntry(w: World, from: string, to: string, amount: number, category: string) {
+  const entries = w.economy!.ledger.entries,
+    batch = entryBatches.get(w)
+  if (batch) {
+    let tail = batch.get(entries)
+    if (!tail) batch.set(entries, (tail = { count: 0, from: [], to: [], amount: [], category: [] }))
+    const next = tail.count++ % 1024
+    tail.from[next] = from
+    tail.to[next] = to
+    tail.amount[next] = amount
+    tail.category[next] = category
+  } else {
+    entries.push({ from, to, amount, category })
+    if (entries.length > 1024) entries.splice(0, entries.length - 1024)
+  }
+}
 const household = (cash: number): HouseholdAccount => ({
   cash,
   income: 0,
@@ -117,28 +214,12 @@ export function ensureEconomy(w: World) {
   return e
 }
 export function balance(w: World, account: string): number {
-  const [kind, id, group] = account.split(':')
-  const i = Number(id)
-  if (kind === 'government') return w.nations[i]?.treasury ?? 0
-  if (kind === 'province') return w.regions[i]?.delegation?.treasury ?? 0
-  if (kind === 'institution') return w.institutions?.organizations.find((o) => o.id === i)?.treasury ?? 0
-  if (kind === 'producer') return w.economy?.producers[i]?.cash ?? 0
-  if (kind === 'firm') return w.economy?.firms?.[i]?.cash ?? 0
-  if (kind === 'household') return w.economy?.households[i]?.[group as EconomicStratum]?.cash ?? 0
-  if (kind === 'credit') return w.economy?.credit.cash ?? 0
-  throw new Error(`Unknown settlement account: ${account}`)
+  const address = accountAddress(w, account)
+  return accountHolder(w, address)?.[address.field] ?? 0
 }
 export function setBalance(w: World, account: string, value: number) {
-  const [kind, id, group] = account.split(':')
-  const i = Number(id)
-  if (kind === 'government') w.nations[i].treasury = value
-  else if (kind === 'province') w.regions[i].delegation!.treasury = value
-  else if (kind === 'institution') w.institutions!.organizations.find((o) => o.id === i)!.treasury = value
-  else if (kind === 'producer') w.economy!.producers[i].cash = value
-  else if (kind === 'firm') w.economy!.firms![i].cash = value
-  else if (kind === 'household') w.economy!.households[i][group as EconomicStratum].cash = value
-  else if (kind === 'credit') w.economy!.credit.cash = value
-  else throw new Error(`Unknown settlement account: ${account}`)
+  const address = accountAddress(w, account)
+  accountHolder(w, address)![address.field] = value
 }
 export function balances(w: World): Record<string, number> {
   const accounts: Record<string, number> = { credit: w.economy?.credit.cash ?? 0 }
@@ -170,13 +251,57 @@ export function changeDeposit(
   e.banking![kind] += Math.abs(delta)
   e.ledger.transactions++
   e.ledger.volume += Math.abs(delta)
-  e.ledger.entries.push({
-    from: delta > 0 ? counterparty : account,
-    to: delta > 0 ? account : counterparty,
-    amount: Math.abs(delta),
+  appendEntry(
+    w,
+    delta > 0 ? counterparty : account,
+    delta > 0 ? account : counterparty,
+    Math.abs(delta),
     category,
-  })
-  if (e.ledger.entries.length > 1024) e.ledger.entries.splice(0, e.ledger.entries.length - 1024)
+  )
+}
+interface PaymentAccount {
+  name: string
+  holder: ReturnType<typeof accountHolder>
+  field: AccountAddress['field']
+  bank?: Bank
+}
+/** A synchronous payroll/retail phase may resolve its participants once. These
+ * handles must not survive account replacement, bank reassignment or remapping.
+ * Bank enrollment stays lazy, at the first positive payment, exactly as transfer. */
+export function preparePayments(w: World) {
+  const e = ensureEconomy(w)
+  return {
+    account(name: string): PaymentAccount {
+      const address = accountAddress(w, name)
+      return { name, holder: accountHolder(w, address), field: address.field }
+    },
+    transfer(from: PaymentAccount, to: PaymentAccount, requested: number, category: string): number {
+      if (!Number.isFinite(requested) || requested < 0)
+        throw new Error('Payments must be finite and nonnegative.')
+      if (from.name === to.name || requested === 0) return 0
+      const source = from.holder?.[from.field] ?? 0,
+        destination = to.holder?.[to.field] ?? 0,
+        amount = Math.min(source, requested)
+      if (!(amount > 0)) return 0
+      from.bank ??= accountBank(w, from.name)
+      to.bank ??= accountBank(w, to.name)
+      settleBankAccounts(w, from.bank, to.bank, amount)
+      if (e.ledger.opening[from.name] === undefined) e.ledger.opening[from.name] = source
+      if (e.ledger.opening[to.name] === undefined) e.ledger.opening[to.name] = destination
+      from.holder![from.field] = source - amount
+      to.holder![to.field] = destination + amount
+      recordTransfer(w, from.name, to.name, amount, category)
+      return amount
+    },
+  }
+}
+function recordTransfer(w: World, from: string, to: string, amount: number, category: string) {
+  const ledger = w.economy!.ledger
+  ledger.net[from] = (ledger.net[from] ?? 0) - amount
+  ledger.net[to] = (ledger.net[to] ?? 0) + amount
+  ledger.transactions++
+  ledger.volume += amount
+  appendEntry(w, from, to, amount, category)
 }
 /** The only runtime cash mutation primitive. Partial settlement is explicit in its return value. */
 export function transfer(w: World, from: string, to: string, requested: number, category: string): number {
@@ -184,24 +309,20 @@ export function transfer(w: World, from: string, to: string, requested: number, 
   if (!Number.isFinite(requested) || requested < 0)
     throw new Error('Payments must be finite and nonnegative.')
   if (from === to || requested === 0) return 0
-  const source = balance(w, from),
-    destination = balance(w, to),
+  const sourceAddress = accountAddress(w, from),
+    destinationAddress = accountAddress(w, to),
+    sourceHolder = accountHolder(w, sourceAddress),
+    destinationHolder = accountHolder(w, destinationAddress),
+    source = sourceHolder?.[sourceAddress.field] ?? 0,
+    destination = destinationHolder?.[destinationAddress.field] ?? 0,
     amount = Math.min(source, requested)
   if (!(amount > 0)) return 0
   settleBankTransfer(w, from, to, amount)
-  for (const [key, value] of [
-    [from, source],
-    [to, destination],
-  ] as const)
-    if (e.ledger.opening[key] === undefined) e.ledger.opening[key] = value
-  setBalance(w, from, source - amount)
-  setBalance(w, to, destination + amount)
-  e.ledger.net[from] = (e.ledger.net[from] ?? 0) - amount
-  e.ledger.net[to] = (e.ledger.net[to] ?? 0) + amount
-  e.ledger.transactions++
-  e.ledger.volume += amount
-  e.ledger.entries.push({ from, to, amount, category })
-  if (e.ledger.entries.length > 1024) e.ledger.entries.splice(0, e.ledger.entries.length - 1024)
+  if (e.ledger.opening[from] === undefined) e.ledger.opening[from] = source
+  if (e.ledger.opening[to] === undefined) e.ledger.opening[to] = destination
+  sourceHolder![sourceAddress.field] = source - amount
+  destinationHolder![destinationAddress.field] = destination + amount
+  recordTransfer(w, from, to, amount, category)
   return amount
 }
 export function beginLedgerMonth(w: World) {

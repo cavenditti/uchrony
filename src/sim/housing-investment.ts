@@ -1,3 +1,4 @@
+import { habitableLand } from './terrain-access'
 import type { World } from './types'
 import type { PhysicalSite } from './adaptive-types'
 import { compactResidence, findResidentialParcel } from './residential-sites'
@@ -29,6 +30,7 @@ export function planHousingInvestment(
   access: ReturnType<typeof settlementAccess>,
   pending: ReadonlySet<string> = new Set(w.adaptive!.construction?.map((p) => p.site)),
   catchmentMeters = 1000,
+  surveyExpansion = true,
 ) {
   const unit = w.localEconomy!.units[target.pool],
     sponsor = w.economy!.producers[target.pool]
@@ -42,10 +44,13 @@ export function planHousingInvestment(
   }[] = []
   const consider = (site: PhysicalSite, plot?: Plot, accessMeters?: number) => {
     const area = plot
-      ? plot.parcel.size ** 2
+      ? plot.building
+        ? polygonArea(plot.building)
+        : plot.parcel.size ** 2
       : compactResidence(site)
         ? polygonArea(residentialFootprint(w, site))
         : polygonArea(cellPolygon(w, site.cell))
+    if (!habitableLand(w.cells[plot?.cell ?? site.cell])) return
     const opening = plot ? 0 : site.capacity
     const inputsFor = (q: number) =>
       w.adaptive!.residentialVersion === 1
@@ -61,7 +66,11 @@ export function planHousingInvestment(
       )
     }
     let lo = 0,
-      hi = plot ? Math.min(need, area / 40) : need
+      hi = plot
+        ? Math.min(need, area / 40)
+        : site.building
+          ? Math.min(need, Math.max(0, area / 10 - opening))
+          : need
     if (!affordable(0)) return
     if (affordable(hi)) lo = hi
     else
@@ -81,13 +90,14 @@ export function planHousingInvestment(
   const targetAccess = access.baseUtility(target)
   for (const home of homes)
     if (
+      (w.adaptive?.buildingVersion !== 1 || !!home.building) &&
       !pending.has(home.id) &&
       Math.hypot(home.x - target.x, home.y - target.y) <= catchmentMeters &&
       access.baseUtility(home) >= targetAccess - 0.08 &&
       (!compactResidence(target) || compactResidence(home))
     )
       consider(home)
-  if (w.adaptive!.residentialVersion === 1 && target.parcel) {
+  if (surveyExpansion && w.adaptive!.residentialVersion === 1 && target.parcel) {
     // Even a free, adjacent plot pays setup costs. Skip its survey when the
     // cheapest infill is already below this strict new-plot cost lower bound.
     const minimum = housingInputs(need, 0, Infinity, 0)

@@ -1,6 +1,7 @@
 import { placeLabels } from './almanac'
-import { urbanBlocks } from './urban-blocks'
 import { economicLandscape } from './economic-landscape'
+import { mapHomesSnapshot, mapMeshSnapshot } from './map-snapshot'
+import { urbanBlocks } from './urban-blocks'
 import { clamp, GOODS, type Inventory, type Army, type World } from './types'
 import { unitLoyalty } from './forces'
 import type { IdentityAxis, PopulationCommunity } from './population-types'
@@ -154,19 +155,9 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
     viewLandscape: economicLandscape(world),
     ...(world.adaptive
       ? {
+          viewHomes: mapHomesSnapshot(world),
+          viewMesh: mapMeshSnapshot(world),
           viewUrbanBlocks: urbanBlocks(world),
-          viewHomes: Object.values(world.adaptive.sites)
-            .filter((site) => site.kind === 'residential' && site.retired === undefined)
-            .map(({ id, cell, pool, capacity, residents, x, y, parcel }) => ({
-              id,
-              cell,
-              pool,
-              capacity,
-              residents,
-              x,
-              y,
-              parcel,
-            })),
         }
       : {}),
     ...(detailNation !== undefined ? { viewNation: detailNation, viewBankLoans: bankLoans } : {}),

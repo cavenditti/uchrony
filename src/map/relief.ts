@@ -19,6 +19,7 @@ import { activityTexture } from './activity-material'
 import { economicLandscape } from '../sim/economic-landscape'
 import { drawGroundRoads } from './ground-roads'
 import { renderedLand } from './land-surface'
+import { sceneryModel } from './scenery-models'
 
 export type ReliefCamera = { w: number; h: number; scale: number; x: number; y: number; tilt: boolean }
 
@@ -195,47 +196,34 @@ export class ReliefMap {
             if (Math.hypot(tree.x - city.x, tree.z - city.z) < city.radius + 5) return false
       return true
     })
-    const geometry = new THREE.SphereGeometry(1, 8, 6)
-    const canopy = geometry.attributes.position
-    for (let i = 0; i < canopy.count; i++) {
-      const x = canopy.getX(i),
-        y = canopy.getY(i),
-        z = canopy.getZ(i)
-      const irregularity = 0.88 + reliefRandom(Math.round((x + 2) * 31 + (y + 2) * 71 + (z + 2) * 113)) * 0.24
-      canopy.setXYZ(i, x * irregularity, y * irregularity, z * irregularity)
+    // Blender trees share the canopy's bounds: round trees become broadleaves
+    // and slender ones conifers. The sphere remains if the kit cannot load.
+    const kinds = [
+      { geometry: sceneryModel('broadleaf', canopyGeometry), trees: trees.filter((t) => t.variation <= 0.64) },
+      { geometry: sceneryModel('conifer', canopyGeometry), trees: trees.filter((t) => t.variation > 0.64) },
+    ]
+    const material = windMaterial(this.motion.time, false, this.treeScale)
+    material.vertexColors = kinds[0].geometry.hasAttribute('color')
+    for (const { geometry, trees } of kinds) {
+      const crowns = new THREE.InstancedMesh(geometry, material, trees.length)
+      let index = 0
+      for (const { x, z, variation: r } of trees) {
+        dummy.position.set(x, this.picker.heightAt(x, z), z)
+        dummy.rotation.set((r - 0.5) * 0.18, r * Math.PI, 0)
+        const slender = r > 0.64
+        dummy.scale.set(
+          slender ? 2.1 : 3.1 + r * 2.2,
+          slender ? 10 + r * 3 : 4 + r * 5,
+          slender ? 2 : 2.7 + r * 2.5,
+        )
+        dummy.updateMatrix()
+        crowns.setMatrixAt(index, dummy.matrix)
+        color.setHSL(0.37 + r * 0.06, 0.39 + r * 0.1, 0.18 + r * 0.1)
+        crowns.setColorAt(index++, color)
+      }
+      crowns.computeBoundingSphere()
+      this.scenery.add(crowns)
     }
-    // Keep continuous crown normals across the non-indexed triangular faces.
-    const normals = geometry.attributes.normal
-    for (let i = 0; i < canopy.count; i++) {
-      const x = canopy.getX(i),
-        y = canopy.getY(i),
-        z = canopy.getZ(i)
-      const length = Math.hypot(x, y, z)
-      normals.setXYZ(i, x / length, y / length, z / length)
-    }
-    geometry.translate(0, 0.8, 0)
-    const crowns = new THREE.InstancedMesh(
-      geometry,
-      windMaterial(this.motion.time, false, this.treeScale),
-      trees.length,
-    )
-    let index = 0
-    for (const { x, z, variation: r } of trees) {
-      dummy.position.set(x, this.picker.heightAt(x, z), z)
-      dummy.rotation.set((r - 0.5) * 0.18, r * Math.PI, 0)
-      const slender = r > 0.64
-      dummy.scale.set(
-        slender ? 2.1 : 3.1 + r * 2.2,
-        slender ? 10 + r * 3 : 4 + r * 5,
-        slender ? 2 : 2.7 + r * 2.5,
-      )
-      dummy.updateMatrix()
-      crowns.setMatrixAt(index, dummy.matrix)
-      color.setHSL(0.37 + r * 0.06, 0.39 + r * 0.1, 0.18 + r * 0.1)
-      crowns.setColorAt(index++, color)
-    }
-    crowns.computeBoundingSphere()
-    this.scenery.add(crowns)
   }
 
   setCamera(next: ReliefCamera) {
@@ -420,4 +408,26 @@ export class ReliefMap {
     this.textureCanvas.width = this.textureCanvas.height = 1
     this.overlayCanvas.width = this.overlayCanvas.height = 1
   }
+}
+
+function canopyGeometry() {
+  const geometry = new THREE.SphereGeometry(1, 8, 6)
+  const canopy = geometry.attributes.position
+  for (let i = 0; i < canopy.count; i++) {
+    const x = canopy.getX(i),
+      y = canopy.getY(i),
+      z = canopy.getZ(i)
+    const irregularity = 0.88 + reliefRandom(Math.round((x + 2) * 31 + (y + 2) * 71 + (z + 2) * 113)) * 0.24
+    canopy.setXYZ(i, x * irregularity, y * irregularity, z * irregularity)
+  }
+  // Keep continuous crown normals across the non-indexed triangular faces.
+  const normals = geometry.attributes.normal
+  for (let i = 0; i < canopy.count; i++) {
+    const x = canopy.getX(i),
+      y = canopy.getY(i),
+      z = canopy.getZ(i)
+    const length = Math.hypot(x, y, z)
+    normals.setXYZ(i, x / length, y / length, z / length)
+  }
+  return geometry.translate(0, 0.8, 0)
 }

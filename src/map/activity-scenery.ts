@@ -12,13 +12,17 @@ import {
   type DetailShape,
 } from './activity-layout'
 import { TerrainPicker } from './relief-picking'
-import { architectureMaterial } from './city-materials'
+import { architectureMaterial, paintedMaterial } from './city-materials'
+import { sceneryModel } from './scenery-models'
 import { activityPose } from './activity-motion'
 import { reliefRandom } from './relief-field'
 import { sceneryBucket, sceneryDensity, sceneryLodMaterial } from './scenery-lod'
 
+type ActorShape = DetailShape | 'boat' | 'cart' | 'figure' | 'sails'
+/** Vertex-colored Blender models draw with the painted material, not masonry. */
+const PAINTED = new Set<ActorShape>(['crown', 'conifer', 'sheep', 'boat', 'cart', 'figure', 'sails'])
 type Actor = {
-  shape: DetailShape
+  shape: ActorShape
   motion: DetailMotion
   matrix: THREE.Matrix4
   color: string
@@ -40,17 +44,27 @@ export class ActivityScenery {
   private dummy = new THREE.Object3D()
   private projection = new THREE.Vector3()
   private raycaster = new THREE.Raycaster()
-  private geometries = {
+  private geometries: Record<ActorShape, THREE.BufferGeometry> = {
     box: new THREE.BoxGeometry(1, 1, 1),
-    roof: new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4),
+    roof: sceneryModel('roof-hip', () => new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4)),
     cone: new THREE.ConeGeometry(0.5, 1, 8),
     cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 8),
-    crown: new THREE.IcosahedronGeometry(0.5, 1),
+    crown: sceneryModel('crown', () => new THREE.IcosahedronGeometry(0.5, 1)),
+    conifer: unitBox(sceneryModel('conifer', () => new THREE.ConeGeometry(0.5, 1, 8))),
+    sheep: sceneryModel('sheep', () => new THREE.IcosahedronGeometry(0.5, 1)),
+    // Moving props have no primitive equivalent; without the kit, addMotion
+    // keeps composing them from boxes and crowns.
+    boat: sceneryModel('boat', () => new THREE.BufferGeometry()),
+    cart: sceneryModel('cart', () => new THREE.BufferGeometry()),
+    figure: sceneryModel('figure', () => new THREE.BufferGeometry()),
+    sails: sceneryModel('mill-sails', () => new THREE.BufferGeometry()),
   }
+  private kit = this.geometries.boat.hasAttribute('position')
   private density = { value: 1 }
   private visibility = { value: 1 }
   private material = sceneryLodMaterial(architectureMaterial('wall'), this.density, this.visibility)
   private roofMaterial = sceneryLodMaterial(architectureMaterial('roof'), this.density, this.visibility)
+  private paintedMaterial = sceneryLodMaterial(paintedMaterial(), this.density, this.visibility)
   private depthMaterial = sceneryLodMaterial(
     new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }),
     this.density,
@@ -153,14 +167,10 @@ export class ActivityScenery {
     }
     this.clearMeshes()
     const color = new THREE.Color()
-    for (const shape of Object.keys(this.geometries) as DetailShape[]) {
+    for (const shape of Object.keys(this.geometries) as ActorShape[]) {
       const list = pieces.filter((p) => p.shape === shape)
       if (!list.length) continue
-      const mesh = new THREE.InstancedMesh(
-        this.geometries[shape].clone(),
-        shape === 'roof' ? this.roofMaterial : this.material,
-        list.length,
-      )
+      const mesh = new THREE.InstancedMesh(this.geometries[shape].clone(), this.materialFor(shape), list.length)
       mesh.geometry.setAttribute(
         'detailThreshold',
         new THREE.InstancedBufferAttribute(new Float32Array(list.map((p) => p.detailThreshold ?? -1)), 1),
@@ -180,10 +190,10 @@ export class ActivityScenery {
       this.group.add(mesh)
     }
     for (const motion of motions) this.addMotion(motion)
-    for (const shape of Object.keys(this.geometries) as DetailShape[]) {
+    for (const shape of Object.keys(this.geometries) as ActorShape[]) {
       const actors = this.actors.filter((a) => a.shape === shape)
       if (!actors.length) continue
-      const mesh = new THREE.InstancedMesh(this.geometries[shape].clone(), this.material, actors.length)
+      const mesh = new THREE.InstancedMesh(this.geometries[shape].clone(), this.materialFor(shape), actors.length)
       mesh.geometry.setAttribute(
         'detailThreshold',
         new THREE.InstancedBufferAttribute(new Float32Array(actors.map((a) => a.threshold)), 1),
@@ -200,6 +210,10 @@ export class ActivityScenery {
     this.motionTick = -1
     this.animate(this.time)
   }
+  private materialFor(shape: ActorShape) {
+    if (PAINTED.has(shape) && this.geometries[shape].hasAttribute('color')) return this.paintedMaterial
+    return shape === 'roof' ? this.roofMaterial : this.material
+  }
   private motionThreshold(m: DetailMotion) {
     // A windmill rotor is part of its structure; roads and people receive
     // deterministic detail samples that remain the same when the camera pans.
@@ -209,7 +223,7 @@ export class ActivityScenery {
   }
   private addMotion(motion: DetailMotion) {
     const add = (
-      shape: DetailShape,
+      shape: ActorShape,
       color: string,
       x: number,
       y: number,
@@ -231,7 +245,11 @@ export class ActivityScenery {
         threshold: this.motionThreshold(motion),
       })
     }
-    if (motion.kind === 'mill')
+    if (this.kit) {
+      // Blender props carry their own colors and true-scale proportions.
+      const shape = motion.kind === 'mill' ? 'sails' : motion.kind === 'worker' ? 'figure' : motion.kind
+      add(shape, '#ffffff', 0, 0, 0, 1, 1, 1)
+    } else if (motion.kind === 'mill')
       for (let i = 0; i < 4; i++) {
         const a = (i * Math.PI) / 2
         add('box', '#d9c49a', Math.cos(a) * 0.48, Math.sin(a) * 0.48, 0, 0.16, 0.8, 0.045, a - Math.PI / 2)
@@ -302,6 +320,16 @@ export class ActivityScenery {
     Object.values(this.geometries).forEach((g) => g.dispose())
     this.material.dispose()
     this.roofMaterial.dispose()
+    this.paintedMaterial.dispose()
     this.depthMaterial.dispose()
   }
+}
+
+/** Fit a model into the unit cube that activity pieces scale, like the primitives. */
+function unitBox(geometry: THREE.BufferGeometry) {
+  geometry.computeBoundingBox()
+  const { min, max } = geometry.boundingBox!
+  return geometry
+    .translate(-(min.x + max.x) / 2, -(min.y + max.y) / 2, -(min.z + max.z) / 2)
+    .scale(1 / (max.x - min.x), 1 / (max.y - min.y), 1 / (max.z - min.z))
 }

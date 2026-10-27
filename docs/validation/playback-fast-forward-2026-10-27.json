@@ -1,0 +1,188 @@
+{
+  "date": "2026-10-27",
+  "scope": "Playback buttons, an exact construction-index optimization, and opt-in approximate six-month Max playback.",
+  "method": {
+    "scenario": "Settled World, seed performance-ledger, 129024 cells, 32 states, six months from generation; startup excluded from tick timing.",
+    "runtime": "Node 26.11.1, macOS arm64",
+    "timing": "Separate-process single trials on a shared machine. CPU and wall time reported. Earlier baseline overlapped some browser QA. These are observed development timings, not isolated repeated performance qualification.",
+    "exactBaseline": "Working source frozen under /tmp/uchrony-playback-baseline before this task; includes previous uncommitted performance and city work.",
+    "approximation": "Max keeps monthly financial/goods settlement, births, deaths and political/military evolution, with coarse job/housing/mobility choices. It is explicitly permitted to produce different history.",
+    "startup": "No startup-performance claim."
+  },
+  "baselineMonthly": {
+    "scale": "world",
+    "mode": "monthly",
+    "seed": "performance-ledger",
+    "months": 6,
+    "startupMs": 8051,
+    "elapsedMs": 262060,
+    "stepMs": [
+      20291,
+      42674,
+      68357,
+      23439,
+      41443,
+      65856
+    ],
+    "cpuMs": 273364,
+    "population": 168290622,
+    "gdp": 95685.39503404504,
+    "validated": true
+  },
+  "optimizedMonthly": {
+    "scale": "world",
+    "mode": "monthly",
+    "seed": "performance-ledger",
+    "months": 6,
+    "startupMs": 5895,
+    "elapsedMs": 104966,
+    "stepMs": [
+      13474,
+      12220,
+      12004,
+      14097,
+      23399,
+      29772
+    ],
+    "cpuMs": 134619,
+    "population": 168290622,
+    "gdp": 95685.39503404504,
+    "validated": true
+  },
+  "approximateMax": {
+    "scale": "world",
+    "mode": "max",
+    "seed": "performance-ledger",
+    "months": 6,
+    "startupMs": 6574,
+    "elapsedMs": 80491,
+    "stepMs": [
+      9927,
+      7079,
+      7343,
+      8184,
+      10127,
+      37831
+    ],
+    "cpuMs": 103896,
+    "population": 168291000,
+    "gdp": 95517.56781215976,
+    "approximation": {
+      "months": 6,
+      "lastMonth": 6,
+      "phase": 0
+    },
+    "validated": true
+  },
+  "comparison": {
+    "exactElapsedSpeedup": 2.4966179524798506,
+    "exactCpuSpeedup": 2.0306494625572915,
+    "maxVsBaselineElapsedSpeedup": 3.255767725584227,
+    "maxVsOptimizedMonthlyElapsedSpeedup": 1.3040712626256352,
+    "maxVsOptimizedMonthlyPopulationChange": 378,
+    "maxVsOptimizedMonthlyGDPChangePercent": -0.17539481529607048
+  },
+  "completeStateReplay": {
+    "world": {
+      "engine": "/Users/carlo/Devel/personal/uchrony",
+      "referenceEngine": "/tmp/uchrony-playback-baseline",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "generationMs": 3167,
+      "generationCpuMs": 3873,
+      "fromMonth": 0,
+      "months": 2,
+      "repeats": 1,
+      "cells": 129024,
+      "communities": 21030,
+      "results": [
+        {
+          "ms": 31409,
+          "preparationMs": 2950,
+          "preparationCpuMs": 4484,
+          "startupMs": 6117,
+          "monthsPerSecond": 0.06,
+          "tickMs": [
+            14302,
+            17106
+          ],
+          "cpuMs": 56015,
+          "tickCpuMs": [
+            21401,
+            34614
+          ],
+          "processPeakRssMiB": 4537,
+          "finalHash": "c357fb8c8e4fa8a4ed1f402d4d52cc7af41680318a997b7bf06ee1e3e40ca1fc",
+          "referenceMs": 56108,
+          "identicalMonths": 2
+        }
+      ]
+    },
+    "regional": {
+      "engine": "/Users/carlo/Devel/personal/uchrony",
+      "referenceEngine": "/tmp/uchrony-playback-baseline",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "generationMs": 399,
+      "generationCpuMs": 601,
+      "fromMonth": 0,
+      "months": 2,
+      "repeats": 1,
+      "cells": 8064,
+      "communities": 2730,
+      "results": [
+        {
+          "ms": 2056,
+          "preparationMs": 267,
+          "preparationCpuMs": 458,
+          "startupMs": 666,
+          "monthsPerSecond": 0.97,
+          "tickMs": [
+            1253,
+            803
+          ],
+          "cpuMs": 3583,
+          "tickCpuMs": [
+            2085,
+            1498
+          ],
+          "processPeakRssMiB": 781,
+          "finalHash": "6765f595afa1db76f16c7fc0d81fac8b603be2be21d65341f3f21ba7fade3b35",
+          "referenceMs": 2092,
+          "identicalMonths": 2
+        }
+      ]
+    }
+  },
+  "validation": {
+    "focusedTests": "14 passed: playback (5), fast-forward (2), urban blocks and housing demand (7). Includes 12-month approximate continuation from a compressed save and monthly financial, goods, bank, workforce and census checks.",
+    "productionBuild": "passed",
+    "browser": "Play/pause, 2x, 4x, Max, keyboard Space/1-4, pause during partial interval, desktop 1440x900 and mobile 390x844 checked. Scoped axe: 14 passes, zero violations/incomplete.",
+    "independentUIReview": "ship, including final Max progress display. Documentation verified."
+  },
+  "profileFinding": {
+    "sample": "Two World months of the initial approximate implementation, V8 CPU samples; includes profiler overhead.",
+    "advanceMonthSampledMs": 55573,
+    "advanceLandUseSampledMs": 36810,
+    "housingCentresSelfSampledMs": 30033,
+    "fix": "Share one immutable construction-membership index across all housing pools per phase. Approximate Max also uses local housing shortages, funded infill, and periodic new-plot surveys."
+  },
+  "finalSourceSha256": {
+    "src/App.tsx": "962c97d5359d8eac84f77677e4169d471c3f06bbc47bd92b20bd768f40d98029",
+    "src/styles.css": "dd8b90ff98f30072d493b9a0b624fbc2bf7826209b94225c6ad5f7618fe188f2",
+    "src/sim/playback.ts": "a6800e26666911ef6e1aabc75d83bca6dd169d11d8a2e2730781fc5109a5d402",
+    "src/sim/fast-forward.ts": "1f8f7c9874bdb5c6f7caf937a75ed3a918e74b3e0610ca04f56937da71b5f97a",
+    "src/sim/engine.ts": "9e7b42b14cb6115f267152dc40fdb092d0bc3eb0ae78903ff6ec00dad904e1ca",
+    "src/sim/worker.ts": "c3c10a84b4a449265a3c9dbd9f45f43f34342e300b10e1d0002951f029f845f2",
+    "src/sim/housing-demand.ts": "30e761afb410f5d55e89b0a4697fc23cbc7f69f32eb1577f80ca7b1b708a0e6e",
+    "src/sim/housing-investment.ts": "42f1df397bc057fb3ca56a15498ac9bec69e8c7f5d6a53f2dfc053ec79820eb6",
+    "src/sim/land-use.ts": "371d59b0a309d4a7e886c53bd956aadf4dca5e961c8b2159769415be4e0ed4e3",
+    "src/sim/settlement-access.ts": "86b15f228c1774eebb9fe7eb0bb82e9161ef38090d093f103eaf3bbf77713302",
+    "src/sim/cities.ts": "69d8b0d562a47060e18db2fdc2de32ed265282334d445a3aa50311de8c1fd6ff",
+    "src/sim/commuting.ts": "d5dd144ea54075a140974df8bcf924d88fc3dda4fd9e64faa99a6403977792b0",
+    "src/sim/population.ts": "66a6ecd4f17d3be01f141464f1b8a4b67a48a472cba1bb50ca7cd92723ad80f9",
+    "src/sim/economy.ts": "1f18ac4032a64fffde94d9c9307a195f85fd60bceeefa69e1faab63c49d0b94e",
+    "src/sim/types.ts": "2ab02c1a786fb6333f77e7a317a21a6efe5b4487255d8d27f0c0c6d843e77a99",
+    "src/sim/persistence.ts": "749d462ea562edbe16393943172352ec3e128740d02e97365fa75cd1c8b4648f"
+  }
+}

@@ -4,7 +4,7 @@ import type { World } from './types'
 
 /** Residence, firm, physical route, then five exact FTE counts and five wage payments. */
 export type CommuteRow = [number, number, string, ...number[]]
-const indexes = new WeakMap<CommuteRow[], Map<string, CommuteRow>>()
+const indexes = new WeakMap<CommuteRow[], Map<number, Map<number, CommuteRow>>>()
 const residenceIndexes = new WeakMap<CommuteRow[], Map<number, CommuteRow[]>>()
 export function recordCommute(
   w: World,
@@ -22,16 +22,18 @@ export function recordCommute(
     index = new Map()
     indexes.set(rows, index)
   }
-  const key = `${residence}:${firm}`
-  let row = index.get(key)
+  let byFirm = index.get(residence)
+  if (!byFirm) index.set(residence, (byFirm = new Map()))
+  let row = byFirm.get(firm)
   if (!row) {
-    row = [residence, firm, route, ...Array<number>(10).fill(0)]
-    index.set(key, row)
+    row = [residence, firm, route, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    byFirm.set(firm, row)
     rows.push(row)
   }
   const slot = STRATA.indexOf(stratum)
   row[3 + slot] = (row[3 + slot] as number) + workers
   row[8 + slot] = (row[8 + slot] as number) + wages
+  return row
 }
 function* expand(w: World, rows: CommuteRow[]): Generator<CommuteFlow> {
   for (const row of rows) {

@@ -1,3 +1,4 @@
+import { governance } from './governance'
 import { archiveRetiredDistricts } from './districts'
 import { economicRegions, economicRegion } from './local-units'
 import {
@@ -37,6 +38,7 @@ import {
   borrow,
   beginLedgerMonth,
   auditLedger,
+  preparePayments,
 } from './ledger'
 import { BASE_PRICE, householdNeed, foodEquivalentPeople } from './economy'
 import { beginGoodsMonth, auditGoods } from './goods-accounting'
@@ -69,7 +71,7 @@ const materialWeights: Inventory = {
 }
 /** Collection capacity changes actual withholding, never creates revenue without a payer. */
 export function collectedTaxRate(w: World, r: Region) {
-  const n = w.nations[r.nation]
+  const n = governance(w, r.nation)
   const collection = clamp(
     (0.6 + n.technologies.governance * 0.045) *
       (0.5 + n.stability / 200) *
@@ -155,7 +157,8 @@ export function householdDemand(prices: Inventory, subsistence: Inventory, budge
   return result
 }
 export function consumeHouseholds(w: World) {
-  const e = ensureEconomy(w)
+  const e = ensureEconomy(w),
+    payments = preparePayments(w)
   for (const r of economicRegions(w)) {
     const f = e.producers[r.id],
       total = Math.max(1, population(r))
@@ -165,7 +168,7 @@ export function consumeHouseholds(w: World) {
       {
         stocks: r.stocks,
         prices: r.prices,
-        account: producerAccount(r.id),
+        account: payments.account(producerAccount(r.id)),
         store: marketStore(r.id),
         seller: f,
       },
@@ -174,7 +177,7 @@ export function consumeHouseholds(w: World) {
         .map((firm) => ({
           stocks: firm.stocks,
           prices: firm.prices,
-          account: firmAccount(firm.id),
+          account: payments.account(firmAccount(firm.id)),
           store: firmStore(firm.id),
           seller: firm,
         })),
@@ -188,6 +191,7 @@ export function consumeHouseholds(w: World) {
     const foodTotal = Object.values(foodWeights).reduce((sum, x) => sum + x, 0)
     const orders: {
       s: EconomicStratum
+      account: ReturnType<typeof payments.account>
       people: number
       needs: Inventory
       requested: Inventory
@@ -224,6 +228,7 @@ export function consumeHouseholds(w: World) {
       )
       orders.push({
         s,
+        account: payments.account(householdAccount(r.id, s)),
         people,
         needs,
         requested: householdDemand(prices, needs, spending),
@@ -250,13 +255,7 @@ export function consumeHouseholds(w: World) {
           const amount = Math.min(offer.stocks[g], quantities[i] * fill)
           if (amount <= 1e-9) return
           const h = e.households[r.id][o.s]
-          const paid = transfer(
-            w,
-            householdAccount(r.id, o.s),
-            offer.account,
-            amount * price,
-            'household consumption',
-          )
+          const paid = payments.transfer(o.account, offer.account, amount * price, 'household consumption')
           const quantity = price > 0 ? Math.min(amount, paid / price) : 0
           recordGoodsSale(w, offer.store, g, quantity, paid, {
             kind: 'household',
@@ -406,7 +405,7 @@ export function purchasePublicLabor(
   }
   const e = ensureEconomy(w),
     f = e.producers[r.id],
-    n = w.nations[r.nation]
+    n = governance(w, r.nation)
   let order = Math.max(0, budget),
     delivered = 0
   for (const s of ['professional', 'artisan', 'laborer', 'smallholder', 'owner'] as const) {
@@ -426,7 +425,7 @@ export function purchasePublicLabor(
     h.income += paid
     h.taxes += tax
     h.employed += actualJobs
-    n.income += tax
+    if (n.id >= 0) n.income += tax
     delivered += paid
     order -= paid
     recordWages(w, r.id, payer, paid, true)
@@ -500,7 +499,7 @@ export function recordTrade(
   b.purchases += value * (1 + tariff)
   b.freight += freight
   e.households[from].laborer.income += freight
-  w.nations[economicRegion(w, to).nation].income += value * tariff
+  if (economicRegion(w, to).nation >= 0) w.nations[economicRegion(w, to).nation].income += value * tariff
 }
 export function settleCredit(w: World) {
   settleBanks(w)
@@ -511,7 +510,7 @@ export function finishEconomyMonth(w: World) {
   finishFirms(w)
   for (const r of economicRegions(w)) {
     const f = e.producers[r.id],
-      nation = w.nations[r.nation]
+      nation = governance(w, r.nation)
     // Cash-basis operating surplus: purchases are expensed on settlement.
     // Consuming the producer's own intermediate output is not another cash cost.
     f.profit = f.sales - f.purchases - f.freight - f.interest
@@ -523,7 +522,7 @@ export function finishEconomyMonth(w: World) {
       'profit tax',
     )
     f.taxes = tax
-    nation.income += tax
+    if (nation.id >= 0) nation.income += tax
     f.profit -= tax
     if (stratumPeople(w, r.id, 'owner')) {
       const dividends = transfer(

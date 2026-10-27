@@ -1,3 +1,4 @@
+import { habitableLand } from './terrain-access'
 import { isVisibleSettlement, settlementKind } from './settlement-model'
 import { settledResidentsByCell } from './settlement-morphology'
 import { METERS_PER_MAP_UNIT } from './physical-space'
@@ -19,8 +20,8 @@ export interface Settlement {
   aliases?: string[]
   position?: { x: number; y: number }
   siteIds?: string[]
-  metropolis?: { name: string; incorporated: boolean }
   nucleusSite?: string
+  metropolis?: { name: string; incorporated: boolean }
 }
 export interface SpatialDistrict {
   id: string
@@ -210,12 +211,15 @@ export function buildSpatial(w: World): SpatialState {
       // Separate entry/exit thresholds preserve existing centers through small shocks.
       const threshold = (old.length ? 600 : 1200) * Math.max(1, Math.sqrt(r.cells.length) / 2)
       const desired = urbanTotal >= threshold ? Math.min(8, 1 + Math.floor(urbanTotal / 40000)) : 0
-      const candidates = [...r.cells].sort(
-        (a, b) => settlementWeight(w.cells[b]) - settlementWeight(w.cells[a]) || a - b,
-      )
-      const sites = old.slice(0, desired).map((s) => s.cell)
+      const candidates = r.cells
+        .filter((id) => habitableLand(w.cells[id]))
+        .sort((a, b) => settlementWeight(w.cells[b]) - settlementWeight(w.cells[a]) || a - b)
+      const sites = old
+        .filter((s) => habitableLand(w.cells[s.cell]))
+        .slice(0, desired)
+        .map((s) => s.cell)
       // A capital is a seat of government, not evidence for a city-sized population.
-      if (isCapital && !sites.length && total > 0) sites.push(r.center)
+      if (isCapital && !sites.length && total > 0 && habitableLand(w.cells[r.center])) sites.push(r.center)
       for (const cell of candidates) {
         if (sites.length >= desired) break
         const c = w.cells[cell]
@@ -245,8 +249,9 @@ export function buildSpatial(w: World): SpatialState {
         total - concentrated,
         r.cells.map((id) => {
           const h = landscapeAt(w.cells[id]).habitat
-          return h < 0.06 ? 0 : h ** 2
+          return habitableLand(w.cells[id]) ? Math.max(0.0001, h ** 2) : 0
         }),
+        r.cells.map((id) => (habitableLand(w.cells[id]) ? Infinity : 0)),
       )
       const activity = w.economy?.firms ? industrialJobs[r.id] : total * r.urban * r.industry * 0.25
       const workWeights = r.cells.map(

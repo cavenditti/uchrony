@@ -1,3 +1,4 @@
+import { habitableLand } from './terrain-access'
 import { clamp, type Cell, type Region } from './types'
 import { hashSeed, noise } from './random'
 import { neighbors } from './grid'
@@ -17,15 +18,25 @@ export function seedLandscape(cells: Cell[], width: number, height: number, seed
     const x = c.q / width,
       y = c.r / height
     const coast = neighbors(c.id, width, height).some((id) => cells[id].terrain === 'water')
-    const habitat = clamp(
-      { plains: 0.9, forest: 0.64, hills: 0.38, mountains: 0.035, desert: 0.045, tundra: 0.025, water: 0 }[
-        c.terrain
-      ] *
-        (0.65 + c.moisture * 0.5) +
-        (c.river ? 0.15 : 0),
-    )
+    const habitat = habitableLand(c)
+      ? clamp(
+          {
+            plains: 0.9,
+            forest: 0.64,
+            hills: 0.38,
+            mountains: 0.035,
+            desert: 0.045,
+            tundra: 0.025,
+            water: 0,
+          }[c.terrain] *
+            (0.65 + c.moisture * 0.5) +
+            (c.river ? 0.15 : 0),
+        )
+      : 0
     const basin = noise(x * 7, y * 7, salt)
-    const attraction = clamp(habitat * (0.12 + 0.88 * basin ** 2) + (coast ? 0.12 : 0) + (c.river ? 0.1 : 0))
+    const attraction = habitableLand(c)
+      ? clamp(habitat * (0.12 + 0.88 * basin ** 2) + (coast ? 0.12 : 0) + (c.river ? 0.1 : 0))
+      : 0
     const ore = (offset: number, frequency: number, threshold: number) =>
       Math.max(0, noise(x * frequency, y * frequency, salt + offset) - threshold) ** 2
     c.landscape = {
@@ -57,6 +68,8 @@ export function seedLandscape(cells: Cell[], width: number, height: number, seed
 
 /** Legacy geography gets a read-only suitability estimate; its stocks and people stay intact. */
 export function landscapeAt(c: Cell): Landscape {
+  if (!habitableLand(c))
+    return { habitat: 0, attraction: 0, resources: { timber: 0, stone: 0, iron: 0, coal: 0 } }
   return (
     c.landscape ?? {
       habitat: c.terrain === 'mountains' || c.terrain === 'desert' || c.terrain === 'tundra' ? 0.05 : 0.65,

@@ -1,0 +1,76 @@
+{
+  "date": "2026-10-27",
+  "scope": "Organic building frontage, varied footprints and density, terrain-guided local lanes, and flat dirt textures for land trade roads",
+  "status": "passed bounded validation",
+  "automated": {
+    "productionBuild": "passed: TypeScript and Vite; existing chunk-size warning remains",
+    "diffWhitespace": "passed",
+    "batches": [
+      {
+        "tests": ["tests/organic-growth.test.ts"],
+        "passed": 3,
+        "failed": 0,
+        "coverage": "Recorded road frontage, varied footprints, absence of grid snapping, terrain response, water avoidance, overlap and street clearance, read-only deterministic surveys, flat road projection and deduplication"
+      },
+      {
+        "tests": ["tests/building-lots.test.ts", "tests/view-storage.test.ts"],
+        "passed": 16,
+        "failed": 0,
+        "coverage": "Building conservation and picking, paid growth, legacy building saves without lanes, and existing snapshot/save storage contracts"
+      },
+      {
+        "tests": ["tests/frontier-settlements.test.ts"],
+        "selection": "frontier months and a restored save remain deterministic across independent communities and state expansion",
+        "passed": 1,
+        "failed": 0,
+        "coverage": "Twelve-month deterministic save continuation after final frontage changes"
+      }
+    ],
+    "earlierRuns": "All seven frontier tests passed. Living-world, city-rendering and relief checks passed in the earlier focused run. Two outdated test expectations failed initially (an adjacent rotated footprint at a corner, and a slope fixture below the contour threshold); both were corrected and their suites passed subsequent runs. Counts across overlapping batches are not a unique-test total."
+  },
+  "browser": {
+    "fixture": "/tests/browser/quadtree.html",
+    "engine": "Chromium through agent-browser",
+    "isolation": "Dedicated fixture worker; no application saves or model calls",
+    "viewports": [[1440, 1000], [390, 844], [509, 853]],
+    "views": ["Quadtree", "3D"],
+    "errors": [],
+    "horizontalOverflow": false,
+    "initial": {"settlements": 8, "buildings": 3601, "residents": 22911},
+    "afterSixMonths": {
+      "states": 8,
+      "settlements": 15,
+      "residents": 23040,
+      "buildings": 4217,
+      "capacity": 31532.09999999989,
+      "economicPools": 218,
+      "leaves": 122100,
+      "minimumSpanMetres": 8,
+      "localLanes": 3666,
+      "tradeRoads": 258,
+      "unclaimedProvinces": 167,
+      "pendingConstruction": 0,
+      "meshBytes": 4941432
+    },
+    "screenshots": [
+      "organic-growth-2026-10-27.png",
+      "organic-trade-roads-2026-10-27.png"
+    ],
+    "previewLimitation": "The development server returned HTTP 200 and the dedicated Chromium checks passed. Refreshing the separate in-app browser encountered ERR_CONNECTION_RESET; successful refresh of that panel was not verified."
+  },
+  "review": {
+    "scope": "Changed map presentation, responsive fixture, source consistency, and matching design documentation",
+    "independentReviewer": "Generic sub-agent using the Impeccable degraded finish-reviewer contract because the named role was unavailable",
+    "disposition": "ship",
+    "resolvedFinding": "Updated stale fixed-16-metre-lot and default-tonnage-road descriptions in design documentation",
+    "documenter": "Independent generic sub-agent updated DESIGN.md and the existing surface record"
+  },
+  "boundaries": [
+    "Building geometry persists independently of numerical refinement; existing buildings are not relocated by this update.",
+    "New openings and subsequent paid growth use the organic survey. Existing saves without lanes retain their footprints and can extend from external frontage.",
+    "Population, money, capacity and paid construction commitments remain conserved; economic simulation retains district pools.",
+    "Terrain guidance interpolates existing 1024-metre elevation samples; it does not add geological resolution.",
+    "Roads are procedurally painted ground textures, not raised road models; land trade geometry still follows its existing graph.",
+    "No complete test-suite, century-scale economic, or new World-scale performance qualification was run. The six-month run is one seeded scenario, not a growth target or frame-rate benchmark."
+  ]
+}

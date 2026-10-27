@@ -1,3 +1,4 @@
+import { habitableLand } from './terrain-access'
 import { GOODS, clamp, population, type World } from './types'
 import { landscapeAt } from './landscape'
 import { localFirmRegion } from './local-units'
@@ -38,8 +39,9 @@ export function economicLandscape(w: World): EconomicLandscape {
   const units = w.localEconomy ? w.localEconomy.active.map((id) => w.localEconomy!.units[id]) : w.regions
   for (const r of units) {
     const total = population(r)
-    for (const id of r.cells)
-      residents[id] = w.localEconomy?.units[r.id]?.residents[id] ?? total / Math.max(1, r.cells.length)
+    const usable = r.cells.filter((id) => habitableLand(w.cells[id]))
+    for (const id of usable)
+      residents[id] = w.localEconomy?.units[r.id]?.residents[id] ?? total / Math.max(1, usable.length)
   }
   const distribution = new Map<string, { weights: number[]; total: number }>()
   for (const f of w.economy?.firms ?? []) {
@@ -57,10 +59,12 @@ export function economicLandscape(w: World): EconomicLandscape {
         let spread = distribution.get(key)
         if (!spread) {
           const weights = r.cells.map((id) =>
-            g === 0
-              ? landscapeAt(w.cells[id]).habitat
-              : (w.localEconomy?.reserves[id]?.[GOODS[g] as 'timber'] ??
-                landscapeAt(w.cells[id]).resources[GOODS[g] as 'timber']),
+            !habitableLand(w.cells[id])
+              ? 0
+              : g === 0
+                ? landscapeAt(w.cells[id]).habitat
+                : (w.localEconomy?.reserves[id]?.[GOODS[g] as 'timber'] ??
+                  landscapeAt(w.cells[id]).resources[GOODS[g] as 'timber']),
           )
           spread = { weights, total: weights.reduce((a, b) => a + b, 0) }
           distribution.set(key, spread)
@@ -74,7 +78,7 @@ export function economicLandscape(w: World): EconomicLandscape {
     }
   }
   for (const c of w.cells) {
-    if (c.terrain === 'water') continue
+    if (!habitableLand(c)) continue
     const id = c.id,
       soil = landscapeAt(c),
       built = w.localEconomy?.built[id] ?? 0

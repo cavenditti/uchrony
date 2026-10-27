@@ -1,3 +1,5 @@
+import { habitableLand } from './terrain-access'
+import { governance } from './governance'
 import type { World } from './types'
 import type { PhysicalSite } from './adaptive-types'
 import { movementNeighbors, CELL_METERS } from './grid'
@@ -24,7 +26,7 @@ export function influenceSnapshot(w: World, pools = residentialPools(w), toleran
     terrain = new Float64Array(count)
   for (const c of w.cells) {
     const region = w.regions[c.region]
-    if (c.terrain === 'water' || !region || region.devastation > 0.9) continue
+    if (!habitableLand(c) || !region || region.devastation > 0.9) continue
     nation[c.id] = region.nation
     terrain[c.id] = c.terrain === 'mountains' ? 2.2 : c.terrain === 'hills' ? 1.4 : 1
   }
@@ -83,13 +85,13 @@ export function influenceSnapshot(w: World, pools = residentialPools(w), toleran
   // paid roads constrain access before any spatial aggregation can take place.
   for (let cell = 0; cell < count; cell++) {
     offsets[cell] = edges.length
-    if (nation[cell] < 0) continue
+    if (!habitableLand(w.cells[cell])) continue
     const r = w.regions[w.cells[cell].region],
-      technology = w.nations[nation[cell]].technologies.logistics
+      technology = governance(w, nation[cell]).technologies.logistics
     const q = cell % w.width,
       row = Math.floor(cell / w.width)
     for (const next of movementNeighbors(w.cells, cell, w.width, w.height)) {
-      if (nation[next] !== nation[cell]) continue
+      if (w.cells[next].terrain === 'water' || nation[next] !== nation[cell]) continue
       const nq = next % w.width,
         nr = Math.floor(next / w.width)
       if (

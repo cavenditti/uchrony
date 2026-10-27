@@ -340,7 +340,7 @@ export function validateEconomy(w: World) {
       (a.complete !== undefined && typeof a.complete !== 'boolean') ||
       !Array.isArray(a.territories) ||
       a.territories.length !== (w.localEconomy?.nextId ?? w.regions.length) ||
-      a.territories.some((n) => !Number.isInteger(n) || !w.nations[n]) ||
+      a.territories.some((n) => !Number.isInteger(n) || (n !== -1 && !w.nations[n])) ||
       !obj(a.nations) ||
       !obj(a.world) ||
       !obj(a.stores) ||
@@ -375,7 +375,7 @@ export function validateEconomy(w: World) {
     for (const s of Object.values(a.stores)) {
       if (
         !obj(s) ||
-        !w.nations[s.nation] ||
+        (s.nation !== -1 && !w.nations[s.nation]) ||
         !economicRegion(w, s.region) ||
         typeof s.government !== 'boolean'
       )
@@ -390,7 +390,7 @@ export function validateEconomy(w: World) {
         !keys.has(owner) ||
         !obj(b) ||
         !Number.isInteger(b.nation) ||
-        !w.nations[b.nation] ||
+        (b.nation !== -1 && !w.nations[b.nation]) ||
         (['receipts', 'purchases', 'wages', 'ownAccount', 'inventoryChange'] as const).some(
           (key) => !num(b[key], -1e16),
         )
@@ -406,6 +406,10 @@ export function validateEconomy(w: World) {
       if (!obj(e.goods[key]) || GOODS.some((g) => !num(e.goods![key][g], key === 'residual' ? -1e16 : 0)))
         fail('physical goods ledger')
   for (const [id, stats] of Object.entries(e.national))
-    if (!w.nations[Number(id)] || !obj(stats) || Object.values(stats).some((v) => !num(v, -1e16)))
+    if (
+      (Number(id) !== -1 && !w.nations[Number(id)]) ||
+      !obj(stats) ||
+      Object.values(stats).some((v) => !num(v, -1e16))
+    )
       fail('national accounts')
 }

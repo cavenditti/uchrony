@@ -28,7 +28,7 @@ export function validateGeopolitics(w: World) {
     !integer(s.rng, 0, 4294967295) ||
     !Array.isArray(s.owners) ||
     s.owners.length !== w.regions.length ||
-    s.owners.some((id) => !nation(id)) ||
+    s.owners.some((id) => id !== -1 && !nation(id)) ||
     !Array.isArray(s.countries) ||
     s.countries.length > w.nations.length ||
     !Array.isArray(s.observedWars) ||

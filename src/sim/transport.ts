@@ -101,10 +101,12 @@ export function transportNetwork(world: World): TransportNetwork {
   if (!world.corridorPlan) return baseNetwork(world)
   let network = planned.get(world.corridorPlan)
   if (!network) {
-    network = {
-      links: world.corridorPlan.links.map((link) => physicalLink(world, link)),
-      harbors: baseNetwork(world).harbors,
-    }
+    network = world.corridorPlan.links.every((link) => traversableLegs(world, link.legs))
+      ? {
+          links: world.corridorPlan.links.map((link) => physicalLink(world, link)),
+          harbors: baseNetwork(world).harbors,
+        }
+      : baseNetwork(world)
     planned.set(world.corridorPlan, network)
   }
   return network
@@ -125,7 +127,9 @@ function physicalLink(world: World, link: { from: number; to: number; legs: Rout
 
 /** Quarterly cost replanning and nearby trunk consolidation, with annual path inertia. */
 export function refreshTransport(world: World, profile: CorridorProfile) {
-  const previous = world.corridorPlan
+  const previous = world.corridorPlan?.links.every((link) => traversableLegs(world, link.legs))
+    ? world.corridorPlan
+    : undefined
   if (
     previous &&
     Math.floor(previous.month / CORRIDOR_LEARNING.replanMonths) ===
@@ -456,4 +460,9 @@ export function traversableLegs(world: World, legs: RouteLeg[]) {
         i === 0 || movementNeighbors(world.cells, leg.cells[i - 1], world.width, world.height).includes(id),
     ),
   )
+}
+export function invalidateTransport(world: World) {
+  cache.delete(world.cells)
+  if (world.corridorPlan) planned.delete(world.corridorPlan)
+  delete world.corridorPlan
 }

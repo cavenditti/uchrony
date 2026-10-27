@@ -20,6 +20,7 @@ export function agreementTerms(world: World, kind?: DiplomaticClause['kind']) {
   )
 }
 export function diplomaticAccess(world: World, traveler: number, host: number) {
+  if (host === -1) return true
   if (sharedInstitution(world, traveler, host, 'defense')) return true
   return agreementTerms(world).some(
     ({ term }) =>
@@ -47,7 +48,7 @@ export function diplomaticAccessView(world: World) {
     if (body.status === 'active' && body.charter.powers.includes('defense'))
       for (const traveler of body.members)
         for (const host of body.members) if (traveler !== host) allow(traveler, host)
-  return (traveler: number, host: number) => hosts.get(traveler)?.has(host) ?? false
+  return (traveler: number, host: number) => host === -1 || (hosts.get(traveler)?.has(host) ?? false)
 }
 export function preferentialTrade(world: World, a: number, b: number) {
   if (sharedInstitution(world, a, b, 'trade')) return true

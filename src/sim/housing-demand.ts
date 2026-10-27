@@ -11,11 +11,40 @@ import { habitableLand } from './terrain-access'
 type Access = ReturnType<typeof settlementAccess>
 const MOVING_HAZARD = 1 - Math.exp(-SETTLEMENT.annualMovingHazard / 12)
 
+/** Aggregate infill demand between detailed location reviews. Pending funded
+ * capacity offsets the shortage once; this never creates an unpaid building. */
+export function coarseHousingDemand(w: World, access: Access) {
+  const demand = new Map<string, number>()
+  const pending = new Map<number, number>()
+  for (const project of w.adaptive?.construction ?? []) {
+    const pool = w.adaptive!.sites[project.site].pool
+    pending.set(pool, (pending.get(pool) ?? 0) + project.capacity)
+  }
+  for (const id of w.localEconomy!.active) {
+    const homes = access.homes(id)
+    const shortage = Math.max(
+      0,
+      population(w.localEconomy!.units[id]) * 1.15 -
+        homes.reduce((sum, home) => sum + home.capacity, 0) -
+        (pending.get(id) ?? 0),
+    )
+    if (!shortage) continue
+    const weights = homes.map((home) => Math.max(0, access.occupied(home) * 1.15 - home.capacity))
+    const total = weights.reduce((sum, count) => sum + count, 0)
+    if (total) homes.forEach((home, i) => demand.set(home.id, (shortage * weights[i]) / total))
+  }
+  return demand
+}
+
 /** One useful location per block, then suppress nearby equivalent locations.
  * Physical accessibility selects centres independently of city names/mergers. */
-export function housingCentres(w: World, homes: PhysicalSite[], access: Access) {
+export function housingCentres(
+  w: World,
+  homes: PhysicalSite[],
+  access: Access,
+  pending: ReadonlySet<string> = new Set(w.adaptive?.construction?.map((p) => p.site)),
+) {
   const blocks = new Map<string, PhysicalSite>()
-  const pending = new Set(w.adaptive?.construction?.map((p) => p.site))
   for (const home of homes) {
     if (
       !habitableLand(w.cells[home.cell]) ||
@@ -53,10 +82,13 @@ export function multiCentreHousingDemand(w: World, access: Access) {
   const pending = new Map<string, number>()
   for (const project of w.adaptive?.construction ?? [])
     pending.set(project.site, (pending.get(project.site) ?? 0) + project.capacity)
+  // This phase does not mutate construction. Build the global membership index
+  // once, rather than rebuilding it for every local housing pool.
+  const pendingSites = new Set(pending.keys())
   for (const id of w.localEconomy!.active) {
     const homes = access.homes(id)
     if (!homes.length) continue
-    const centres = housingCentres(w, homes, access)
+    const centres = housingCentres(w, homes, access, pendingSites)
     if (!centres.length) continue
     const index = new SpatialBuckets<PhysicalSite>(1000)
     centres.forEach((c) => index.insert(c, c.x, c.y, c.x, c.y))

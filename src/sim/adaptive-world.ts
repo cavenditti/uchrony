@@ -4,6 +4,8 @@ import { population } from './types'
 import { localFirmRegion } from './local-units'
 import { ensureDistrictEconomy } from './districts'
 import { CELL_METERS } from './grid'
+import { compactResidence } from './residential-sites'
+import { SpatialBuckets } from './spatial-buckets'
 import {
   METERS_PER_MAP_UNIT,
   cellPosition,
@@ -14,6 +16,7 @@ import {
   polygonArea,
   splitFragments,
   meshInterfaces,
+  unbalancedMeshNodes,
 } from './physical-space'
 import type {
   AdaptiveNode,
@@ -24,6 +27,25 @@ import type {
 } from './adaptive-types'
 
 const meshCache = new WeakMap<World, { revision: number; mesh: AdaptiveMesh }>()
+const meshGeometry = new WeakMap<
+  AdaptiveMesh,
+  {
+    partition: string[]
+    sources: Float64Array
+    rootSize: number
+    scale: number
+    minimumSpan: number
+    mode: string
+  }
+>()
+const membershipCache = new WeakMap<
+  AdaptiveMesh,
+  {
+    byId: Map<string, AdaptiveNode>
+    sites: WeakMap<PhysicalSite, { x: number; y: number; node: AdaptiveNode }>
+    occupied: AdaptiveNode[]
+  }
+>()
 /** Persistent pools are closure records, not mesh cells. Their account IDs never follow a mesh boundary. */
 export function ensureAdaptiveWorld(w: World) {
   if (w.adaptive) return w.adaptive
@@ -87,6 +109,7 @@ export function ensureAdaptiveWorld(w: World) {
     })
   }
   for (const region of w.regions) {
+    if (region.nation < 0) continue
     const province = `province:${region.id}`,
       municipality = `municipality:${region.id}`
     for (const [id, level] of [
@@ -173,11 +196,67 @@ function sitePopulation(w: World, site: PhysicalSite) {
 export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstruct = false): AdaptiveMesh {
   const a = w.adaptive!,
     root = rootBounds(w)
+  const previousMesh = meshCache.get(w)?.mesh
+  const geometry = previousMesh && meshGeometry.get(previousMesh)
+  // During the dwell period no existing branch can close. Start at its leaves
+  // and refine the changed physical activity there, retaining exact source
+  // fragments instead of cutting the entire world into the same pieces again.
+  const retainPartition =
+    !reconstruct &&
+    mode === 'adaptive' &&
+    a.mode === mode &&
+    geometry?.partition === a.tree.leaves &&
+    geometry.mode === mode &&
+    a.minimumSpan <= geometry.minimumSpan &&
+    geometry.rootSize === root.size &&
+    geometry.scale === a.metersPerMapUnit &&
+    geometry.sources.length === w.cells.length * 3 &&
+    w.cells.every(
+      (c, i) =>
+        geometry.sources[i * 3] === c.x &&
+        geometry.sources[i * 3 + 1] === c.y &&
+        geometry.sources[i * 3 + 2] === Number(c.terrain === 'water'),
+    ) &&
+    a.tree.leaves.every((id) => w.month - (a.tree.changed[id] ?? -100) < 12)
   const prior = new Set(a.tree.leaves),
     priorBranches = new Set<string>()
-  for (const id of prior) for (let i = 1; i < id.length; i++) priorBranches.add(id.slice(0, i))
+  if (!retainPartition)
+    for (const id of prior)
+      for (let i = id.length - 1; i >= 1; i--) {
+        const ancestor = id.slice(0, i)
+        if (priorBranches.has(ancestor)) break
+        priorBranches.add(ancestor)
+      }
+  // A new deep leaf must keep all its ancestors open during the dwell period.
+  // Some of those branches were never leaves, so they have no direct change entry.
+  const changedAt = new Map<string, number>()
+  if (!retainPartition)
+    for (const id of Object.keys(a.tree.changed)) {
+      const month = a.tree.changed[id]
+      for (let i = id.length; i >= 1; i--) {
+        const ancestor = id.slice(0, i)
+        if ((changedAt.get(ancestor) ?? -Infinity) >= month) break
+        changedAt.set(ancestor, month)
+      }
+    }
   const sites = Object.values(a.sites).filter((s) => s.retired === undefined)
   const jobs = new Map((w.economy?.firms ?? []).map((f) => [`firm:${f.id}`, f.active ? f.employment : 0]))
+  const construction = new Set(a.construction?.map((project) => project.site))
+  const development = sites.flatMap((site) => {
+    if (site.kind !== 'residential' || !site.parcel) return []
+    const people = sitePopulation(w, site)
+    if (!(people > 0 && compactResidence(site)) && !construction.has(site.id)) return []
+    return [
+      {
+        bounds: site.parcel,
+        span: site.building
+          ? 8
+          : Math.max(a.minimumSpan, Math.min(512, site.parcel.size / (1 + Math.sqrt(people / 12000)))),
+      },
+    ]
+  })
+  const overlaps = (a: SpatialBounds, b: SpatialBounds) =>
+    a.x < b.x + b.size && a.x + a.size > b.x && a.y < b.y + b.size && a.y + a.size > b.y
   // Mobile activity is a refinement signal, never an extra population/account entry.
   const activity = new Map<number, number>()
   for (const fleet of w.warfare?.fleets ?? [])
@@ -190,15 +269,12 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
     if (corridor.traffic > 0)
       for (const cell of [corridor.a, corridor.b])
         activity.set(cell, (activity.get(cell) ?? 0) + corridor.traffic / 20000)
-  const fragments = w.cells.map((c) => {
-    const polygon = cellPolygon(w, c.id)
-    return { cell: c.id, water: c.terrain === 'water', polygon, area: polygonArea(polygon) }
-  })
   const makeNode = (
     id: string,
     bounds: SpatialBounds,
     pieces: SpatialFragment[],
     members: PhysicalSite[],
+    developed: typeof development = [],
   ): AdaptiveNode => {
     const residents = members.reduce((sum, s) => sum + sitePopulation(w, s), 0)
     const work = members.reduce((sum, s) => sum + (jobs.get(s.entity) ?? 0), 0)
@@ -244,10 +320,15 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
         landArea > 0 && waterArea > 0 ? 1.1 : 0,
       ) * Math.min(1, (bounds.size / 2000) ** 2)
     const rivers = pieces.some((p) => w.cells[p.cell].river)
+    // Occupied development and paid building works deserve parcel-scale detail,
+    // even before they have enough residents to earn a city name. Vacant stock
+    // stays physically present while the existing dwell rule permits coarsening.
+    const developing = developed.some((plot) => bounds.size > plot.span)
     const indicator =
       (residents / 12000 + work / 2500 + movingActivity) * Math.min(1, (bounds.size / 1000) ** 2) +
       members.length / 64 +
       terrainError +
+      (developing ? 1.1 : 0) +
       variation * 2 +
       (rivers && bounds.size > 4000 ? 1 : 0)
     return {
@@ -263,11 +344,17 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
       indicator,
     }
   }
-  const leaves: AdaptiveNode[] = []
-  const visit = (id: string, bounds: SpatialBounds, pieces: SpatialFragment[], members: PhysicalSite[]) => {
+  let leaves: AdaptiveNode[] = []
+  const visit = (
+    id: string,
+    bounds: SpatialBounds,
+    pieces: SpatialFragment[],
+    members: PhysicalSite[],
+    developed: typeof development,
+  ) => {
     if (!pieces.length) return
-    const node = makeNode(id, bounds, pieces, members)
-    const dwell = w.month - (a.tree.changed[id] ?? -100) < 12
+    let node: AdaptiveNode | undefined
+    const dwell = w.month - (changedAt.get(id) ?? -100) < 12
     const refine = reconstruct
       ? priorBranches.has(id)
       : mode === 'coarse'
@@ -275,39 +362,84 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
         : mode === 'fine'
           ? bounds.size > CELL_METERS
           : bounds.size > 16 * CELL_METERS ||
-            node.indicator > (priorBranches.has(id) ? 0.55 : 1) ||
-            (priorBranches.has(id) && dwell)
+            (priorBranches.has(id) && dwell) ||
+            developed.some((plot) => bounds.size > plot.span) ||
+            (node = makeNode(id, bounds, pieces, members, developed)).indicator >
+              (priorBranches.has(id) ? 0.55 : 1)
     if (bounds.size / 2 >= a.minimumSpan && refine) {
       const children = splitFragments(pieces, bounds),
         groups: PhysicalSite[][] = [[], [], [], []]
       for (const site of members) groups[quadrant(site, bounds)].push(site)
-      children.forEach((parts, i) => visit(id + i, nodeBounds(bounds, 'r' + i), parts, groups[i]))
+      children.forEach((parts, i) => {
+        const child = nodeBounds(bounds, 'r' + i)
+        visit(
+          id + i,
+          child,
+          parts,
+          groups[i],
+          developed.filter((plot) => overlaps(plot.bounds, child)),
+        )
+      })
     } else {
       if (reconstruct && !prior.has(id)) throw new Error('Saved spatial partition leaves land uncovered')
-      leaves.push(node)
+      leaves.push(node ?? makeNode(id, bounds, pieces, members, developed))
     }
   }
-  visit('r', root, fragments, sites)
-  // Enforce a 2:1 neighbor ratio without touching any economic state.
-  let interfaces = meshInterfaces(leaves, false)
-  for (;;) {
-    const byId = new Map(leaves.map((n) => [n.id, n]))
-    const split = new Set<string>()
-    for (const edge of interfaces) {
-      const x = byId.get(edge.a)!,
-        y = byId.get(edge.b)!
-      if (x.bounds.size > y.bounds.size * 2) split.add(x.id)
-      if (y.bounds.size > x.bounds.size * 2) split.add(y.id)
+  if (retainPartition) {
+    const byId =
+      membershipCache.get(previousMesh!)?.byId ?? new Map(previousMesh!.leaves.map((node) => [node.id, node]))
+    const groups = new Map<AdaptiveNode, PhysicalSite[]>()
+    const priorMembership = membershipCache.get(previousMesh!)?.sites
+    for (const site of sites) {
+      const previous = priorMembership?.get(site)
+      let node = previous && previous.x === site.x && previous.y === site.y ? previous.node : undefined
+      if (!node) {
+        let id = 'r',
+          bounds = root
+        while (!byId.has(id)) {
+          const q = quadrant(site, bounds)
+          id += q
+          bounds = nodeBounds(bounds, 'r' + q)
+          if (id.length > 40) throw new Error('Site is outside the active spatial partition')
+        }
+        node = byId.get(id)!
+      }
+      const members = groups.get(node) ?? []
+      members.push(site)
+      groups.set(node, members)
     }
+    const plots = new SpatialBuckets<(typeof development)[number]>(CELL_METERS)
+    for (const plot of development) {
+      const b = plot.bounds
+      plots.insert(plot, b.x, b.y, b.x + b.size, b.y + b.size)
+    }
+    for (const node of previousMesh!.leaves) {
+      const b = node.bounds
+      const developed =
+        b.size <= Math.min(a.minimumSpan, 8)
+          ? []
+          : [...plots.query(b.x, b.y, b.x + b.size, b.y + b.size)].filter((plot) => overlaps(plot.bounds, b))
+      visit(node.id, b, node.fragments, groups.get(node) ?? [], developed)
+    }
+  } else {
+    const fragments = w.cells.map((c) => {
+      const polygon = cellPolygon(w, c.id)
+      return { cell: c.id, water: c.terrain === 'water', polygon, area: polygonArea(polygon) }
+    })
+    visit('r', root, fragments, sites, development)
+  }
+  // Enforce a 2:1 neighbor ratio without touching any economic state.
+  for (;;) {
+    const split = unbalancedMeshNodes(leaves)
     if (!split.size) break
     if (reconstruct) throw new Error('Saved spatial partition violates 2:1 balance')
-    for (let i = leaves.length - 1; i >= 0; i--)
-      if (split.has(leaves[i].id)) {
-        const old = leaves.splice(i, 1)[0],
-          parts = splitFragments(old.fragments, old.bounds)
+    const balanced: AdaptiveNode[] = []
+    for (const old of leaves)
+      if (split.has(old.id)) {
+        const parts = splitFragments(old.fragments, old.bounds)
         for (let q = 0; q < 4; q++)
           if (parts[q].length)
-            leaves.push(
+            balanced.push(
               makeNode(
                 old.id + q,
                 nodeBounds(old.bounds, 'r' + q),
@@ -315,31 +447,51 @@ export function rebuildAdaptiveMesh(w: World, mode = w.adaptive!.mode, reconstru
                 old.sites.map((id) => a.sites[id]).filter((s) => quadrant(s, old.bounds) === q),
               ),
             )
-      }
-    interfaces = meshInterfaces(leaves, false)
+      } else balanced.push(old)
+    // Keep Morton order during balancing so the next pass can search the same
+    // sorted intervals directly, without sorting hundreds of thousands again.
+    leaves = balanced
   }
   leaves.sort((x, y) => x.id.localeCompare(y.id))
-  interfaces = meshInterfaces(leaves)
+  // Radial/site queries only need the tree. Materialize the physical face graph
+  // on demand for callers that actually traverse it.
+  let interfaces: AdaptiveMesh['interfaces'] | undefined
+  const mesh: AdaptiveMesh = {
+    leaves,
+    get interfaces() {
+      return (interfaces ??= meshInterfaces(leaves))
+    },
+    revision: a.revision,
+  }
   if (reconstruct) {
     if (leaves.length !== prior.size || leaves.some((n) => !prior.has(n.id)))
       throw new Error('Saved spatial partition contains leaves outside the domain')
-    const mesh = { leaves, interfaces, revision: a.revision }
     meshCache.set(w, { revision: a.revision, mesh })
     return mesh
   }
   const next = leaves.map((n) => n.id)
   const nextSet = new Set(next)
-  for (const id of new Set([...prior, ...next]))
-    if (prior.has(id) !== nextSet.has(id)) a.tree.changed[id] = w.month
+  for (const id of prior) if (!nextSet.has(id)) a.tree.changed[id] = w.month
+  for (const id of next) if (!prior.has(id)) a.tree.changed[id] = w.month
   // Retain recent hysteresis history only; retired nodes carry no assets or contracts.
-  for (const [id, month] of Object.entries(a.tree.changed))
-    if (w.month - month > 24) delete a.tree.changed[id]
+  for (const id of Object.keys(a.tree.changed))
+    if (w.month - a.tree.changed[id] > 24) delete a.tree.changed[id]
   a.tree.leaves = next
+  meshGeometry.set(mesh, {
+    partition: next,
+    sources: retainPartition
+      ? geometry.sources
+      : Float64Array.from(w.cells.flatMap((c) => [c.x, c.y, Number(c.terrain === 'water')])),
+    rootSize: root.size,
+    scale: a.metersPerMapUnit,
+    minimumSpan: a.minimumSpan,
+    mode,
+  })
   a.tree.domain = 'world'
   a.tree.month = w.month
   a.mode = mode
   a.revision++
-  const mesh = { leaves, interfaces, revision: a.revision }
+  mesh.revision = a.revision
   meshCache.set(w, { revision: a.revision, mesh })
   return mesh
 }
@@ -358,35 +510,59 @@ export function adaptivePopulation(w: World) {
 /** Between scheduled remeshes, update only derived totals. Physical polygons are unchanged. */
 export function refreshAdaptiveTotals(w: World) {
   const a = w.adaptive!,
-    mesh = adaptiveMesh(w),
-    byId = new Map(mesh.leaves.map((n) => [n.id, n]))
+    mesh = adaptiveMesh(w)
+  let membership = membershipCache.get(mesh)
+  if (!membership) {
+    membership = {
+      byId: new Map(mesh.leaves.map((n) => [n.id, n])),
+      sites: new WeakMap(),
+      occupied: mesh.leaves.filter((n) => n.sites.length > 0),
+    }
+    membershipCache.set(mesh, membership)
+  }
+  const { byId } = membership
   const root = rootBounds(w),
-    poolSets = new Map<string, Set<number>>()
-  for (const n of mesh.leaves) {
+    poolSets = new Map<AdaptiveNode, Set<number>>()
+  // Fine meshes have many empty leaves around physical buildings. Only leaves
+  // that previously contained sites can have totals or membership to clear.
+  for (const n of membership.occupied) {
     n.population = 0
     n.jobs = 0
-    n.sites = []
-    n.pools = []
-    poolSets.set(n.id, new Set())
+    n.sites.length = 0
+    n.pools.length = 0
   }
+  membership.occupied = []
   const jobs = new Map((w.economy?.firms ?? []).map((f) => [`firm:${f.id}`, f.active ? f.employment : 0]))
   for (const site of Object.values(a.sites)) {
     if (site.retired !== undefined) continue
-    let id = 'r',
-      bounds = root
-    while (!byId.has(id)) {
-      const q = quadrant(site, bounds)
-      id += q
-      bounds = nodeBounds(bounds, 'r' + q)
-      if (id.length > 40) throw new Error('Site is outside the active spatial partition')
+    const prior = membership.sites.get(site)
+    let n: AdaptiveNode
+    if (prior && prior.x === site.x && prior.y === site.y) n = prior.node
+    else {
+      let id = 'r',
+        bounds = root
+      while (!byId.has(id)) {
+        const q = quadrant(site, bounds)
+        id += q
+        const size = bounds.size / 2
+        bounds = { x: bounds.x + (q % 2) * size, y: bounds.y + Math.floor(q / 2) * size, size }
+        if (id.length > 40) throw new Error('Site is outside the active spatial partition')
+      }
+      n = byId.get(id)!
+      membership.sites.set(site, { x: site.x, y: site.y, node: n })
     }
-    const n = byId.get(id)!
     n.sites.push(site.id)
     n.population += sitePopulation(w, site)
     n.jobs += jobs.get(site.entity) ?? 0
-    poolSets.get(id)!.add(site.pool)
+    let pools = poolSets.get(n)
+    if (!pools) {
+      pools = new Set()
+      poolSets.set(n, pools)
+      membership.occupied.push(n)
+    }
+    pools.add(site.pool)
   }
-  for (const n of mesh.leaves) n.pools = [...poolSets.get(n.id)!].sort((x, y) => x - y)
+  for (const [n, pools] of poolSets) n.pools = [...pools].sort((x, y) => x - y)
   a.revision++
   mesh.revision = a.revision
   meshCache.set(w, { revision: a.revision, mesh })

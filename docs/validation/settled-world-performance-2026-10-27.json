@@ -1,0 +1,457 @@
+{
+  "date": "2026-10-27",
+  "runtime": "Node 26.11.1, macOS arm64",
+  "scope": "Third performance pass; settled World economic matching, population/migration and trade. No simulation rules, time steps or precision tolerances changed.",
+  "comparison": "Previous optimized working tree frozen at the start of this pass versus performance edits applied to that same source. Concurrent city, housing and event-history edits excluded from both timing snapshots; separate integration replays include them in both versions.",
+  "method": {
+    "world": "Two independent processes per version, reference/current/current/reference order. Seed performance-ledger, World settled, 129024 cells, 32 states, 3 monthly ticks. Single live world. Preparation measured separately. No per-month hashes during timing trials; census checks and final hashing/validation outside timers.",
+    "cpu": "Process user plus system CPU time, including GC helper threads; reported separately from elapsed wall time.",
+    "memory": "Peak process RSS includes module loading, generation, preparation, ticks and final hashing/validation. Not a tick-only memory measurement.",
+    "environment": "Shared machine with concurrent CPU-heavy work; elapsed and startup timings are noisy. No isolated-hardware, browser-frame-rate or long-run claim.",
+    "payroll": "Four alternating opening-payroll-only trials from one reference-generated/prepared World. Population/economy month initialization and local firm hiring precede cloning. Clone/hash/explicit GC occur outside timers. Every result compared by complete world fingerprint. Other monthly phases excluded."
+  },
+  "summary": {
+    "worldTickMeanMs": {
+      "before": 71008,
+      "after": 48224.5,
+      "speedup": 1.4724465779842197
+    },
+    "worldTickCpuMeanMs": {
+      "before": 77213,
+      "after": 60446.5,
+      "ratio": 1.277377515654339
+    },
+    "startupMeanMs": {
+      "before": 8677,
+      "after": 7925.5,
+      "ratio": 1.0948205160557694,
+      "conclusion": "Overlapping noisy trials; no reliable large startup gain established."
+    },
+    "payrollMeanMs": {
+      "before": 14162.5,
+      "after": 7337.5,
+      "speedup": 1.93015332197615
+    }
+  },
+  "worldTiming": {
+    "before": [
+      {
+        "engine": "/tmp/uchrony-perf3/before",
+        "seed": "performance-ledger",
+        "start": "settled",
+        "generationMs": 4249,
+        "generationCpuMs": 4632,
+        "fromMonth": 0,
+        "months": 3,
+        "repeats": 1,
+        "cells": 129024,
+        "communities": 21030,
+        "results": [
+          {
+            "ms": 77081,
+            "preparationMs": 5384,
+            "preparationCpuMs": 6309,
+            "startupMs": 9633,
+            "monthsPerSecond": 0.04,
+            "tickMs": [
+              28929,
+              31133,
+              17019
+            ],
+            "cpuMs": 79498,
+            "tickCpuMs": [
+              33791,
+              26539,
+              19169
+            ],
+            "processPeakRssMiB": 2697,
+            "finalHash": "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+          }
+        ]
+      },
+      {
+        "engine": "/tmp/uchrony-perf3/before",
+        "seed": "performance-ledger",
+        "start": "settled",
+        "generationMs": 3918,
+        "generationCpuMs": 4551,
+        "fromMonth": 0,
+        "months": 3,
+        "repeats": 1,
+        "cells": 129024,
+        "communities": 21030,
+        "results": [
+          {
+            "ms": 64935,
+            "preparationMs": 3803,
+            "preparationCpuMs": 5198,
+            "startupMs": 7721,
+            "monthsPerSecond": 0.05,
+            "tickMs": [
+              21776,
+              19794,
+              23365
+            ],
+            "cpuMs": 74928,
+            "tickCpuMs": [
+              26820,
+              25026,
+              23081
+            ],
+            "processPeakRssMiB": 2522,
+            "finalHash": "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+          }
+        ]
+      }
+    ],
+    "after": [
+      {
+        "engine": "/tmp/uchrony-perf3/after",
+        "seed": "performance-ledger",
+        "start": "settled",
+        "generationMs": 3452,
+        "generationCpuMs": 4025,
+        "fromMonth": 0,
+        "months": 3,
+        "repeats": 1,
+        "cells": 129024,
+        "communities": 21030,
+        "results": [
+          {
+            "ms": 48010,
+            "preparationMs": 3284,
+            "preparationCpuMs": 4900,
+            "startupMs": 6736,
+            "monthsPerSecond": 0.06,
+            "tickMs": [
+              14088,
+              17349,
+              16573
+            ],
+            "cpuMs": 58349,
+            "tickCpuMs": [
+              19413,
+              20738,
+              18198
+            ],
+            "processPeakRssMiB": 2592,
+            "finalHash": "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+          }
+        ]
+      },
+      {
+        "engine": "/tmp/uchrony-perf3/after",
+        "seed": "performance-ledger",
+        "start": "settled",
+        "generationMs": 4424,
+        "generationCpuMs": 4676,
+        "fromMonth": 0,
+        "months": 3,
+        "repeats": 1,
+        "cells": 129024,
+        "communities": 21030,
+        "results": [
+          {
+            "ms": 48439,
+            "preparationMs": 4691,
+            "preparationCpuMs": 5941,
+            "startupMs": 9115,
+            "monthsPerSecond": 0.06,
+            "tickMs": [
+              19174,
+              14307,
+              14958
+            ],
+            "cpuMs": 62544,
+            "tickCpuMs": [
+              25304,
+              18154,
+              19085
+            ],
+            "processPeakRssMiB": 2298,
+            "finalHash": "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+          }
+        ]
+      }
+    ]
+  },
+  "payrollTiming": [
+    {
+      "kind": "before",
+      "ms": 14263,
+      "cpuMs": 15746,
+      "hash": "b07f5a9eeef91f2417b5a5fdea14ad3c889f293e883ed54a9d7c170ecb46a387",
+      "rows": 587541,
+      "transactions": 5862580
+    },
+    {
+      "kind": "after",
+      "ms": 7901,
+      "cpuMs": 8931,
+      "hash": "b07f5a9eeef91f2417b5a5fdea14ad3c889f293e883ed54a9d7c170ecb46a387",
+      "rows": 587541,
+      "transactions": 5862580
+    },
+    {
+      "kind": "after",
+      "ms": 6774,
+      "cpuMs": 7311,
+      "hash": "b07f5a9eeef91f2417b5a5fdea14ad3c889f293e883ed54a9d7c170ecb46a387",
+      "rows": 587541,
+      "transactions": 5862580
+    },
+    {
+      "kind": "before",
+      "ms": 14062,
+      "cpuMs": 12462,
+      "hash": "b07f5a9eeef91f2417b5a5fdea14ad3c889f293e883ed54a9d7c170ecb46a387",
+      "rows": 587541,
+      "transactions": 5862580
+    }
+  ],
+  "equivalence": {
+    "preparedWorldHash": "117ae143c790cfadd821e6f19b14fbd433a0cc23d33c58af55ff7e04b7546f37",
+    "worldMonthlyHashes": [
+      "5b78b42f15b58f739006d214662e20ed02691d48c2eb22833ed24255f147e4b8",
+      "0a2cdec7a19708c06ca608c1832413bf81bba055b97ba2a93a2a431d6787acd3",
+      "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+    ],
+    "worldMonths": 3,
+    "regionalSettled12Months": {
+      "engine": "/tmp/uchrony-perf3/after",
+      "referenceEngine": "/tmp/uchrony-perf3/before",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "generationMs": 480,
+      "generationCpuMs": 682,
+      "fromMonth": 0,
+      "months": 12,
+      "repeats": 1,
+      "cells": 8064,
+      "communities": 2730,
+      "results": [
+        {
+          "ms": 23616,
+          "preparationMs": 327,
+          "preparationCpuMs": 637,
+          "startupMs": 807,
+          "monthsPerSecond": 0.51,
+          "tickMs": [
+            2743,
+            1080,
+            1539,
+            1013,
+            1226,
+            1366,
+            2124,
+            2263,
+            1856,
+            2199,
+            2630,
+            3579
+          ],
+          "cpuMs": 24848,
+          "tickCpuMs": [
+            2546,
+            1776,
+            1443,
+            1297,
+            1547,
+            1674,
+            2672,
+            1887,
+            1949,
+            2298,
+            2210,
+            3548
+          ],
+          "processPeakRssMiB": 1279,
+          "finalHash": "c3dd5f068d8694e8fc86d30af1f0e4b2be8e0a4aa1e5b560b71271bc09960f1c",
+          "referenceMs": 23771,
+          "identicalMonths": 12
+        }
+      ]
+    },
+    "concurrentChangesSettled6Months": {
+      "engine": "/tmp/uchrony-perf3/integration-after",
+      "referenceEngine": "/tmp/uchrony-perf3/integration-before",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "generationMs": 608,
+      "generationCpuMs": 853,
+      "fromMonth": 0,
+      "months": 6,
+      "repeats": 1,
+      "cells": 8064,
+      "communities": 2730,
+      "results": [
+        {
+          "ms": 9620,
+          "preparationMs": 519,
+          "preparationCpuMs": 601,
+          "startupMs": 1127,
+          "monthsPerSecond": 0.62,
+          "tickMs": [
+            1732,
+            1969,
+            1254,
+            1345,
+            1390,
+            1931
+          ],
+          "cpuMs": 11495,
+          "tickCpuMs": [
+            2499,
+            2023,
+            1505,
+            1752,
+            1711,
+            2004
+          ],
+          "processPeakRssMiB": 883,
+          "finalHash": "03414d33c84005d2b854a479c2c6b3c101eabfb1c33d4f50bc8e1fb45c4cc7c2",
+          "referenceMs": 10145,
+          "identicalMonths": 6
+        }
+      ]
+    },
+    "concurrentChangesFrontier6Months": {
+      "engine": "/tmp/uchrony-perf3/integration-after",
+      "referenceEngine": "/tmp/uchrony-perf3/integration-before",
+      "seed": "performance-ledger",
+      "start": "frontier",
+      "generationMs": 797,
+      "generationCpuMs": 717,
+      "fromMonth": 0,
+      "months": 6,
+      "repeats": 1,
+      "cells": 8064,
+      "communities": 393,
+      "results": [
+        {
+          "ms": 8162,
+          "preparationMs": 944,
+          "preparationCpuMs": 1262,
+          "startupMs": 1741,
+          "monthsPerSecond": 0.74,
+          "tickMs": [
+            3206,
+            1471,
+            1650,
+            625,
+            439,
+            771
+          ],
+          "cpuMs": 7710,
+          "tickCpuMs": [
+            2293,
+            1571,
+            1732,
+            745,
+            589,
+            779
+          ],
+          "processPeakRssMiB": 762,
+          "finalHash": "7a712c138230f0981a97c64492f6f221939f535a34d4c4a102b8a5a722d8dd16",
+          "referenceMs": 6982,
+          "identicalMonths": 6
+        }
+      ]
+    },
+    "referenceWorldMonthlyHashes": [
+      "5b78b42f15b58f739006d214662e20ed02691d48c2eb22833ed24255f147e4b8",
+      "0a2cdec7a19708c06ca608c1832413bf81bba055b97ba2a93a2a431d6787acd3",
+      "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+    ]
+  },
+  "validation": {
+    "focusedChecks": 117,
+    "passed": 115,
+    "previouslyReproducedBaselineFailures": [
+      "a representative commute starts at its sampled home and uses its own travel time: expected inspection routine missing",
+      "firms, banks and GDP survive deterministic save continuation and paid construction: adaptive.lanes undefined versus absent after JSON restoration"
+    ],
+    "productionBuild": "passed",
+    "formatting": "passed",
+    "gitDiffCheck": "passed",
+    "fullRepositorySuite": "not rerun",
+    "longRunQualification": "not rerun",
+    "payrollHarnessRegionalReplay": "passed, four complete-world fingerprints identical"
+  },
+  "sources": {
+    "timedBeforeTreeSha256": "cebede6f59fed8e8593730f04bd816be87ab413de69568252a973ab5e9da1107",
+    "timedAfterTreeSha256": "6e5cba427cd865e2bdf2d7c276d05fe2556ee35ad9a790493fcb356b7197c89f",
+    "integrationBeforeTreeSha256": "3a7a1f61838e4cfe3192d005df13e26c68938194a9d2958b833bb568abeb03db",
+    "integrationAfterTreeSha256": "c5553928721e48c4529e8e4d840337e269892a835634b574fa9e951ca54e63bb",
+    "files": {
+      "src/sim/commuting.ts": {
+        "before": "075a4fec46217a3dcf9a8b054978f1c8f1ff6519e08f7ea9fab2e2d52f18329d",
+        "after": "ba5f8295d92e8dd0be613405091f4e72d7fb1372f8a0174596d7e02a31ff3779"
+      },
+      "src/sim/adaptive-grid.ts": {
+        "before": "5ab07d5da42d92035a70bfaa1c8bce7dce30a0ef79be6196fd72d62a1ce8bf56",
+        "after": "7906893d61a001d1a7177f8c0bc76872e5d3c526568755d9ba56ac2012415d8d"
+      },
+      "src/sim/allocation.ts": {
+        "before": "eb761e8f935fa9629a0cc8d10725e92ceb64db7233f616356591a4072e0c7254",
+        "after": "bb4509e8fa63376846f2bd8713e099678c4701cdbfad8aa5aa95a5acb6ad8279"
+      },
+      "src/sim/ledger.ts": {
+        "before": "218f961feaf9ad19438bcf896c3ca2258e0f9fc9e027080ae7ac606bff00a991",
+        "after": "ba1881ddf592c8eb79fbf8e7df07efce74bf4a9196a079e99ac2140bf39f949f"
+      },
+      "src/sim/settlement-access.ts": {
+        "before": "d492c92083b444d6ea23a4a0b408493c85499390e74bd3d03db820bfedbdfbdf",
+        "after": "fb69de26038be1ade486f987d746dfc46703b698924122436ac70f9d6dcfed62"
+      },
+      "src/sim/banking.ts": {
+        "before": "65186971efb1dcb10db61abe5bb4588bc0e37a9bc4c2378ce244eb06f56a9173",
+        "after": "bbce55c726abe48cce13d3397d0755ee973b050b8a5d95fcea10dee070094c6b"
+      },
+      "src/sim/spatial-buckets.ts": {
+        "before": "66b70279b0ea85aba3d107f80c947a73299a336673380919399b4ed08d9977b1",
+        "after": "ecd1b4bb4350c7bb505fa0a07b1198f6c0ba4886b8544a7358ffcb887118b143"
+      },
+      "src/sim/commute-ledger.ts": {
+        "before": "0921815302595e62d7ec32d43e3e93b2d3d165e7326c3a9ca6b025b766f156c4",
+        "after": "84d4616a54cd4a076743deac9c26463ffe518ecde40f876859764149cb9e8edd"
+      },
+      "src/sim/age-cohorts.ts": {
+        "before": "0ab080c2840ae27c4d8c0c84cbcca4e9e195712fa4a246ba65f615ccccb53cdc",
+        "after": "e8882da4c5cf16b706ee7651611e52747ceccfc3b79474c18c348cfb3ccbdd59"
+      },
+      "src/sim/macroeconomy.ts": {
+        "before": "225c0439bf87839d3f02440f5a71b29f1cf5d5911e1bec530fc8ef528b9671e8",
+        "after": "18c8a88e8ca440515c800d2f3d35458fd685bd659482f3758f2309c7320e669b"
+      },
+      "src/sim/heap.ts": {
+        "before": "1bd557f1b9d4ebb78fb7d7e4b34ac4f40db6338bef60c496fc1bd3c93f5676d9",
+        "after": "415af1a66955a9f6929c611da520fed6d058fa86ddb6331135e7c5cbb407b53b"
+      },
+      "src/sim/district-transport.ts": {
+        "before": "e740558b1fcdca5eef467cc8260b71bc386245947eb251f4490a29d56fe6791d",
+        "after": "458c7467d3175a558e10151774df9eb372a1c3de1f5ab063eda8d99ee3ff4669"
+      },
+      "src/sim/public-services.ts": {
+        "before": "5e4a64f74de7d105988c0b145e6f3b67a2948343851617fc51964942a93886b8",
+        "after": "55aa468deea7667613bc82520c66895779650499bfd5fcaa729a4940429750e2"
+      },
+      "src/sim/sovereignty.ts": {
+        "before": "55fdd569624bc58043b21cd4668c25d5b75796c29ef0d485110e71a81af5c5c0",
+        "after": "7096ef13ed33073b00cc3eddaefa1261f773fec6faa6d2b86e772b5059f032eb"
+      },
+      "src/sim/districts.ts": {
+        "before": "a6e46e8a4fcd4591af21bd23782e3fe9533fc42d5ea1112e2a3467c3ccd3dfff",
+        "after": "a8c792765189b549e4468c83bec7dfe3ee1e2d8d29690cf525e9c12e3f38c90a"
+      },
+      "src/sim/population.ts": {
+        "before": "3804f0d6b2063165c76f42217ec7cc2ce35becf2b95706f7a68acda770994a83",
+        "after": "0f6ebe759a6420a567b8f90063356e4b31c3054d2ca9cd518cfe45b776754650"
+      },
+      "src/sim/population-clone.ts": {
+        "before": "81cb902a445d7d269267ee7bdb9d0f036d6940e1f354fa906b90a51a3b2f98f0",
+        "after": "ed4c5535284ae9019c89eef77d1d42cefb6ad1afd7bcec218532f17c2dd4debd"
+      }
+    }
+  }
+}

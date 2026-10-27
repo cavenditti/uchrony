@@ -1,0 +1,215 @@
+{
+  "date": "2026-10-27",
+  "runtime": {
+    "node": "v26.11.1",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "baseline": {
+    "head": "0643cbc",
+    "description": "Working tree at task start, including existing uncommitted simulation work; source snapshot copied before edits."
+  },
+  "measurementNotes": [
+    "Single-machine synthetic benchmarks; shared host and background work mean timings are indicative, not isolated CPU limits.",
+    "Tick time excludes generation, cloning, fingerprints, census assertions and final save validation.",
+    "Regional comparisons replay both implementations from the same initial state and compare the complete state each month.",
+    "World settled runs use separate processes and compare all monthly serialization hashes to avoid retaining two large worlds and both cache sets."
+  ],
+  "changes": {
+    "adaptive-grid.ts": {
+      "beforeSha256": "a85dc6913f32c889431a37e5bbd24303de563c6822539491cec9e9c457682b6e",
+      "afterSha256": "274b284c7087b70c891ed7e3a2c32eadf9fa63bbf08d7e95eec6e51b80209976"
+    },
+    "adaptive-world.ts": {
+      "beforeSha256": "3b200d0210b3fe5115c4dd739f4099e3f131774cb78e60011555164061f82e76",
+      "afterSha256": "0ec8b489d119af3e4152e21dc2753e0ede4b059e452285560770a35b0a1e6f2c"
+    },
+    "commuting.ts": {
+      "beforeSha256": "493dcb925145c5a738c15f13fb60e982a62ae09a14382eb716a7d81fbc810e75",
+      "afterSha256": "e1ef7edf460e0569d662c9f66dea56de0f13a58dfddd32be4b2f4bcfe59bad7d"
+    },
+    "engine.ts": {
+      "beforeSha256": "d4ac9d28c0bf408a94ea6d9be96964dac22e0c465351801d9382175a572ec86a",
+      "afterSha256": "275311f760bca2fbe1dfc1487ee34f291edf1a1ed8c153daefcdf0a578102009"
+    },
+    "firms.ts": {
+      "beforeSha256": "730af7aeb858b85580dcbe2420136b9518201398bf2c37318b8fd0c68a4e633d",
+      "afterSha256": "a64e81c7917607f4e49d026464220c353af50cdbfb82ae9105c9a8fe273a99c7"
+    },
+    "founding.ts": {
+      "beforeSha256": "4e9ad4e2ce9a8ad36d700cdcc3c34bbf13ca81e8f2617e5de0272702c073f2ae",
+      "afterSha256": "8a67773dd5da4b3177879a6d86ecc86987457b5ca913444a94d9d5d08b0521a4"
+    },
+    "grid.ts": {
+      "beforeSha256": "8ce69c5688600f180bcddec7273c671b3846de0871544a3ce1669f4df39c69d8",
+      "afterSha256": "2ebf16b84d5a09c1ae4704c8d2541ffb5e04714deb1fb9255d4c4340353b83fc"
+    },
+    "housing-investment.ts": {
+      "beforeSha256": "7798083cd6b886bd4e241ed2308d363054a05286d82505f4d810cc56785a757a",
+      "afterSha256": "a5a8c58c81fd01917998dd9841634c721cd7834de41d074a9fb6c3303b6a99e7"
+    },
+    "land-use.ts": {
+      "beforeSha256": "4a915fcdf75e1ea35d74e5344802cab60bdaede9a99ed352b940509fa2b0a218",
+      "afterSha256": "927af9a5e3789474ef97d008268a0b658f8ed02ae49291dd4848e80ed25f7197"
+    },
+    "ledger.ts": {
+      "beforeSha256": "1bb2588e122e4856d88a9b5c0c68f4bbd553c566ae7c13446d5451357d69cd9b",
+      "afterSha256": "218f961feaf9ad19438bcf896c3ca2258e0f9fc9e027080ae7ac606bff00a991"
+    },
+    "physical-space.ts": {
+      "beforeSha256": "7e5138fb8d0d8887af10a43d75eaaf326fab92e204d45548428e244f2f6cf45b",
+      "afterSha256": "3b775bd058a4724d40ac2ed06214c8909e3dbd0b1a34c92c3436355436a1fa85"
+    },
+    "settlement-access.ts": {
+      "beforeSha256": "643c6f41111427df6ec8cb77fd9961895fdd966a766566a411e6e977c954c7d1",
+      "afterSha256": "e5d9a68955323fb731d48761fa162fbfad83585100f9260254a8266dde310135"
+    },
+    "settlement-morphology.ts": {
+      "beforeSha256": "22a89c6e28dba6f7f9dfc1ffe5e16cef339be86eecbe9cca126a7a60a0cb7421",
+      "afterSha256": "727584f6c118f1eec52ce5d0bc1f1f8b3cf733ecc09a82f7ed0e45880e511de2"
+    }
+  },
+  "measurements": {
+    "worldSettled": {
+      "seed": "performance-ledger",
+      "start": "settled",
+      "generationMs": 4257,
+      "fromMonth": 0,
+      "months": 3,
+      "repeats": 1,
+      "cells": 129024,
+      "communities": 21030,
+      "results": [
+        {
+          "ms": 96474,
+          "monthsPerSecond": 0.03,
+          "tickMs": [52956, 21480, 22038],
+          "finalHash": "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545",
+          "monthlyHashes": [
+            "5b78b42f15b58f739006d214662e20ed02691d48c2eb22833ed24255f147e4b8",
+            "0a2cdec7a19708c06ca608c1832413bf81bba055b97ba2a93a2a431d6787acd3",
+            "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+          ]
+        }
+      ]
+    },
+    "baselineWorldSettled": {
+      "seed": "performance-ledger",
+      "start": "settled",
+      "generationMs": 3805,
+      "fromMonth": 0,
+      "months": 3,
+      "repeats": 1,
+      "cells": 129024,
+      "communities": 21030,
+      "results": [
+        {
+          "ms": 134830,
+          "monthsPerSecond": 0.02,
+          "tickMs": [54591, 33801, 46437],
+          "finalHash": "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545",
+          "monthlyHashes": [
+            "5b78b42f15b58f739006d214662e20ed02691d48c2eb22833ed24255f147e4b8",
+            "0a2cdec7a19708c06ca608c1832413bf81bba055b97ba2a93a2a431d6787acd3",
+            "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+          ]
+        }
+      ]
+    },
+    "worldFrontier": {
+      "seed": "performance-ledger",
+      "start": "frontier",
+      "generationMs": 3070,
+      "fromMonth": 0,
+      "months": 6,
+      "repeats": 1,
+      "cells": 129024,
+      "communities": 2853,
+      "results": [
+        {
+          "ms": 107192,
+          "monthsPerSecond": 0.06,
+          "tickMs": [35557, 22381, 22891, 6960, 6977, 12426],
+          "finalHash": "cc9e77231a96328ad4ef1cfbb522cf0cef2bfc43a0106c8b3c3984160ef41ef1"
+        }
+      ]
+    },
+    "regionalFrontier": {
+      "seed": "performance-ledger",
+      "start": "frontier",
+      "generationMs": 352,
+      "fromMonth": 0,
+      "months": 12,
+      "repeats": 1,
+      "cells": 8064,
+      "communities": 393,
+      "results": [
+        {
+          "ms": 18924,
+          "monthsPerSecond": 0.63,
+          "tickMs": [3551, 1784, 1920, 1246, 1069, 1434, 1263, 1178, 1116, 1128, 1188, 2048],
+          "finalHash": "bc36b398e3170b387777064f6a81fba9c1aea0e52d4e6e1e88e4961d55a75975",
+          "referenceMs": 47600,
+          "identicalMonths": 12
+        }
+      ]
+    }
+  },
+  "baselineFrontierWorld": {
+    "scale": "world",
+    "start": "frontier",
+    "seed": "performance-ledger",
+    "monthsRequested": 3,
+    "monthsCompleted": 0,
+    "outcome": "The CPU-profiled baseline process exhausted its approximately 4 GiB default V8 heap before completing month 1."
+  },
+  "tests": {
+    "spatialSimulation": {
+      "tests": 72,
+      "passed": 71,
+      "failed": 1,
+      "failure": "a representative commute starts at its sampled home and uses its own travel time",
+      "baselineReproduced": true
+    },
+    "finance": {
+      "tests": 18,
+      "passed": 17,
+      "failed": 1,
+      "failure": "firms, banks and GDP survive deterministic save continuation and paid construction",
+      "reason": "adaptive.lanes is present with undefined in the original and absent after JSON restoration.",
+      "baselineReproduced": true
+    },
+    "build": "TypeScript and production Vite build passed; existing large-chunk warning remains.",
+    "total": {
+      "tests": 90,
+      "passed": 88,
+      "preexistingFailures": 2
+    },
+    "formatting": "Changed source files and benchmark tests passed Prettier; git diff --check passed."
+  },
+  "limits": [
+    "No full 200-year soak or browser throughput qualification in this change.",
+    "The largest frontier still has expensive initialization, founding and scheduled remeshing.",
+    "No source commit, push or deployment performed."
+  ],
+  "worldSettledComparison": {
+    "speedup": 1.398,
+    "identicalMonthlyStates": true,
+    "months": 3
+  },
+  "regionalFrontierComparison": {
+    "speedup": 2.515,
+    "identicalMonthlyStates": true,
+    "months": 12,
+    "comparison": "Complete deep structural equality, including numerical mesh metadata; JSON insertion order may differ."
+  },
+  "commands": [
+    "node --import tsx tests/performance.ts --scale regional --start frontier --months 12 --repeats 1 --compare-root /tmp/uchrony-perf/baseline --progress",
+    "node --import tsx tests/performance.ts --scale world --months 3 --repeats 1 --fingerprints --progress",
+    "node --import tsx tests/performance.ts --engine-root /tmp/uchrony-perf/baseline --scale world --months 3 --repeats 1 --fingerprints --progress",
+    "node --import tsx tests/performance.ts --scale world --start frontier --months 6 --repeats 1 --progress",
+    "node --import tsx --test --test-concurrency=1 tests/performance-contracts.test.ts tests/adaptive-grid.test.ts tests/adaptive-economy.test.ts tests/adaptive-world.test.ts tests/settlement-conservation.test.ts tests/settlement-dynamics.test.ts tests/frontier-settlements.test.ts tests/organic-growth.test.ts tests/mountain-access.test.ts tests/settlement-influence.test.ts tests/transport.test.ts",
+    "node --import tsx --test tests/banks-firms-gdp.test.ts",
+    "npx tsc -b && npx vite build"
+  ]
+}

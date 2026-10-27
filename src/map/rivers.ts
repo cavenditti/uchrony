@@ -1,4 +1,5 @@
 import { neighbors } from '../sim/grid'
+import { SpatialBuckets } from '../sim/spatial-buckets'
 import type { Cell, World } from '../sim/types'
 import type { Point } from './geometry'
 
@@ -184,6 +185,123 @@ export function riverPaths(curves: RiverCurve[]) {
 export function riverHalfWidth(curve: RiverCurve, t: number) {
   const flow = curve.flow + ((curve.endFlow ?? curve.flow) - curve.flow) * t
   return Math.min(6, 0.35 + Math.sqrt(flow) * 0.13) / 2
+}
+
+type Channel = { a: Point; b: Point; halfWidth: number }
+const channelIndexes = new WeakMap<readonly Cell[], SpatialBuckets<Channel>>()
+
+/** Short chords of every rendered reach, indexed once per geography. */
+function channelIndex(world: Pick<World, 'cells' | 'width' | 'height'>) {
+  let index = channelIndexes.get(world.cells)
+  if (index) return index
+  index = new SpatialBuckets<Channel>(8)
+  for (const curve of riverCurves(world)) {
+    const span =
+      Math.hypot(curve.b.x - curve.a.x, curve.b.y - curve.a.y) +
+      Math.hypot(curve.c.x - curve.b.x, curve.c.y - curve.b.y) +
+      Math.hypot(curve.d.x - curve.c.x, curve.d.y - curve.c.y)
+    const steps = Math.max(2, Math.ceil(span / 0.5))
+    for (let i = 0; i < steps; i++) {
+      const a = riverPoint(curve, i / steps),
+        b = riverPoint(curve, (i + 1) / steps),
+        halfWidth = Math.max(riverHalfWidth(curve, i / steps), riverHalfWidth(curve, (i + 1) / steps))
+      index.insert(
+        { a, b, halfWidth },
+        Math.min(a.x, b.x) - halfWidth,
+        Math.min(a.y, b.y) - halfWidth,
+        Math.max(a.x, b.x) + halfWidth,
+        Math.max(a.y, b.y) + halfWidth,
+      )
+    }
+  }
+  channelIndexes.set(world.cells, index)
+  return index
+}
+
+/** Whether a footprint (map units) comes within `setback` of rendered river
+ * water. Lot surveys and town rendering share this test, so a building is
+ * neither planned nor drawn inside the visible channel. */
+export function inRiverChannel(
+  world: Pick<World, 'cells' | 'width' | 'height'>,
+  footprint: readonly Point[],
+  setback = 0,
+) {
+  const xs = footprint.map((p) => p.x),
+    ys = footprint.map((p) => p.y)
+  let wet = false
+  channelIndex(world).visit(
+    Math.min(...xs) - setback,
+    Math.min(...ys) - setback,
+    Math.max(...xs) + setback,
+    Math.max(...ys) + setback,
+    (channel) => {
+      wet ||= polygonSegmentDistance(footprint, channel.a, channel.b) < channel.halfWidth + setback
+    },
+  )
+  return wet
+}
+
+/** Widest rendered channel within `reach` of a point, in map units; 0 away from rivers. */
+export function riverWidthNear(world: Pick<World, 'cells' | 'width' | 'height'>, p: Point, reach: number) {
+  let width = 0
+  channelIndex(world).visit(p.x - reach, p.y - reach, p.x + reach, p.y + reach, (channel) => {
+    if (segmentDistanceSquared(p, channel.a, channel.b) < (channel.halfWidth + reach) ** 2)
+      width = Math.max(width, channel.halfWidth * 2)
+  })
+  return width
+}
+
+/** Length of a straight segment lying over rendered river water, in map units. */
+export function riverCrossing(world: Pick<World, 'cells' | 'width' | 'height'>, a: Point, b: Point) {
+  const length = Math.hypot(b.x - a.x, b.y - a.y),
+    steps = Math.max(1, Math.ceil(length / 0.05)),
+    index = channelIndex(world)
+  let wet = 0
+  for (let i = 0; i < steps; i++) {
+    const t = (i + 0.5) / steps,
+      p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
+    let inside = false
+    index.visit(p.x, p.y, p.x, p.y, (channel) => {
+      inside ||= segmentDistanceSquared(p, channel.a, channel.b) < channel.halfWidth ** 2
+    })
+    if (inside) wet += length / steps
+  }
+  return wet
+}
+
+function polygonSegmentDistance(polygon: readonly Point[], a: Point, b: Point) {
+  if (insidePolygon(a, polygon)) return 0
+  let distance = Infinity
+  for (let i = 0; i < polygon.length; i++) {
+    const p = polygon[i],
+      q = polygon[(i + 1) % polygon.length]
+    const d = { x: q.x - p.x, y: q.y - p.y },
+      e = { x: b.x - a.x, y: b.y - a.y },
+      det = d.x * e.y - d.y * e.x
+    if (Math.abs(det) > 1e-12) {
+      const t = ((a.x - p.x) * e.y - (a.y - p.y) * e.x) / det,
+        u = ((a.x - p.x) * d.y - (a.y - p.y) * d.x) / det
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0
+    }
+    distance = Math.min(
+      distance,
+      segmentDistanceSquared(p, a, b),
+      segmentDistanceSquared(a, p, q),
+      segmentDistanceSquared(b, p, q),
+    )
+  }
+  return Math.sqrt(distance)
+}
+
+function insidePolygon(point: Point, polygon: readonly Point[]) {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i],
+      b = polygon[j]
+    if (a.y > point.y !== b.y > point.y && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x)
+      inside = !inside
+  }
+  return inside
 }
 
 /** Approximate distance from each reach's downstream end to open water. Following

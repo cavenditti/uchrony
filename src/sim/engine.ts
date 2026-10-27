@@ -1,5 +1,9 @@
 import { advanceAlmanac } from './almanac'
 import { recordWorldEvent } from './event-memory'
+import { reconcileMountainTerrain } from './terrain-migration'
+import { ensureBuildingLots } from './building-lots'
+import { foundSettlement, advanceFounding } from './founding'
+import { governance } from './governance'
 import { buildTransport } from './public-works'
 import { ensureResidentialSites, syncResidentialPopulation } from './residential-sites'
 import { arriveFreight } from './freight-transit'
@@ -15,7 +19,7 @@ import { settlementAccess } from './settlement-access'
 import { refreshSpatial } from './spatial'
 import { inventoryFlow, marketStore, recordUse, reconcileGDP } from './national-accounts'
 import { beginEconomyMonth, fundGovernment, finishEconomyMonth } from './macroeconomy'
-import { publicExpense } from './ledger'
+import { publicExpense, withBatchedLedgerEntries } from './ledger'
 import { MAX_ARMIES } from './military-limits'
 import {
   allocateProvincialTaxes,
@@ -129,7 +133,7 @@ export function event(
     type,
     title,
     detail,
-    ...(nation !== undefined ? { nation } : {}),
+    ...(nation !== undefined && nation >= 0 ? { nation } : {}),
     ...(region !== undefined ? { region } : {}),
   })
 
@@ -160,10 +164,10 @@ function fiscalPolicy(w: World) {
   }
 }
 
-function demographics(w: World) {
+function demographics(w: World, coarse = false, mobilityMonths = 1) {
   ensurePopulation(w)
   for (const r of economicRegions(w)) {
-    const n = w.nations[r.nation],
+    const n = governance(w, r.nation),
       pop = population(r)
     const services =
       (realService(w, r, 'administration') / Math.max(1, pop / 10000)) *
@@ -221,7 +225,7 @@ function demographics(w: World) {
         investment * MODEL_PARAMETERS.infrastructureServiceProductivity -
         r.infrastructure * MODEL_PARAMETERS.infrastructureWearMonthly -
         r.devastation * 0.0007,
-      0.08,
+      w.settlementStart === 'frontier' ? 0 : 0.08,
       1.5,
     )
     if (!w.adaptive) r.urban = clamp(r.urban + (r.industry * 0.5 - r.urban) * 0.001, 0.03, 0.92)
@@ -239,10 +243,12 @@ function demographics(w: World) {
   aggregateDistricts(w)
   ageMilitaryPopulation(w)
   linkDistrictPeople(w)
-  migrateCommunities(w)
-  advanceEconomicStrata(w)
+  if (!coarse) {
+    migrateCommunities(w, mobilityMonths)
+    advanceEconomicStrata(w, mobilityMonths)
+  }
   aggregateDistricts(w)
-  evolveIdentities(w)
+  if (!coarse) evolveIdentities(w)
   linkDistrictPeople(w)
   aggregateDistricts(w)
 }
@@ -486,8 +492,12 @@ export function summarize(w: World, record = true) {
       ? (w.economy.accounts.nations[n.id]?.productionGDP ?? 0)
       : regions.reduce((s, r) => s + r.gdp, 0)
   }
-  w.totals.population = w.nations.reduce((s, n) => s + n.population, 0)
-  w.totals.gdp = w.nations.reduce((s, n) => s + n.gdp, 0)
+  w.totals.population =
+    w.nations.reduce((s, n) => s + n.population, 0) +
+    w.regions.filter((r) => r.nation < 0).reduce((s, r) => s + population(r), 0)
+  w.totals.gdp =
+    w.nations.reduce((s, n) => s + n.gdp, 0) +
+    w.regions.filter((r) => r.nation < 0).reduce((s, r) => s + r.gdp, 0)
   w.totals.trade = w.routes.reduce((s, r) => s + r.volume, 0)
   w.totals.wars = w.relations.filter((r) => r.treaty === 'war' && isAlive(w, r.a) && isAlive(w, r.b)).length
   if (record) {
@@ -516,14 +526,40 @@ export function summarize(w: World, record = true) {
   }
 }
 
-export function tick(w: World): World {
+/** Establish physical land and the adaptive map before the first displayed month.
+ * The same initialization is used by playback; observing a new world does not tick it. */
+export function prepareSpatialWorld(w: World) {
+  return withBatchedLedgerEntries(w, () => initializeSpatialWorld(w))
+}
+function initializeSpatialWorld(w: World) {
   ensurePopulation(w)
   const converting = !w.localEconomy
+  const initializing = !w.adaptive || w.adaptive.residentialVersion !== 1
   ensureDistrictEconomy(w)
   if (converting) evolveCities(w, true)
   ensureAdaptiveWorld(w)
   ensureResidentialSites(w)
+  const terrainChanged = reconcileMountainTerrain(w)
+  const buildingsChanged = ensureBuildingLots(w)
   syncResidentialPopulation(w)
+  if (initializing || buildingsChanged || terrainChanged) {
+    rebuildAdaptiveMesh(w)
+    refreshCityLabels(w)
+    refreshSpatial(w)
+  }
+}
+
+export type TickDetail = 'monthly' | 'coarse' | 'reconcile'
+export function tick(w: World, detail: TickDetail = 'monthly'): World {
+  const resumeMonthly = detail === 'monthly' && !!w.fastForward?.phase
+  const result = withBatchedLedgerEntries(w, () => advanceMonth(w, resumeMonthly ? 'reconcile' : detail))
+  if (resumeMonthly) w.fastForward!.phase = 0
+  return result
+}
+
+function advanceMonth(w: World, detail: TickDetail): World {
+  const coarse = detail === 'coarse'
+  prepareSpatialWorld(w)
   w.month++
   w.totals.births = 0
   w.totals.deaths = 0
@@ -540,7 +576,7 @@ export function tick(w: World): World {
   if (w.statecraft) advanceStatecraft(w)
   linkDistrictPeople(w)
   for (const id of w.localEconomy!.active) refreshEndowment(w, w.localEconomy!.units[id], false)
-  produce(w)
+  produce(w, coarse)
   aggregateDistricts(w)
   advanceNavy(w)
   trade(w)
@@ -552,7 +588,7 @@ export function tick(w: World): World {
   advanceIntelligence(w)
   advanceGeopolitics(w)
   linkDistrictPeople(w)
-  demographics(w)
+  demographics(w, coarse, detail === 'reconcile' ? (w.fastForward?.phase ?? 0) + 1 : 1)
   science(w)
   diplomacy(w)
   advanceArmies(w)
@@ -564,19 +600,22 @@ export function tick(w: World): World {
   syncResidentialPopulation(w)
   syncSites(w)
   refreshAdaptiveTotals(w)
-  const access = settlementAccess(w)
-  advanceLandUse(w, access)
+  const access = settlementAccess(w, coarse)
+  // Max retains aggregate housing demand even during its periodic plot review.
+  advanceLandUse(w, access, coarse, detail !== 'monthly')
+  advanceFounding(w)
   refreshAdaptiveTotals(w)
   finishEconomyMonth(w)
   if (w.adaptive?.transit)
     w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
-  advanceSettlements(w, false, access)
+  advanceSettlements(w, false, access, coarse ? 0 : detail === 'reconcile' ? (w.fastForward?.phase ?? 0) + 1 : 1)
   refreshCityLabels(w)
   aggregateDistricts(w)
   syncSites(w)
-  if (w.month % 6 === 0) rebuildAdaptiveMesh(w)
+  if (!coarse && (w.month % 6 === 0 || detail === 'reconcile')) rebuildAdaptiveMesh(w)
   else refreshAdaptiveTotals(w)
   summarize(w)
+  // Saves may occur between coarse substeps; their physical settlement census must be current.
   refreshSpatial(w)
   advanceAlmanac(w)
   return w
@@ -635,6 +674,7 @@ export function applyCommand(w: World, command: Command): string {
   return result
 }
 function executeCommand(w: World, command: Command): string {
+  if (command.type === 'found-settlement') return foundSettlement(w, command.nation, command.cell)
   if (command.type === 'intelligence') {
     configureIntelligence(w, command.nation, command.budgetShare, command.priority, command.focus)
     return 'Intelligence priorities updated. Reports improve through funded collection over time.'
@@ -741,7 +781,7 @@ function executeCommand(w: World, command: Command): string {
   if (command.type === 'build') {
     const r = w.regions[command.region]
     if (!r) throw new Error('That province does not exist.')
-    const n = w.nations[r.nation]
+    const n = governance(w, r.nation)
     if (command.building === 'paved-road' || command.building === 'railway' || command.building === 'port')
       return buildTransport(w, r.id, command.building)
     const cost = { farm: 450, industry: 900, road: 600, school: 500 }[command.building]

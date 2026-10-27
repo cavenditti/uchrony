@@ -1,3 +1,4 @@
+import { habitableLand } from './terrain-access'
 import { GOODS, population, type World } from './types'
 import { rebuildAdaptiveMesh } from './adaptive-world'
 import { STRATA } from './economic-types'
@@ -21,7 +22,7 @@ export function validateAdaptiveWorld(w: World) {
     !Number.isSafeInteger(a.revision) ||
     a.revision < 0 ||
     a.metersPerMapUnit !== METERS_PER_MAP_UNIT ||
-    !finite(a.minimumSpan, 25) ||
+    !finite(a.minimumSpan, 8) ||
     !['adaptive', 'coarse', 'fine'].includes(a.mode)
   )
     fail('unsupported version, units or resolution')
@@ -81,6 +82,31 @@ export function validateAdaptiveWorld(w: World) {
   for (const id of w.localEconomy!.active)
     for (const c of w.localEconomy!.units[id].cells)
       if (a.sites[`home:${c}`]?.pool !== id) fail('residents have no persistent home site')
+  if (a.terrainVersion !== undefined && a.terrainVersion !== 1) fail('invalid terrain version')
+  if (a.buildingVersion !== undefined && a.buildingVersion !== 1) fail('invalid building version')
+  if (a.lanes !== undefined) {
+    if (!Array.isArray(a.lanes) || a.lanes.length > 1000000) fail('invalid local lanes')
+    for (const lane of a.lanes) {
+      const unit = w.localEconomy!.units[lane.pool]
+      if (
+        !unit ||
+        !date(lane.founded) ||
+        !finite(lane.width, 1) ||
+        lane.width > 20 ||
+        !Array.isArray(lane.points) ||
+        lane.points.length < 2 ||
+        lane.points.length > 4096 ||
+        lane.points.some(
+          (p) =>
+            !p ||
+            !finite(p.x) ||
+            !finite(p.y) ||
+            !unit.cells.some((id) => pointInPolygon(p, cellPolygon(w, id))),
+        )
+      )
+        fail('invalid lane geometry or owner')
+    }
+  }
   if (a.residentialVersion !== undefined) {
     if (a.residentialVersion !== 1 || !Number.isSafeInteger(a.nextResidence) || a.nextResidence! < 0)
       fail('invalid residential version or sequence')
@@ -117,6 +143,27 @@ export function validateAdaptiveWorld(w: World) {
         ].every((point) => pointInPolygon(point, cellPolygon(w, site.cell)))
       )
         fail('residential parcel crosses its source land')
+      if (
+        site.building !== undefined &&
+        (!Array.isArray(site.building) ||
+          site.building.length !== 4 ||
+          site.building.some(
+            (point) =>
+              !finite(point.x) ||
+              !finite(point.y) ||
+              point.x < p.x ||
+              point.x > p.x + p.size ||
+              point.y < p.y ||
+              point.y > p.y + p.size,
+          ))
+      )
+        fail('building must lie inside its surveyed lot')
+      if (
+        a.terrainVersion === 1 &&
+        !habitableLand(w.cells[site.cell]) &&
+        ((site.residents ?? 0) > 0 || site.capacity > 0 || site.building)
+      )
+        fail('housing on inaccessible mountains')
       if (site.retired !== undefined) {
         if (site.residents || site.capacity) fail('retired residence still holds occupants or capacity')
         continue
@@ -172,7 +219,8 @@ export function validateAdaptiveWorld(w: World) {
         seen.add(c)
       }
     }
-    if (seen.size !== w.cells.filter((c) => c.terrain !== 'water').length) fail('unassigned land')
+    if (seen.size !== w.cells.filter((c) => c.terrain !== 'water' && w.regions[c.region].nation >= 0).length)
+      fail('unassigned land')
   }
   for (const change of a.boundaries) {
     if (

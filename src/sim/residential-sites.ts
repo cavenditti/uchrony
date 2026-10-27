@@ -1,3 +1,5 @@
+import { habitableLand } from './terrain-access'
+import { buildingFootprint, LOT_SPAN } from './building-lots'
 import { apportion } from './allocation'
 import { population, type World } from './types'
 import type { PhysicalSite, SpatialBounds, PointMeters } from './adaptive-types'
@@ -5,6 +7,7 @@ import { cellPolygon, pointInPolygon } from './physical-space'
 import { queryAdaptiveLeaves } from './adaptive-grid'
 import { SETTLEMENT } from './settlement-model'
 import { MODEL_PARAMETERS } from './model-parameters'
+import { findOrganicParcel } from './urban-growth'
 
 export function occupiedResidents(w: World, site: PhysicalSite) {
   if (site.kind !== 'residential' || site.retired !== undefined) return 0
@@ -17,6 +20,7 @@ export function occupiedResidents(w: World, site: PhysicalSite) {
  * known built footprint rather than borrowing another parcel's investment.
  */
 export function compactResidence(site: PhysicalSite, retained = false) {
+  if (site.building) return site.capacity > 0
   const opening =
     (site.openingBuilt ?? 0) +
     ((site.investedValue ?? 0) > 0
@@ -80,6 +84,7 @@ export function syncResidentialPopulation(w: World) {
       const shares = apportion(
         total,
         sites.map((s) => (prior ? (s.residents ?? 0) : Math.max(0, s.capacity))),
+        sites.map((s) => (habitableLand(w.cells[s.cell]) ? Infinity : 0)),
       )
       sites.forEach((s, i) => {
         s.residents = shares[i]
@@ -121,12 +126,15 @@ export function relocateResidentialResidents(
   }
   for (const [pool, count] of arrivals) {
     const sites = pools.get(pool)!,
-      vacant = sites.map((s) => Math.max(0, Math.floor(s.capacity - s.residents!)))
+      vacant = sites.map((s) =>
+        habitableLand(w.cells[s.cell]) ? Math.max(0, Math.floor(s.capacity - s.residents!)) : 0,
+      )
     const parts = apportion(count, vacant, vacant)
     const remainder = count - parts.reduce((sum, n) => sum + n, 0)
     const crowded = apportion(
       remainder,
       sites.map((s) => s.capacity),
+      sites.map((s) => (habitableLand(w.cells[s.cell]) ? Infinity : 0)),
     )
     sites.forEach((s, i) => {
       s.residents! += parts[i] + crowded[i]
@@ -150,6 +158,7 @@ export function createResidentialParcel(
   if (
     a.residentialVersion !== 1 ||
     !unit?.cells.includes(cell) ||
+    !habitableLand(w.cells[cell]) ||
     !pointInPolygon(point, cellPolygon(w, cell))
   )
     throw new Error('Residential parcel must lie on its owner’s land')
@@ -184,6 +193,7 @@ export function createResidentialParcel(
     capitalReference: 0,
     residents: 0,
   }
+  if (a.buildingVersion === 1 && parcel.size <= 32) site.building = buildingFootprint(w.seed, point)
   a.sites[id] = site
   return site
 }
@@ -197,17 +207,27 @@ export function findResidentialParcel(
   near: PhysicalSite,
   existing = residentialPools(w).get(near.pool) ?? [],
 ) {
-  const size = 128,
-    radius = 1000,
+  if (w.adaptive?.buildingVersion === 1) return findOrganicParcel(w, near, existing)
+  const size = w.adaptive?.buildingVersion === 1 ? LOT_SPAN : 128,
+    radius = w.adaptive?.buildingVersion === 1 ? 160 : 1000,
     origin = 0
   const bounds = { x: near.x - radius, y: near.y - radius, size: radius * 2 }
   const owned = new Set(w.localEconomy!.units[near.pool].cells)
   const cells = [...new Set(queryAdaptiveLeaves(w, bounds).flatMap((n) => n.fragments.map((f) => f.cell)))]
-    .filter((c) => owned.has(c))
+    .filter((c) => owned.has(c) && habitableLand(w.cells[c]))
     .sort((a, b) => a - b)
   const polygons = cells.map((cell) => ({ cell, polygon: cellPolygon(w, cell) }))
-  const occupied = existing
-  const candidates: { cell: number; point: PointMeters; parcel: SpatialBounds; distance: number }[] = []
+  const occupied = existing.filter(
+    (s) => s.capacity > 0 || s.building || w.adaptive?.construction?.some((p) => p.site === s.id),
+  )
+  const candidates: {
+    cell: number
+    point: PointMeters
+    parcel: SpatialBounds
+    distance: number
+    building?: PointMeters[]
+    lanes?: import('./adaptive-types').SettlementLane[]
+  }[] = []
   for (
     let ix = Math.floor((bounds.x - origin) / size);
     ix <= Math.ceil((bounds.x + bounds.size - origin) / size);

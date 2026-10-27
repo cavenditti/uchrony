@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-26",
+  "scope": "Single offline World-scale generation and geometry/projection qualification; no long-run or frame-rate claim.",
+  "sourceCells": 129024,
+  "leaves": 81321,
+  "people": 178364230,
+  "developed": 1324,
+  "initializeMs": 8937.083750000002,
+  "remeshMs": 1271.0591670000013,
+  "snapshotMs": 628.176125,
+  "buildMapIndexMs": 162.09191600000122,
+  "localLeaves": 25,
+  "localQueryMs": 0.016501660000012634,
+  "meshProjectionBytes": 3064704,
+  "heapMiB": 1203.1303176879883,
+  "measurementNote": "Single runs overlapped other validation; timings are diagnostic, not isolated statistical benchmarks. Heap includes the canonical world, mesh and display projection.",
+  "validation": {
+    "focusedTests": 54,
+    "failures": 0,
+    "productionBuild": "passed",
+    "browser": {
+      "fixture": "/tests/browser/quadtree.html",
+      "seed": "Quadtree urban validation",
+      "desktop": [
+        1440,
+        900
+      ],
+      "phone": [
+        390,
+        844
+      ],
+      "start": {
+        "month": 0,
+        "leaves": 8241,
+        "developed": 160,
+        "residents": 10787224,
+        "capacity": 12406984
+      },
+      "after": {
+        "month": 6,
+        "leaves": 19713,
+        "developed": 167,
+        "residents": 10879706,
+        "capacity": 12442029.87831289,
+        "construction": 524,
+        "changedDisplayedPlots": 605
+      },
+      "horizontalOverflow": false,
+      "initial3DModuleLoaded": false,
+      "optional3DOpened": true,
+      "notes": "Isolated real simulation; no application saves or model calls. No long-duration economic qualification."
+    }
+  }
+}

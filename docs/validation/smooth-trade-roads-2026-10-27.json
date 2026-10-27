@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-27",
+  "scope": "Smooth shared land-trade geometry for ground dirt paint, Trade highlights and symbolic cargo",
+  "implementation": {
+    "geometry": "Exact quadratic curves at unanchored degree-two nodes, split between incoming and outgoing edges",
+    "terrainSafety": "Each half lies in its original traversed source cell; only habitable movement-neighbor edges enter the graph",
+    "anchors": "Junctions, province centers, ports, surveyed building cells and local lane cells keep their exact connections",
+    "material": "Procedural dirt paint batched by width, with soft shoulders and broken wear; no road mesh or new raster asset",
+    "alignment": "Quadtree, relief ground paint and Trade highlights share exact curves; cargo uses sixteen samples per half-curve in either direction",
+    "simulation": "Read-only presentation; routing, physical freight distances, costs, buildings and save schema unchanged"
+  },
+  "automated": {
+    "command": "node --import tsx --test tests/road-curves.test.ts tests/transport.test.ts tests/organic-growth.test.ts tests/relief.test.ts",
+    "passed": 19,
+    "failed": 0,
+    "roadCurveTests": 5,
+    "coverage": [
+      "Position and tangent continuity through bends, reversed travel and closed loops",
+      "Ground, overlay and cargo alignment with unchanged physical route distance and world state",
+      "Curves contained within traversable land cells beside mountains and water",
+      "Anchored junctions and building frontages, edge deduplication and cache invalidation",
+      "Shared strokes avoid repeated alpha caps",
+      "Existing transport, organic growth and relief contracts"
+    ],
+    "productionBuild": "Passed TypeScript and Vite; existing bundle-size warning remains",
+    "diffWhitespace": "Passed"
+  },
+  "browser": {
+    "fixture": "/tests/browser/quadtree.html?start=settled",
+    "engine": "Isolated Chromium via agent-browser",
+    "isolation": "Dedicated fixture worker; no application saves or model calls",
+    "viewports": [[1440, 1000], [390, 844], [509, 853]],
+    "views": ["Quadtree Terrain", "Quadtree Trade", "3D Terrain"],
+    "afterSixMonths": {
+      "tradeRoads": 1555,
+      "mountainResidents": 0,
+      "mountainBuildings": 0,
+      "blockedRoutes": 0,
+      "error": ""
+    },
+    "errors": [],
+    "desktopHorizontalOverflow": false,
+    "reviewCaptures": ".impeccable/review/smooth-roads/",
+    "screenshots": ["smooth-trade-roads-2026-10-27.png", "smooth-trade-overlay-2026-10-27.png"]
+  },
+  "review": {
+    "scope": "Changed road presentation, five supplied captures and sampled source contracts",
+    "independentReviewer": "Fresh generic sub-agent using the Impeccable finish-reviewer contract because the named role was unavailable",
+    "disposition": "ship",
+    "materialFixes": [],
+    "documenter": "Independent generic documenter appended the surface refinement; DESIGN.md and global tokens remain unchanged",
+    "reviewLimit": "Reviewer inspected captures and source; dynamic behavior and automated test results are builder-supplied evidence"
+  },
+  "boundaries": [
+    "Sharp turns remain at physical frontage anchors and junctions; established buildings and lanes are not moved.",
+    "The settled-world stress fixture includes legacy parcel townscapes and does not demonstrate new frontier urban generation.",
+    "No new full-suite, long-run economic or World-scale performance qualification was run."
+  ]
+}

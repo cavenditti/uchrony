@@ -128,7 +128,7 @@ export function validateIntelligence(w: World) {
         !integer(p.id, 0, w.regions.length - 1) ||
         chart.has(p.id) ||
         !text(p.name) ||
-        !nation(p.nation) ||
+        !(p.nation === -1 || nation(p.nation)) ||
         !month(p.month) ||
         typeof p.coastal !== 'boolean' ||
         !text(p.terrain, 20) ||

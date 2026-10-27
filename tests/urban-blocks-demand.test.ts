@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { World } from '../src/sim/types'
 import type { PhysicalSite } from '../src/sim/adaptive-types'
-import { multiCentreHousingDemand, housingCentres } from '../src/sim/housing-demand'
+import { multiCentreHousingDemand, housingCentres, coarseHousingDemand } from '../src/sim/housing-demand'
 import { urbanBlocks } from '../src/sim/urban-blocks'
 import { SETTLEMENT } from '../src/sim/settlement-model'
 function rectangularFootprint(p: { x: number; y: number }, width: number, depth: number, angle: number) {
@@ -127,6 +127,17 @@ test('growth is bounded by the pool shortage and projects offset it locally', ()
   const after = multiCentreHousingDemand(w, equal)
   assert.equal(after.get(homes[0].id), before.get(homes[0].id)! - 20)
   assert.equal(after.get(homes[2].id), before.get(homes[2].id))
+})
+
+test('coarse housing demand conserves the pool shortage and deducts funded capacity once', () => {
+  const { w, homes, access } = fixture()
+  homes.forEach((s) => { s.capacity = s.residents! * 0.8 })
+  const total = () => [...coarseHousingDemand(w, access).values()].reduce((a, b) => a + b, 0)
+  assert(Math.abs(total() - 420) < 1e-9)
+  w.adaptive!.construction!.push({ site: homes[0].id, capacity: 20, cost: 10, remaining: 3 })
+  assert(Math.abs(total() - 400) < 1e-9)
+  w.adaptive!.construction!.push({ site: homes[2].id, capacity: 1000, cost: 100, remaining: 3 })
+  assert.equal(total(), 0)
 })
 
 test('nearby duplicate sites do not create extra demand centres', () => {

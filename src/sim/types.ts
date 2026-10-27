@@ -69,6 +69,7 @@ export interface Region {
   occupation?: Occupation
   id: number
   name: string
+  /** -1 means land outside any state's sovereignty. */
   nation: number
   culture: number
   census?: PopulationCensus
@@ -242,6 +243,8 @@ export interface HistoryPoint {
   nations: { id: number; population: number; gdp: number; territory: number; treasury: number }[]
 }
 export interface World {
+  /** Persistent provenance; coarse history remains approximate after returning to monthly play. */
+  fastForward?: { months: number; lastMonth: number; phase: number }
   almanac?: import('./almanac-types').Almanac
   viewPlaces?: import('./almanac-types').PlaceLabel[]
   adaptive?: import('./adaptive-types').AdaptiveWorld
@@ -253,9 +256,10 @@ export interface World {
   viewNation?: number | null
   viewBankLoans?: Record<number, number>
   /** Read-only economic tile projection shared by every observer. */
+  viewLandscape?: import('./economic-landscape').EconomicLandscape
+  /** Exact adaptive cells for the map, without simulation-owned polygons or accounts. */
   viewMesh?: import('./map-snapshot').MapMesh
   viewUrbanBlocks?: import('./urban-blocks').UrbanBlock[]
-  viewLandscape?: import('./economic-landscape').EconomicLandscape
   /** Compact display records; avoids cloning a giant string-keyed site registry. */
   viewHomes?: {
     id: string
@@ -280,6 +284,7 @@ export interface World {
   sovereignty?: SovereigntyState
   pressures?: PressureState
   generatorVersion?: number
+  settlementStart?: 'frontier'
   gridTopology?: 'square-v1'
   seed: string
   rng: number
@@ -316,6 +321,7 @@ export interface World {
   }
 }
 export type Command =
+  | { type: 'found-settlement'; nation: number; cell: number }
   | {
       type: 'intelligence'
       nation: number
@@ -380,7 +386,7 @@ export type WorkerRequest =
       scale?: WorldScale
     }
   | { type: 'step'; count: number }
-  | { type: 'playback'; running: boolean; speed: number }
+  | { type: 'playback'; running: boolean; speed: import('./playback').PlaybackSpeed }
   | { type: 'command'; command: Command }
   | { type: 'load'; world: unknown }
   | { type: 'restore'; legacy: string | null }
@@ -388,7 +394,7 @@ export type WorkerRequest =
   | { type: 'export' }
   | { type: 'save'; force?: boolean }
   | { type: 'storage-port'; port: MessagePort }
-  | { type: 'storage-error' }
+  | { type: 'storage-error'; message?: string }
   | { type: 'snapshot-ack'; mapKey: string }
   | { type: 'retry-history' }
   | { type: 'advise'; nation: number; text: string }
@@ -396,6 +402,7 @@ export type WorkerRequest =
   | { type: 'agent-strategy'; nation: number }
   | { type: 'event-details'; event: number }
 export type WorkerResponse =
+  | { type: 'playback-progress'; months: number }
   | { type: 'places'; result: import('./almanac-types').PlaceResult }
   | { type: 'world-writing'; id: string; state: 'loading' | 'done' | 'error'; message?: string }
   | { type: 'inspection'; snapshot: import('./inspection').InspectionSnapshot }

@@ -83,6 +83,16 @@ export function architectureMaterial(kind: 'wall' | 'roof') {
   return material
 }
 
+/** Blender scenery models carry their own vertex colors instead of procedural masonry. */
+export function paintedMaterial() {
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })
+  material.customProgramCacheKey = () => 'town-illuminated-painted-v1'
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', pigmentFinish)
+  }
+  return material
+}
+
 export function townGroundMaterial() {
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true,

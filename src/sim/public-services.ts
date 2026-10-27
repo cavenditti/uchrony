@@ -26,6 +26,22 @@ export function provincialRealService(w: World, r: Region, kind: 'policing' | 'a
     : realService(w, r, kind)
 }
 
+/** Resolve membership once during an authority assessment. Service values and
+ * delegated powers remain live; this lookup never survives a district remap. */
+export function provincialServiceLookup(w: World) {
+  const provinces = new Map<number, Region[]>()
+  if (w.localEconomy)
+    for (const unit of economicRegions(w)) {
+      const members = provinces.get(unit.province!) ?? []
+      members.push(unit)
+      provinces.set(unit.province!, members)
+    }
+  return (r: Region, kind: 'policing' | 'administration') =>
+    w.localEconomy
+      ? (provinces.get(r.id) ?? []).reduce((sum, unit) => sum + realService(w, unit, kind), 0)
+      : realService(w, r, kind)
+}
+
 export function nationalRealService(w: World, nation: number, kind: 'research' | 'administration') {
   return economicRegions(w)
     .filter((r) => r.nation === nation)

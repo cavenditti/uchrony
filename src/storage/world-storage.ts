@@ -56,11 +56,13 @@ export class WorldStorage {
           return backend.writeBlob(blob)
         }),
       )
-      const message = writes
-        .flatMap((result, i) =>
-          result.status === 'rejected' ? [`${this.backends[i].name}: ${String(result.reason)}`] : [],
-        )
-        .join(' ')
+      const failures = new Map<string, string[]>()
+      writes.forEach((result, i) => {
+        if (result.status !== 'rejected') return
+        const reason = result.reason instanceof Error ? result.reason.message : String(result.reason)
+        failures.set(reason, [...(failures.get(reason) ?? []), this.backends[i].name])
+      })
+      const message = [...failures].map(([reason, names]) => `${names.join(' and ')}: ${reason}`).join(' ')
       const replicas = this.backends.filter((_, i) => writes[i].status === 'fulfilled').map((b) => b.name)
       if (replicas.length) {
         // Retry degraded replication on the next interval even if the world is paused.
@@ -79,10 +81,7 @@ export class WorldStorage {
           state: 'error',
           month,
           startYear,
-          message:
-            writes
-              .map((r, i) => `${this.backends[i].name}: ${r.status === 'rejected' ? String(r.reason) : ''}`)
-              .join(' ') + ' Your previous save remains intact.',
+          message: `${message} Your previous save remains intact.`,
         })
     })().finally(() => {
       this.flight = null

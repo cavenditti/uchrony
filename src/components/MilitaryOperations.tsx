@@ -196,7 +196,7 @@ export function NavalForces({
             >
               {ports.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name} · {w.nations[r.nation].shortName}
+                  {r.name} · {w.nations[r.nation]?.shortName ?? 'Unclaimed'}
                 </option>
               ))}
             </select>

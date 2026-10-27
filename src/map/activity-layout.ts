@@ -10,7 +10,7 @@ import { illuminated } from './illuminated-palette'
 import { tradeRoadEdges, type RoadPoint } from './road-curves'
 import { footprint, landSurface, renderedLand } from './land-surface'
 
-export type DetailShape = 'box' | 'roof' | 'cone' | 'cylinder' | 'crown'
+export type DetailShape = 'box' | 'roof' | 'cone' | 'cylinder' | 'crown' | 'conifer' | 'sheep'
 export interface DetailPiece {
   shape: DetailShape
   x: number
@@ -199,19 +199,7 @@ export function activityLayout(
       h = orchard ? 0.5 : 0.8 + v * 0.7
     add('cylinder', x, z, h * 0.35, 0.08, h * 0.7, 0.08, timber, 'tree')
     if (climate.biome === 'boreal' || climate.biome === 'polar') {
-      for (let tier = 0; tier < 3; tier++)
-        add(
-          'cone',
-          x,
-          z,
-          h * (0.55 + tier * 0.2),
-          size * (1.3 - tier * 0.25),
-          h * 0.7,
-          size * (1.3 - tier * 0.25),
-          '#326550',
-          'conifer',
-          0,
-        )
+      add('conifer', x, z, h * 0.72, size * 1.4, h * 1.16, size * 1.4, '#326550', 'conifer', v * 6)
     } else if ((climate.biome === 'tropical' && v > 0.82) || climate.biome === 'arid') {
       for (let leaf = 0; leaf < 5; leaf++) {
         const a = (leaf * Math.PI * 2) / 5
@@ -279,8 +267,7 @@ export function activityLayout(
       for (let i = 0; i < 10; i++) {
         const x = yardX - 3 + random(i + 400) * 2,
           z = yardZ - 3 + random(i + 500) * 4
-        add('crown', x, z, 0.15, 0.23, 0.22, 0.38, '#dfdac2', 'livestock', random(i) * 6)
-        add('box', x, z + 0.2, 0.19, 0.1, 0.13, 0.16, dark, 'livestock', 0)
+        add('sheep', x, z, 0.14, 0.24, 0.28, 0.46, '#dfdac2', 'livestock', random(i) * 6)
       }
     else if (random(88) < 0.28) {
       const x = yardX - 1.2,

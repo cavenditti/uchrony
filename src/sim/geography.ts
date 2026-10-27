@@ -1,3 +1,4 @@
+import { MOUNTAIN_ELEVATION } from './terrain-access'
 import { fractal, hashSeed, random, noise } from './random'
 import { clamp, type Cell, type Terrain } from './types'
 import { CELL_SIZE, neighbors } from './grid'
@@ -110,7 +111,7 @@ export function generateGeography(seed: string, continents: number, width: numbe
       const terrain: Terrain =
         elevation < SEA_LEVEL
           ? 'water'
-          : elevation > 0.43
+          : elevation > MOUNTAIN_ELEVATION
             ? 'mountains'
             : temperature < 0.24
               ? 'tundra'
@@ -150,7 +151,7 @@ export function generateGeography(seed: string, continents: number, width: numbe
     const latitude = Math.abs(c.r / (height - 1) - 0.5) * 2
     const temperature = 1 - latitude * 0.85 - Math.max(0, c.elevation - SEA_LEVEL) * 0.8
     c.terrain =
-      c.elevation > 0.43
+      c.elevation > MOUNTAIN_ELEVATION
         ? 'mountains'
         : temperature < 0.24
           ? 'tundra'

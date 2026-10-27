@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "living-world-fixture",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--config", "tests/browser/living-world.config.ts"],
+      "port": 5199
+    }
+  ]
+}

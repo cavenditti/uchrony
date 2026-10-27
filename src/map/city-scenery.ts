@@ -9,12 +9,13 @@ import {
   type CityPoint,
   type CityBuilding,
 } from './city-layout'
-import type { RiverCurve } from './rivers'
+import { inRiverChannel, type RiverCurve } from './rivers'
 import { TerrainPicker } from './relief-picking'
 import { architectureMaterial, townGroundMaterial, windMaterial } from './city-materials'
 import { illuminated } from './illuminated-palette'
 import { streetRibbon } from './street-geometry'
 import { footprint, renderedLand } from './land-surface'
+import { sceneryModel } from './scenery-models'
 
 const PALETTES = illuminated.cities
 const DETAIL_LIMIT = 6,
@@ -46,11 +47,11 @@ export class CityScenery {
   private viewKey = ''
   private geometries = {
     box: new THREE.BoxGeometry(1, 1, 1),
-    hip: new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4),
-    gable: gableGeometry(),
+    hip: sceneryModel('roof-hip', () => new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4)),
+    gable: sceneryModel('roof-gable', gableGeometry),
     dome: new THREE.SphereGeometry(0.5, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2),
     cone: new THREE.ConeGeometry(0.5, 1, 8),
-    tree: new THREE.IcosahedronGeometry(0.5, 1),
+    tree: sceneryModel('crown', () => new THREE.IcosahedronGeometry(0.5, 1)),
     cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
     ring: new THREE.TorusGeometry(0.5, 0.08, 6, 20).rotateX(Math.PI / 2),
     flag: new THREE.PlaneGeometry(1, 1, 8, 2),
@@ -60,7 +61,9 @@ export class CityScenery {
   private roofMaterial = architectureMaterial('roof')
   private groundMaterial = townGroundMaterial()
   private detailMaterial = new THREE.MeshStandardMaterial({ roughness: 0.93 })
-  private foliageMaterial = windMaterial(this.time)
+  private foliageMaterial = Object.assign(windMaterial(this.time), {
+    vertexColors: this.geometries.tree.hasAttribute('color'),
+  })
   private clothMaterial = windMaterial(this.time, true)
   private dummy = new THREE.Object3D()
   private detailSize = new StringTable<number>()
@@ -267,6 +270,8 @@ export class CityScenery {
     const lift = city.building ? b.height * 0.05 : city.form ? 0.2 / city.form.metersPerMapUnit : 0.04
     const corners = footprint(b.x, b.z, b.width + footing * 2, b.depth + footing * 2, b.angle)
     if (!corners.every((p) => renderedLand(this.geography, p.x, p.z))) return null
+    // Older saves recorded lots inside the visible channel; never draw them underwater.
+    if (inRiverChannel(this.geography, corners.map((p) => ({ x: p.x, y: p.z })))) return null
     const floors = corners.map((p) => this.height(p.x, p.z))
     const high = Math.max(...floors),
       floor = Math.min(...floors, this.height(b.x, b.z))

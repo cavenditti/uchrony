@@ -1,5 +1,14 @@
 import type { BirthCohort, PopulationCommunity } from './population-types'
 
+/** Dated cohorts are numeric tuples; clone the extensible social record normally
+ * and copy its large tuple array directly, preserving optional-field presence. */
+export function cloneCommunity(group: PopulationCommunity): PopulationCommunity {
+  const copy = structuredClone({ ...group, ageCohorts: undefined }) as PopulationCommunity
+  if (!Object.hasOwn(group, 'ageCohorts')) delete copy.ageCohorts
+  if (group.ageCohorts) copy.ageCohorts = group.ageCohorts.map((c): BirthCohort => [c[0], c[1], c[2]])
+  return copy
+}
+
 /** Isolate settlement trials without sending millions of numeric tuples through structuredClone. */
 export function clonePopulationHolders<T extends { communities?: PopulationCommunity[] }>(holders: T[]): T[] {
   const result: T[] = structuredClone(holders.map((holder) => ({ ...holder, communities: undefined })))

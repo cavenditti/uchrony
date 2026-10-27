@@ -4,6 +4,7 @@ import type { PhysicalSite } from './adaptive-types'
 import { residentialSites, occupiedResidents, compactResidence } from './residential-sites'
 import { residentialFootprint, footprintConnection, localWalkingConnection } from './residential-geometry'
 import { SETTLEMENT, isVisibleSettlement } from './settlement-model'
+import { riverCrossing, riverWidthNear } from '../map/rivers'
 
 export interface SettlementComponent {
   cells: number[]
@@ -13,8 +14,8 @@ export interface SettlementComponent {
 }
 
 /** Morphological continuity uses occupied physical plots, not shared geography IDs
- * or municipal membership. A narrow street/park gap can connect urban fabric;
- * a sea gap or an inaccessible route cannot.
+ * or municipal membership. A narrow street/park gap or a river crossing can
+ * connect urban fabric; a sea gap or an inaccessible route cannot.
  */
 export function settlementComponents(w: World, nations?: ReadonlySet<number>): SettlementComponent[] {
   const eligible = residentialSites(w)
@@ -51,12 +52,18 @@ export function settlementComponents(w: World, nations?: ReadonlySet<number>): S
   }
   const components: SettlementComponent[] = []
   const footprints = new Map(sites.map((s) => [s.id, residentialFootprint(w, s)]))
+  // Lot surveys keep houses off the rendered river, so its banks would part a
+  // town. Water a link crosses does not count toward the walking gap.
+  const scale = w.adaptive?.metersPerMapUnit ?? 1
+  const river = (s: PhysicalSite) =>
+    s.building ? riverWidthNear(w, { x: s.x / scale, y: s.y / scale }, 40 / scale) * scale : 0
   for (const start of sites) {
     if (!take(start.id)) continue
     const members = [start]
     for (let i = 0; i < members.length; i++) {
       const from = members[i],
-        radius = (from.parcel!.size + maximum) / Math.SQRT2 + (from.building ? 24 : 150)
+        across = river(from),
+        radius = (from.parcel!.size + maximum) / Math.SQRT2 + (from.building ? 24 + across : 150)
       const candidates: string[] = []
       for (let x = Math.floor((from.x - radius) / span); x <= Math.floor((from.x + radius) / span); x++)
         for (let y = Math.floor((from.y - radius) / span); y <= Math.floor((from.y + radius) / span); y++)
@@ -67,9 +74,19 @@ export function settlementComponents(w: World, nations?: ReadonlySet<number>): S
         if (Math.hypot(to.x - from.x, to.y - from.y) > radius) continue
         const connection = footprintConnection(footprints.get(from.id)!, footprints.get(to.id)!)
         const nation = w.localEconomy!.units[from.pool].nation
+        const gap =
+          across && to.building && connection.distance > 24
+            ? connection.distance -
+              riverCrossing(
+                w,
+                { x: connection.from.x / scale, y: connection.from.y / scale },
+                { x: connection.to.x / scale, y: connection.to.y / scale },
+              ) *
+                scale
+            : connection.distance
         if (
           w.localEconomy!.units[to.pool].nation !== nation ||
-          connection.distance > (from.building && to.building ? 24 : 150) + 1e-7 ||
+          gap > (from.building && to.building ? 24 : 150) + 1e-7 ||
           !localWalkingConnection(w, connection.from, connection.to, nation, [from.cell, to.cell])
         )
           continue

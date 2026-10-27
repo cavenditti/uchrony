@@ -1,4 +1,5 @@
 import { recordWorldEvent } from './event-memory'
+import { governance } from './governance'
 import { economicRegions } from './local-units'
 import { random } from './random'
 import { allForces } from './forces'
@@ -33,7 +34,7 @@ function note(world: World, region: Region, title: string, detail: string) {
     type: 'population',
     title,
     detail,
-    nation: region.nation,
+    ...(region.nation >= 0 ? { nation: region.nation } : {}),
     region: region.id,
   })
 
@@ -143,7 +144,7 @@ export function evolveIdentities(world: World) {
   for (const region of world.regions) {
     if (!population(region)) continue
     const index = communityIndex(region.communities!),
-      nation = world.nations[region.nation],
+      nation = governance(world, region.nation),
       official = nation.identity!,
       metrics = region.populationDynamics!,
       exposure = Object.fromEntries(AXES.map((axis) => [axis, new Map<number, number>()])) as Record<

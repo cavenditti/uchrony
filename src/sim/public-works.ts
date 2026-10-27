@@ -1,3 +1,4 @@
+import { governance } from './governance'
 import type { World, Good } from './types'
 import { publicExpense } from './ledger'
 import { marketStore, recordUse } from './national-accounts'
@@ -20,7 +21,7 @@ export type TransportProject = keyof typeof TRANSPORT_PROJECTS
 export function buildTransport(w: World, region: number, kind: TransportProject) {
   const r = w.regions[region],
     p = TRANSPORT_PROJECTS[kind],
-    n = w.nations[r.nation]
+    n = governance(w, r.nation)
   if (n.technologies.logistics < p.technology) return `${p.label} require logistics level ${p.technology}.`
   if (kind === 'port' && !transportNetwork(w).harbors.some((h) => h.region === r.id))
     return 'Harbor docks require an accessible coastal port.'

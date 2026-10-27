@@ -1,3 +1,5 @@
+import { habitableLand } from './terrain-access'
+import { governance } from './governance'
 import { provinceWorks, roadInvestment } from './transport-development'
 import { economicRegions } from './local-units'
 import { effectMultiplier } from './effects'
@@ -26,6 +28,7 @@ const difficulty: Record<Terrain, number> = {
 
 /** Travel effort remains positive even on a fully established corridor. */
 export function roadCost(a: Cell, b: Cell) {
+  if (!habitableLand(a) || !habitableLand(b)) return Infinity
   return (
     ((difficulty[a.terrain] + difficulty[b.terrain]) / 2 +
       Math.abs(a.elevation - b.elevation) * 12 +
@@ -97,12 +100,13 @@ export function corridorProfile(world: World) {
     capacity = new Float64Array(count)
   for (const trace of world.corridors ?? []) {
     const i = geo.index(trace.a, trace.b)
+    if (i < 0) continue
     familiarity[i] = trace.familiarity
     traffic[i] = trace.traffic
   }
   const provinces = new Map(
     economicRegions(world).map((region) => {
-      const tech = world.nations[region.nation].technologies.logistics,
+      const tech = governance(world, region.nation).technologies.logistics,
         infra = region.infrastructure,
         damage = 1 - region.devastation * 0.6
       return [
@@ -176,7 +180,7 @@ export function corridorCost(profile: CorridorProfile, legs: RouteLeg[]) {
   for (const leg of legs) {
     if (leg.mode === 'sea') cost += 2 // Loading/unloading cannot be removed by familiarity.
     for (let i = 1; i < leg.cells.length; i++)
-      cost += profile.cost[profile.index(leg.cells[i - 1], leg.cells[i])]
+      cost += profile.cost[profile.index(leg.cells[i - 1], leg.cells[i])] ?? Infinity
   }
   return cost
 }
@@ -190,6 +194,7 @@ export function learnCorridors(world: World, profile: CorridorProfile) {
   for (const route of world.routes) {
     if (!route.legs || route.volume <= 0) continue
     const usage = corridorUsage(profile, route.legs)
+    if (usage.has(-1)) continue
     let effort = route.legs.filter((leg) => leg.mode === 'sea').length * 2
     for (const [index, count] of usage) effort += profile.baseCost[index] * count
     // Useful tonnes per unit of unreinforced travel effort. A detour earns less;

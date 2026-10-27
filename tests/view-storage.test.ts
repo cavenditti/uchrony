@@ -1,4 +1,5 @@
 import { describeCity } from '../src/map/city-layout'
+import { compactResidence } from '../src/sim/residential-sites'
 import { spatialState } from '../src/sim/spatial'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -356,6 +357,25 @@ test('invalid simulation state cannot overwrite either good replica', async () =
   assert.match(reports.at(-1)?.message ?? '', /non-finite/)
 })
 
+test('a shared writer failure is reported once with its cause and one preservation notice', async () => {
+  const reports: { state: string; message?: string }[] = []
+  const backends = (['disk', 'browser'] as const).map((name) => ({
+    name,
+    async writeBlob() {
+      throw new Error('The save worker stopped: module unavailable')
+    },
+  }))
+  const storage = new WorldStorage(backends, (status) => reports.push(status))
+  await storage.save(world, 1)
+  assert.deepEqual(reports.at(-1), {
+    state: 'error',
+    month: world.month,
+    startYear: world.startYear,
+    message:
+      'disk and browser: The save worker stopped: module unavailable Your previous save remains intact.',
+  })
+})
+
 test('save I/O uses a private byte channel and recovers after a writer disconnects', async () => {
   const client = new ByteStorageClient(),
     channel = new MessageChannel()
@@ -390,15 +410,19 @@ test('lean residential display records preserve every recorded capacity and town
   assert.equal(view.viewHomes!.length, homes.length)
   assert.deepEqual(
     view.viewHomes,
-    homes.map(({ id, cell, pool, capacity, residents, x, y, parcel }) => ({
-      id,
-      cell,
-      pool,
-      capacity,
-      residents,
-      x,
-      y,
-      parcel,
+    homes.map((home) => ({
+      id: home.id,
+      cell: home.cell,
+      pool: home.pool,
+      capacity: home.capacity,
+      residents: home.residents,
+      x: home.x,
+      y: home.y,
+      parcel: home.parcel,
+      developed: compactResidence(home),
+      construction: (world.adaptive!.construction ?? [])
+        .filter((p) => p.site === home.id)
+        .reduce((sum, p) => sum + p.capacity, 0),
     })),
   )
   assert.deepEqual(view.adaptive!.sites, {})

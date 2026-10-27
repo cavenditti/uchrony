@@ -87,6 +87,10 @@ function reserveFunding(w: World, bank: Bank, required: number) {
 export function settleBankTransfer(w: World, from: string, to: string, amount: number) {
   const a = accountBank(w, from),
     b = accountBank(w, to)
+  settleBankAccounts(w, a, b, amount)
+}
+/** Same settlement primitive for a phase that has already resolved its banks. */
+export function settleBankAccounts(w: World, a: Bank, b: Bank, amount: number) {
   if (a === b) return
   reserveFunding(w, a, amount)
   a.reserves = Math.max(0, a.reserves - amount)
@@ -261,7 +265,6 @@ export function settleBanks(w: World) {
           title: `${n.shortName} restructures its debt`,
           detail: 'Unpaid interest triggers a matched borrower liability and bank asset write-down.',
         })
-
       }
     }
   }

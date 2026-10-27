@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-27",
+  "status": "Applied and verified in the affected Chrome app at port 5173",
+  "diagnosis": {
+    "reportedSymptom": "The save worker stopped for both disk and browser replicas",
+    "observedPersistentFailure": "Invalid district economy: shipment destination",
+    "cause": "Terrain migration moved market centers off peaks while preserving completed shipments to their former centers. The validator still required those historical journeys to end at the current centers.",
+    "historicalDestinationMismatches": 30,
+    "affectedDistricts": 12,
+    "workerStartup": "No-write worker probes succeeded in isolated Chromium at ports 5196 and 5173 and in the in-app browser against the isolated test server. The original worker crash itself was not reproduced."
+  },
+  "changes": [
+    "Narrow read-only acceptance of historical mountain endpoints within the same district after migration, retaining all route-step checks",
+    "No changes to completed shipment quantities, accounting, paths or the prohibition on new mountain travel",
+    "Retain pending immutable bytes across save-writer replacement; replay only unconfirmed replicas",
+    "Bound sends and response deadlines, ignore stale writer events, and preserve underlying error details",
+    "Deduplicate identical disk/browser failure messages"
+  ],
+  "realCheckpoint": {
+    "month": 62,
+    "displayedDate": "Mar 1725",
+    "shipments": 3315,
+    "encodedBytes": 16488582,
+    "inputUnchanged": true,
+    "saveRoundTripExact": true,
+    "exportSha256": "ee016fc9af49ab7c7dc2d7b2463a3d5723f657f53eb18567c96a59447d674edb",
+    "backup": "Original exported world retained in Downloads; additional unchanged copy retained in /tmp",
+    "chronology": "The user tab initially displayed Apr 1727, then restored Mar 1725 before this fix was applied. The March world was exported before live source edits. Recovery of the intervening unsaved progress was not established."
+  },
+  "validation": {
+    "command": "node --import tsx --test tests/byte-storage-recovery.test.ts tests/view-storage.test.ts tests/autosave.test.ts tests/mountain-access.test.ts tests/transport.test.ts",
+    "passed": 41,
+    "failed": 0,
+    "productionBuild": "TypeScript and Vite passed; existing bundle-size warning remains",
+    "whitespace": "git diff --check passed",
+    "syntheticBrowserCrash": {
+      "fixture": "tests/browser/save-worker-recovery.html",
+      "previousCopiesPreserved": true,
+      "recoveredReplicas": ["disk", "browser"],
+      "exactReplicaEquality": true,
+      "saveStates": ["saving", "saved"],
+      "isolation": "Separate temporary project, browser origin and save slot; no model calls"
+    },
+    "liveConfirmation": "Affected Chrome tab displayed Saved Mar 1725 · local disk with no replica warning after applying the fix"
+  },
+  "limits": [
+    "Focused save, terrain migration and routing qualification, not a full-suite or long-duration simulation run",
+    "Historical validation remains distinct from eligibility for newly planned journeys"
+  ]
+}

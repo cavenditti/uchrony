@@ -18,11 +18,12 @@ import { pendingAdvice, submitAdvice, withdrawAdvice } from './advisors'
 import { geographyKey } from '../map/geometry'
 import { DEFAULT_WORLD_SCALE, WORLD_SCALES } from './scale'
 import { Playback } from './playback'
+import { fastForwardMonth } from './fast-forward'
 import { ensurePopulation } from './population'
 import { ensureIntelligence } from './intelligence'
 import { ensureWarfare } from './navy'
 import { generateWorld } from './generate'
-import { tick, applyCommand, summarize } from './engine'
+import { tick, applyCommand, summarize, prepareSpatialWorld } from './engine'
 import { restoreWorld } from './persistence'
 import { receiveHistoricalEvent, ensureHistory, historicalContext } from './history'
 import {
@@ -213,8 +214,12 @@ async function connection() {
   }
 }
 const playback = new Playback(
-  () => {
-    if (world) tick(world)
+  (speed) => {
+    if (!world) return false
+    const ready = speed === 'max' ? fastForwardMonth(world) : (tick(world), true)
+    if (speed === 'max') send({ type: 'playback-progress', months: world.fastForward!.phase || 6 })
+    revision++
+    return ready
   },
   () => publish(),
   (error) => send({ type: 'error', message: error instanceof Error ? error.message : 'Simulation stopped.' }),
@@ -614,7 +619,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       return
     }
     if (data.type === 'storage-error') {
-      byteStorage.disconnect()
+      byteStorage.interrupted(data.message ? `The save worker stopped: ${data.message}` : undefined)
       return
     }
     if (data.type === 'snapshot-ack') {
@@ -655,6 +660,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     const action = data
     if (action.type === 'playback') {
       const intent = ++playbackIntent
+      playback.stop()
       if (world && action.running) {
         await spatialReady
         if (intent !== playbackIntent) return
@@ -675,8 +681,10 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         action.nations ?? WORLD_SCALES[scale].states,
         action.settings,
         scale,
+        'frontier',
       )
       mapKey = geographyKey(world.cells)
+      prepareSpatialWorld(world)
       advanceAlmanac(world, true)
       ensurePopulation(world)
       ensureHistory(world)
@@ -688,6 +696,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       reset()
       world = restored
       mapKey = geographyKey(world.cells)
+      prepareSpatialWorld(world)
       advanceAlmanac(world, true)
       ensureWarfare(world)
       ensurePopulation(world)

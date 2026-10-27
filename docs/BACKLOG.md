@@ -45,3 +45,13 @@ A reviewed diagnosis links each material failure to a demonstrated mechanism or 
 The phase-7 tests reproduce different floating-point results in Node 26.11.1 (V8 14.6) and Chromium 151 for `Math.log`, `Math.exp`, `Math.pow` and `Math.hypot`. Identical starting worlds diverge in their exact hashes after one native step without any camera or inspection. Transaction counters can also differ because numerical residuals create different tiny transfers. This is separate from the deferred US model diagnosis.
 
 Pin runtime/version for exact replay and paired experiments. If bit-identical trajectories across engines or upgrades become a requirement, evaluate portable deterministic transcendental functions and record numeric-runtime provenance before changing the model. Do not hide differences by rounding accounts or weakening observer comparisons.
+
+
+## Terrain diversity after the dynamic urban map
+
+Priority requested on 26 October 2026: strengthen the visible quadtree and dynamic urban land first, then make generated geography more varied. The first map pass leaves the terrain generator unchanged. Follow-up should vary landforms, coast structure, drainage and biome transitions in the authoritative geography, with reproducible seeds and physical constraints shared by settlement growth. Numerical subdivision must never invent geological knowledge. Evaluate the map and urban response before adding more decorative scenery or interface panels.
+
+
+## Building-scale map cost
+
+The frontier model now retains individual housing lots with 8 m numerical refinement while keeping district economic accounts. One World-scale initialization (32 states, 99,843 people) produced 18,525 buildings, 1,731 economic pools and 514,662 leaves. Generation, spatial initialization and save validation together took 36.4 seconds in a diagnostic run concurrent with other checks. This is not a sustained simulation or frame-rate qualification. Profile sparse rural refinement, balance propagation and viewport projection before increasing population or the default world size; preserve physical buildings and coarse economic accounts. The existing food/employment calibration remains deferred, and a successful conservation test is not evidence that long-run economic outcomes are calibrated.

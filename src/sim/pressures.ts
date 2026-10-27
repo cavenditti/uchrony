@@ -43,7 +43,7 @@ export function advancePressures(world: World) {
   }
   if (intensity === 0 || world.month < state.nextAt) return
   const pick = <T>(values: readonly T[]): T => values[Math.floor(random(state) * values.length)],
-    origin = pick(world.regions),
+    origin = pick(world.regions.filter((r) => r.nation >= 0)),
     nation = world.nations[origin.nation],
     roll = random(state),
     scope: PoliticalIncident['scope'] =
@@ -92,8 +92,12 @@ export function advancePressures(world: World) {
     affected = [...ids].map((id) => world.regions[id])
   }
   if (scope === 'international') {
-    const borders = world.regions.filter((region) =>
-      region.neighbors.some((id) => world.regions[id].nation !== region.nation),
+    const borders = world.regions.filter(
+      (region) =>
+        region.nation >= 0 &&
+        region.neighbors.some(
+          (id) => world.regions[id].nation >= 0 && world.regions[id].nation !== region.nation,
+        ),
     )
     if (!borders.length) {
       state.nextAt = world.month + 3
@@ -101,7 +105,9 @@ export function advancePressures(world: World) {
     }
     const border = pick(borders),
       foreign = pick(
-        border.neighbors.map((id) => world.regions[id]).filter((region) => region.nation !== border.nation),
+        border.neighbors
+          .map((id) => world.regions[id])
+          .filter((region) => region.nation >= 0 && region.nation !== border.nation),
       ),
       a = world.nations[border.nation],
       b = world.nations[foreign.nation],
@@ -174,7 +180,7 @@ export function advancePressures(world: World) {
       }
     }
   }
-  const nations = [...new Set(affected.map((region) => region.nation))],
+  const nations = [...new Set(affected.map((region) => region.nation).filter((id) => id >= 0))],
     regions = affected.map((region) => region.id),
     incident: PoliticalIncident = {
       id: state.nextId++,

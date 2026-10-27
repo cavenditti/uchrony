@@ -14,6 +14,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Play,
   Pause,
+  FastForward,
   SkipForward,
   Download,
   Upload,
@@ -53,6 +54,7 @@ import {
   dateLabel,
 } from './sim/types'
 import { LEGACY_SAVE_KEY } from './storage/autosave'
+import { PLAYBACK_SPEEDS, type PlaybackSpeed } from './sim/playback'
 import { MAX_SAVE_BYTES } from './storage/save-types'
 import type { AgentServiceStatus } from './sim/statecraft-types'
 import type { StorytellerStatus } from './sim/history-types'
@@ -62,7 +64,6 @@ import './styles.css'
 
 const ModelMathematics = lazy(() => import('./components/ModelMathematics'))
 
-const speedOptions = [1, 4, 12, 60]
 const tabLayer: Partial<Record<Tab, Layer>> = {
   atlas: 'political',
   population: 'population',
@@ -96,7 +97,8 @@ export default function App() {
   const [llmPending, setLlmPending] = useState(false)
   const [world, setWorld] = useState<World | null>(null),
     [running, setRunning] = useState(false),
-    [speed, setSpeed] = useState(1)
+    [speed, setSpeed] = useState<PlaybackSpeed>(1)
+  const [playbackProgress, setPlaybackProgress] = useState(0)
   const [tab, setTab] = useState<Tab>('atlas'),
     [layer, setLayer] = useState<Layer>('terrain')
   const [nation, setNation] = useState(0),
@@ -174,21 +176,32 @@ export default function App() {
     let writer: Worker | null = null
     const connectWriter = () => {
       if (writer) return
-      writer = new Worker(new URL('./storage/byte-worker.ts', import.meta.url), { type: 'module' })
+      const currentWriter = new Worker(new URL('./storage/byte-worker.ts', import.meta.url), {
+        type: 'module',
+      })
+      writer = currentWriter
       const channel = new MessageChannel()
       writer.postMessage({ port: channel.port1 }, [channel.port1])
       instance.postMessage({ type: 'storage-port', port: channel.port2 } satisfies WorkerRequest, [
         channel.port2,
       ])
-      writer.onerror = () => {
-        instance.postMessage({ type: 'storage-error' } satisfies WorkerRequest)
-        writer?.terminate()
+      writer.onerror = (event) => {
+        if (writer !== currentWriter) return
+        instance.postMessage({
+          type: 'storage-error',
+          message: event.message || undefined,
+        } satisfies WorkerRequest)
+        currentWriter.terminate()
         writer = null
       }
     }
     ensureSaveWorker.current = connectWriter
     connectWriter()
     instance.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+      if (data.type === 'playback-progress') {
+        setPlaybackProgress(data.months)
+        return
+      }
       if (data.type === 'places') {
         if (data.result.request === placeSequence.current) setPlaceResult(data.result)
         return
@@ -272,7 +285,10 @@ export default function App() {
         if (!data.recoverable) setRunning(false)
         return
       }
-      if (data.world.cells) receivedGeography.current = { key: data.mapKey, cells: data.world.cells }
+      if (data.world.cells) {
+        receivedGeography.current = { key: data.mapKey, cells: data.world.cells }
+      }
+      setPlaybackProgress(data.world.fastForward?.phase ?? 0)
       const cells =
         data.world.cells ??
         (receivedGeography.current?.key === data.mapKey ? receivedGeography.current.cells : undefined)
@@ -315,7 +331,10 @@ export default function App() {
   }, [notify, send])
 
   useEffect(() => {
-    worker.current?.postMessage({ type: 'view-focus', nation: inspectorOpen ? nation : null } satisfies WorkerRequest)
+    worker.current?.postMessage({
+      type: 'view-focus',
+      nation: inspectorOpen ? nation : null,
+    } satisfies WorkerRequest)
   }, [inspectorOpen, nation])
 
   // Acknowledge only after React commits, so busy painting cannot queue old worlds.
@@ -402,7 +421,7 @@ export default function App() {
         e.preventDefault()
         setRunning((v) => !v)
       }
-      if (['1', '2', '3', '4'].includes(e.key)) setSpeed(speedOptions[Number(e.key) - 1])
+      if (['1', '2', '3', '4'].includes(e.key)) setSpeed(PLAYBACK_SPEEDS[Number(e.key) - 1])
       if (e.key === 'l' || e.key === 'L')
         setLayer((v) => {
           const list: Layer[] = [
@@ -468,7 +487,7 @@ export default function App() {
       return
     }
     setRegion(id)
-    setNation(world.regions[id].nation)
+    if (world.regions[id].nation >= 0) setNation(world.regions[id].nation)
     setOverviewOpen(false)
   }
   const focusRegion = (id: number) => setFocus({ region: id, key: Date.now() })
@@ -678,7 +697,13 @@ export default function App() {
                       : 'Off for all tabs. Native simulation continues.'}
               </p>
               <p>
-                This world: {world.modelProvenance?.source === 'native' ? 'native simulation' : world.modelProvenance?.source === 'model-assisted' ? `${world.modelProvenance.accepted} accepted model responses` : 'earlier model use unknown'}.
+                This world:{' '}
+                {world.modelProvenance?.source === 'native'
+                  ? 'native simulation'
+                  : world.modelProvenance?.source === 'model-assisted'
+                    ? `${world.modelProvenance.accepted} accepted model responses`
+                    : 'earlier model use unknown'}
+                .
               </p>
               <button
                 onClick={() => {
@@ -782,11 +807,16 @@ export default function App() {
             orderMode={orderedArmy !== null}
             showContext={!inspectorOpen && !overviewOpen}
             onSelect={selectRegion}
+            onFound={(cell) => command({ type: 'found-settlement', nation: selected.id, cell })}
             onInspectDaily={(cell) => requestInspection(inspectionAround(world, cell))}
             onInspectArea={requestInspection}
             onInspectionViewport={inspection ? requestInspection : undefined}
             onLayer={setLayer}
             onInspect={(id, section) => {
+              if (world.regions[id].nation < 0) {
+                requestInspection(inspectionAround(world, world.regions[id].center))
+                return
+              }
               selectRegion(id)
               chooseTab(section)
             }}
@@ -951,7 +981,7 @@ export default function App() {
               onEventDetails={(event) => worker.current?.postMessage({ type: 'event-details', event })}
               pendingDetails={pendingDetails}
               nationId={selected.id}
-              regionId={region}
+              regionId={region !== null && world.regions[region].nation >= 0 ? region : null}
               tab={tab}
               onTab={chooseTab}
               onCommand={command}
@@ -1016,60 +1046,83 @@ export default function App() {
             </div>
           </section>
         )}
-        <div className="atlas-clock" aria-label="Simulation time controls">
+        <div className="atlas-clock" role="group" aria-label="Simulation time controls">
           <div className="clock-date">
             <strong>{dateLabel(world)}</strong>
-            <span>{busy ? 'Advancing…' : running ? 'In motion' : 'Paused'}</span>
+            <span>
+              {busy
+                ? 'Advancing…'
+                : running
+                  ? speed === 'max'
+                    ? `Approx. · ${playbackProgress}/6 months`
+                    : `In motion · ${speed}×`
+                  : 'Paused'}
+              {world.fastForward && !(running && speed === 'max') && ' · Approx. history'}
+            </span>
           </div>
-          <button
-            className={`play-button ${running ? 'running' : ''}`}
-            aria-label={running ? 'Pause simulation' : 'Play simulation'}
-            title="Play / pause (Space)"
-            onClick={() => setRunning((v) => !v)}
-          >
-            {running ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
-          </button>
-          <button
-            className="icon-button clock-step"
-            aria-label="Advance one month"
-            title="Advance one month"
-            disabled={busy || running}
-            onClick={() => send({ type: 'step', count: 1 })}
-          >
-            <SkipForward size={17} />
-          </button>
-          <select
-            aria-label="Simulation speed"
-            title="Simulation speed"
-            value={speed}
-            onChange={(e) => setSpeed(Number(e.target.value))}
-          >
-            {speedOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}×
-              </option>
-            ))}
-          </select>
-          <details className="clock-options" data-menu>
-            <summary className="icon-button" aria-label="Time controls">
-              <Ellipsis size={19} />
-              <span className="visually-hidden">Time controls</span>
-            </summary>
-            <div className="chrome-popover">
-              <p>{world.month} months of history</p>
-              <button
-                disabled={busy || running}
-                onClick={() => {
-                  closeMenus()
-                  send({ type: 'step', count: 12 })
-                }}
-              >
-                <CalendarDays size={16} />
-                Advance one year
-              </button>
-              <p>{busy ? 'Calculating the next month…' : 'Space to play or pause · 1–4 for speed'}</p>
+          <div className="clock-controls">
+            <button
+              className={`play-button ${running ? 'running' : ''}`}
+              aria-label={running ? 'Pause simulation' : 'Play simulation'}
+              title="Play / pause (Space)"
+              onClick={() => setRunning((v) => !v)}
+            >
+              {running ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
+            </button>
+            <div className="clock-speeds" role="group" aria-label="Simulation speed">
+              {PLAYBACK_SPEEDS.map((value) => (
+                <button
+                  key={value}
+                  aria-pressed={speed === value}
+                  aria-label={
+                    value === 'max' ? 'Maximum speed, approximate six-month simulation' : `Play at ${value}× speed`
+                  }
+                  title={
+                    value === 'max'
+                      ? 'As fast as possible · approximate six-month simulation (4)'
+                      : `${value}× speed (${PLAYBACK_SPEEDS.indexOf(value) + 1})`
+                  }
+                  onClick={() => {
+                    setSpeed(value)
+                    setRunning(true)
+                  }}
+                >
+                  {typeof value === 'number' && value > 1 && <FastForward size={14} aria-hidden="true" />}
+                  {value === 'max' ? 'Max' : `${value}×`}
+                </button>
+              ))}
             </div>
-          </details>
+            <button
+              className="icon-button clock-step"
+              aria-label="Advance one month"
+              title="Advance one month"
+              disabled={busy || running}
+              onClick={() => send({ type: 'step', count: 1 })}
+            >
+              <SkipForward size={17} />
+            </button>
+            <details className="clock-options" data-menu>
+              <summary className="icon-button" aria-label="Time controls">
+                <Ellipsis size={19} />
+                <span className="visually-hidden">Time controls</span>
+              </summary>
+              <div className="chrome-popover">
+                <p>{world.month} months of history</p>
+                <button
+                  disabled={busy || running}
+                  onClick={() => {
+                    closeMenus()
+                    send({ type: 'step', count: 12 })
+                  }}
+                >
+                  <CalendarDays size={16} />
+                  Advance one year
+                </button>
+                <p>{busy ? 'Calculating the next month…' : 'Space to play or pause · 1–4 for speed'}</p>
+                <p>Max approximates local changes over six months. Pause takes effect after the current month.</p>
+              </div>
+            </details>
+          </div>
         </div>
         {placesOpen && (
           <PlaceAtlas
@@ -1206,7 +1259,8 @@ export default function App() {
             </label>
             <p className="panel-note">
               Around {WORLD_SCALES[scale].provinces.toLocaleString()} provinces. Larger worlds add real
-              distance: longer supply lines, regional markets, and more room for independent states.
+              distance: longer supply lines, regional markets, and more wilderness. Each state starts with one
+              settlement, 2,500 people and supplies; most land is unclaimed.
             </p>
             <div className="form-columns">
               <label className="select-label">
@@ -1292,8 +1346,8 @@ export default function App() {
             <p>
               Towns emerge from occupied development and merge as their neighborhoods connect. Housing grows
               through paid construction, and households seek accessible jobs. Administrative borders and
-              spatial resolution evolve while preserving people, firms, goods and accounts. Close inspection shows
-              representative daily activity from the recorded population and paid jobs.
+              spatial resolution evolve while preserving people, firms, goods and accounts. Close inspection
+              shows representative daily activity from the recorded population and paid jobs.
             </p>
             <p>
               LLM assistance is optional and off by default. The World menu switch applies to every tab; the
@@ -1310,8 +1364,9 @@ export default function App() {
                 <div>
                   <Play size={18} />
                   <span>
-                    <strong>Set history in motion</strong>Play advances monthly ticks. Speed changes pacing;
-                    +1 year advances twelve months while paused.
+                    <strong>Set history in motion</strong>Play, 2× and 4× use the monthly model. Max runs as fast
+                    as possible, approximating local changes between six-month reviews; its history can differ.
+                    Pause takes effect after the current month. Advance one year runs twelve monthly steps while paused.
                   </span>
                 </div>
                 <div>

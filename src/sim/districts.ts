@@ -1,3 +1,4 @@
+import { habitableLand } from './terrain-access'
 import { rebuildAdaptiveMesh } from './adaptive-world'
 import { consolidateClaims } from './district-finance'
 import { MODEL_PARAMETERS } from './model-parameters'
@@ -57,22 +58,27 @@ export function partitionPeople(groups: PopulationCommunity[], ids: number[], ta
         if (!count) break
       }
       if (count) throw new Error('District community allocation exceeded census capacity')
-      const bins: BirthCohort[][] = ids.map(() => [])
+      // A joint community occupies only its allocated districts. Do not build
+      // and sort a mostly empty vector for every sex and dated birth cohort.
+      const occupied = portions.map((n, i) => (n > 0 ? i : -1)).filter((i) => i >= 0)
+      const capacities = occupied.map((i) => portions[i])
+      const bins: BirthCohort[][] = occupied.map(() => [])
       for (const [born, female, male] of group.ageCohorts ?? []) {
         const bySex = [female, male].map((count) => {
-          const parts = apportion(count, portions, portions)
-          parts.forEach((part, i) => (portions[i] -= part))
+          const parts = apportion(count, capacities, capacities)
+          parts.forEach((part, i) => (capacities[i] -= part))
           return parts
         })
-        ids.forEach((_, i) => {
+        occupied.forEach((_, i) => {
           if (bySex[0][i] + bySex[1][i]) bins[i].push([born, bySex[0][i], bySex[1][i]])
         })
       }
-      ids.forEach((id, i) => {
+      occupied.forEach((destination, i) => {
         if (!bins[i].length) return
+        const id = ids[destination]
         const copy = { ...group, locality: id, population: { ...group.population }, ageCohorts: bins[i] }
         refreshAges(copy)
-        result[i].push(copy)
+        result[destination].push(copy)
       })
     }
   }
@@ -81,7 +87,10 @@ export function partitionPeople(groups: PopulationCommunity[], ids: number[], ta
 }
 
 function geometry(w: World, parent: Region, d: SpatialDistrict, id: number): DistrictUnit {
-  const center = d.cells.includes(parent.center) ? parent.center : d.cells[0]
+  const center =
+    d.cells.includes(parent.center) && habitableLand(w.cells[parent.center])
+      ? parent.center
+      : (d.cells.find((id) => habitableLand(w.cells[id])) ?? d.cells[0])
   const r: DistrictUnit = {
     ...parent,
     id,
@@ -193,21 +202,31 @@ function partitionAccount(w: World, from: string, recipients: string[], weights:
 function zeroAccounts(w: World, id: number, template: number) {
   const e = w.economy!
   if (e.producers[id]) return
-  e.producers[id] = structuredClone(e.producers[template])
-  for (const [key, value] of Object.entries(e.producers[id])) {
-    if (typeof value === 'number' && !['wage', 'previousPriceIndex'].includes(key))
-      (e.producers[id] as unknown as Record<string, unknown>)[key] = 0
-    else if (Array.isArray(value)) (e.producers[id] as unknown as Record<string, unknown>)[key] = []
-    else if (value && typeof value === 'object')
-      (e.producers[id] as unknown as Record<string, unknown>)[key] = inventory()
+  // These accounts inherit a schema, not assets. Build the empty fields directly
+  // instead of deeply cloning inventories and projects only to discard them.
+  const producer: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(e.producers[template])) {
+    producer[key] =
+      typeof value === 'number'
+        ? key === 'wage' || key === 'previousPriceIndex'
+          ? value
+          : 0
+        : Array.isArray(value)
+          ? []
+          : value && typeof value === 'object'
+            ? inventory()
+            : value
   }
-  e.households[id] = structuredClone(e.households[template])
-  for (const h of Object.values(e.households[id])) {
-    for (const key of Object.keys(h))
-      if (key !== 'consumption')
-        (h as unknown as Record<string, unknown>)[key] = key.endsWith('Coverage') ? 1 : 0
+  e.producers[id] = producer as unknown as (typeof e.producers)[number]
+  const households = {} as (typeof e.households)[number]
+  for (const [stratum, source] of Object.entries(e.households[template])) {
+    const h: Record<string, unknown> = {}
+    for (const key of Object.keys(source)) h[key] = key.endsWith('Coverage') ? 1 : 0
     h.consumption = inventory()
+    households[stratum as keyof typeof households] =
+      h as unknown as (typeof households)[keyof typeof households]
   }
+  e.households[id] = households
 }
 
 function shareProducer(w: World, source: number, targets: DistrictUnit[], weights: number[]) {
@@ -279,8 +298,18 @@ export function ensureDistrictEconomy(w: World) {
       ) as typeof natural
       system.built[c.id] = 0
     }
+  const districtsByProvince = new Map<number, SpatialDistrict[]>()
+  for (const district of spatial.districts) {
+    const list = districtsByProvince.get(district.region) ?? []
+    list.push(district)
+    districtsByProvince.set(district.region, list)
+  }
+  const settlementByCell = new Map<number, number>()
+  spatial.settlements.forEach((s, i) => {
+    if (!settlementByCell.has(s.cell)) settlementByCell.set(s.cell, i)
+  })
   for (const r of w.regions) {
-    const parts = spatial.districts.filter((d) => d.region === r.id)
+    const parts = districtsByProvince.get(r.id) ?? []
     const targets = parts.map((d) => {
       const id = d.cells.includes(r.center) ? r.id : system.nextId++
       const unit = geometry(w, r, d, id)
@@ -299,10 +328,15 @@ export function ensureDistrictEconomy(w: World) {
       unit.communities = groups[i]
       rollupPopulation(unit)
       const urban = parts[i].urbanPopulation
-      const site = spatial.settlements.find((s) => unit.cells.includes(s.cell))
+      const first = unit.cells.reduce(
+        (index, cell) => Math.min(index, settlementByCell.get(cell) ?? Infinity),
+        Infinity,
+      )
+      const site = spatial.settlements[first]
       const rural = apportion(
         population(unit) - urban,
         unit.cells.map((c) => landscapeAt(w.cells[c]).habitat ** 2),
+        unit.cells.map((c) => (habitableLand(w.cells[c]) ? Infinity : 0)),
       )
       unit.cells.forEach(
         (c, j) => (unit.residents[c] = rural[j] + (c === (site?.cell ?? unit.center) ? urban : 0)),

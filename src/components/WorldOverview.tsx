@@ -390,12 +390,16 @@ export function WorldOverview({
             </thead>
             <tbody>
               {world.regions
-                .filter((r) => world.nations[r.nation].shortName.toLowerCase().includes(filter.toLowerCase()))
+                .filter((r) =>
+                  (world.nations[r.nation]?.shortName ?? 'Unclaimed')
+                    .toLowerCase()
+                    .includes(filter.toLowerCase()),
+                )
                 .sort((a, b) => b.unrest - a.unrest)
                 .map((r) => (
                   <tr key={r.id}>
                     <th scope="row">{r.name}</th>
-                    <td>{world.nations[r.nation].shortName}</td>
+                    <td>{world.nations[r.nation]?.shortName ?? 'Unclaimed'}</td>
                     <td>{number(population(r))}</td>
                     <td>{percent(r.foodCoverage)}</td>
                     <td>{percent(r.materialCoverage ?? 1)}</td>

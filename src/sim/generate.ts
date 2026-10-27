@@ -1,4 +1,5 @@
 import { advanceAlmanac } from './almanac'
+import { habitableLand } from './terrain-access'
 import { seedLandscape, settlementWeight } from './landscape'
 import { refreshSpatial } from './spatial'
 import { WORLD_SCALES, worldScale, type WorldScale } from './scale'
@@ -163,6 +164,7 @@ export function generateWorld(
   nationCount = 8,
   settings: SimulationSettings = DEFAULT_SETTINGS,
   scale: WorldScale = 'regional',
+  start: 'settled' | 'frontier' = 'settled',
 ): World {
   const extent = WORLD_SCALES[worldScale(scale)]
   settings = validateSettings(settings)
@@ -174,14 +176,15 @@ export function generateWorld(
   const cells = generateGeography(seed, continents, width, height)
   seedLandscape(cells, width, height, seed)
   const land = cells.filter((c) => c.terrain !== 'water')
-  const seeds: Cell[] = [land[Math.floor(rand() * land.length)]]
+  const habitable = land.filter(habitableLand)
+  const seeds: Cell[] = [habitable[Math.floor(rand() * habitable.length)]]
   const minDistances = new Float64Array(cells.length).fill(Infinity)
   const targetRegions = Math.min(extent.provinces, Math.floor(land.length / 13))
   for (let i = 1; i < targetRegions; i++) {
     const last = seeds[seeds.length - 1]
-    let best = land[0],
+    let best = habitable[0],
       max = -1
-    for (const c of land) {
+    for (const c of habitable) {
       minDistances[c.id] = Math.min(minDistances[c.id], (c.x - last.x) ** 2 + (c.y - last.y) ** 2)
       const d = minDistances[c.id] * (0.04 + c.landscape!.attraction ** 3 * 4) * (0.85 + rand() * 0.3)
       if (d > max) {
@@ -239,7 +242,10 @@ export function generateWorld(
       Math.hypot(x.x - cx, x.y - cy) * 0.3 +
       Math.max(0, x.elevation - 0.2) * 45 -
       x.landscape!.attraction * 70
-    c = regionCells.reduce((best, x) => (score(x) < score(best) ? x : best))
+    const candidates = regionCells.filter(habitableLand)
+    c = (candidates.length ? candidates : regionCells).reduce((best, x) =>
+      score(x) < score(best) ? x : best,
+    )
 
     const fertility = clamp(
       regionCells.reduce(
@@ -359,9 +365,14 @@ export function generateWorld(
   const capitals: Region[] = [regions.reduce((a, b) => (population(a) > population(b) ? a : b))]
   while (capitals.length < nationCount) {
     const candidates = regions.filter(
-      (r) => !capitals.includes(r) && r.cells.length > 4 && landmassSize[r.center] >= 200,
+      (r) =>
+        habitableLand(cells[r.center]) &&
+        !capitals.includes(r) &&
+        r.cells.length > 4 &&
+        landmassSize[r.center] >= 200,
     )
-    if (!candidates.length) candidates.push(...regions.filter((r) => !capitals.includes(r)))
+    if (!candidates.length)
+      candidates.push(...regions.filter((r) => habitableLand(cells[r.center]) && !capitals.includes(r)))
     let best = candidates[0],
       max = -1
     for (const r of candidates) {
@@ -385,7 +396,7 @@ export function generateWorld(
     stateCosts[r.id] = 0
     stateFrontier.push(r.id, 0)
   })
-  while (stateFrontier.size) {
+  while (start === 'settled' && stateFrontier.size) {
     const { id, cost } = stateFrontier.pop(),
       r = regions[id]
     if (cost !== stateCosts[id]) continue
@@ -405,13 +416,15 @@ export function generateWorld(
     // Unsettled islands join the closest capital across water.
     if (r.nation < 0) {
       const c = cells[r.center]
-      r.nation = capitals.reduce((best, cap, i) => {
+      const closest = capitals.reduce((best, cap, i) => {
         const a = cells[cap.center],
           b = cells[capitals[best].center]
         return Math.hypot(a.x - c.x, a.y - c.y) < Math.hypot(b.x - c.x, b.y - c.y) ? i : best
       }, 0)
+      if (start === 'settled') r.nation = closest
+      r.culture = closest
     }
-    r.culture = r.nation
+    if (r.nation >= 0) r.culture = r.nation
   }
   capitals.forEach((r, i) => {
     r.nation = i
@@ -435,9 +448,41 @@ export function generateWorld(
     r.infrastructure = 0.85
     r.industry = 0.8
   })
+  if (start === 'frontier') {
+    for (const r of regions) {
+      const capital = r.nation >= 0
+      // Most wilderness is empty. Small independent pockets are people, not
+      // prebuilt cities, sovereign claims, or free state-owned resources.
+      const roll = hashSeed(`${seed}:independent:${r.id}`)
+      const people = capital ? 2500 : habitableLand(cells[r.center]) && roll % 7 === 0 ? 40 + (roll % 121) : 0
+      r.population = { children: Math.floor(people * 0.29), adults: Math.floor(people * 0.62), elders: 0 }
+      r.population.elders = people - r.population.children - r.population.adults
+      r.urban = capital ? 1 : 0
+      r.infrastructure = capital ? 0.2 : 0.02
+      r.industry = capital ? 0.18 : people ? 0.02 : 0
+      r.stocks = inventory()
+      if (capital)
+        Object.assign(r.stocks, {
+          food: 780,
+          timber: 300,
+          stone: 200,
+          iron: 60,
+          coal: 30,
+          tools: 80,
+          textiles: 80,
+        })
+      else if (people)
+        Object.assign(r.stocks, { food: people * 0.026 * 6, timber: people * 0.02, tools: people * 0.003 })
+    }
+    for (const n of nations) {
+      n.treasury = 500
+      n.population = 2500
+    }
+  }
   const world: World = {
     version: 1,
     generatorVersion: 5,
+    ...(start === 'frontier' ? { settlementStart: 'frontier' as const } : {}),
     gridTopology: GRID_TOPOLOGY,
     modelProvenance: { accepted: 0, lastMonth: 0, roles: {}, source: 'native' },
     simulation: { ...settings },
@@ -473,6 +518,7 @@ export function generateWorld(
       })
     }
   for (const n of nations) {
+    if (start === 'frontier') continue
     const r = regions[n.capital]
     let soldiers = Math.min(3000, Math.floor(r.population.adults * 0.08))
     if (scale === 'regional') r.population.adults -= soldiers
@@ -515,7 +561,10 @@ export function generateWorld(
     month: 0,
     type: 'world',
     title: 'A world unwritten',
-    detail: `${nations.length} sovereign states. ${regions.length} provinces. Every future begins here.`,
+    detail:
+      start === 'frontier'
+        ? `${nations.length} founding settlements begin with people and supplies. Most of the land is unclaimed wilderness; scattered independent communities live beyond the states.`
+        : `${nations.length} sovereign states. ${regions.length} provinces. Every future begins here.`,
   })
   ensurePopulation(world)
   ensureCharacters(world)
@@ -528,7 +577,7 @@ export function generateWorld(
     const port = world.regions
       .filter((r) => r.nation === n.id && portAt(world, r.id))
       .sort((a, b) => b.stocks.timber - a.stocks.timber)[0]
-    if (port) {
+    if (port && start === 'settled') {
       try {
         commissionFleet(world, n.id, port.id, 1, 4)
       } catch {
@@ -539,7 +588,9 @@ export function generateWorld(
       world.regions.filter((r) => r.nation === n.id).reduce((sum, r) => sum + population(r), 0) +
       militaryPeople(world, n.id)
   }
-  world.totals.population = world.nations.reduce((sum, n) => sum + n.population, 0)
+  world.totals.population =
+    world.nations.reduce((sum, n) => sum + n.population, 0) +
+    regions.filter((r) => r.nation < 0).reduce((sum, r) => sum + population(r), 0)
   ensureIntelligence(world)
   refreshSpatial(world)
   advanceAlmanac(world)

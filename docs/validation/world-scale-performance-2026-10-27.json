@@ -1,0 +1,283 @@
+{
+  "date": "2026-10-27",
+  "scope": "World-scale performance follow-up; baseline is the preceding optimized working tree, including pre-existing uncommitted work",
+  "environment": {
+    "node": "v26.11.1",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64"
+  },
+  "method": {
+    "timed": "generation and explicit preparation separately, then monthly ticks",
+    "excluded": [
+      "module loading",
+      "world cloning",
+      "state hashing",
+      "validation",
+      "display transfer",
+      "rendering"
+    ],
+    "execution": "separate processes; final timings without concurrent test/build jobs; shared host, not isolated hardware",
+    "world_seed": "performance-ledger",
+    "world_dimensions": [448, 288],
+    "controls": "same prepared-world and every monthly full-state serialization fingerprint; census conservation and final save validation"
+  },
+  "measurements": {
+    "frontier_previous": {
+      "engine": "/tmp/uchrony-perf2/before",
+      "seed": "performance-ledger",
+      "start": "frontier",
+      "generationMs": 2865,
+      "fromMonth": 0,
+      "months": 6,
+      "repeats": 1,
+      "cells": 129024,
+      "communities": 2853,
+      "results": [
+        {
+          "ms": 97006,
+          "preparationMs": 16450,
+          "startupMs": 19315,
+          "preparedHash": "99f220a815d5fea76787f32a065cc614334f4ca5983d1a6e3fa27a72cfafdfa7",
+          "monthsPerSecond": 0.06,
+          "tickMs": [18843, 23631, 22356, 12290, 8161, 11725],
+          "finalHash": "cc9e77231a96328ad4ef1cfbb522cf0cef2bfc43a0106c8b3c3984160ef41ef1",
+          "monthlyHashes": [
+            "0770ef978fef9e6e2424ba5faa81882067fc49b1d6d3001a003375d1e4857c4d",
+            "b9dce75d3facac5ee17925f562602e819bb7ff8f5e2e4eb6d371ac31e281e719",
+            "8c5f31a5f19c28a7327222d5f2f68dec74570cc7766af3a32b8ff5dd8c3dbca6",
+            "1857ecb3aaacacdd6c8abd90454ba8eac6bbd9956a4ee751c692a6aba5f963c2",
+            "19a957a20babe5c212045f93e3d7ac0489e46f73145cf664571663fafdd2ef8d",
+            "cc9e77231a96328ad4ef1cfbb522cf0cef2bfc43a0106c8b3c3984160ef41ef1"
+          ]
+        }
+      ]
+    },
+    "frontier_current_trials": [
+      {
+        "engine": "/Users/carlo/Devel/personal/uchrony",
+        "seed": "performance-ledger",
+        "start": "frontier",
+        "generationMs": 2802,
+        "fromMonth": 0,
+        "months": 6,
+        "repeats": 1,
+        "cells": 129024,
+        "communities": 2853,
+        "results": [
+          {
+            "ms": 36760,
+            "preparationMs": 5634,
+            "startupMs": 8436,
+            "preparedHash": "99f220a815d5fea76787f32a065cc614334f4ca5983d1a6e3fa27a72cfafdfa7",
+            "monthsPerSecond": 0.16,
+            "tickMs": [9926, 8878, 8539, 2661, 2845, 3911],
+            "finalHash": "cc9e77231a96328ad4ef1cfbb522cf0cef2bfc43a0106c8b3c3984160ef41ef1",
+            "monthlyHashes": [
+              "0770ef978fef9e6e2424ba5faa81882067fc49b1d6d3001a003375d1e4857c4d",
+              "b9dce75d3facac5ee17925f562602e819bb7ff8f5e2e4eb6d371ac31e281e719",
+              "8c5f31a5f19c28a7327222d5f2f68dec74570cc7766af3a32b8ff5dd8c3dbca6",
+              "1857ecb3aaacacdd6c8abd90454ba8eac6bbd9956a4ee751c692a6aba5f963c2",
+              "19a957a20babe5c212045f93e3d7ac0489e46f73145cf664571663fafdd2ef8d",
+              "cc9e77231a96328ad4ef1cfbb522cf0cef2bfc43a0106c8b3c3984160ef41ef1"
+            ]
+          }
+        ]
+      },
+      {
+        "engine": "/Users/carlo/Devel/personal/uchrony",
+        "seed": "performance-ledger",
+        "start": "frontier",
+        "generationMs": 2810,
+        "fromMonth": 0,
+        "months": 6,
+        "repeats": 1,
+        "cells": 129024,
+        "communities": 2853,
+        "results": [
+          {
+            "ms": 36472,
+            "preparationMs": 5735,
+            "startupMs": 8545,
+            "preparedHash": "99f220a815d5fea76787f32a065cc614334f4ca5983d1a6e3fa27a72cfafdfa7",
+            "monthsPerSecond": 0.16,
+            "tickMs": [10100, 8710, 8540, 2524, 2807, 3790],
+            "finalHash": "cc9e77231a96328ad4ef1cfbb522cf0cef2bfc43a0106c8b3c3984160ef41ef1",
+            "monthlyHashes": [
+              "0770ef978fef9e6e2424ba5faa81882067fc49b1d6d3001a003375d1e4857c4d",
+              "b9dce75d3facac5ee17925f562602e819bb7ff8f5e2e4eb6d371ac31e281e719",
+              "8c5f31a5f19c28a7327222d5f2f68dec74570cc7766af3a32b8ff5dd8c3dbca6",
+              "1857ecb3aaacacdd6c8abd90454ba8eac6bbd9956a4ee751c692a6aba5f963c2",
+              "19a957a20babe5c212045f93e3d7ac0489e46f73145cf664571663fafdd2ef8d",
+              "cc9e77231a96328ad4ef1cfbb522cf0cef2bfc43a0106c8b3c3984160ef41ef1"
+            ]
+          }
+        ]
+      }
+    ],
+    "settled_previous": {
+      "engine": "/tmp/uchrony-perf2/before",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "generationMs": 3462,
+      "fromMonth": 0,
+      "months": 3,
+      "repeats": 1,
+      "cells": 129024,
+      "communities": 21030,
+      "results": [
+        {
+          "ms": 57109,
+          "preparationMs": 4660,
+          "startupMs": 8122,
+          "preparedHash": "117ae143c790cfadd821e6f19b14fbd433a0cc23d33c58af55ff7e04b7546f37",
+          "monthsPerSecond": 0.05,
+          "tickMs": [22136, 17591, 17382],
+          "finalHash": "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545",
+          "monthlyHashes": [
+            "5b78b42f15b58f739006d214662e20ed02691d48c2eb22833ed24255f147e4b8",
+            "0a2cdec7a19708c06ca608c1832413bf81bba055b97ba2a93a2a431d6787acd3",
+            "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+          ]
+        }
+      ]
+    },
+    "settled_current": {
+      "engine": "/Users/carlo/Devel/personal/uchrony",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "generationMs": 3504,
+      "fromMonth": 0,
+      "months": 3,
+      "repeats": 1,
+      "cells": 129024,
+      "communities": 21030,
+      "results": [
+        {
+          "ms": 47852,
+          "preparationMs": 3491,
+          "startupMs": 6995,
+          "preparedHash": "117ae143c790cfadd821e6f19b14fbd433a0cc23d33c58af55ff7e04b7546f37",
+          "monthsPerSecond": 0.06,
+          "tickMs": [19692, 14631, 13528],
+          "finalHash": "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545",
+          "monthlyHashes": [
+            "5b78b42f15b58f739006d214662e20ed02691d48c2eb22833ed24255f147e4b8",
+            "0a2cdec7a19708c06ca608c1832413bf81bba055b97ba2a93a2a431d6787acd3",
+            "134ba2aef38ff142694a4f402e0b695f809dbb8864320ebdfc922e9d3696b545"
+          ]
+        }
+      ]
+    },
+    "regional_frontier_14_month_replay": {
+      "engine": "/Users/carlo/Devel/personal/uchrony",
+      "referenceEngine": "/tmp/uchrony-perf2/before",
+      "seed": "performance-ledger",
+      "start": "frontier",
+      "generationMs": 339,
+      "fromMonth": 0,
+      "months": 14,
+      "repeats": 1,
+      "cells": 8064,
+      "communities": 393,
+      "results": [
+        {
+          "ms": 9190,
+          "preparationMs": 603,
+          "startupMs": 942,
+          "preparedHash": "3c40a55131264e53cf85b138a9f689d168c7ddefbaffddb891ce668fc7e02259",
+          "monthsPerSecond": 1.52,
+          "tickMs": [1105, 848, 784, 568, 350, 640, 400, 363, 604, 326, 803, 931, 991, 475],
+          "finalHash": "fd0e38c0605766ee6b899a5ca712317610cdd512a9e7b428e8afcd4887aea7c6",
+          "referenceMs": 23114,
+          "identicalMonths": 14
+        }
+      ]
+    }
+  },
+  "sources": {
+    "src/sim/commuting.ts": {
+      "before": "e1ef7edf460e0569d662c9f66dea56de0f13a58dfddd32be4b2f4bcfe59bad7d",
+      "after": "075a4fec46217a3dcf9a8b054978f1c8f1ff6519e08f7ea9fab2e2d52f18329d"
+    },
+    "src/sim/adaptive-grid.ts": {
+      "before": "274b284c7087b70c891ed7e3a2c32eadf9fa63bbf08d7e95eec6e51b80209976",
+      "after": "5ab07d5da42d92035a70bfaa1c8bce7dce30a0ef79be6196fd72d62a1ce8bf56"
+    },
+    "src/sim/cities.ts": {
+      "before": "1e400e8b5277f9802be28190788febc67af635410c8f63675d82b3f2eb9e4acc",
+      "after": "300ddea7965e8be9e75a9a50bed2e9889f5de9591930bf5e0295121927e4be2f"
+    },
+    "src/sim/allocation.ts": {
+      "before": "bac9149d501a3e370b2ec0ffb53427aded5d233d30552d5aa5fd6c2ecc1e03f4",
+      "after": "eb761e8f935fa9629a0cc8d10725e92ceb64db7233f616356591a4072e0c7254"
+    },
+    "src/sim/districts.ts": {
+      "before": "13b53e7bdcbdbcc70044bd3970f7d4e4298da52d98a77bfd05e41708628350e1",
+      "after": "a6e46e8a4fcd4591af21bd23782e3fe9533fc42d5ea1112e2a3467c3ccd3dfff"
+    },
+    "src/sim/urban-growth.ts": {
+      "before": "ec28f784fa36ff2c7ed02d7c1e38ded1cfc45913d681ff5f78caea7bee7bb254",
+      "after": "46306c5d6f53f085605b9a63902246330626bfce828b9f8df5c48aa38896d300"
+    },
+    "src/sim/physical-space.ts": {
+      "before": "3b775bd058a4724d40ac2ed06214c8909e3dbd0b1a34c92c3436355436a1fa85",
+      "after": "dfe581d863acd2dcd91e14d718d3a3cc02ba7d56b74109ff8b6ed6529eb6c0dd"
+    },
+    "src/sim/adaptive-world.ts": {
+      "before": "0ec8b489d119af3e4152e21dc2753e0ede4b059e452285560770a35b0a1e6f2c",
+      "after": "bf09139835124d5790831a6889862579b8703b2b63d06c123a21b6df10f3e5c2"
+    },
+    "src/sim/settlement-morphology.ts": {
+      "before": "727584f6c118f1eec52ce5d0bc1f1f8b3cf733ecc09a82f7ed0e45880e511de2",
+      "after": "cf1f552be0daa0091abb04421e9075e820a793bcb0a3b2f0420662157eaa3029"
+    },
+    "src/sim/engine.ts": {
+      "before": "275311f760bca2fbe1dfc1487ee34f291edf1a1ed8c153daefcdf0a578102009",
+      "after": "62b7ac1cbd10b0c4be24dceb780aea7f29ed7e8e5cf53d9059e480b15718e127"
+    },
+    "src/sim/settlement-access.ts": {
+      "before": "e5d9a68955323fb731d48761fa162fbfad83585100f9260254a8266dde310135",
+      "after": "d492c92083b444d6ea23a4a0b408493c85499390e74bd3d03db820bfedbdfbdf"
+    },
+    "src/sim/population.ts": {
+      "before": "4a83f49a3657edfa8a973542220c1efcbfef769d0cab472434d77e372da5cf0e",
+      "after": "3804f0d6b2063165c76f42217ec7cc2ce35becf2b95706f7a68acda770994a83"
+    },
+    "src/sim/spatial-buckets.ts": {
+      "before": null,
+      "after": "66b70279b0ea85aba3d107f80c947a73299a336673380919399b4ed08d9977b1"
+    },
+    "src/sim/founding.ts": {
+      "before": "8a67773dd5da4b3177879a6d86ecc86987457b5ca913444a94d9d5d08b0521a4",
+      "after": "47b1c535f9988a5c4b26b3917d26dcd77a1075f448186b24c3c0481746ed88a5"
+    },
+    "src/sim/residential-geometry.ts": {
+      "before": "46b0601f736775b7bb2d71b29e5fc195c836b85e90d3b8b267822bdf7fed6a2a",
+      "after": "806e05690fef73b117e876ef3d509ff6ff43530c112102d33b8d79f5b40883d8"
+    },
+    "tests/performance.ts": {
+      "before": "073851926db2a194cc6c9cbd7a50c435efa67296953e3fcab5f92fcc7eed2f25",
+      "after": "1abb45843a12261d6c2ed3d21f2cb5f4f47560c0337b78c14985f4c189eb8bd2"
+    },
+    "tests/performance-contracts.test.ts": {
+      "before": "6ceed362c11f35631829e08714bdc80c79c6982e00ebc94e7ddc0b3a38bf980a",
+      "after": "6524df8fea0feadc6fc972eda6ce50d5fe2bc3a799f5c0ca30fadc5db13bcf3a"
+    }
+  },
+  "validation": {
+    "unique_checks": 96,
+    "passed": 94,
+    "pre_existing_failures": [
+      "representative commute inspection routine absent in original fixture",
+      "JSON continuation omits adaptive.lanes: undefined"
+    ],
+    "additional_replay": "14 regional frontier months compared completely, including dwell expiry",
+    "build": "TypeScript and Vite production build passed; final rerun recorded in work log",
+    "limits": [
+      "No 200-year soak",
+      "No browser throughput or first-frame timing",
+      "Settled World remains much slower than frontier ordinary months",
+      "Synthetic single-seed World scenarios"
+    ]
+  }
+}

@@ -74,7 +74,7 @@ export function validatePopulation(world: World, allowDuplicateCommunities = fal
         !identity(group.belief, 'belief') ||
         !identity(group.movement, 'movement') ||
         !(group.allegiance === -1 || nation(group.allegiance)) ||
-        !nation(group.host) ||
+        !(group.host === -1 || nation(group.host)) ||
         !identity(group.knownLanguage, 'language') ||
         !object(group.population) ||
         AGES.some((age) => !integer(group.population[age])) ||

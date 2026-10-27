@@ -1,6 +1,7 @@
 import {
   settlementComponents,
   settledResidentsByCell,
+  type SettlementComponent,
 } from './settlement-morphology'
 import { optimizeResidentialLocations, settlementAccess } from './settlement-access'
 import { clamp, population, type World } from './types'
@@ -21,6 +22,7 @@ export function advanceSettlements(
   w: World,
   initialize = false,
   access?: ReturnType<typeof settlementAccess>,
+  mobilityMonths = 1,
 ) {
   const local = w.localEconomy
   if (!local) return
@@ -34,7 +36,7 @@ export function advanceSettlements(
         f.employment * (f.laborMix ? f.laborMix.tools + f.laborMix.textiles + f.laborMix.arms : 0.2)
     }
   for (const id of local.active) updateResidentCounts(local.units[id])
-  if (w.adaptive && !initialize) optimizeResidentialLocations(w, access)
+  if (w.adaptive && !initialize && mobilityMonths) optimizeResidentialLocations(w, access, mobilityMonths)
   for (const id of local.active) {
     const u = local.units[id]
     for (const c of u.cells) residents[c] = u.residents[c] ?? 0
@@ -94,13 +96,13 @@ export function advanceSettlements(
 }
 
 /** Observer projection only: names and ancestry never determine physical activity. */
-export function refreshCityLabels(w: World) {
+export function refreshCityLabels(w: World, prepared?: SettlementComponent[]) {
   const local = w.localEconomy
   if (!local) return
   const residents = new Float64Array(w.cells.length)
   for (const id of local.active)
     for (const c of local.units[id].cells) residents[c] = local.units[id].residents[c] ?? 0
-  const physical = w.adaptive?.residentialVersion === 1 ? settlementComponents(w) : undefined
+  const physical = w.adaptive?.residentialVersion === 1 ? (prepared ?? settlementComponents(w)) : undefined
   let components: number[][]
   if (physical) components = physical.map((p) => p.cells)
   else {

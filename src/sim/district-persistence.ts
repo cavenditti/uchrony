@@ -1,6 +1,7 @@
 import { GOODS, population, type World } from './types'
-import { movementNeighbors, neighbors } from './grid'
+import { geographicNeighbors as movementNeighbors, neighbors } from './grid'
 import { communitySize } from './population'
+import { habitableLand, highMountain } from './terrain-access'
 
 /** Import checks are read-only. Duplicate/missing ownership must never be repaired by minting or deleting assets. */
 export function validateDistrictEconomy(w: World) {
@@ -293,6 +294,21 @@ export function validateDistrictEconomy(w: World) {
       fail('firm site or ownership')
   }
   if (s.shipments.length > w.cells.length * 100) fail('shipment budget')
+  // These are completed clearing records, not newly planned journeys. The
+  // mountain migration moves market centres but preserves their exact history.
+  // Accept only an old peak within the same district after that correction;
+  // ordinary mismatches and endpoints in another district must still fail.
+  const shipmentEndpoint = (district: number, cell: number) => {
+    const unit = s.units[district]
+    return (
+      cell === unit.center ||
+      (w.adaptive?.terrainVersion === 1 &&
+        int(cell, 0, w.cells.length - 1) &&
+        highMountain(w.cells[cell]) &&
+        habitableLand(w.cells[unit.center]) &&
+        unit.cells.includes(cell))
+    )
+  }
   for (const shipment of s.shipments) {
     if (
       !obj(shipment) ||
@@ -307,7 +323,8 @@ export function validateDistrictEconomy(w: World) {
       !Array.isArray(shipment.cells)
     )
       fail('shipment')
-    let last = s.units[shipment.from].center
+    let last = shipment.legs[0]?.cells?.[0] ?? s.units[shipment.from].center
+    if (!shipmentEndpoint(shipment.from, last)) fail('shipment origin')
     for (const leg of shipment.legs) {
       if (
         !leg ||
@@ -328,6 +345,6 @@ export function validateDistrictEconomy(w: World) {
       }
       last = leg.cells.at(-1)!
     }
-    if (last !== s.units[shipment.to].center) fail('shipment destination')
+    if (!shipmentEndpoint(shipment.to, last)) fail('shipment destination')
   }
 }

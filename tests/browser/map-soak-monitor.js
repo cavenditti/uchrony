@@ -192,7 +192,7 @@ window.__uchronySoak = {
       layer: document.querySelector('.map-canvas-wrap')?.dataset.layer,
       date: document.querySelector('.clock-date strong')?.textContent,
       running: !!document.querySelector('[aria-label="Pause simulation"]'),
-      speed: document.querySelector('[aria-label="Simulation speed"]')?.value,
+      speed: document.querySelector('[aria-label="Simulation speed"] [aria-pressed="true"]')?.textContent,
       scale: document.querySelector('.map-scale small')?.textContent,
       visible: document.visibilityState,
       canvases: [...document.querySelectorAll('canvas')].map((c) => ({

@@ -1,3 +1,5 @@
+import { highMountain } from './terrain-access'
+
 /** One terrain sample occupies an aligned 1,024 m square. Numerical leaves may
  * aggregate samples or subdivide them; physical entities keep their own positions. */
 export const CELL_SIZE = 12
@@ -25,19 +27,15 @@ export function adjacentCells(id: number, width: number, height: number): number
   const q = id % width,
     r = Math.floor(id / width)
   return [
-    [0, -1],
-    [1, -1],
-    [1, 0],
-    [1, 1],
-    [0, 1],
-    [-1, 1],
-    [-1, 0],
-    [-1, -1],
-  ].map(([dx, dy]) => {
-    const x = q + dx,
-      y = r + dy
-    return x < 0 || y < 0 || x >= width || y >= height ? -1 : y * width + x
-  })
+    r > 0 ? id - width : -1,
+    r > 0 && q + 1 < width ? id - width + 1 : -1,
+    q + 1 < width ? id + 1 : -1,
+    r + 1 < height && q + 1 < width ? id + width + 1 : -1,
+    r + 1 < height ? id + width : -1,
+    r + 1 < height && q > 0 ? id + width - 1 : -1,
+    q > 0 ? id - 1 : -1,
+    r > 0 && q > 0 ? id - width - 1 : -1,
+  ]
 }
 
 export function cellAt(x: number, y: number, width: number, height: number): number | undefined {
@@ -47,8 +45,9 @@ export function cellAt(x: number, y: number, width: number, height: number): num
   return q >= 0 && r >= 0 && q < width && r < height ? r * width + q : undefined
 }
 
-/** Physical movement may be diagonal, but cannot squeeze between two blocked
- * corners or embark/disembark across a point contact. Ports use shared faces. */
+/** Structural adjacency for validating historical journeys. Land/sea corners
+ * cannot be crossed and ports use shared faces. Actual travel also excludes
+ * mountains through movementNeighbors below. */
 export function geographicNeighbors(
   cells: readonly { terrain: string }[],
   id: number,
@@ -59,8 +58,12 @@ export function geographicNeighbors(
   const water = cells[id].terrain === 'water'
   const q = id % width,
     r = Math.floor(id / width)
-  for (const next of adjacentCells(id, width, height)) {
-    if (next < 0 || face.includes(next) || (cells[next].terrain === 'water') !== water) continue
+  // Faces already have the required N/E/S/W order. Only visit diagonals,
+  // preserving NE/SE/SW/NW tie order without allocating coordinate pairs.
+  const adjacent = adjacentCells(id, width, height)
+  for (let i = 1; i < 8; i += 2) {
+    const next = adjacent[i]
+    if (next < 0 || (cells[next].terrain === 'water') !== water) continue
     const x = next % width,
       y = Math.floor(next / width)
     if (
@@ -75,5 +78,20 @@ export function geographicNeighbors(
 export const stepDistance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.hypot(a.x - b.x, a.y - b.y) / CELL_SIZE
 
-/** Travel shares geographic adjacency until additional movement rules apply. */
-export const movementNeighbors = geographicNeighbors
+/** Actual movement excludes peaks, including diagonal corner cuts and ports. */
+export function movementNeighbors(
+  cells: readonly { terrain: string; elevation?: number }[],
+  id: number,
+  width: number,
+  height: number,
+): number[] {
+  if (highMountain(cells[id])) return []
+  const q = id % width,
+    r = Math.floor(id / width)
+  return geographicNeighbors(cells, id, width, height).filter((next) => {
+    if (highMountain(cells[next])) return false
+    const x = next % width,
+      y = Math.floor(next / width)
+    return q === x || r === y || (!highMountain(cells[r * width + x]) && !highMountain(cells[y * width + q]))
+  })
+}

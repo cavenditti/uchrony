@@ -5,6 +5,7 @@ import { economicLandscape, TILE_ACTIVITIES, type EconomicLandscape } from '../.
 import type { World } from '../../src/sim/types'
 import { buildAtlas } from '../../src/map/renderer'
 import { ReliefMap } from '../../src/map/relief'
+import { loadSceneryModels } from '../../src/map/scenery-models'
 import { activityLayout, detailRoads } from '../../src/map/activity-layout'
 import { activityPose } from '../../src/map/activity-motion'
 import { landSurface } from '../../src/map/land-surface'
@@ -133,6 +134,8 @@ const fixture = {
 } as unknown as World
 const canvas = document.querySelector('canvas')!,
   result = document.querySelector('#result')!
+// `?primitives` compares the scene without the Blender model kit.
+if (!new URLSearchParams(location.search).has('primitives')) await loadSceneryModels()
 let world = fixture,
   atlas = buildAtlas(world),
   relief = new ReliefMap(canvas, world, atlas),

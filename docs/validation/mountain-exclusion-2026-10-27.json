@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-27",
+  "scope": "Hard high-mountain exclusion for residents, settlement growth, access and transport; corresponding ground textures and activity props",
+  "terrainRule": "Mountain biome or recorded elevation greater than 0.43. Hills and lower passes remain accessible; source terrain remains at 1024 m.",
+  "checks": {
+    "mountainRegressionSuite": {
+      "passed": 7,
+      "failed": 0,
+      "log": "/tmp/uchrony-mountain-residents-final.log"
+    },
+    "transportAndMountainBatch": {
+      "passed": 11,
+      "failed": 0,
+      "log": "/tmp/uchrony-mountain-final-focused.log"
+    },
+    "frontierAndMountainBatch": {
+      "passed": 13,
+      "failed": 0,
+      "log": "/tmp/uchrony-mountain-final-regressions.log",
+      "includes": "Twelve-month deterministic save continuation"
+    },
+    "buildingOrganicLivingReliefSquareBatch": {
+      "passed": 23,
+      "failed": 0,
+      "log": "/tmp/uchrony-mountain-integration.log"
+    },
+    "geography": "Six geography checks passed in the initial routing batch",
+    "countNote": "Batches overlap and are not additive. Early test failures were corrected and rerun: invalid non-neighbour road fixture, expected rejection of a peak survey, legacy administrative depot ownership, and stale partial route rendering.",
+    "build": "Production TypeScript/Vite build passed; existing bundle-size warning remains",
+    "limits": "Focused qualification, not a full suite or long-duration economic benchmark"
+  },
+  "browser": {
+    "fixture": "/tests/browser/quadtree.html?start=settled",
+    "engine": "Isolated Chromium via agent-browser",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "visual": "Quadtree and 3D checked. High ridge remains uncultivated, without housing or dirt roads. White province boundaries remain legitimate administrative markings.",
+    "afterSixMonths": {
+      "mountainCells": 308,
+      "mountainResidents": 0,
+      "mountainBuildings": 0,
+      "blockedRoutes": 0,
+      "tradeRoadsElsewhere": 1555,
+      "error": ""
+    },
+    "errors": [],
+    "screenshot": "mountain-exclusion-2026-10-27.png",
+    "screenshotMonth": 0,
+    "isolation": "Fixture does not write application saves or call models"
+  },
+  "compatibility": {
+    "marker": "adaptive.terrainVersion = 1",
+    "preparation": "Invalid housing occupancy, capacity, capital and pending construction consolidate onto habitable housing records. A wholly alpine pool transfers dated people and household claims to an eligible pool, preferring its province and state.",
+    "conservation": "Population, dated cohort totals, housing capacity, stocks, money and pending construction were checked; ledger and save validation passed.",
+    "history": "Historical shipment accounting is retained. No new mountain route can be planned, and invalid current route summaries and learned edges are withdrawn.",
+    "display": "Map queries remain read-only; preparation performs the correction before publishing a snapshot."
+  }
+}
