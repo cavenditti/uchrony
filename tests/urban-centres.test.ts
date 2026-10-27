@@ -4,6 +4,7 @@ import { integrateCentres, separateCentre } from '../src/sim/urban-centres'
 import type { World } from '../src/sim/types'
 import type { City } from '../src/sim/district-types'
 import type { PhysicalSite } from '../src/sim/adaptive-types'
+import { PAIR_SCENARIOS, runUrbanPair } from './fixtures/urban-pairs'
 
 function fixture(large = 50000, small = 500, wealth = 100) {
   const sites = [large, small].map(
@@ -87,13 +88,13 @@ test('wealth and prestige dominance can incorporate, then fully merge, while ret
   assert.equal(cities[1].metropolis?.centre, 0)
   for (let i = 0; i < 10; i++) review(0)
   assert.equal(cities[1].history!.length, 1)
-  review(59)
+  review(119)
   assert.equal(cities[1].metropolis?.incorporated, undefined)
-  review(60)
-  assert.equal(cities[1].metropolis?.incorporated, 60)
-  review(239)
+  review(120)
+  assert.equal(cities[1].metropolis?.incorporated, 120)
+  review(359)
   assert.equal(cities[1].absorbedBy, undefined)
-  review(240)
+  review(360)
   assert.equal(cities[1].absorbedBy, 0)
   assert.equal(cities[0].population, 50500)
   assert.equal(cities[1].population, 0)
@@ -104,7 +105,7 @@ test('wealth and prestige dominance can incorporate, then fully merge, while ret
   assert.equal(cities[1].name, 'Mere')
   assert(cities[0].aliases.includes('Mere'))
   assert.equal(JSON.stringify(sites), physical)
-  review(241)
+  review(361)
   assert.equal(w.localEconomy!.cities.length, 2)
 })
 
@@ -118,6 +119,28 @@ test('comparable centres stay distinct and a large but poor centre cannot absorb
     review(600)
     assert(cities.every((c) => c.absorbedBy === undefined && c.metropolis?.incorporated === undefined))
   }
+})
+
+test('previously incorporated centres retain their dated history when the waiting periods change', () => {
+  const { cities, review } = fixture()
+  review(0)
+  // An existing save incorporated under the former five-year rule.
+  cities[1].metropolis!.incorporated = 60
+  cities[1].history!.push({ month: 60, kind: 'incorporated', with: 0 })
+  review(120)
+  assert.equal(cities[1].metropolis!.incorporated, 60)
+  review(299)
+  assert.equal(cities[1].absorbedBy, undefined)
+  review(300)
+  assert.equal(cities[1].absorbedBy, 0)
+  assert.deepEqual(
+    cities[1].history!.map((e) => [e.kind, e.month]),
+    [
+      ['linked', 0],
+      ['incorporated', 60],
+      ['merged', 300],
+    ],
+  )
 })
 
 test('loss of dominance restarts the clock; a narrow connection never incorporates', () => {
@@ -150,4 +173,35 @@ test('an old prestigious centre resists a richer neighbour and a richer centre c
   review(1800)
   assert.equal(cities[1].absorbedBy, undefined)
   assert.equal(cities[1].metropolis?.incorporated, undefined)
+})
+
+test('fifty-year monthly trajectories distinguish sustained dominance from booms and catch-up', () => {
+  const expected: Record<string, [number | null, number | null]> = {
+    'equal peers': [null, null],
+    'large but poor': [null, null],
+    'wealth without prestige': [null, null],
+    'modestly richer neighbour': [null, null],
+    'clear regional leader': [120, null],
+    'dominant metropolis': [120, 360],
+    'dominant with twice the wealth': [120, 360],
+    'dominant with moderate wealth': [120, null],
+    'overwhelming metropolis': [120, 360],
+    'old independent centre': [null, null],
+    'narrow ribbon': [null, null],
+    'four year wealth boom': [null, null],
+    'eight year wealth boom': [null, null],
+    'dominance interrupted': [216, 456],
+    'growing satellite catches up': [120, null],
+  }
+  for (const spec of PAIR_SCENARIOS) {
+    const result = runUrbanPair(spec)
+    assert.deepEqual(
+      [
+        result.events.find((e) => e.kind === 'incorporated')?.month ?? null,
+        result.events.find((e) => e.kind === 'merged')?.month ?? null,
+      ],
+      expected[spec.name],
+      spec.name,
+    )
+  }
 })

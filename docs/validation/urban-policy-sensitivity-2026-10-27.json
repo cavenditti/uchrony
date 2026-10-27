@@ -1,0 +1,4926 @@
+{
+  "kind": "controlled monthly identity scenarios; not full economic trajectories",
+  "results": [
+    {
+      "name": "initial",
+      "values": {
+        "incorporationMonths": 60,
+        "mergerMonths": 180,
+        "prestigeRatio": 1.5,
+        "wealthRatio": 1.25,
+        "mergerPrestigeRatio": 3,
+        "mergerWealthRatio": 2
+      },
+      "scenarios": [
+        {
+          "name": "equal peers",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "large but poor",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 6.324555320336759,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 120,
+              "prestige": 4.144768146249318,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 240,
+              "prestige": 3.5371791393235403,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 360,
+              "prestige": 3.231307003482143,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 480,
+              "prestige": 3.040498949971176,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 600,
+              "prestige": 2.907239996506233,
+              "wealth": 0.3548387096774194
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "wealth without prestige",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "modestly richer neighbour",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.1935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "clear regional leader",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant metropolis",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant with twice the wealth",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant with moderate wealth",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1.4838709677419355
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "overwhelming metropolis",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 10,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 6.315544982346771,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 240,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "old independent centre",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 0.8469007446794263,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 0.9696219371835861,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.0370815868952266,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.082064741806827,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.1148737893126726,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.1400997197174998,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "narrow ribbon",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "four year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "eight year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominance interrupted",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 156,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "growing satellite catches up",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 3,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 2.6739524259338223,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.1470216791335033,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.8069763927995133,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5471167938574368,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.3328013185645262,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        }
+      ]
+    },
+    {
+      "name": "lower prestige only",
+      "values": {
+        "incorporationMonths": 60,
+        "mergerMonths": 180,
+        "prestigeRatio": 1.5,
+        "wealthRatio": 1.25,
+        "mergerPrestigeRatio": 2,
+        "mergerWealthRatio": 2
+      },
+      "scenarios": [
+        {
+          "name": "equal peers",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "large but poor",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 6.324555320336759,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 120,
+              "prestige": 4.144768146249318,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 240,
+              "prestige": 3.5371791393235403,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 360,
+              "prestige": 3.231307003482143,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 480,
+              "prestige": 3.040498949971176,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 600,
+              "prestige": 2.907239996506233,
+              "wealth": 0.3548387096774194
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "wealth without prestige",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "modestly richer neighbour",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.1935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "clear regional leader",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant metropolis",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 240,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with twice the wealth",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant with moderate wealth",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1.4838709677419355
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "overwhelming metropolis",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 10,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 6.315544982346771,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 240,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "old independent centre",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 0.8469007446794263,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 0.9696219371835861,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.0370815868952266,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.082064741806827,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.1148737893126726,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.1400997197174998,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "narrow ribbon",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "four year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "eight year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominance interrupted",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 156,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 336,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "growing satellite catches up",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 2
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 2.6739524259338223,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 240,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        }
+      ]
+    },
+    {
+      "name": "lower merger barrier",
+      "values": {
+        "incorporationMonths": 60,
+        "mergerMonths": 180,
+        "prestigeRatio": 1.5,
+        "wealthRatio": 1.25,
+        "mergerPrestigeRatio": 2,
+        "mergerWealthRatio": 1.75
+      },
+      "scenarios": [
+        {
+          "name": "equal peers",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "large but poor",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 6.324555320336759,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 120,
+              "prestige": 4.144768146249318,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 240,
+              "prestige": 3.5371791393235403,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 360,
+              "prestige": 3.231307003482143,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 480,
+              "prestige": 3.040498949971176,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 600,
+              "prestige": 2.907239996506233,
+              "wealth": 0.3548387096774194
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "wealth without prestige",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "modestly richer neighbour",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.1935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "clear regional leader",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant metropolis",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 240,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with twice the wealth",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 240,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with moderate wealth",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1.4838709677419355
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "overwhelming metropolis",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 10,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 6.315544982346771,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 240,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "old independent centre",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 0.8469007446794263,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 0.9696219371835861,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.0370815868952266,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.082064741806827,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.1148737893126726,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.1400997197174998,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "narrow ribbon",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "four year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "eight year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominance interrupted",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 156,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 336,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "growing satellite catches up",
+          "thresholds": {
+            "incorporationMonths": 60,
+            "mergerMonths": 180,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 2.6739524259338223,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 60,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 240,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        }
+      ]
+    },
+    {
+      "name": "persistent dominance",
+      "values": {
+        "incorporationMonths": 120,
+        "mergerMonths": 240,
+        "prestigeRatio": 1.5,
+        "wealthRatio": 1.25,
+        "mergerPrestigeRatio": 2,
+        "mergerWealthRatio": 1.75
+      },
+      "scenarios": [
+        {
+          "name": "equal peers",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "large but poor",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 6.324555320336759,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 120,
+              "prestige": 4.144768146249318,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 240,
+              "prestige": 3.5371791393235403,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 360,
+              "prestige": 3.231307003482143,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 480,
+              "prestige": 3.040498949971176,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 600,
+              "prestige": 2.907239996506233,
+              "wealth": 0.3548387096774194
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "wealth without prestige",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "modestly richer neighbour",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.1935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "clear regional leader",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant metropolis",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 360,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with twice the wealth",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 360,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with moderate wealth",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1.4838709677419355
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "overwhelming metropolis",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 10,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 6.315544982346771,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 5.28854822236454,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 360,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "old independent centre",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 0.8469007446794263,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 0.9696219371835861,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.0370815868952266,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.082064741806827,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.1148737893126726,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.1400997197174998,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "narrow ribbon",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "four year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "eight year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominance interrupted",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 216,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 456,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "growing satellite catches up",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 2.6739524259338223,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.1470216791335033,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.8069763927995133,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5471167938574368,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.3328013185645262,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        }
+      ]
+    },
+    {
+      "name": "longer merger delay",
+      "values": {
+        "incorporationMonths": 120,
+        "mergerMonths": 360,
+        "prestigeRatio": 1.5,
+        "wealthRatio": 1.25,
+        "mergerPrestigeRatio": 2,
+        "mergerWealthRatio": 1.75
+      },
+      "scenarios": [
+        {
+          "name": "equal peers",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "large but poor",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 6.324555320336759,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 120,
+              "prestige": 4.144768146249318,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 240,
+              "prestige": 3.5371791393235403,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 360,
+              "prestige": 3.231307003482143,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 480,
+              "prestige": 3.040498949971176,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 600,
+              "prestige": 2.907239996506233,
+              "wealth": 0.3548387096774194
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "wealth without prestige",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "modestly richer neighbour",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.1935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "clear regional leader",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant metropolis",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 480,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with twice the wealth",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 480,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with moderate wealth",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1.4838709677419355
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "overwhelming metropolis",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 10,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 6.315544982346771,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 5.28854822236454,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 4.771538057767646,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 480,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "old independent centre",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 0.8469007446794263,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 0.9696219371835861,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.0370815868952266,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.082064741806827,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.1148737893126726,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.1400997197174998,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "narrow ribbon",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "four year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "eight year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominance interrupted",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 216,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 576,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "growing satellite catches up",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 360,
+            "prestigeRatio": 1.5,
+            "wealthRatio": 1.25,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 2.6739524259338223,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.1470216791335033,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.8069763927995133,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5471167938574368,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.3328013185645262,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        }
+      ]
+    },
+    {
+      "name": "looser incorporation",
+      "values": {
+        "incorporationMonths": 120,
+        "mergerMonths": 240,
+        "prestigeRatio": 1.35,
+        "wealthRatio": 1.15,
+        "mergerPrestigeRatio": 2,
+        "mergerWealthRatio": 1.75
+      },
+      "scenarios": [
+        {
+          "name": "equal peers",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "large but poor",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 6.324555320336759,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 120,
+              "prestige": 4.144768146249318,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 240,
+              "prestige": 3.5371791393235403,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 360,
+              "prestige": 3.231307003482143,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 480,
+              "prestige": 3.040498949971176,
+              "wealth": 0.3548387096774194
+            },
+            {
+              "month": 600,
+              "prestige": 2.907239996506233,
+              "wealth": 0.3548387096774194
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "wealth without prestige",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "modestly richer neighbour",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.1935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.1935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "clear regional leader",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 2,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 1.7633676110637517,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 1.670549437733472,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 360,
+              "prestige": 1.6172955017945154,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 480,
+              "prestige": 1.5814756345460261,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 600,
+              "prestige": 1.5551548588101367,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominant metropolis",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 360,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with twice the wealth",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.967741935483871
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.967741935483871
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 360,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "dominant with moderate wealth",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1.4838709677419355
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1.4838709677419355
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "overwhelming metropolis",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 10,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 6.315544982346771,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 5.28854822236454,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 360,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "old independent centre",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 0.8469007446794263,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 0.9696219371835861,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 1.0370815868952266,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.082064741806827,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.1148737893126726,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.1400997197174998,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "narrow ribbon",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "four year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "eight year wealth boom",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 1
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 1
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 1
+            },
+            {
+              "month": 480,
+              "prestige": 2.4866956268566787,
+              "wealth": 1
+            },
+            {
+              "month": 600,
+              "prestige": 2.406332497846076,
+              "wealth": 1
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        },
+        {
+          "name": "dominance interrupted",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 3.08567280810434,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.7700959081831154,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 2.598491418210449,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 216,
+              "kind": "incorporated",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 456,
+              "kind": "merged",
+              "with": 0
+            }
+          ],
+          "activeCentres": 1
+        },
+        {
+          "name": "growing satellite catches up",
+          "thresholds": {
+            "incorporationMonths": 120,
+            "mergerMonths": 240,
+            "prestigeRatio": 1.35,
+            "wealthRatio": 1.15,
+            "mergerPrestigeRatio": 2,
+            "mergerWealthRatio": 1.75
+          },
+          "months": 600,
+          "ratios": [
+            {
+              "month": 0,
+              "prestige": 4,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 120,
+              "prestige": 2.6739524259338223,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 240,
+              "prestige": 2.1470216791335033,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 360,
+              "prestige": 1.8069763927995133,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 480,
+              "prestige": 1.5471167938574368,
+              "wealth": 2.935483870967742
+            },
+            {
+              "month": 600,
+              "prestige": 1.3328013185645262,
+              "wealth": 2.935483870967742
+            }
+          ],
+          "events": [
+            {
+              "centre": 1,
+              "month": 0,
+              "kind": "linked",
+              "with": 0
+            },
+            {
+              "centre": 1,
+              "month": 120,
+              "kind": "incorporated",
+              "with": 0
+            }
+          ],
+          "activeCentres": 2
+        }
+      ]
+    }
+  ]
+}

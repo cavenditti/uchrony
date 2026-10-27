@@ -8,15 +8,15 @@ import { SpatialBuckets } from './spatial-buckets'
 import { MinHeap } from './heap'
 import { settlementKind } from './settlement-model'
 
-/** Initial calibration, expressed in elapsed simulation months. Repeated label
- * refreshes cannot accelerate integration. These are not historical estimates. */
+/** Synthetic calibration from monthly 50-year paired-centre scenarios (see
+ * docs/URBAN_CENTRES.md). Repeated refreshes cannot accelerate elapsed time. */
 export const URBAN_INTEGRATION = {
-  incorporationMonths: 60,
-  mergerMonths: 180,
+  incorporationMonths: 120,
+  mergerMonths: 240,
   prestigeRatio: 1.5,
   wealthRatio: 1.25,
-  mergerPrestigeRatio: 3,
-  mergerWealthRatio: 2,
+  mergerPrestigeRatio: 2,
+  mergerWealthRatio: 1.75,
 } as const
 
 export function setCentreSites(city: City, sites: PhysicalSite[]) {
