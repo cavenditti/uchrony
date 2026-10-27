@@ -1,3 +1,5 @@
+import { settlementElevation } from './settlement-terrain'
+export { settlementElevation } from './settlement-terrain'
 import { habitableLand } from './terrain-access'
 import type { PhysicalSite, PointMeters, SettlementLane, SpatialBounds } from './adaptive-types'
 import type { World } from './types'
@@ -7,6 +9,7 @@ import { cellPolygon, pointInPolygon } from './physical-space'
 import { footprintConnection } from './residential-geometry'
 import { SpatialBuckets } from './spatial-buckets'
 import { inRiverChannel } from '../map/rivers'
+import { laneTouchesRiver, nearbyRiverBank, surveyRiverBridge } from './river-lanes'
 
 export interface BuildingPlot {
   cell: number
@@ -34,24 +37,6 @@ export function rectangularFootprint(point: PointMeters, width: number, depth: n
     x: point.x + ((x * width) / 2) * Math.cos(angle) - ((y * depth) / 2) * Math.sin(angle),
     y: point.y + ((x * width) / 2) * Math.sin(angle) + ((y * depth) / 2) * Math.cos(angle),
   }))
-}
-
-/** Interpolation of recorded terrain, not invented sub-cell geology. */
-export function settlementElevation(w: World, p: PointMeters) {
-  const x = p.x / CELL_METERS - 0.5,
-    y = p.y / CELL_METERS - 0.5
-  const q = Math.floor(x),
-    r = Math.floor(y),
-    tx = x - q,
-    ty = y - r
-  let value = 0
-  for (let dy = 0; dy <= 1; dy++)
-    for (let dx = 0; dx <= 1; dx++) {
-      const ix = Math.max(0, Math.min(w.width - 1, q + dx)),
-        iy = Math.max(0, Math.min(w.height - 1, r + dy))
-      value += w.cells[iy * w.width + ix].elevation * (dx ? tx : 1 - tx) * (dy ? ty : 1 - ty)
-    }
-  return value
 }
 
 function surveyContext(w: World, source: PhysicalSite, existing: PhysicalSite[], opening: boolean) {
@@ -204,12 +189,15 @@ export function surveyBuildingPlots(
   const salt = `${w.seed}:frontage:${source.id}`
   const reach = Math.max(100, Math.sqrt(count) * 21)
   const segmentClear = (a: PointMeters, b: PointMeters, width: number) => {
-    const n = Math.ceil(distance(a, b) / 6)
+    const n = Math.max(1, Math.ceil(distance(a, b) / 6))
     for (let i = 0; i <= n; i++) {
       const p = { x: a.x + ((b.x - a.x) * i) / n, y: a.y + ((b.y - a.y) * i) / n }
       if (context.land(p) < 0) return false
     }
-    return context.clear([a, b], width / 2 + 1)
+    return (
+      Math.abs(settlementElevation(w, a) - settlementElevation(w, b)) < 0.025 &&
+      context.clear([a, b], width / 2 + 1)
+    )
   }
   const place = (a: PointMeters, b: PointMeters, roadWidth: number, key: string, side: number) => {
     const angle = Math.atan2(b.y - a.y, b.x - a.x),
@@ -279,6 +267,7 @@ export function surveyBuildingPlots(
   if (!opening) {
     // Existing street frontages are considered before extending a dead end.
     const edges = lanes
+      .filter((l) => !l.bridge)
       .flatMap((l, index) =>
         l.points.slice(1).map((b, i) => ({
           a: l.points[i],
@@ -299,13 +288,65 @@ export function surveyBuildingPlots(
   const tips: Tip[] = []
   const addTip = (point: PointMeters, angle: number, depth: number, key: string) =>
     tips.push({ point, angle, depth, key, priority: distance(point, source) + depth * 4 })
+  let anchor: PointMeters = source
+  const bank = nearbyRiverBank(w, source)
+  if (opening && laneTouchesRiver(w, [anchor], 5.5) && bank) {
+    // Opening housing supports can be centred on a river. Begin on a real bank,
+    // never grow a mesh of streets through the channel to find buildable ground.
+    const dry = [bank.point, bank.opposite].find(
+      (p) => context.land(p) >= 0 && !laneTouchesRiver(w, [p], 5.5),
+    )
+    if (dry) anchor = dry
+  }
+  if (!opening) {
+    const end = lanes
+      .filter((l) => !l.bridge && l.width >= 5)
+      .flatMap((l) => [l.points[0], l.points.at(-1)!])
+      .filter((p) => distance(p, source) < 180 && !laneTouchesRiver(w, [p], 5.5))
+      .sort((a, b) => distance(a, source) - distance(b, source))[0]
+    if (end) anchor = end
+  }
+  const bridge =
+    compact && (opening ? count >= 24 : anchor !== source) && bank
+      ? surveyRiverBridge(
+          w,
+          anchor,
+          [...(w.adaptive!.lanes ?? []).filter((l) => l.bridge), ...lanes],
+          (a, b, width) =>
+            segmentClear(a, b, width) &&
+            segmentClear(anchor, a, width) &&
+            !laneTouchesRiver(w, [anchor, a], width),
+        )
+      : undefined
+  if (bridge) {
+    const [a, b] = bridge.points
+    const deck: SettlementLane = {
+      pool: source.pool,
+      founded: w.month,
+      width: 5.5,
+      points: [a, b],
+      bridge: true,
+    }
+    fresh.push(deck)
+    addStreet(deck)
+    if (distance(anchor, a) > 1) {
+      const approach = { pool: source.pool, founded: w.month, width: 5.5, points: [anchor, a] }
+      fresh.push(approach)
+      addStreet(approach)
+    }
+    const angle = Math.atan2(bridge.tangent.y, bridge.tangent.x)
+    for (const [i, p] of [a, b].entries()) {
+      addTip(p, angle, 0, `main:bank:${i}:0`)
+      addTip(p, angle + Math.PI, 0, `main:bank:${i}:1`)
+    }
+  }
   if (!opening && lanes.length) {
     for (const [i, l] of lanes.entries()) {
       const p = l.points.at(-1)!,
         before = l.points.at(-2)!
       if (distance(p, source) <= 320) addTip(p, Math.atan2(p.y - before.y, p.x - before.x), 0, `extend:${i}`)
     }
-  } else {
+  } else if (!bridge) {
     const direction = initialDirection(w, source)
     if (!opening && source.building) {
       // Older building saves have no lanes. Start outside the occupied house,
@@ -319,8 +360,9 @@ export function surveyBuildingPlots(
         addTip(start, outward - Math.PI / 2, 0, `legacy:${i}:1`)
       })
     } else {
-      addTip(source, direction, 0, 'main:0')
-      addTip(source, direction + Math.PI, 0, 'main:1')
+      const bearing = anchor !== source && bank ? Math.atan2(bank.tangent.y, bank.tangent.x) : direction
+      addTip(anchor, bearing, 0, 'main:0')
+      addTip(anchor, bearing + Math.PI, 0, 'main:1')
     }
   }
   const visited = new Set<string>()
@@ -332,7 +374,18 @@ export function surveyBuildingPlots(
     const step = compact ? 20 + random(`${key}:step`) * 10 : 58 + random(`${key}:step`) * 25
     const width = tip.key.startsWith('main') ? 5.5 : 3.5
     const elevation = settlementElevation(w, tip.point)
-    const candidates = [-0.62, -0.3, 0, 0.3, 0.62]
+    const turns = [-0.62, -0.3, 0, 0.3, 0.62]
+    if (laneTouchesRiver(w, [tip.point], width + step * 2)) {
+      const edge = nearbyRiverBank(w, tip.point)
+      if (edge) {
+        const tangent = Math.atan2(edge.tangent.y, edge.tangent.x)
+        for (const heading of [tangent, tangent + Math.PI]) {
+          const turn = Math.atan2(Math.sin(heading - tip.angle), Math.cos(heading - tip.angle))
+          if (Math.abs(turn) < Math.PI * 0.75) turns.push(turn)
+        }
+      }
+    }
+    const candidates = turns
       .map((turn) => {
         const angle = tip.angle + turn + (random(`${key}:bend`) - 0.5) * 0.28
         const point = along(tip.point, angle, step)
@@ -348,7 +401,12 @@ export function surveyBuildingPlots(
             (cell < 0 ? Infinity : (1 - (w.cells[cell].landscape?.habitat ?? 0.5)) * 0.15),
         }
       })
-      .filter((c) => c.cell >= 0 && segmentClear(tip.point, c.point, width))
+      .filter(
+        (c) =>
+          c.cell >= 0 &&
+          !laneTouchesRiver(w, [tip.point, c.point], width) &&
+          segmentClear(tip.point, c.point, width),
+      )
       .sort((a, b) => a.score - b.score)
     const best = candidates[0]
     if (!best) continue

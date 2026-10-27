@@ -14,6 +14,8 @@ export interface SettlementLane {
   founded: number
   width: number
   points: PointMeters[]
+  /** One deliberately surveyed bank-to-bank span, never ordinary frontage. */
+  bridge?: true
 }
 export interface PhysicalSite extends PointMeters {
   id: string
@@ -106,6 +108,7 @@ export interface AdaptiveWorld {
   residentialVersion?: 1
   buildingVersion?: 1
   terrainVersion?: 1
+  riverLaneVersion?: 1
   /** Surveyed local access paths; geometry persists independently of the mesh. */
   lanes?: SettlementLane[]
   nextResidence?: number

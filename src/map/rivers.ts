@@ -251,6 +251,32 @@ export function riverWidthNear(world: Pick<World, 'cells' | 'width' | 'height'>,
   return width
 }
 
+/** Local channel sections, with a stable tangent and the closest centreline point.
+ * Road surveys use the same water geometry as buildings and the renderer. */
+export function riverSectionsNear(world: Pick<World, 'cells' | 'width' | 'height'>, p: Point, reach: number) {
+  return [...channelIndex(world).query(p.x - reach, p.y - reach, p.x + reach, p.y + reach)]
+    .map(({ a, b, halfWidth }) => {
+      const dx = b.x - a.x,
+        dy = b.y - a.y,
+        length = Math.hypot(dx, dy)
+      const t = length ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / length ** 2)) : 0
+      const point = { x: a.x + t * dx, y: a.y + t * dy }
+      return {
+        point,
+        tangent: { x: dx / (length || 1), y: dy / (length || 1) },
+        halfWidth,
+        distance: Math.hypot(p.x - point.x, p.y - point.y),
+      }
+    })
+    .filter((s) => s.distance < reach + s.halfWidth)
+    .sort(
+      (a, b) =>
+        a.distance - a.halfWidth - (b.distance - b.halfWidth) ||
+        a.point.x - b.point.x ||
+        a.point.y - b.point.y,
+    )
+}
+
 /** Length of a straight segment lying over rendered river water, in map units. */
 export function riverCrossing(world: Pick<World, 'cells' | 'width' | 'height'>, a: Point, b: Point) {
   const length = Math.hypot(b.x - a.x, b.y - a.y),

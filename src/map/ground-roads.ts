@@ -8,7 +8,7 @@ import { hashSeed } from '../sim/random'
 export interface GroundRoad {
   points: { x: number; y: number }[]
   width: number
-  kind: 'lane' | 'trade'
+  kind: 'lane' | 'trade' | 'bridge'
   curves?: RoadCurve[]
 }
 const cache = new WeakMap<
@@ -53,7 +53,7 @@ export function groundRoads(w: World) {
       }),
     )
     .map((lane) => ({
-      kind: 'lane',
+      kind: lane.bridge ? 'bridge' : 'lane',
       width: lane.width / meters,
       points: lane.points.map((p) => ({ x: p.x / meters, y: p.y / meters })),
     }))
@@ -87,7 +87,7 @@ export function drawGroundRoads(
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   const batches = new Map<number, Path2D>()
-  for (const road of roads) {
+  for (const road of roads.filter((r) => r.kind !== 'bridge')) {
     const width = Math.max(road.width, 0.65 / scale)
     const path = batches.get(width) ?? new Path2D()
     if (road.curves) traceRoadCurves(path, road.curves)
@@ -116,6 +116,26 @@ export function drawGroundRoads(
       ctx.stroke(path)
       ctx.setLineDash([])
     }
+  }
+  // A bridge is one legible deck with parapets, not dirt tracks painted on water.
+  // The relief overlay uses this same retained geography above the river surface.
+  ctx.setLineDash([])
+  ctx.lineCap = 'butt'
+  for (const bridge of roads.filter((r) => r.kind === 'bridge')) {
+    const [a, b] = bridge.points,
+      width = Math.max(bridge.width, 1.2 / scale)
+    const path = new Path2D()
+    path.moveTo(a.x, a.y)
+    path.lineTo(b.x, b.y)
+    ctx.strokeStyle = '#514b3d'
+    ctx.lineWidth = width * 1.35
+    ctx.stroke(path)
+    ctx.strokeStyle = '#bcb297'
+    ctx.lineWidth = width
+    ctx.stroke(path)
+    ctx.strokeStyle = '#ddd0ad'
+    ctx.lineWidth = width * 0.62
+    ctx.stroke(path)
   }
   ctx.restore()
 }

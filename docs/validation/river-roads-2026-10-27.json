@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-27",
+  "scope": "Physical city lane generation and one-time old-save repair",
+  "heuristics": {
+    "bankSetbackBeyondHalfWidthMeters": 4,
+    "abutmentBeyondWaterMeters": 14,
+    "maximumSpanMeters": 360,
+    "minimumBridgeSpacingMeters": 320,
+    "searchMeters": 180
+  },
+  "oldSaveRepair": {
+    "oldWetLanes": 501,
+    "repairedWetLanes": 0,
+    "repairMs": 44.160833000000025,
+    "repairedBridges": 11,
+    "newWorldMs": 1477.4999999999995,
+    "newLanes": 3365,
+    "newBridges": 3,
+    "homes": 3580,
+    "preserved": "all world state except lane geometry, revision and migration marker",
+    "postRepairMonthlyTick": "passed"
+  },
+  "generationSeeds": [
+    {
+      "seed": "River lots",
+      "scale": "regional",
+      "cells": 8064,
+      "ms": 1016.9442079999999,
+      "lanes": 3235,
+      "bridges": 1,
+      "wetLanes": 0
+    },
+    {
+      "seed": "Frontier probe",
+      "scale": "regional",
+      "cells": 8064,
+      "ms": 1070.902291,
+      "lanes": 3284,
+      "bridges": 2,
+      "wetLanes": 0
+    },
+    {
+      "seed": "Estuary streets",
+      "scale": "regional",
+      "cells": 8064,
+      "ms": 1112.69825,
+      "lanes": 3380,
+      "bridges": 3,
+      "wetLanes": 0
+    },
+    {
+      "seed": "Meandering towns",
+      "scale": "regional",
+      "cells": 8064,
+      "ms": 911.2830839999997,
+      "lanes": 3314,
+      "bridges": 4,
+      "wetLanes": 0
+    },
+    {
+      "seed": "performance-ledger",
+      "scale": "world",
+      "cells": 129024,
+      "ms": 9545.207583,
+      "lanes": 17266,
+      "bridges": 21,
+      "wetLanes": 0
+    }
+  ],
+  "validation": {
+    "productionBuild": "passed after final shared terrain interpolation change",
+    "focusedIntegrationTests": 24,
+    "followupTestsAfterGrowthChange": 12,
+    "browserErrors": [],
+    "independentVisualReview": "ship",
+    "finalRiverSpecificTests": 6,
+    "reviewerFollowup": "ship: grade consistency and bend/confluence fixtures confirmed"
+  },
+  "limits": [
+    "Synthetic road-survey heuristic; no structural engineering or bridge capital-cost model.",
+    "Local physical lanes only; freight routes and decorative coarse-city road plans are unchanged.",
+    "Recorded times are single runs on a shared machine, not comparative performance claims."
+  ],
+  "screenshots": {
+    "before": "river-roads-before-2026-10-27.png",
+    "after3d": "river-roads-after-2026-10-27.png",
+    "atlas": "river-roads-atlas-2026-10-27.png",
+    "phone": "river-roads-phone-2026-10-27.png"
+  }
+}

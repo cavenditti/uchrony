@@ -11,6 +11,7 @@ import { advanceAlmanac } from './almanac'
 import { recordWorldEvent } from './event-memory'
 import { reconcileMountainTerrain } from './terrain-migration'
 import { ensureBuildingLots } from './building-lots'
+import { reconcileRiverLanes } from './river-lanes'
 import { foundSettlement, advanceFounding } from './founding'
 import { governance } from './governance'
 import { buildTransport } from './public-works'
@@ -554,6 +555,7 @@ function initializeSpatialWorld(w: World) {
   ensureResidentialSites(w)
   const terrainChanged = reconcileMountainTerrain(w)
   const buildingsChanged = ensureBuildingLots(w)
+  reconcileRiverLanes(w)
   syncResidentialPopulation(w)
   if (initializing || buildingsChanged || terrainChanged) {
     rebuildAdaptiveMesh(w)

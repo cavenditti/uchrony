@@ -84,6 +84,7 @@ export function validateAdaptiveWorld(w: World) {
       if (a.sites[`home:${c}`]?.pool !== id) fail('residents have no persistent home site')
   if (a.terrainVersion !== undefined && a.terrainVersion !== 1) fail('invalid terrain version')
   if (a.buildingVersion !== undefined && a.buildingVersion !== 1) fail('invalid building version')
+  if (a.riverLaneVersion !== undefined && a.riverLaneVersion !== 1) fail('invalid river lane version')
   if (a.lanes !== undefined) {
     if (!Array.isArray(a.lanes) || a.lanes.length > 1000000) fail('invalid local lanes')
     for (const lane of a.lanes) {
@@ -96,6 +97,7 @@ export function validateAdaptiveWorld(w: World) {
         !Array.isArray(lane.points) ||
         lane.points.length < 2 ||
         lane.points.length > 4096 ||
+        (lane.bridge !== undefined && (lane.bridge !== true || lane.points.length !== 2)) ||
         lane.points.some(
           (p) =>
             !p ||
