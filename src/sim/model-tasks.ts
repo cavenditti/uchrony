@@ -74,6 +74,25 @@ export const MODEL_TASKS = {
   },
 } as const
 export type ModelTask = keyof typeof MODEL_TASKS
+export type ModelTier = 'light' | 'strong'
+export const DEFAULT_MODELS: Record<ModelTier, string> = {
+  light: 'google/gemma-4-26b-a4b-it:free',
+  strong: 'nvidia/nemotron-3.5-super-vl:free',
+}
+export const MODEL_TASK_TIERS: Record<ModelTask, ModelTier> = {
+  naming: 'light',
+  culture: 'light',
+  description: 'light',
+  tradition: 'light',
+  chronicle: 'light',
+  details: 'light',
+  decision: 'light',
+  biography: 'strong',
+  historian: 'strong',
+  history: 'strong',
+  strategy: 'strong',
+  referee: 'strong',
+}
 export type WritingTask =
   'naming' | 'culture' | 'description' | 'biography' | 'tradition' | 'chronicle' | 'historian'
 export const WRITING_TASKS: WritingTask[] = [
@@ -107,6 +126,7 @@ export interface ModelOption {
   structured: boolean
   json: boolean
   outputLimit?: number
+  reasoningRequired?: boolean
 }
 export interface ModelMeasurement {
   calls: number
@@ -124,8 +144,8 @@ export interface ModelServiceSnapshot {
   catalogError: string
 }
 export function defaultModelSettings(env: Record<string, string | undefined> = {}): ModelSettings {
-  const history = env.OPENROUTER_MODEL?.trim() || 'deepseek/deepseek-v4.1-flash'
-  const writing = env.OPENROUTER_WRITING_MODEL?.trim() || 'mistralai/ministral-8b-2512'
+  const history = env.OPENROUTER_MODEL?.trim() || DEFAULT_MODELS.strong
+  const writing = env.OPENROUTER_WRITING_MODEL?.trim() || DEFAULT_MODELS.light
   const strategy = env.OPENROUTER_STRATEGY_MODEL?.trim() || history
   return {
     version: 1,
@@ -137,7 +157,7 @@ export function defaultModelSettings(env: Record<string, string | undefined> = {
         task,
         {
           model:
-            task === 'history'
+            task === 'history' || task === 'biography' || task === 'historian'
               ? history
               : task === 'strategy'
                 ? strategy

@@ -5186,6 +5186,18 @@ select option {
 .fixture-models { max-width: 960px; margin: 0 auto; padding: 24px; height: 100%; overflow: auto; }
 
 .assignment-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.assignment-view-switch { display: flex; gap: 4px; width: fit-content; margin: 20px 0 28px; padding: 4px; border: 1px solid var(--line); border-radius: 5px; }
+.assignment-view-switch button { min-height: 36px; padding: 7px 16px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); }
+.assignment-view-switch button[aria-pressed='true'] { background: var(--selected-state, #31403f); color: var(--ink); }
+.assignment-view-switch button:hover:not(:disabled) { color: var(--accent); }
+.assignment-view-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.simple-assignments { max-width: 560px; }
+.model-assignments-simple { max-width: 560px; margin-inline: auto; }
+.assignments-dialog:has(.model-assignments-simple) { width: min(640px, calc(100vw - 32px)); }
+.simple-assignment { margin-bottom: 28px; }
+.simple-assignment > label { display: block; font: 500 23px/1.2 Alegreya, Georgia, serif; }
+.simple-assignment > p { margin: 8px 0 12px; color: var(--muted); line-height: 1.5; }
+.simple-assignment select { width: 100%; min-width: 0; min-height: 40px; }
 .place-writing textarea { display: block; width: 100%; min-width: 0; padding: 9px 11px; font: inherit; line-height: 1.5; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; caret-color: var(--accent); }
 .place-writing textarea::placeholder { color: var(--muted); opacity: 1; }
 .place-writing textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

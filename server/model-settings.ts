@@ -136,6 +136,7 @@ export class ModelService {
             structured: m.supported_parameters?.includes('structured_outputs') === true,
             json: m.supported_parameters?.includes('response_format') === true,
             outputLimit: m.top_provider?.max_completion_tokens || undefined,
+            reasoningRequired: m.reasoning?.mandatory === true,
           }))
           .sort((a: ModelOption, b: ModelOption) => a.name.localeCompare(b.name))
         this.catalogAt = Date.now()
