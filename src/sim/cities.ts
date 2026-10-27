@@ -1,4 +1,7 @@
-import { settlementComponents, settledResidentsByCell } from './settlement-morphology'
+import {
+  settlementComponents,
+  settledResidentsByCell,
+} from './settlement-morphology'
 import { optimizeResidentialLocations, settlementAccess } from './settlement-access'
 import { clamp, population, type World } from './types'
 import { neighbors } from './grid'
@@ -11,6 +14,7 @@ import type { City, DistrictActivity } from './district-types'
 import { MODEL_PARAMETERS } from './model-parameters'
 import { cellPolygon, polygonArea } from './physical-space'
 import { SETTLEMENT, isVisibleSettlement, settlementKind } from './settlement-model'
+import { integrateCentres, partitionCentres, separateCentre } from './urban-centres'
 
 /** Built land changes slowly. Population growth alone does not instantly pave a cell. */
 export function advanceSettlements(
@@ -188,6 +192,31 @@ export function refreshCityLabels(w: World) {
       }
       local.cities.push(city)
     }
+    if (physical) {
+      const sites = physical[part].sites
+      const members = overlaps.length ? overlaps : [city]
+      const available = new Map(sites.map((s) => [s.id, s]))
+      const seeded: City[] = []
+      for (const centre of members) {
+        const nucleus =
+          available.get(centre.nucleusSite ?? `home:${centre.nucleus}`) ??
+          centre.sites?.map((id) => available.get(id)).find((s) => s !== undefined) ??
+          (members.length === 1 ? available.get(physical[part].nucleus.id) : undefined)
+        if (!nucleus) continue
+        centre.nucleusSite = nucleus.id
+        centre.nucleus = nucleus.cell
+        available.delete(nucleus.id)
+        seeded.push(centre)
+        claimed.add(centre.id)
+      }
+      if (!seeded.length) {
+        city.nucleusSite = physical[part].nucleus.id
+        seeded.push(city)
+        claimed.add(city.id)
+      }
+      integrateCentres(w, seeded, partitionCentres(w, sites, seeded))
+      continue
+    }
     claimed.add(city.id)
     const previousPopulation = city.population
     for (const other of overlaps.slice(1)) {
@@ -205,25 +234,29 @@ export function refreshCityLabels(w: World) {
     city.cells = cells
     if (!cells.includes(city.nucleus))
       city.nucleus = [...cells].sort((a, b) => residents[b] - residents[a] || a - b)[0]
-    if (physical) {
-      city.sites = physical[part].sites.map((s) => s.id)
-      if (!city.nucleusSite || !city.sites.includes(city.nucleusSite))
-        city.nucleusSite = physical[part].nucleus.id
-      city.nucleus = w.adaptive!.sites[city.nucleusSite].cell
-    }
-    city.population = physical?.[part].population ?? cells.reduce((sum, c) => sum + residents[c], 0)
+    city.population = cells.reduce((sum, c) => sum + residents[c], 0)
     city.kind = settlementKind(city.population)
   }
   // Shrinking settlements keep their identities and names, available for later revival.
   for (const city of active)
     if (!claimed.has(city.id)) {
+      separateCentre(w, city)
       city.cells = []
       if (city.sites) city.sites = []
       city.population = 0
     }
   const cityAt = new Map<number, City>()
   for (const city of local.cities)
-    if (city.absorbedBy === undefined) for (const c of city.cells) cityAt.set(c, city)
+    if (city.absorbedBy === undefined)
+      for (const c of city.cells) {
+        const previous = cityAt.get(c)
+        if (
+          !previous ||
+          city.population > previous.population ||
+          (city.population === previous.population && city.id < previous.id)
+        )
+          cityAt.set(c, city)
+      }
   for (const id of local.active) {
     const u = local.units[id]
     const city = cityAt.get(u.center)

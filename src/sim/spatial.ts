@@ -19,6 +19,7 @@ export interface Settlement {
   aliases?: string[]
   position?: { x: number; y: number }
   siteIds?: string[]
+  metropolis?: { name: string; incorporated: boolean }
   nucleusSite?: string
 }
 export interface SpatialDistrict {
@@ -179,6 +180,14 @@ export function buildSpatial(w: World): SpatialState {
           ),
           cells: [...city.cells],
           aliases: [...city.aliases],
+          ...(city.metropolis
+            ? {
+                metropolis: {
+                  name: local.cities.find((c) => c.id === city.metropolis!.centre)!.name,
+                  incorporated: city.metropolis.incorporated !== undefined,
+                },
+              }
+            : {}),
           ...(city.sites ? { siteIds: [...city.sites], nucleusSite: city.nucleusSite } : {}),
           ...(city.nucleusSite && w.adaptive?.sites[city.nucleusSite]
             ? {

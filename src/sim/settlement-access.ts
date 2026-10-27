@@ -1,3 +1,4 @@
+import { multiCentreHousingDemand } from './housing-demand'
 import type { World } from './types'
 import { population } from './types'
 import type { PhysicalSite } from './adaptive-types'
@@ -76,38 +77,7 @@ export function settlementMigrationOptions(w: World) {
  * Existing residents can request a better location even before it has vacancies.
  */
 export function residentialDemand(w: World, access = settlementAccess(w)) {
-  const demand = new Map<string, number>()
-  for (const id of w.localEconomy!.active) {
-    const homes = access.homes(id)
-    const shortage = Math.max(
-      0,
-      population(w.localEconomy!.units[id]) * 1.15 - homes.reduce((sum, s) => sum + s.capacity, 0),
-    )
-    for (const home of homes)
-      demand.set(home.id, Math.min(shortage, Math.max(0, access.occupied(home) * 1.15 - home.capacity)))
-    if (homes.length < 2) continue
-    const target = [...homes].sort(
-      (x, y) => access.baseUtility(y) - access.baseUtility(x) || x.id.localeCompare(y.id),
-    )[0]
-    let wanted = 0
-    for (const home of homes) {
-      const gain = access.baseUtility(target) - access.baseUtility(home) - SETTLEMENT.movingFriction
-      if (home === target || gain <= 0) continue
-      if (!commuteSiteRoute(w, home, target, SETTLEMENT.accessMinutes)) continue
-      wanted += access.occupied(home) * MONTHLY_MOVING_HAZARD * (1 - Math.exp(-gain / 0.15))
-    }
-    // A one-year demand horizon covers the three-month build lag and expected
-    // moves; empty space already built is deducted before funding another home.
-    const nearbyVacancy = homes
-      .filter(
-        (home) =>
-          Math.hypot(home.x - target.x, home.y - target.y) <= 1000 &&
-          access.baseUtility(home) >= access.baseUtility(target) - SETTLEMENT.movingFriction,
-      )
-      .reduce((sum, home) => sum + access.vacancy(home), 0)
-    demand.set(target.id, Math.max(demand.get(target.id)!, wanted * 12 * 1.15 - nearbyVacancy))
-  }
-  return demand
+  return multiCentreHousingDemand(w, access)
 }
 
 /** Vacancy-constrained, conservative household-location search. A moving cohort

@@ -182,6 +182,38 @@ export function validateDistrictEconomy(w: World) {
       fail('city identity')
     if (!['village', 'town', 'city'].includes(c.kind)) fail('city kind')
     cityIds.add(c.id)
+    if (
+      c.standing !== undefined &&
+      (!obj(c.standing) || !num(c.standing.prestige) || !num(c.standing.wealthPerResident))
+    )
+      fail('city standing')
+    if (c.metropolis !== undefined) {
+      const m = c.metropolis
+      if (
+        !obj(m) ||
+        !int(m.centre, 0, s.nextCity - 1) ||
+        m.centre === c.id ||
+        !int(m.since, 0, w.month) ||
+        [m.dominantSince, m.overwhelmingSince, m.incorporated].some(
+          (month) => month !== undefined && !int(month, m.since, w.month),
+        ) ||
+        c.absorbedBy !== undefined
+      )
+        fail('city metropolis')
+    }
+    if (
+      c.history !== undefined &&
+      (!Array.isArray(c.history) ||
+        c.history.some(
+          (e, i) =>
+            !obj(e) ||
+            !int(e.month, i ? c.history![i - 1].month : 0, w.month) ||
+            !int(e.with, 0, s.nextCity - 1) ||
+            e.with === c.id ||
+            !['linked', 'separated', 'incorporated', 'merged'].includes(e.kind),
+        ))
+    )
+      fail('city history')
     if (c.absorbedBy !== undefined && !int(c.absorbedBy, 0, s.nextCity - 1)) fail('city succession')
     if (c.absorbedBy !== undefined) continue
     if (c.sites !== undefined) {
@@ -219,6 +251,30 @@ export function validateDistrictEconomy(w: World) {
     )
   )
     fail('city lineage')
+  const citiesById = new Map(s.cities.map((c) => [c.id, c]))
+  for (const city of s.cities) {
+    if (city.history?.some((e) => !cityIds.has(e.with))) fail('city history reference')
+    if (city.metropolis) {
+      const centre = citiesById.get(city.metropolis.centre)
+      if (
+        !centre ||
+        centre.absorbedBy !== undefined ||
+        centre.metropolis ||
+        !centre.population ||
+        !city.population ||
+        w.localEconomy!.units[w.adaptive?.sites[centre.nucleusSite!]?.pool ?? -1]?.nation !==
+          w.localEconomy!.units[w.adaptive?.sites[city.nucleusSite!]?.pool ?? -1]?.nation
+      )
+        fail('city metropolis reference')
+    }
+    const lineage = new Set<number>([city.id])
+    let successor = city.absorbedBy
+    while (successor !== undefined) {
+      if (lineage.has(successor)) fail('city succession cycle')
+      lineage.add(successor)
+      successor = citiesById.get(successor)?.absorbedBy
+    }
+  }
   for (const f of w.economy?.firms ?? []) {
     const u = s.units[f.locality!]
     if (

@@ -11,6 +11,8 @@ Mode: Operate. A desktop-first simulation workspace with mobile inspection suppo
 
 ## Direction contract
 
+Urban detail extension, 27 October 2026: preserve the cabinet-map composition. Selecting developed land exposes a 128 m block summary and an Inspect block action inside the existing place context; building and numerical-cell inspection remain available. Close city captions explain metropolitan membership or incorporation. Keep slate, brass, existing type roles and mobile wrapping; no new permanent panel, map layer or palette. Code-led extension of the existing direction. Finish with desktop/mobile captures and an independent finish review.
+
 THESIS: The cabinet map table puts geographic consequences at the center, with state dossiers and decisions at arm's reach.
 
 OWN-WORLD: Slate blue-green framing, warm pale type, restrained brass active controls, and desaturated colored sovereign territory. Precise tables, visible separators, compact toolbars, and self-hosted Alegreya map lettering.
@@ -60,3 +62,14 @@ FORM: The retained code-native 3D scene receives procedural pigments and materia
 FINISH: The first independent review requested finer Atlas coastline weight and documentation. The final Atlas recapture and documentation update resolved both specified fixes; the independent verdict is `ship` at that scope. Validation covers the isolated animated graphics fixture, not a fresh simulation/autosave endurance run. See [map rendering](../../docs/MAP_RENDERING.md#illuminated-atlas-trial--25-october-2026) for measured costs and evidence.
 
 The subsequent 3D estuary refinement retains rich inland blue while matching the existing sea pigment, ripples and roughness near actual outlets. Banks fade before open water. The transition follows drainage through tributary joins; it is an illustrated mixing zone, with no sediment simulation, new global token or additional texture. Atlas keeps its cartographic strokes.
+
+
+## Urban-centre inspection extension — 27 October 2026
+
+The selected-place popup now includes a 128 m block summary: residents, jobs, vacant housing capacity, construction when present, and associated centre names. Explicit building records add building count and coverage; broader housing records instead show their coarser basis. **Inspect block** opens the block bounds through the existing area-inspection action. Numerical-cell and building inspection remain distinct actions above it. The popup reuses the existing ruled rows, slate surface, Alegreya heading and brass text actions; its height is bounded to the remaining map viewport and excess content scrolls internally.
+
+Close-city captions optionally show **Linked with** a metropolitan centre or **District of** that centre after incorporation. This source-reviewed caption describes the recorded relationship; it introduces no permanent panel, map layer, art direction or global token. Simulation rules for persistent centres, incorporation and housing demand belong in the simulation documentation.
+
+FINISH: The independent fallback finish review returned `ship` with no material fixes for the captured block extension. The desktop capture ([1440 × 1000](../review/urban-centres/desktop.png)) and mobile capture ([390 × 844](../review/urban-centres/mobile.png)) show block statistics and the block action within the existing popup, alongside numerical-cell inspection. These are isolated review fixtures, not shipping raster artwork. The metropolitan caption was source-reviewed but is not shown in these captures; conditional construction/coarse-housing states and building-action preservation are also source evidence, not claims of captured coverage. The detector returned `[]`; no QUALITY BAR card was supplied, so the verdict makes no separate quality-bar certification.
+
+Documentation check: `PRODUCT.md`, `DESIGN.md`, `src/styles.css` and the affected `src/components/WorldMap.tsx` markup remain consistent with an ordinary extension of the incumbent visual system. `DESIGN.md` and `.impeccable/design.json` are unchanged by this pass; the new surface behavior is recorded here without promoting local details or pre-existing drift into global rules.

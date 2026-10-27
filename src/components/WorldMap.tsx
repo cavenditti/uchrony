@@ -1,3 +1,4 @@
+import { mapUrbanBlockAt } from '../map/quadtree'
 import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
 import type { SpatialBounds } from '../sim/adaptive-types'
 import { districtDensityScale, spatialState, settlementPosition, type Settlement } from '../sim/spatial'
@@ -116,11 +117,12 @@ export function WorldMap({
     frame = useRef(0)
   const [size, setSize] = useState({ w: 900, h: 680 }),
     [view, setView] = useState({ zoom: 1, x: 0, y: 0 })
-  const [hover, setHover] = useState<{ id: number; x: number; y: number } | null>(null)
+  type MapPick = { id: number; x: number; y: number; point: { x: number; y: number } }
+  const [hover, setHover] = useState<MapPick | null>(null)
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null)
   const [layerMenu, setLayerMenu] = useState(false),
     [legendOpen, setLegendOpen] = useState(false),
-    [picked, setPicked] = useState<{ id: number; x: number; y: number } | null>(null)
+    [picked, setPicked] = useState<MapPick | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{ distance: number; center: { x: number; y: number }; view: typeof view } | null>(null)
   useEffect(() => {
@@ -561,11 +563,18 @@ export function WorldMap({
         y <= b.maxY &&
         contains(atlas.geometry.provinces[id], x, y)
       )
-        return { id, x: clientX - rect.left, y: clientY - rect.top }
+        return { id, x: clientX - rect.left, y: clientY - rect.top, point: { x: x * METERS_PER_MAP_UNIT, y: y * METERS_PER_MAP_UNIT } }
     }
     return null
   }
   const maxZoom = isRelief ? Math.max(32, 36 / fit) : 32
+  const pickedBlock = !isRelief && picked ? mapUrbanBlockAt(world, picked.point) : undefined
+  const placeContextTop = picked ? Math.max(70, Math.min(picked.y + 14, size.h - 540)) : 70
+  const blockCentres =
+    pickedBlock?.centres.flatMap((id) => {
+      const centre = world.localEconomy?.cities.find((c) => c.id === id)
+      return centre ? [centre] : []
+    }) ?? []
   const settlements = useMemo(() => spatialState(world).settlements, [world])
   const pickedCity = picked
     ? settlements.filter((s) => s.region === picked.id).sort((a, b) => b.population - a.population)[0]
@@ -980,6 +989,11 @@ export function WorldMap({
                   ? 'Town'
                   : 'Village'}
           </p>
+          {closeCity.metropolis && (
+            <p>
+              {closeCity.metropolis.incorporated ? 'District of' : 'Linked with'} {closeCity.metropolis.name}
+            </p>
+          )}
         </div>
       )}
       <div className="zoom-controls">
@@ -1000,7 +1014,9 @@ export function WorldMap({
           aria-label="Selected province actions"
           style={{
             left: Math.max(12, Math.min(picked.x + 14, size.w - 290)),
-            top: Math.max(70, Math.min(picked.y + 14, size.h - 350)),
+            top: placeContextTop,
+            maxHeight: Math.max(80, size.h - placeContextTop - 12),
+            overflowY: 'auto',
           }}
         >
           <div className="place-context-heading">
@@ -1022,6 +1038,39 @@ export function WorldMap({
             {compact(population(world.regions[picked.id]))} people <span>·</span>{' '}
             {world.regions[picked.id].terrain}
           </p>
+          {pickedBlock && (
+            <div className="picked-cell">
+              <span>
+                128 m block · {compact(pickedBlock.residents)} residents · {compact(pickedBlock.jobs)} jobs
+              </span>
+              <span>
+                {Math.floor(pickedBlock.vacantCapacity).toLocaleString()} vacant spaces
+                {pickedBlock.construction > 0
+                  ? ` · ${Math.ceil(pickedBlock.construction).toLocaleString()} being built`
+                  : ''}
+              </span>
+              {!pickedBlock.coarseHousing && (
+                <span>
+                  {pickedBlock.buildings} buildings ·{' '}
+                  {Math.round((100 * pickedBlock.builtArea) / Math.max(1, pickedBlock.landArea))}% building
+                  coverage
+                </span>
+              )}
+              {pickedBlock.coarseHousing && <span>Housing recorded as broader parcels</span>}
+              {blockCentres.length > 0 && <span>{blockCentres.map((c) => c.name).join(' · ')}</span>}
+              {onInspectArea && (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    onInspectArea(pickedBlock.bounds)
+                    setPicked(null)
+                  }}
+                >
+                  Inspect block <ArrowUpRight size={14} />
+                </button>
+              )}
+            </div>
+          )}
           <div className="place-quick-actions">
             {(
               [

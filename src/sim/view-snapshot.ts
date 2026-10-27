@@ -1,3 +1,4 @@
+import { urbanBlocks } from './urban-blocks'
 import { economicLandscape } from './economic-landscape'
 import { clamp, GOODS, type Inventory, type Army, type World } from './types'
 import { unitLoyalty } from './forces'
@@ -150,6 +151,7 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
     viewLandscape: economicLandscape(world),
     ...(world.adaptive
       ? {
+          viewUrbanBlocks: urbanBlocks(world),
           viewHomes: Object.values(world.adaptive.sites)
             .filter((site) => site.kind === 'residential' && site.retired === undefined)
             .map(({ id, cell, pool, capacity, residents, x, y, parcel }) => ({

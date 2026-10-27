@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-27",
+  "scope": "Persistent city centres, wealth/prestige-based integration, derived urban blocks, multiple housing demand and construction centres",
+  "status": "passed bounded validation",
+  "automated": {
+    "regressionRun": {
+      "tests": 63,
+      "passed": 63,
+      "failed": 0,
+      "files": [
+        "urban-centres",
+        "urban-blocks-demand",
+        "settlement-dynamics",
+        "building-lots",
+        "quadtree-map",
+        "frontier-settlements",
+        "settlement-influence",
+        "settlement-conservation",
+        "view-storage"
+      ]
+    },
+    "additionalGeometryTest": "Physical centre catchments retain nuclei, distinguish broad contact from a ribbon and are stable under input order reversal; passed with all six block/demand checks.",
+    "uniqueTests": 64,
+    "build": "TypeScript and Vite production build passed; existing large-chunk warning remains.",
+    "formatting": "Focused Prettier check passed; git diff --check passed.",
+    "continuation": "Frontier twelve-month save continuation and serial/parallel monthly influence continuation passed."
+  },
+  "browser": {
+    "fixture": "/tests/browser/quadtree.html",
+    "isolation": "Dedicated generated world; no production saves or model calls",
+    "viewports": [
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "mobileHorizontalOverflow": false,
+    "mobileInspectorBounds": {
+      "left": 100,
+      "top": 304,
+      "right": 374,
+      "bottom": 832
+    },
+    "blockAction": "Invoked Inspect block; fixture reported Inspected 128 m at 9600, 10624.",
+    "fixtureError": "",
+    "screenshots": [
+      "../../.impeccable/review/urban-centres/desktop.png",
+      "../../.impeccable/review/urban-centres/mobile.png"
+    ],
+    "review": "Independent fallback Impeccable finish reviewer: ship, no material fixes for captured block extension. Metropolitan caption source-reviewed only.",
+    "detectorFindings": []
+  },
+  "limits": [
+    "Thresholds are initial calibration, not historical estimates.",
+    "No century-scale economic qualification or new World-scale throughput benchmark.",
+    "Block summaries do not reconstruct coarse legacy housing into measured buildings.",
+    "Other changes were already present and continued in the shared working tree; they were preserved."
+  ]
+}

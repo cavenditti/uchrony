@@ -251,6 +251,8 @@ export interface World {
   viewNation?: number | null
   viewBankLoans?: Record<number, number>
   /** Read-only economic tile projection shared by every observer. */
+  viewMesh?: import('./map-snapshot').MapMesh
+  viewUrbanBlocks?: import('./urban-blocks').UrbanBlock[]
   viewLandscape?: import('./economic-landscape').EconomicLandscape
   /** Compact display records; avoids cloning a giant string-keyed site registry. */
   viewHomes?: {
@@ -262,6 +264,9 @@ export interface World {
     x?: number
     y?: number
     parcel?: import('./adaptive-types').SpatialBounds
+    building?: import('./adaptive-types').PointMeters[]
+    developed?: boolean
+    construction?: number
   }[]
   economy?: EconomicSystem
   version: 1

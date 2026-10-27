@@ -39,6 +39,16 @@ export interface City {
   /** Occupied physical parcels; several independent settlements may share one terrain sample. */
   sites?: string[]
   nucleusSite?: string
+  /** Descriptive indicators, never assets or an extra economic account. */
+  standing?: { prestige: number; wealthPerResident: number }
+  metropolis?: {
+    centre: number
+    since: number
+    dominantSince?: number
+    overwhelmingSince?: number
+    incorporated?: number
+  }
+  history?: { month: number; kind: 'linked' | 'separated' | 'incorporated' | 'merged'; with: number }[]
 }
 export interface DistrictEconomy {
   version: 1

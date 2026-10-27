@@ -9,6 +9,12 @@ export interface SpatialBounds {
   y: number
   size: number
 }
+export interface SettlementLane {
+  pool: number
+  founded: number
+  width: number
+  points: PointMeters[]
+}
 export interface PhysicalSite extends PointMeters {
   id: string
   cell: number
@@ -26,6 +32,8 @@ export interface PhysicalSite extends PointMeters {
   residents?: number
   /** Physical building plot in meters, retained through numerical split/merge. */
   parcel?: SpatialBounds
+  /** Actual building footprint within this lot; economics remain in the parent pool. */
+  building?: PointMeters[]
 }
 export interface Jurisdiction {
   id: string
@@ -96,6 +104,10 @@ export interface AdaptiveWorld {
   migration: { source: 'legacy'; month: number; assumptions: string[] }
   reviewMonth: number
   residentialVersion?: 1
+  buildingVersion?: 1
+  terrainVersion?: 1
+  /** Surveyed local access paths; geometry persists independently of the mesh. */
+  lanes?: SettlementLane[]
   nextResidence?: number
 }
 export interface SpatialFragment {

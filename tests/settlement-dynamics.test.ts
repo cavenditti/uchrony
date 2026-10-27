@@ -101,7 +101,7 @@ test('rural spare capacity and empty parcels do not become towns or municipal ca
   validateWorld(w)
 })
 
-test('two settlements can occupy one terrain sample; occupied infill merges identities without moving assets', () => {
+test('occupied infill links two persistent centres without moving assets or resetting their street frames', () => {
   const { w, make, first, second, total } = prepareTwinParcels()
   const before = holdings(w)
   evolveCities(w, true)
@@ -127,18 +127,35 @@ test('two settlements can occupy one terrain sample; occupied infill merges iden
   evolveCities(w, true)
   refreshSpatial(w)
   const active = w.localEconomy!.cities.filter((c) => c.population && c.absorbedBy === undefined)
-  assert.equal(active.length, 1)
-  assert.equal(active[0].population, total)
-  assert(active[0].sites!.includes(second.id) && active[0].sites!.includes(bridge.id))
-  const patches = settlementPlaces(w)
-  assert(
-    patches.every(
-      (p) => p.form!.angle === patches[0].form!.angle && p.form!.planSeed === patches[0].form!.planSeed,
-    ),
-    'merged neighborhoods share one street frame',
+  assert.equal(active.length, 2)
+  assert.equal(
+    active.reduce((sum, c) => sum + c.population, 0),
+    total,
   )
-  assert.equal(active[0].parents.length, 1)
-  assert(active[0].aliases.length > 0)
+  assert.equal(new Set(active.flatMap((c) => c.sites!)).size, 3)
+  assert.deepEqual(
+    active.map((c) => c.id),
+    initial.map((c) => c.id),
+  )
+  assert.equal(active.filter((c) => c.metropolis).length, 1)
+  const patches = settlementPlaces(w)
+  assert.equal(new Set(patches.map((p) => p.form!.planSeed)).size, 2)
+  const labels = JSON.stringify(active)
+  evolveCities(w, true)
+  assert.equal(JSON.stringify(active), labels, 'same-month refresh does not advance integration')
+  const restored = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(w))))
+  assert.deepEqual(restored.localEconomy!.cities, w.localEconomy!.cities)
+  first.residents! += bridge.residents!
+  bridge.residents = 0
+  syncResidentialPopulation(w)
+  evolveCities(w, true)
+  assert.equal(active.filter((c) => c.metropolis).length, 0)
+  assert.equal(
+    active.reduce((sum, c) => sum + c.population, 0),
+    total,
+  )
+  assert(active.some((c) => c.history?.some((e) => e.kind === 'separated')))
+  refreshSpatial(w)
   assert.equal(holdings(w), before)
   validateWorld(w)
 })
@@ -255,6 +272,42 @@ test('location optimization concentrates residents without per-cell rounding fre
   assert.equal(first.residents! + second.residents!, population(unit))
   assert.equal(holdings(w), before)
   assert(second.residents! <= second.capacity)
+})
+
+test('several centres in one pool can fund housing without duplicating projects or creating money', () => {
+  const { w, unit, first, second } = prepareTwinParcels()
+  for (const home of residentialPools(w).get(unit.id)!) home.capacity = home.residents! * 0.8
+  for (const producer of Object.values(w.economy!.producers)) producer.cash = 0
+  const sponsor = w.economy!.producers[unit.id]
+  sponsor.cash = 1e8
+  unit.stocks.timber = unit.stocks.stone = 1e7
+  beginEconomyMonth(w)
+  w.economy!.households[unit.id].laborer.laborForce = 1e7
+  w.economy!.households[unit.id].laborer.employed = 0
+  rebaseEndowments(w)
+  const money = Object.values(balances(w)).reduce((a, b) => a + b, 0)
+  const capacities = [first.capacity, second.capacity]
+  const access = { ...settlementAccess(w), baseUtility: () => 1, utility: () => 1 }
+  advanceLandUse(w, access)
+  const projects = w.adaptive!.construction!.filter((p) => w.adaptive!.sites[p.site].pool === unit.id)
+  assert.equal(projects.length, 2)
+  const nearest = (id: string) => {
+    const site = w.adaptive!.sites[id]
+    return [first, second].sort(
+      (a, b) => Math.hypot(a.x - site.x, a.y - site.y) - Math.hypot(b.x - site.x, b.y - site.y),
+    )[0].id
+  }
+  assert.deepEqual(projects.map((p) => nearest(p.site)).sort(), [first.id, second.id].sort())
+  assert.deepEqual([first.capacity, second.capacity], capacities, 'funding does not complete buildings')
+  assert(Math.abs(Object.values(balances(w)).reduce((a, b) => a + b, 0) - money) < 1e-6)
+  assert(auditLedger(w) < 1e-7)
+  advanceLandUse(w, access)
+  const pending = w.adaptive!.construction!.filter((p) => w.adaptive!.sites[p.site].pool === unit.id)
+  assert.equal(new Set(pending.map((p) => p.site)).size, pending.length)
+  assert(
+    pending.reduce((sum, p) => sum + p.capacity, 0) <=
+      population(unit) * 1.15 - capacities[0] - capacities[1] + 1e-7,
+  )
 })
 
 test('one administrative review can fund several mergers while retaining local service offices', async () => {

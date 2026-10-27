@@ -291,3 +291,8 @@ export function matchCommuters(w: World) {
     recordCommute(w, pool, firm.id, routeId, stratum, actual, paid)
   }
 }
+
+/** Cost-only projection for housing destination comparisons. */
+export function commuteSiteMinutes(w: World, from: Pick<PhysicalSite, 'cell' | 'x' | 'y'>, to: Pick<PhysicalSite, 'cell' | 'x' | 'y'>, limit = 90) {
+  return commuteSiteRoute(w, from, to, limit)?.minutes ?? null
+}

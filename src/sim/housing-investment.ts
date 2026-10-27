@@ -27,10 +27,11 @@ export function planHousingInvestment(
   homes: PhysicalSite[],
   availableLabor: number,
   access: ReturnType<typeof settlementAccess>,
+  pending: ReadonlySet<string> = new Set(w.adaptive!.construction?.map((p) => p.site)),
+  catchmentMeters = 1000,
 ) {
   const unit = w.localEconomy!.units[target.pool],
     sponsor = w.economy!.producers[target.pool]
-  const pending = new Set(w.adaptive!.construction?.map((p) => p.site))
   type Plot = NonNullable<ReturnType<typeof findResidentialParcel>>
   const choices: {
     site: PhysicalSite
@@ -81,7 +82,7 @@ export function planHousingInvestment(
   for (const home of homes)
     if (
       !pending.has(home.id) &&
-      Math.hypot(home.x - target.x, home.y - target.y) <= 1000 &&
+      Math.hypot(home.x - target.x, home.y - target.y) <= catchmentMeters &&
       access.baseUtility(home) >= targetAccess - 0.08 &&
       (!compactResidence(target) || compactResidence(home))
     )

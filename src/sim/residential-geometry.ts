@@ -1,3 +1,4 @@
+import { habitableLand } from './terrain-access'
 import type { World } from './types'
 import type { PhysicalSite, PointMeters } from './adaptive-types'
 import { cellPolygon, clipPolygon, pointInPolygon } from './physical-space'
@@ -5,6 +6,7 @@ import { movementNeighbors } from './grid'
 import { queryAdaptiveLeaves } from './adaptive-grid'
 
 export function residentialFootprint(w: World, site: PhysicalSite) {
+  if (site.building) return site.building
   return site.parcel ? clipPolygon(cellPolygon(w, site.cell), site.parcel) : []
 }
 const cross = (a: PointMeters, b: PointMeters) => a.x * b.y - a.y * b.x
@@ -13,6 +15,12 @@ const at = (a: PointMeters, b: PointMeters, t: number) => ({
   x: a.x + (b.x - a.x) * t,
   y: a.y + (b.y - a.y) * t,
 })
+const projection = (v: PointMeters, x: PointMeters, y: PointMeters) => {
+  const dx = y.x - x.x,
+    dy = y.y - x.y,
+    t = ((v.x - x.x) * dx + (v.y - x.y) * dy) / (dx * dx + dy * dy || 1)
+  return at(x, y, Math.max(0, Math.min(1, t)))
+}
 
 /** Closest actual land-footprint edges, not the centres of their terrain samples. */
 export function footprintConnection(a: PointMeters[], b: PointMeters[]) {
@@ -40,11 +48,6 @@ export function footprintConnection(a: PointMeters[], b: PointMeters[]) {
           const point = at(p, q, t)
           return { distance: 0, from: point, to: point }
         }
-      }
-      const projection = (v: PointMeters, x: PointMeters, y: PointMeters) => {
-        const d = subtract(y, x),
-          t = ((v.x - x.x) * d.x + (v.y - x.y) * d.y) / (d.x * d.x + d.y * d.y || 1)
-        return at(x, y, Math.max(0, Math.min(1, t)))
       }
       consider(p, projection(p, r, s))
       consider(q, projection(q, r, s))
@@ -119,7 +122,7 @@ export function localWalkingConnection(
       region = w.regions[cell.region],
       polygon = cellPolygon(w, id)
     if (
-      cell.terrain === 'water' ||
+      !habitableLand(cell) ||
       region?.nation !== nation ||
       region.devastation > 0.9 ||
       !pointInPolygon(from, polygon) ||
@@ -147,7 +150,7 @@ export function localWalkingConnection(
     .flatMap((id) => {
       const c = w.cells[id],
         r = w.regions[c.region]
-      if (c.terrain === 'water' || r?.nation !== nation || r.devastation > 0.9) return []
+      if (!habitableLand(c) || r?.nation !== nation || r.devastation > 0.9) return []
       const span = segmentInterval(from, to, cellPolygon(w, id))
       return span
         ? [

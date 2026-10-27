@@ -2,7 +2,6 @@ import type { World } from './types'
 import { CELL_METERS } from './grid'
 import type { PhysicalSite } from './adaptive-types'
 import { residentialSites, occupiedResidents, compactResidence } from './residential-sites'
-import { adaptiveGrid, queryAdaptiveLeaves } from './adaptive-grid'
 import { residentialFootprint, footprintConnection, localWalkingConnection } from './residential-geometry'
 import { SETTLEMENT, isVisibleSettlement } from './settlement-model'
 
@@ -17,8 +16,8 @@ export interface SettlementComponent {
  * or municipal membership. A narrow street/park gap can connect urban fabric;
  * a sea gap or an inaccessible route cannot.
  */
-export function settlementComponents(w: World): SettlementComponent[] {
-  const sites = residentialSites(w)
+export function settlementComponents(w: World, nations?: ReadonlySet<number>): SettlementComponent[] {
+  const eligible = residentialSites(w)
     .filter((s) => {
       if (!s.parcel) return false
       return (
@@ -27,24 +26,29 @@ export function settlementComponents(w: World): SettlementComponent[] {
       )
     })
     .sort((a, b) => a.id.localeCompare(b.id))
+  const maximum = eligible.reduce((max, s) => Math.max(max, s.parcel!.size), 0)
+  const sites = nations ? eligible.filter((s) => nations.has(w.localEconomy!.units[s.pool].nation)) : eligible
   const byId = new Map(sites.map((s) => [s.id, s])),
     remaining = new Set(byId.keys())
-  // Keep only unvisited candidates in each active leaf. Once a dense connected
-  // block is consumed, later frontier sites never scan its members again.
-  const pendingByLeaf = new Map<string, Set<string>>()
-  const leafBySite = new Map<string, string>()
-  for (const leaf of adaptiveGrid(w).leaves) {
-    const pending = new Set(leaf.sites.filter((id) => remaining.has(id)))
-    if (!pending.size) continue
-    pendingByLeaf.set(leaf.id, pending)
-    for (const id of pending) leafBySite.set(id, leaf.id)
+  // Index the occupied plots themselves. An 8 m numerical mesh contains many
+  // empty leaves around each building; city connectivity needs none of them.
+  // These buckets only screen candidates: the original distance, footprint,
+  // political-access tests and stable ID ordering still decide every edge.
+  const span = Math.max(64, Math.min(1024, maximum + 150))
+  const buckets = new Map<string, Set<string>>()
+  const bucketBySite = new Map<string, Set<string>>()
+  for (const site of sites) {
+    const key = `${Math.floor(site.x / span)}:${Math.floor(site.y / span)}`,
+      bucket = buckets.get(key) ?? new Set<string>()
+    bucket.add(site.id)
+    buckets.set(key, bucket)
+    bucketBySite.set(site.id, bucket)
   }
   const take = (id: string) => {
     if (!remaining.delete(id)) return false
-    pendingByLeaf.get(leafBySite.get(id)!)?.delete(id)
+    bucketBySite.get(id)!.delete(id)
     return true
   }
-  const maximum = sites.reduce((max, s) => Math.max(max, s.parcel!.size), 0)
   const components: SettlementComponent[] = []
   const footprints = new Map(sites.map((s) => [s.id, residentialFootprint(w, s)]))
   for (const start of sites) {
@@ -52,10 +56,12 @@ export function settlementComponents(w: World): SettlementComponent[] {
     const members = [start]
     for (let i = 0; i < members.length; i++) {
       const from = members[i],
-        radius = (from.parcel!.size + maximum) / Math.SQRT2 + 150
-      const candidates = queryAdaptiveLeaves(w, { x: from.x - radius, y: from.y - radius, size: radius * 2 })
-        .flatMap((leaf) => [...(pendingByLeaf.get(leaf.id) ?? [])])
-        .sort((a, b) => a.localeCompare(b))
+        radius = (from.parcel!.size + maximum) / Math.SQRT2 + (from.building ? 24 : 150)
+      const candidates: string[] = []
+      for (let x = Math.floor((from.x - radius) / span); x <= Math.floor((from.x + radius) / span); x++)
+        for (let y = Math.floor((from.y - radius) / span); y <= Math.floor((from.y + radius) / span); y++)
+          for (const id of buckets.get(`${x}:${y}`) ?? []) candidates.push(id)
+      candidates.sort((a, b) => a.localeCompare(b))
       for (const id of candidates) {
         const to = byId.get(id)!
         if (Math.hypot(to.x - from.x, to.y - from.y) > radius) continue
@@ -63,7 +69,7 @@ export function settlementComponents(w: World): SettlementComponent[] {
         const nation = w.localEconomy!.units[from.pool].nation
         if (
           w.localEconomy!.units[to.pool].nation !== nation ||
-          connection.distance > 150 + 1e-7 ||
+          connection.distance > (from.building && to.building ? 24 : 150) + 1e-7 ||
           !localWalkingConnection(w, connection.from, connection.to, nation, [from.cell, to.cell])
         )
           continue

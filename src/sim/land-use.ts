@@ -1,3 +1,4 @@
+import { habitableLand } from './terrain-access'
 import { STRATA } from './economic-types'
 import { producerAccount, householdAccount, transfer } from './ledger'
 import { marketStore, recordUse, recordOwnCapital, recordWages } from './national-accounts'
@@ -29,52 +30,61 @@ export function advanceLandUse(w: World, prepared?: ReturnType<typeof settlement
     const r = w.localEconomy.units[id],
       p = w.economy.producers[id],
       hh = w.economy.households[id]
-    const available = STRATA.reduce((sum, s) => sum + Math.max(0, hh[s].laborForce - hh[s].employed), 0)
-    if (!available || p.wage <= 0) continue
-    const targets = (homes.get(id) ?? []).filter((s) => !pending.has(s.id))
-    let site = targets.sort(
-      (x, y) => (demand.get(y.id) ?? 0) - (demand.get(x.id) ?? 0) || x.id.localeCompare(y.id),
-    )[0]
-    if (!site) continue
-    const reserved = a.construction
-      .filter((p) => a.sites[p.site].pool === id)
-      .reduce((sum, p) => sum + p.capacity, 0)
-    const need = Math.max(0, (demand.get(site.id) ?? 0) - reserved)
-    if (!need) continue
-    const investment = planHousingInvestment(w, site, need, homes.get(id) ?? [], available, access)
-    if (!investment) continue
-    site = investment.site
-    const { plot, spaces, inputs } = investment
-    if (plot) {
-      site = createResidentialParcel(w, id, plot.cell, plot.point, plot.parcel)
-      homes.get(id)!.push(site)
-    }
-    const labor = inputs.labor
-    let wages = 0
-    for (const s of STRATA) {
-      const h = hh[s],
-        jobs = (labor * Math.max(0, h.laborForce - h.employed)) / available
-      const paid = transfer(
+    const targets = (homes.get(id) ?? [])
+      .filter((s) => !pending.has(s.id) && habitableLand(w.cells[s.cell]))
+      .sort((x, y) => (demand.get(y.id) ?? 0) - (demand.get(x.id) ?? 0) || x.id.localeCompare(y.id))
+    for (const target of targets) {
+      if (pending.has(target.id)) continue
+      const available = STRATA.reduce((sum, s) => sum + Math.max(0, hh[s].laborForce - hh[s].employed), 0)
+      if (!available || p.wage <= 0) break
+      let site = target
+      const need = demand.get(site.id) ?? 0
+      if (need <= 1e-6) continue
+      const investment = planHousingInvestment(
         w,
-        producerAccount(id),
-        householdAccount(id, s),
-        jobs * p.wage,
-        'housing construction wages',
+        site,
+        need,
+        homes.get(id) ?? [],
+        available,
+        access,
+        pending,
+        256,
       )
-      h.employed += paid / p.wage
-      h.income += paid
-      wages += paid
-      recordWages(w, id, producerAccount(id), paid)
+      if (!investment) continue
+      site = investment.site
+      const { plot, spaces, inputs } = investment
+      if (plot) {
+        site = createResidentialParcel(w, id, plot.cell, plot.point, plot.parcel)
+        homes.get(id)!.push(site)
+      }
+      const labor = inputs.labor
+      let wages = 0
+      for (const s of STRATA) {
+        const h = hh[s],
+          jobs = (labor * Math.max(0, h.laborForce - h.employed)) / available
+        const paid = transfer(
+          w,
+          producerAccount(id),
+          householdAccount(id, s),
+          jobs * p.wage,
+          'housing construction wages',
+        )
+        h.employed += paid / p.wage
+        h.income += paid
+        wages += paid
+        recordWages(w, id, producerAccount(id), paid)
+      }
+      const { timber, stone } = inputs
+      const materials =
+        recordUse(w, marketStore(id), 'timber', timber) + recordUse(w, marketStore(id), 'stone', stone)
+      r.stocks.timber = Math.max(0, r.stocks.timber - timber)
+      r.stocks.stone = Math.max(0, r.stocks.stone - stone)
+      r.consumption.timber += timber
+      r.consumption.stone += stone
+      recordOwnCapital(w, id, producerAccount(id), wages + materials)
+      a.construction.push({ site: site.id, capacity: spaces, cost: wages + materials, remaining: 3 })
+      pending.add(site.id)
     }
-    const { timber, stone } = inputs
-    const materials =
-      recordUse(w, marketStore(id), 'timber', timber) + recordUse(w, marketStore(id), 'stone', stone)
-    r.stocks.timber = Math.max(0, r.stocks.timber - timber)
-    r.stocks.stone = Math.max(0, r.stocks.stone - stone)
-    r.consumption.timber += timber
-    r.consumption.stone += stone
-    recordOwnCapital(w, id, producerAccount(id), wages + materials)
-    a.construction.push({ site: site.id, capacity: spaces, cost: wages + materials, remaining: 3 })
   }
   // Built cover is a physical capacity projection; legacy opening cover is preserved as a lower constraint.
   const cover = new Map<number, { opening: number; added: number }>()
