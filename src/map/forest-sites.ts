@@ -2,6 +2,7 @@ import { landscapeField, sampleLandscape } from './landscape-field'
 import { fractal, hashSeed } from '../sim/random'
 import { reliefRandom } from './relief-field'
 import type { World } from '../sim/types'
+import { renderedLand } from './land-surface'
 
 /** World-space clustered scattering, built once per scene, with a fixed instance cap. */
 export function forestSites(world: Pick<World, 'cells' | 'width' | 'height' | 'seed'>) {
@@ -17,7 +18,7 @@ export function forestSites(world: Pick<World, 'cells' | 'width' | 'height' | 's
     const x = reliefRandom(salt + i * 5) * field.spanX,
       z = reliefRandom(salt + i * 5 + 1) * field.spanY
     sampleLandscape(field, x, z, values)
-    if (values[2] < 0.7 || values[7] < 0.015) continue
+    if (values[2] < 0.7 || values[7] < 0.015 || !renderedLand(world, x, z)) continue
     const cluster = fractal(x / 65, z / 65, salt)
     if (reliefRandom(salt + i * 5 + 2) > cluster * cluster * 1.6) continue
     sites.push({ x, z, variation: reliefRandom(salt + i * 5 + 3) })

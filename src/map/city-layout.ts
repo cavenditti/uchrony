@@ -2,7 +2,7 @@ import type { Settlement } from '../sim/spatial'
 import type { World } from '../sim/types'
 import { hashSeed } from '../sim/random'
 import { reliefRandom } from './relief-field'
-import { cellAt } from '../sim/grid'
+import { renderedLand } from './land-surface'
 import type { UrbanForm } from './urban-form'
 import { parcelLayout } from './parcel-layout'
 import { riverHalfWidth, riverPoint, type RiverCurve } from './rivers'
@@ -34,6 +34,7 @@ export type CityDescription = {
   style: number
   capacity?: number
   civic?: boolean
+  building?: CityBuilding
 }
 export type CityLayout = {
   city: CityDescription
@@ -90,12 +91,34 @@ export function describeCity(
           Math.max(0.35, Math.sqrt((capacity * 40) / Math.PI) / scale),
         )
       : (site.kind === 'city' ? 15 : site.kind === 'town' ? 10 : 5.5) * (0.92 + reliefRandom(seed) * 0.16)
+  const footprint = recorded?.building
+  const floorArea = footprint
+    ? Math.hypot(footprint[1].x - footprint[0].x, footprint[1].y - footprint[0].y) *
+      Math.hypot(footprint[2].x - footprint[1].x, footprint[2].y - footprint[1].y)
+    : 0
+  const storeys = Math.max(1, Math.ceil(((capacity ?? 0) * 28) / Math.max(1, floorArea)))
+  const building: CityBuilding | undefined = footprint
+    ? {
+        x: footprint.reduce((n, p) => n + p.x, 0) / footprint.length / scale,
+        z: footprint.reduce((n, p) => n + p.y, 0) / footprint.length / scale,
+        width: Math.hypot(footprint[1].x - footprint[0].x, footprint[1].y - footprint[0].y) / scale,
+        depth: Math.hypot(footprint[2].x - footprint[1].x, footprint[2].y - footprint[1].y) / scale,
+        angle: -Math.atan2(footprint[1].y - footprint[0].y, footprint[1].x - footprint[0].x),
+        height: (3.2 * storeys) / scale,
+        storeys,
+        representedCapacity: capacity,
+        roof: seed % 5 === 0 ? 'hip' : 'gable',
+        tone: reliefRandom(seed),
+        use: 'housing',
+      }
+    : undefined
   return {
+    building,
     form: site.form,
     civic: site.civic,
     id: site.id,
     cell: site.cell,
-    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${site.civic}:${style}:${Math.round(capacity ?? 0)}:${position?.x ?? cell.x}:${position?.y ?? cell.y}:${radius}:${JSON.stringify(site.form)}`,
+    key: `${site.id}:${site.cell}:${site.kind}:${site.capital}:${site.civic}:${style}:${Math.round(capacity ?? 0)}:${position?.x ?? cell.x}:${position?.y ?? cell.y}:${radius}:${JSON.stringify(site.form)}:${JSON.stringify(building)}`,
     x: position ? position.x / scale : cell.x,
     z: position ? position.y / scale : cell.y,
     radius: site.form ? site.form.parcel.size / (2 * scale) : radius,
@@ -113,12 +136,27 @@ const distanceTo = (p: CityPoint, a: CityPoint, b: CityPoint) => {
   return Math.hypot(p.x - a.x - t * dx, p.z - a.z - t * dz)
 }
 
-/** Decorative town plans at cartographic scale, not a census of simulated buildings. */
+/** Recorded buildings use their exact footprint; older town supports retain
+ * their decorative cartographic plan. */
 export function cityLayout(
   world: Pick<World, 'cells' | 'width' | 'height'>,
   city: CityDescription,
   rivers: readonly RiverCurve[] = [],
 ): CityLayout {
+  if (city.building)
+    return {
+      city,
+      pattern: 'spine',
+      buildings: [city.building],
+      streets: [],
+      bridges: [],
+      square: [],
+      trees: [],
+      gardens: [],
+      landmark: 'belfry',
+      plaza: { x: city.x, z: city.z },
+      angle: city.building.angle,
+    }
   const random = (n: number) => reliefRandom(city.seed + n * 1013)
   const channels: { a: CityPoint; b: CityPoint; width: number }[] = []
   for (const river of rivers) {
@@ -163,8 +201,7 @@ export function cityLayout(
       }
   }
   const isLand = (p: CityPoint) => {
-    const id = cellAt(p.x, p.z, world.width, world.height)
-    return id !== undefined && world.cells[id].terrain !== 'water'
+    return renderedLand(world, p.x, p.z)
   }
   const dry = (p: CityPoint, setback = 1) =>
     isLand(p) && channels.every(({ a, b, width }) => distanceTo(p, a, b) > width + setback)

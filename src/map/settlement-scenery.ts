@@ -23,6 +23,28 @@ export function settlementPlaces(world: World): SettlementPlace[] {
       Object.values(world.adaptive.sites).filter((s) => s.kind === 'residential' && s.retired === undefined)
     ).map((s) => [s.id, s]),
   )
+  if (world.adaptive.buildingVersion === 1) {
+    const labels = new Map(cities.flatMap((city) => (city.siteIds ?? []).map((id) => [id, city] as const)))
+    return [...homes.values()]
+      .filter((home) => home.building && home.capacity > 0)
+      .map((home) => {
+        const city = labels.get(home.id)
+        return {
+          id: `building:${home.id}`,
+          name: city?.name ?? 'Independent home',
+          region: world.cells[home.cell].region,
+          cell: home.cell,
+          population: home.residents ?? 0,
+          kind: city?.kind ?? 'village',
+          capital: false,
+          civic: false,
+          nucleusSite: home.id,
+          position: { x: home.x!, y: home.y! },
+          parcel: home.parcel,
+          capacity: home.capacity,
+        }
+      })
+  }
   return cities.flatMap((city) => {
     const cells = city.cells?.length ? city.cells : [city.cell]
     const ids = city.siteIds ?? cells.map((c) => `home:${c}`)

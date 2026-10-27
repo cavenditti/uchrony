@@ -1,3 +1,4 @@
+import { habitableLand } from '../sim/terrain-access'
 import { CELL_SIZE, cellAt } from '../sim/grid'
 import { hashSeed } from '../sim/random'
 import { localClimate } from '../sim/climate'
@@ -6,6 +7,8 @@ import type { World } from '../sim/types'
 import { roadSurface, type RoadSurface } from '../sim/transport-development'
 import { reliefRandom } from './relief-field'
 import { illuminated } from './illuminated-palette'
+import { tradeRoadEdges, type RoadPoint } from './road-curves'
+import { footprint, landSurface, renderedLand } from './land-surface'
 
 export type DetailShape = 'box' | 'roof' | 'cone' | 'cylinder' | 'crown'
 export interface DetailPiece {
@@ -20,6 +23,7 @@ export interface DetailPiece {
   color: string
   role: string
   water?: boolean
+  baseY?: number
 }
 export interface DetailMotion {
   kind: 'mill' | 'cart' | 'worker' | 'boat'
@@ -28,6 +32,8 @@ export interface DetailMotion {
   angle: number
   phase: number
   water?: boolean
+  path?: RoadPoint[]
+  baseY?: number
 }
 export interface ActivityPlan {
   cell: number
@@ -39,6 +45,7 @@ export interface DetailRoad {
   a: number
   b: number
   surface: RoadSurface
+  points: RoadPoint[]
 }
 
 /** Detailed props are stateless conditional samples. Their identity depends on
@@ -50,6 +57,7 @@ export function activityLayout(
   roads: DetailRoad[] = [],
   height?: (x: number, z: number) => number,
 ): ActivityPlan {
+  const terrainHeightAt = height
   const cell = w.cells[id],
     use = TILE_ACTIVITIES[land.activity[id]],
     climate = localClimate(w, cell),
@@ -58,6 +66,10 @@ export function activityLayout(
     pieces: DetailPiece[] = [],
     motions: DetailMotion[] = [],
     angle = random(2) * 0.45 - 0.225
+  // Building-scale worlds draw persistent physical sites. The older economic
+  // activity illustrations are oversized symbols, not additional buildings or
+  // people; adding them would invent development over the recorded lots.
+  if (!habitableLand(cell) || w.adaptive?.buildingVersion === 1) return { cell: id, use, pieces, motions }
   const add = (
     shape: DetailShape,
     x: number,
@@ -70,10 +82,17 @@ export function activityLayout(
     role: string,
     turn = angle,
     water = false,
+    baseY?: number,
   ) => {
     const at = cellAt(x, z, w.width, w.height)
-    if (at === undefined || (!water && w.cells[at].terrain === 'water')) return
-    pieces.push({ shape, x, z, y, w: width, h: height, d: depth, angle: turn, color, role, water })
+    if (
+      at === undefined ||
+      (!water &&
+        (!habitableLand(w.cells[at]) ||
+          !footprint(x, z, width, depth, turn).every((p) => renderedLand(w, p.x, p.z))))
+    )
+      return
+    pieces.push({ shape, x, z, y, w: width, h: height, d: depth, angle: turn, color, role, water, baseY })
   }
   const timber = '#826144',
     stone = '#c5b394',
@@ -89,11 +108,58 @@ export function activityLayout(
     paint = stone,
     turn = angle,
   ) => {
-    add('box', x, z, height / 2, width, height, depth, paint, role, turn)
-    add('roof', x, z, height + width * 0.16, width * 1.08, width * 0.32, depth * 1.08, roof, role, turn)
+    const corners = footprint(x, z, width * 1.08, depth * 1.08, turn)
+    if (!corners.every((p) => renderedLand(w, p.x, p.z))) return
+    const baseY = terrainHeightAt ? Math.max(...corners.map((p) => terrainHeightAt(p.x, p.z))) : undefined
+    if (baseY !== undefined) {
+      const low = Math.min(...corners.map((p) => terrainHeightAt!(p.x, p.z)))
+      if (baseY - low > 0.001)
+        add(
+          'box',
+          x,
+          z,
+          (baseY - low) / 2,
+          width,
+          baseY - low,
+          depth,
+          stone,
+          `${role}-foundation`,
+          turn,
+          false,
+          low,
+        )
+    }
+    add('box', x, z, height / 2, width, height, depth, paint, role, turn, false, baseY)
+    add(
+      'roof',
+      x,
+      z,
+      height + width * 0.16,
+      width * 1.08,
+      width * 0.32,
+      depth * 1.08,
+      roof,
+      role,
+      turn,
+      false,
+      baseY,
+    )
     const dx = Math.sin(turn) * depth * 0.51,
       dz = Math.cos(turn) * depth * 0.51
-    add('box', x + dx, z + dz, height * 0.26, width * 0.18, height * 0.52, 0.035, dark, role, turn)
+    add(
+      'box',
+      x + dx,
+      z + dz,
+      height * 0.26,
+      width * 0.18,
+      height * 0.52,
+      0.035,
+      dark,
+      role,
+      turn,
+      false,
+      baseY,
+    )
     for (const side of [-1, 1])
       add(
         'box',
@@ -106,6 +172,8 @@ export function activityLayout(
         dark,
         role,
         turn,
+        false,
+        baseY,
       )
   }
   const tree = (x: number, z: number, i: number, orchard = false) => {
@@ -165,8 +233,8 @@ export function activityLayout(
       if (cell.river && Math.abs(x - cell.x) < 0.9) continue
       if (use === 'timber' && Math.hypot(x - cell.x, z - cell.y) < 2.5) continue
       if (
-        roads.some(
-          ({ a, b }) => distanceTo(x, z, w.cells[a].x, w.cells[a].y, w.cells[b].x, w.cells[b].y) < 0.65,
+        roads.some(({ points }) =>
+          points.slice(1).some((p, i) => distanceTo(x, z, points[i].x, points[i].y, p.x, p.y) < 0.65),
         )
       )
         continue
@@ -201,7 +269,7 @@ export function activityLayout(
         z = yardZ + 1
       add('cone', x, z, 0.65, 0.75, 1.3, 0.75, stone, 'windmill', 0)
       add('cone', x, z, 1.45, 0.85, 0.45, 0.85, roof, 'windmill', 0)
-      motions.push({ kind: 'mill', x, z: z + 0.43, angle: 0, phase: random(77) * 6 })
+      motions.push({ kind: 'mill', x, z: z + 0.43, angle: 0, phase: random(77) * 6, baseY: height?.(x, z) })
     }
     for (let i = 0; i < 6; i++)
       add(
@@ -285,50 +353,54 @@ export function activityLayout(
       ux = dx / length,
       uz = dz / length,
       turn = Math.atan2(ux, uz)
-    let shore = 0.44
-    if (height)
-      for (let i = 1; i <= 24; i++)
-        if (height(cell.x + (dx * i) / 24, cell.y + (dz * i) / 24) < 0.2) {
-          shore = i / 24
-          break
-        }
-    const x = cell.x + dx * shore,
-      z = cell.y + dz * shore
-    for (let dock = 0; dock < Math.min(4, harbor.level + 1); dock++) {
-      const offset = (dock - harbor.level / 2) * 0.9,
-        bx = x + uz * offset,
-        bz = z - ux * offset
-      add('box', bx + ux * 0.7, bz + uz * 0.7, 0.18, 0.42, 0.18, 2.1, timber, 'pier', turn, true)
+    const coast = landSurface(w),
+      anchor = coast.shore(cell, sea)
+    if (!anchor || !length) continue
+    const x = anchor.x,
+      z = anchor.y
+    const count = Math.min(4, harbor.level + 1)
+    for (let dock = 0; dock < count; dock++) {
+      const offset = (dock - (count - 1) / 2) * 0.9
+      const root = coast.shore(
+        { x: cell.x + uz * offset, y: cell.y - ux * offset },
+        { x: sea.x + uz * offset, y: sea.y - ux * offset },
+      )
+      if (!root) continue
+      const bx = root.x,
+        bz = root.y,
+        deck = Math.max(0.18, (height?.(bx - ux * 0.35, bz - uz * 0.35) ?? 0) + 0.18)
+      add('box', bx + ux * 0.7, bz + uz * 0.7, deck, 0.42, 0.18, 2.1, timber, 'pier', turn, true)
       for (let j = 0; j < 4; j++)
         for (const side of [-1, 1])
           add(
             'box',
             bx + ux * j * 0.5 + uz * side * 0.2,
             bz + uz * j * 0.5 - ux * side * 0.2,
-            0.1,
+            (deck - 0.1) / 2,
             0.07,
-            0.6,
+            deck + 0.3,
             0.07,
             timber,
             'piling',
             turn,
             true,
           )
-      motions.push({
+      const boat = {
         kind: 'boat',
         x: bx + ux * 1.7 + uz * 0.5,
         z: bz + uz * 1.7 - ux * 0.5,
         angle: turn,
         phase: random(dock + 600) * 6,
         water: true,
-      })
+      } as DetailMotion
+      if (!coast.contains(boat.x, boat.z)) motions.push(boat)
     }
     box(x - ux * 0.9, z - uz * 0.9, 1.1, 1.5, 0.9, 'warehouse', stone, turn)
     add(
       'box',
       x - ux * 0.2,
       z - uz * 0.2,
-      0.12,
+      (height?.(x - ux * 0.2, z - uz * 0.2) ?? 0) + 0.12,
       Math.min(5, harbor.level + 2),
       0.24,
       0.65,
@@ -359,9 +431,10 @@ export function activityLayout(
         z: (a.y + b.y) / 2,
         angle: turn,
         phase: random(road.b) * 6,
+        path: road.points,
       })
     }
-  return { cell: id, use, pieces, motions }
+  return { cell: id, use, pieces, motions: motions.filter((m) => m.water || renderedLand(w, m.x, m.z)) }
 }
 export function distanceTo(x: number, z: number, ax: number, az: number, bx: number, bz: number) {
   const dx = bx - ax,
@@ -371,17 +444,10 @@ export function distanceTo(x: number, z: number, ax: number, az: number, bx: num
 }
 
 export function detailRoads(w: World): DetailRoad[] {
-  const edges = new Map<string, DetailRoad>()
-  const add = (a: number, b: number) => {
-    if (w.cells[a]?.terrain === 'water' || w.cells[b]?.terrain === 'water' || !w.cells[a] || !w.cells[b])
-      return
-    const key = `${Math.min(a, b)}:${Math.max(a, b)}`
-    edges.set(key, { a: Math.min(a, b), b: Math.max(a, b), surface: roadSurface(w, a, b) })
-  }
-  for (const trace of w.corridors ?? [])
-    if (trace.familiarity > 0.06 || trace.traffic > 0) add(trace.a, trace.b)
-  for (const link of w.corridorPlan?.links ?? [])
-    for (const leg of link.legs)
-      if (leg.mode === 'land') for (let i = 1; i < leg.cells.length; i++) add(leg.cells[i - 1], leg.cells[i])
-  return [...edges.values()]
+  return [...tradeRoadEdges(w).values()].map(({ a, b, points }) => ({
+    a,
+    b,
+    points,
+    surface: roadSurface(w, a, b),
+  }))
 }

@@ -1,4 +1,4 @@
-import { stepDistance } from './grid'
+import { movementNeighbors, stepDistance } from './grid'
 import { MinHeap } from './heap'
 import { bundleCorridors } from './corridor-bundling'
 import { shippingBackbone } from './shipping-backbone'
@@ -446,4 +446,14 @@ function seaBackbone(
     if (b.access.length > 1) legs.push({ mode: 'land', cells: [...b.access].reverse() })
     return [{ from: a.region, to: b.region, landCost: a.cost + b.cost, seaCost: crossing.cost + 2, legs }]
   })
+}
+
+/** Old route plans cannot keep an impassable ridge open through path inertia. */
+export function traversableLegs(world: World, legs: RouteLeg[]) {
+  return legs.every((leg) =>
+    leg.cells.every(
+      (id, i) =>
+        i === 0 || movementNeighbors(world.cells, leg.cells[i - 1], world.width, world.height).includes(id),
+    ),
+  )
 }

@@ -1,3 +1,12 @@
+import {
+  tradeRoadEdges,
+  roadKey,
+  orientedRoadCurves,
+  traceRoadCurves,
+  type RoadPoint,
+  type RoadCurve,
+} from './road-curves'
+import { traversableLegs } from '../sim/transport'
 import { StringTable } from './string-table'
 import type { Route, World } from '../sim/types'
 import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
@@ -13,6 +22,8 @@ export interface FreightSegment {
 }
 export interface FreightCorridor {
   cells: number[]
+  points?: RoadPoint[]
+  curves?: RoadCurve[]
   lengths: number[]
   distance: number
   mode: 'land' | 'sea'
@@ -33,6 +44,7 @@ export function freightOverlay(world: World, nation: number, region: number | nu
       legacy = true
       continue
     }
+    if (!traversableLegs(world, route.legs)) continue
     const selected =
       region !== null
         ? route.from === region || route.to === region
@@ -121,6 +133,27 @@ export function freightOverlay(world: World, nation: number, region: number | nu
   }
   // Closed loops have no junction; they still carry and display freight.
   for (const [i, edge] of edges.entries()) if (!visited[i]) walk(i, edge.a)
+  const roads = tradeRoadEdges(world)
+  for (const corridor of corridors) {
+    if (corridor.mode !== 'land') continue
+    const points: RoadPoint[] = [],
+      curves: RoadCurve[] = []
+    for (let i = 1; i < corridor.cells.length; i++) {
+      const from = corridor.cells[i - 1],
+        edge = roads.get(roadKey(from, corridor.cells[i]))!
+      const part = edge.a === from ? edge.points : [...edge.points].reverse()
+      points.push(...(points.length ? part.slice(1) : part))
+      curves.push(...orientedRoadCurves(edge, from))
+    }
+    corridor.points = points
+    corridor.curves = curves
+    corridor.lengths = [0]
+    for (let i = 1; i < points.length; i++)
+      corridor.lengths.push(
+        corridor.lengths[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y),
+      )
+    corridor.distance = corridor.lengths.at(-1) ?? 0
+  }
   return { corridors, ports: [...ports.values()], legacy }
 }
 
@@ -128,8 +161,8 @@ export function pointAlong(world: World, corridor: FreightCorridor, distance: nu
   const d = Math.max(0, Math.min(corridor.distance, distance))
   let i = 1
   while (i < corridor.lengths.length - 1 && corridor.lengths[i] < d) i++
-  const a = world.cells[corridor.cells[i - 1]],
-    b = world.cells[corridor.cells[i]],
+  const a = corridor.points?.[i - 1] ?? world.cells[corridor.cells[i - 1]],
+    b = corridor.points?.[i] ?? world.cells[corridor.cells[i]],
     t = (d - corridor.lengths[i - 1]) / (corridor.lengths[i] - corridor.lengths[i - 1])
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
 }
@@ -178,24 +211,29 @@ export function drawFreight(
       : corridor.forward + corridor.backward
     if (volume <= 0) return
     const sea = corridor.mode === 'sea'
+    // The underlying land route is already painted as a dirt road. Only the
+    // explicit Trade layer adds a quantity highlight above that ground texture.
+    if (!sea && !focused) return
     ctx.globalAlpha = focused && !selected ? 0.13 : 0.2 + strength(volume) * (sea ? 0.7 : 0.6)
     ctx.strokeStyle = sea ? '#e8d3a5' : '#524328'
     ctx.lineWidth = width(volume)
     ctx.setLineDash(sea ? [4 / scale, 5 / scale] : [])
     ctx.beginPath()
-    corridor.cells.forEach((id, i) => {
-      const c = world.cells[id]
-      if (i === 0) ctx.moveTo(c.x, c.y)
-      else if (i === corridor.cells.length - 1) ctx.lineTo(c.x, c.y)
-      else {
-        // Round only inside the cell around a corner; never shortcut the route.
-        const before = world.cells[corridor.cells[i - 1]],
-          after = world.cells[corridor.cells[i + 1]],
-          inset = 0.18
-        ctx.lineTo(c.x + (before.x - c.x) * inset, c.y + (before.y - c.y) * inset)
-        ctx.quadraticCurveTo(c.x, c.y, c.x + (after.x - c.x) * inset, c.y + (after.y - c.y) * inset)
-      }
-    })
+    if (corridor.curves) traceRoadCurves(ctx, corridor.curves)
+    else
+      corridor.cells.forEach((id, i) => {
+        const c = world.cells[id]
+        if (i === 0) ctx.moveTo(c.x, c.y)
+        else if (i === corridor.cells.length - 1) ctx.lineTo(c.x, c.y)
+        else {
+          // Round only inside the cell around a corner; never shortcut the route.
+          const before = world.cells[corridor.cells[i - 1]],
+            after = world.cells[corridor.cells[i + 1]],
+            inset = 0.18
+          ctx.lineTo(c.x + (before.x - c.x) * inset, c.y + (before.y - c.y) * inset)
+          ctx.quadraticCurveTo(c.x, c.y, c.x + (after.x - c.x) * inset, c.y + (after.y - c.y) * inset)
+        }
+      })
     ctx.stroke()
   }
   for (const corridor of overlay.corridors) drawLine(corridor, false)

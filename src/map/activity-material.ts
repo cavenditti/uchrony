@@ -1,3 +1,4 @@
+import { habitableLand } from '../sim/terrain-access'
 import * as THREE from 'three'
 import { TILE_ACTIVITIES, type EconomicLandscape } from '../sim/economic-landscape'
 import { localClimate } from '../sim/climate'
@@ -9,6 +10,7 @@ export function activityTexture(world: World, landscape: EconomicLandscape) {
   const data = new Uint8Array(world.width * world.height * 4),
     color = new THREE.Color()
   for (const c of world.cells) {
+    if (!habitableLand(c)) continue
     const use = TILE_ACTIVITIES[landscape.activity[c.id]],
       climate = localClimate(world, c)
     if (use === 'fields')

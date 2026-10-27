@@ -2,13 +2,19 @@ import { StringTable } from './string-table'
 import * as THREE from 'three'
 import type { World } from '../sim/types'
 import { settlementPlaces } from './settlement-scenery'
-import { describeCity, cityLayout, type CityDescription, type CityPoint } from './city-layout'
+import {
+  describeCity,
+  cityLayout,
+  type CityDescription,
+  type CityPoint,
+  type CityBuilding,
+} from './city-layout'
 import type { RiverCurve } from './rivers'
 import { TerrainPicker } from './relief-picking'
 import { architectureMaterial, townGroundMaterial, windMaterial } from './city-materials'
 import { illuminated } from './illuminated-palette'
-import { reliefRandom } from './relief-field'
 import { streetRibbon } from './street-geometry'
+import { footprint, renderedLand } from './land-surface'
 
 const PALETTES = illuminated.cities
 const DETAIL_LIMIT = 6,
@@ -33,7 +39,7 @@ export class CityScenery {
   private cache = new Map<string, CityEntry>()
   private overview = new THREE.Group()
   private heights = new StringTable<number>()
-  private ranges = new StringTable<[number, number]>()
+  private ranges = new StringTable<[number, number][]>()
   private overviewMatrices: Float32Array[] = []
   private hidden = new Set<string>()
   private clock = 0
@@ -57,7 +63,8 @@ export class CityScenery {
   private foliageMaterial = windMaterial(this.time)
   private clothMaterial = windMaterial(this.time, true)
   private dummy = new THREE.Object3D()
-  private ray = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0))
+  private detailSize = new StringTable<number>()
+  private detailed = false
   private projection = new THREE.Vector3()
   private geography: Pick<World, 'cells' | 'width' | 'height'>
 
@@ -87,6 +94,7 @@ export class CityScenery {
     this.descriptions = cities
     this.heights.clear()
     this.ranges.clear()
+    this.detailSize.clear()
     this.hidden.clear()
     const keys = new StringTable<true>()
     for (const city of cities) keys.set(city.key, true)
@@ -97,120 +105,90 @@ export class CityScenery {
       }
     this.release(this.overview)
     this.overview = new THREE.Group()
-    // Overview samples the same physical building form as detail. Huge generic
-    // houses cannot suddenly replace a neighboring district at the cache edge.
-    const native = new Map(
-      cities
-        .filter((c) => c.form)
-        .map((c) => {
-          const all = cityLayout(this.geography, c, this.rivers).buildings
-          const count = Math.min(32, all.length)
-          return [
-            c.id,
-            Array.from({ length: count }, (_, i) => all[Math.floor((i * all.length) / count)]),
-          ] as const
-        }),
+    // Every LoD samples the same placed buildings. Simplification may omit
+    // small houses, never replace them with unrelated blocks or change a roof.
+    const native = cities.map((city) => {
+      const buildings = cityLayout(this.geography, city, this.rivers)
+        .buildings.map((building) => ({ building, placement: this.placement(city, building) }))
+        .filter((b) => b.placement !== null)
+      this.detailSize.set(
+        city.id,
+        buildings.reduce((size, { building: b }) => Math.max(size, b.width, b.depth, b.height), 0),
+      )
+      const count = Math.min(32, buildings.length)
+      return Array.from({ length: count }, (_, i) => buildings[Math.floor((i * buildings.length) / count)])
+    })
+    const shapes = ['box', 'hip', 'gable', 'box', 'box'] as const
+    const totals = [0, 0, 0, 0, 0]
+    for (const buildings of native)
+      for (const { building: b } of buildings) {
+        totals[0]++
+        totals[4]++
+        totals[b.roof === 'hip' ? 1 : b.roof === 'gable' ? 2 : 3]++
+      }
+    const meshes = shapes.map(
+      (shape, i) =>
+        new THREE.InstancedMesh(
+          this.geometries[shape],
+          i === 0 ? this.wallMaterial : i === 4 ? this.detailMaterial : this.roofMaterial,
+          totals[i],
+        ),
     )
-    const countFor = (c: CityDescription) =>
-      native.get(c.id)?.length ??
-      (c.capacity === undefined
-        ? c.kind === 'city'
-          ? 7
-          : c.kind === 'town'
-            ? 4
-            : 2
-        : Math.max(1, Math.min(12, Math.ceil(Math.sqrt(c.capacity / 150)))))
-    const total = cities.reduce((n, c) => n + countFor(c), 0)
-    // Write straight into GPU instance buffers. Materializing hundreds of thousands
-    // of temporary Piece/Color records also required one large JS array allocation.
-    const walls = new THREE.InstancedMesh(this.geometries.box, this.wallMaterial, total)
-    const roofs = new THREE.InstancedMesh(this.geometries.hip, this.roofMaterial, total)
-    const colors = PALETTES.map((p) => ({ walls: new THREE.Color(p.walls), roof: new THREE.Color(p.roof) }))
-    let index = 0
-    const put = (
-      mesh: THREE.InstancedMesh,
-      x: number,
-      y: number,
-      z: number,
-      w: number,
-      h: number,
-      d: number,
-      color: THREE.Color,
-      angle = 0,
-    ) => {
-      this.dummy.position.set(x, y, z)
-      this.dummy.rotation.set(0, angle, 0)
+    const indices = [0, 0, 0, 0, 0],
+      color = new THREE.Color()
+    const put = (slot: number, b: CityBuilding, y: number, w: number, h: number, d: number) => {
+      this.dummy.position.set(b.x, y, b.z)
+      this.dummy.rotation.set(0, b.angle, 0)
       this.dummy.scale.set(w, h, d)
       this.dummy.updateMatrix()
-      mesh.setMatrixAt(index, this.dummy.matrix)
-      mesh.setColorAt(index, color)
+      meshes[slot].setMatrixAt(indices[slot], this.dummy.matrix)
+      meshes[slot].setColorAt(indices[slot]++, color)
     }
-    for (const c of cities) {
-      this.heights.set(c.id, this.height(c.x, c.z))
-      const first = index,
-        count = countFor(c),
-        palette = colors[c.style]
-      for (let j = 0; j < count; j++) {
-        const physical = native.get(c.id)?.[j]
-        if (physical) {
-          const b = physical,
-            floor = this.height(b.x, b.z),
-            roofHeight = Math.min(b.width, b.depth) * (b.roof === 'flat' ? 0.08 : 0.3)
-          put(walls, b.x, floor + b.height / 2, b.z, b.width, b.height, b.depth, palette.walls, b.angle)
-          put(
-            roofs,
-            b.x,
-            floor + b.height + roofHeight / 2,
-            b.z,
-            b.width * 1.04,
-            roofHeight,
-            b.depth * 1.04,
-            palette.roof,
-            b.angle,
-          )
-          index++
-          continue
-        }
-
-        const a = j * 2.4 + (c.capacity === undefined ? 0 : reliefRandom(c.seed + j) * Math.PI * 2),
-          d = c.capacity === undefined ? Math.sqrt(j) * 1.25 : Math.sqrt((j + 0.3) / count) * c.radius * 0.75,
-          x = c.x + Math.cos(a) * d,
-          z = c.z + Math.sin(a) * d
-        const floor = this.height(x, z)
-        const form = c.form,
-          workshop = form && (form.district === 'industrial' || form.district === 'mining') && j % 3 === 0
-        const span = form ? form.parcel.size / form.metersPerMapUnit : 0
-        const width = form ? span * Math.sqrt(form.coverage / count) : 1
-        const floors = form ? form.floorAreaRatio / Math.max(0.01, form.coverage) : 0
-        const h = form
-          ? ((workshop ? 6 : 3 * floors * (1.25 - (j / count) * 0.5)) / form.metersPerMapUnit) * 2
-          : j === 0 && c.civic
-            ? 3.7
-            : c.capacity === undefined
-              ? 1.5
-              : 0.6 + reliefRandom(c.seed + j + 91) * 0.8
-        const roofHeight = form ? Math.min(width * 0.3, h * 0.2) : 0.8
-        put(walls, x, floor + h / 2, z, width, h, workshop ? width * 1.5 : width, palette.walls)
+    cities.forEach((city, i) => {
+      this.heights.set(city.id, this.height(city.x, city.z))
+      const start = [...indices],
+        palette = PALETTES[city.style]
+      for (const { building: b, placement } of native[i]) {
+        const { base, floor, footing, lift } = placement!
+        color.set(palette.trim)
         put(
-          roofs,
-          x,
-          floor + h + roofHeight / 2,
-          z,
-          width * 1.08,
-          roofHeight,
-          width * (workshop ? 1.6 : 1.08),
-          palette.roof,
+          4,
+          b,
+          floor + (base - floor) / 2,
+          b.width + footing,
+          Math.max(lift, base - floor),
+          b.depth + footing,
         )
-        index++
+        color.set(palette.walls).multiplyScalar(0.94 + b.tone * 0.1)
+        put(0, b, base + b.height / 2, b.width, b.height, b.depth)
+        const physical = city.form || city.building
+        const roofHeight = physical
+          ? Math.min(b.width, b.depth) * (b.roof === 'flat' ? 0.08 : 0.3)
+          : b.roof === 'flat'
+            ? 0.14
+            : b.roof === 'gable'
+              ? 0.55
+              : 0.65
+        color.set(palette.roof).multiplyScalar(0.88 + b.tone * 0.22)
+        put(
+          b.roof === 'hip' ? 1 : b.roof === 'gable' ? 2 : 3,
+          b,
+          base + b.height + roofHeight / 2,
+          physical ? b.width * 1.04 : b.width + (b.roof === 'flat' ? 0.09 : 0.18),
+          roofHeight,
+          physical ? b.depth * 1.04 : b.depth + (b.roof === 'flat' ? 0.09 : 0.18),
+        )
       }
-      this.ranges.set(c.id, [first, count])
-    }
-    for (const mesh of [walls, roofs]) {
+      this.ranges.set(
+        city.id,
+        indices.map((end, slot) => [start[slot], end - start[slot]]),
+      )
+    })
+    for (const mesh of meshes) {
       mesh.computeBoundingSphere()
       mesh.castShadow = true
       mesh.receiveShadow = true
-      if (total) this.overview.add(mesh)
-      else mesh.dispose()
+      this.overview.add(mesh)
     }
     this.overviewMatrices = this.overview.children.map((mesh) =>
       ((mesh as THREE.InstancedMesh).instanceMatrix.array as Float32Array).slice(),
@@ -219,29 +197,59 @@ export class CityScenery {
   }
 
   private height(x: number, z: number) {
-    this.ray.origin.set(x, 1000, z)
-    return this.picker.intersect(this.ray)?.y ?? 0
+    return this.picker.heightAt(x, z)
+  }
+
+  private placement(city: CityDescription, b: CityBuilding) {
+    const footing = city.building
+      ? Math.min(b.width, b.depth) * 0.04
+      : city.form
+        ? 0.5 / city.form.metersPerMapUnit
+        : 0.09
+    const lift = city.building ? b.height * 0.05 : city.form ? 0.2 / city.form.metersPerMapUnit : 0.04
+    const corners = footprint(b.x, b.z, b.width + footing * 2, b.depth + footing * 2, b.angle)
+    if (!corners.every((p) => renderedLand(this.geography, p.x, p.z))) return null
+    const floors = corners.map((p) => this.height(p.x, p.z))
+    const high = Math.max(...floors),
+      floor = Math.min(...floors, this.height(b.x, b.z))
+    if (high - floor > 1.4) return null
+    return { footing, lift, floor, base: high + lift }
   }
 
   /** Called on camera changes. Offscreen details are hidden immediately; visible and cached detail both have fixed limits. */
   view(camera: THREE.Camera, width: number, height: number, scale: number) {
-    const key = `${camera.position.x}:${camera.position.y}:${camera.position.z}:${width}:${height}:${scale}`
+    const key = `${camera.matrixWorld.elements.join(',')}:${camera.projectionMatrix.elements.join(',')}:${width}:${height}:${scale}`
     if (key === this.viewKey) return
     this.viewKey = key
+    const previous = new Set(this.hidden)
     for (const id of this.hidden) this.hideOverview(id, false)
     this.hidden.clear()
     for (const entry of this.cache.values()) entry.group.visible = false
-    if (scale < 3) return
+    this.detailed = scale >= (this.detailed ? 2.6 : 3)
+    if (!this.detailed) return
     const visible: { city: CityDescription; distance: number }[] = []
     for (const city of this.descriptions) {
+      // Small recorded homes need facade detail only once it can be resolved.
+      if (
+        (city.building || city.form) &&
+        (this.detailSize.get(city.id) ?? 0) * scale < (previous.has(city.id) ? 4 : 5)
+      )
+        continue
       this.projection.set(city.x, this.heights.get(city.id) ?? 0, city.z).project(camera)
       const marginX = (city.radius * scale * 2) / width,
         marginY = (city.radius * scale * 2) / height
+      if (this.projection.z < -1 || this.projection.z > 1) continue
       if (Math.abs(this.projection.x) > 1 + marginX || Math.abs(this.projection.y) > 1 + marginY) continue
-      visible.push({ city, distance: this.projection.x ** 2 + this.projection.y ** 2 })
+      visible.push({
+        city,
+        distance: (this.projection.x ** 2 + this.projection.y ** 2) * (previous.has(city.id) ? 0.85 : 1),
+      })
     }
     visible.sort((a, b) => a.distance - b.distance)
-    for (const { city } of visible.slice(0, visible.some(({ city }) => city.form) ? 16 : DETAIL_LIMIT)) {
+    for (const { city } of visible.slice(
+      0,
+      visible.some(({ city }) => city.form || city.building) ? 16 : DETAIL_LIMIT,
+    )) {
       let entry = this.cache.get(city.id)
       if (!entry) {
         // There are at most six near-camera towns. Each layout has a finite parcel budget.
@@ -254,7 +262,7 @@ export class CityScenery {
       this.hidden.add(city.id)
       entry.used = ++this.clock
     }
-    while (this.cache.size > (this.descriptions.some((c) => c.form) ? 24 : CACHE_LIMIT)) {
+    while (this.cache.size > (this.descriptions.some((c) => c.form || c.building) ? 24 : CACHE_LIMIT)) {
       let oldestId = '',
         oldest = Infinity
       for (const [id, entry] of this.cache)
@@ -274,7 +282,8 @@ export class CityScenery {
     this.overview.children.forEach((object, index) => {
       const mesh = object as THREE.InstancedMesh,
         array = mesh.instanceMatrix.array
-      for (let i = range[0] * 16; i < (range[0] + range[1]) * 16; i++)
+      const [start, count] = range[index]
+      for (let i = start * 16; i < (start + count) * 16; i++)
         array[i] = hide ? 0 : this.overviewMatrices[index][i]
       mesh.instanceMatrix.needsUpdate = true
     })
@@ -344,14 +353,9 @@ export class CityScenery {
         street.width < 0.7 ? 1 : 0,
       )
     for (const b of layout.buildings) {
-      const floor = this.height(b.x, b.z),
-        footing = city.form ? 0.5 / city.form.metersPerMapUnit : 0.09,
-        lift = city.form ? 0.2 / city.form.metersPerMapUnit : 0.04,
-        corners = rectangle(b.x, b.z, b.width + footing * 2, b.depth + footing * 2, b.angle)
-      const floors = corners.map((p) => this.height(p.x, p.z)),
-        high = Math.max(...floors)
-      if (high - Math.min(...floors) > 1.4) continue
-      const base = high + lift
+      const placement = this.placement(city, b)
+      if (!placement) continue
+      const { floor, footing, lift, base } = placement
       const wall = new THREE.Color(palette.walls).multiplyScalar(0.94 + b.tone * 0.1)
       const roof = new THREE.Color(palette.roof).multiplyScalar(0.88 + b.tone * 0.22)
       trim.push({
@@ -374,7 +378,7 @@ export class CityScenery {
         a: b.angle,
         color: wall,
       })
-      if (city.form) {
+      if (city.form || city.building) {
         const cap = Math.min(b.width, b.depth) * 0.08
         const roofHeight = b.roof === 'flat' ? cap : Math.min(b.width, b.depth) * 0.3
         parts[b.roof === 'flat' ? 'box' : b.roof].push({
@@ -541,7 +545,7 @@ export class CityScenery {
       }
     }
     const p = layout.plaza,
-      floor = this.height(p.x, p.z),
+      floor = Math.max(this.height(p.x, p.z), ...layout.square.map((p) => this.height(p.x, p.z))),
       stone = new THREE.Color(palette.walls),
       roof = new THREE.Color(palette.roof)
     if (layout.square.length && city.civic !== false && city.form) {

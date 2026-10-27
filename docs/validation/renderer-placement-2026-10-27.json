@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-27",
+  "scope": "3D model placement, coastline attachment, curved road motion, terrain picking, and scenery LoD",
+  "build": {
+    "passed": true,
+    "warning": "Vite reports chunks over 500 kB"
+  },
+  "tests": {
+    "passed": 49,
+    "failed": 0,
+    "newRegressions": 7,
+    "files": [
+      "renderer-placement",
+      "city-rendering",
+      "relief",
+      "living-world",
+      "road-curves",
+      "river-rendering",
+      "quadtree-map",
+      "building-lots"
+    ]
+  },
+  "browser": {
+    "engine": "Chromium via agent-browser",
+    "viewports": [
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "runtimeErrorsInFinalSession": 0,
+    "controlledHarbor": {
+      "piers": 4,
+      "rootsOnLand": 4,
+      "tipsOnWater": 4,
+      "roadCarts": 13,
+      "maximumLandSeaProjectionRoundTripErrorMapUnits": 9.1e-13,
+      "desktop": {
+        "visibleActivityCells": 28,
+        "cachedActivityCells": 74,
+        "movingActors": 120,
+        "instances": 844
+      },
+      "phone": {
+        "visibleActivityCells": 14,
+        "cachedActivityCells": 78,
+        "movingActors": 61,
+        "instances": 436
+      }
+    },
+    "generatedWorld": {
+      "seed": "Living landscape browser",
+      "cells": 8064,
+      "simulatedMonths": 1
+    }
+  },
+  "regressions": [
+    "Exact quadratic coast including rounded corners and inland water",
+    "Piers in four orientations and harbor levels 0/1/3/8 on elevated shores",
+    "Carts remain on painted bends and face travel; plans alone create no traffic",
+    "Compound facility foundation alignment and retained paused animation time",
+    "Matching overview/detail wall, roof and foundation transforms; hysteresis and rotated camera invalidation",
+    "Projected-size detail eligibility for recorded building footprints",
+    "Picking skips transparent terrain and reaches visible land behind it"
+  ],
+  "bounds": {
+    "activityVisibleCells": 64,
+    "activityCachedCells": 128,
+    "movingActors": 384,
+    "legacyVisibleTowns": 6,
+    "legacyCachedTowns": 12,
+    "physicalVisiblePatches": 16,
+    "physicalCachedPatches": 24
+  },
+  "screenshots": [
+    "renderer-harbor-2026-10-27.png",
+    "renderer-traffic-2026-10-27.png",
+    "renderer-harbor-mobile-2026-10-27.png",
+    "renderer-generated-2026-10-27.png",
+    "renderer-generated-mobile-2026-10-27.png"
+  ],
+  "limits": [
+    "Fixture and regional generated-world qualification, not a world-scale endurance run or exhaustive inspection of every saved world.",
+    "Primitive budgets intentionally retain simplified overview buildings beyond the detail budget.",
+    "Coast geometry follows the atlas path; texture sampling retains the existing finite raster resolution."
+  ],
+  "designDetector": "Only advisory findings for existing map-local material colors; no new palette changes.",
+  "commands": [
+    "npm run build",
+    "node --import tsx --test tests/renderer-placement.test.ts tests/city-rendering.test.ts tests/relief.test.ts tests/living-world.test.ts tests/road-curves.test.ts tests/river-rendering.test.ts tests/quadtree-map.test.ts tests/building-lots.test.ts",
+    "git diff --check"
+  ]
+}

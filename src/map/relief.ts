@@ -17,6 +17,8 @@ import { illuminated } from './illuminated-palette'
 import { ActivityScenery } from './activity-scenery'
 import { activityTexture } from './activity-material'
 import { economicLandscape } from '../sim/economic-landscape'
+import { drawGroundRoads } from './ground-roads'
+import { renderedLand } from './land-surface'
 
 export type ReliefCamera = { w: number; h: number; scale: number; x: number; y: number; tilt: boolean }
 
@@ -39,7 +41,7 @@ export class ReliefMap {
   private overlayCanvas = document.createElement('canvas')
   private textureCanvas = document.createElement('canvas')
   private scenery = new THREE.Group()
-  private treeScale = { value: 1 }
+  private treeScale = { value: 0.16 }
   private motion = new SceneryMotion()
   private pigment = { value: 1 }
   private sun = new THREE.DirectionalLight('#fff0d8', 1.85)
@@ -219,7 +221,7 @@ export class ReliefMap {
     )
     let index = 0
     for (const { x, z, variation: r } of trees) {
-      dummy.position.set(x, terrainHeight(world, x, z) + 0.2, z)
+      dummy.position.set(x, this.picker.heightAt(x, z), z)
       dummy.rotation.set((r - 0.5) * 0.18, r * Math.PI, 0)
       const slender = r > 0.64
       dummy.scale.set(
@@ -292,7 +294,6 @@ export class ReliefMap {
     this.cities.group.visible = next.scale > 0.38
     this.cities.view(this.camera, next.w, next.h, next.scale)
     this.activities.view(this.camera, next.w, next.h, next.scale)
-    this.treeScale.value = THREE.MathUtils.lerp(1, 0.16, THREE.MathUtils.smoothstep(next.scale, 1.5, 6))
     this.sun.castShadow = next.scale >= 3
     if (this.sun.castShadow) {
       const extent = Math.min(300, Math.max(35, (next.w / next.scale) * 0.7))
@@ -347,6 +348,7 @@ export class ReliefMap {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height)
     ctx.setTransform(sx, 0, 0, sy, -bounds.x * sx, -bounds.y * sy)
+    drawGroundRoads(ctx, this.lineworkWorld, this.cameraState.scale, bounds, this.atlas.land)
     drawAtlasLinework(ctx, this.atlas, this.lineworkWorld, this.lineworkLayer, this.cameraState.scale, true)
     draw(ctx)
     this.overlay.needsUpdate = true
@@ -362,7 +364,8 @@ export class ReliefMap {
   }
 
   project(x: number, y: number, lift = 2) {
-    const p = new THREE.Vector3(x, terrainHeight(this.geography, x, y) + lift, y).project(this.camera)
+    const floor = renderedLand(this.geography, x, y) ? this.picker.heightAt(x, y) : -0.1
+    const p = new THREE.Vector3(x, floor + lift, y).project(this.camera)
     return { x: ((p.x + 1) * this.cameraState.w) / 2, y: ((1 - p.y) * this.cameraState.h) / 2 }
   }
 
@@ -371,8 +374,15 @@ export class ReliefMap {
       new THREE.Vector2((x / this.cameraState.w) * 2 - 1, 1 - (y / this.cameraState.h) * 2),
       this.camera,
     )
-    const hit = this.picker.intersect(this.raycaster.ray)
-    return hit ? { x: hit.x, y: hit.z } : null
+    const hit = this.picker.intersect(this.raycaster.ray, (x, z) => renderedLand(this.geography, x, z))
+    if (hit) return { x: hit.x, y: hit.z }
+    const ray = this.raycaster.ray,
+      t = (-0.1 - ray.origin.y) / ray.direction.y
+    const xSea = ray.origin.x + ray.direction.x * t,
+      zSea = ray.origin.z + ray.direction.z * t
+    return t >= 0 && xSea >= 0 && zSea >= 0 && xSea <= this.width && zSea <= this.height
+      ? { x: xSea, y: zSea }
+      : null
   }
 
   pauseMotion() {

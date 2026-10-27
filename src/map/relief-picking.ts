@@ -1,4 +1,4 @@
-import { Box3, Vector3, type PlaneGeometry, type Ray } from 'three'
+import { Box3, Vector3, Ray, type PlaneGeometry } from 'three'
 
 /** Exact triangle picking restricted to the regular-grid cells crossed by the ray.
  * The map camera looks down, so only the narrow segment between peak height and
@@ -13,6 +13,7 @@ export class TerrainPicker {
   private c = new Vector3()
   private candidate = new Vector3()
   private hit = new Vector3()
+  private vertical = new Ray(new Vector3(), new Vector3(0, -1, 0))
 
   constructor(private geometry: PlaneGeometry) {
     geometry.computeBoundingBox()
@@ -21,7 +22,19 @@ export class TerrainPicker {
     this.bounds.max.y = Math.max(0.001, this.bounds.max.y)
   }
 
-  intersect(ray: Ray) {
+  get minimumHeight() {
+    return this.bounds.min.y
+  }
+  get maximumHeight() {
+    return this.bounds.max.y
+  }
+
+  heightAt(x: number, z: number) {
+    this.vertical.origin.set(x, this.maximumHeight + 1, z)
+    return this.intersect(this.vertical)?.y ?? 0
+  }
+
+  intersect(ray: Ray, visible?: (x: number, z: number) => boolean) {
     if (ray.direction.y >= -1e-6 || !ray.intersectsBox(this.bounds)) return null
     const upper = Math.max(0, (this.bounds.max.y - ray.origin.y) / ray.direction.y)
     const lower = (this.bounds.min.y - ray.origin.y) / ray.direction.y
@@ -44,6 +57,7 @@ export class TerrainPicker {
           this.b.fromBufferAttribute(positions, indices.getX(triangle + 1))
           this.c.fromBufferAttribute(positions, indices.getX(triangle + 2))
           if (!ray.intersectTriangle(this.a, this.b, this.c, true, this.candidate)) continue
+          if (visible && !visible(this.candidate.x, this.candidate.z)) continue
           const distance = ray.origin.distanceToSquared(this.candidate)
           if (distance < closest) {
             closest = distance

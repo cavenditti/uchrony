@@ -1,10 +1,16 @@
 import { generateWorld } from '../../src/sim/generate'
 import { tick } from '../../src/sim/engine'
 import { CELL_SIZE } from '../../src/sim/grid'
-import { TILE_ACTIVITIES, type EconomicLandscape } from '../../src/sim/economic-landscape'
+import { economicLandscape, TILE_ACTIVITIES, type EconomicLandscape } from '../../src/sim/economic-landscape'
 import type { World } from '../../src/sim/types'
 import { buildAtlas } from '../../src/map/renderer'
 import { ReliefMap } from '../../src/map/relief'
+import { activityLayout, detailRoads } from '../../src/map/activity-layout'
+import { activityPose } from '../../src/map/activity-motion'
+import { landSurface } from '../../src/map/land-surface'
+import type { TerrainPicker } from '../../src/map/relief-picking'
+import type { ActivityScenery } from '../../src/map/activity-scenery'
+import type { CityScenery } from '../../src/map/city-scenery'
 
 const generated = generateWorld('Living landscape browser', 2, 4),
   width = 16,
@@ -60,6 +66,7 @@ for (const c of cells) {
 }
 const cityCell = 5 * width + 11,
   center = cells[cityCell]
+const roadPath = [80, 81, 82, 83, 84, 85, 86, 70, 71, 72, 88, 89, 90, 91]
 const fixture = {
   ...generated,
   seed: 'Living landscape fixture',
@@ -81,7 +88,7 @@ const fixture = {
   ],
   nations: [{ ...generated.nations[0], id: 0, capital: 0 }],
   routes: [],
-  corridors: [],
+  corridors: roadPath.slice(1).map((b, i) => ({ a: roadPath[i], b, familiarity: 1, traffic: 40 })),
   corridorPlan: {
     links: Array.from({ length: 11 }, (_, q) => ({
       from: 0,
@@ -142,12 +149,70 @@ function render() {
     tilt: true,
   })
   relief.paint(world, 'terrain', zoom)
+  relief.paintOverlay(() => {}, 0, world, false)
   result.textContent = `${world === fixture ? 'Controlled illustration' : 'Generated simulation geography'} · ${world.cells.length.toLocaleString()} tiles · month ${world.month + 1} · zoom ${zoom.toFixed(1)}`
 }
 const focusOn = (x: number, y: number, span: number) => {
   focus = { x: x * CELL_SIZE, y: y * CELL_SIZE, span }
   render()
 }
+// Isolated browser qualification only; no production-world access or saving.
+Object.assign(window, {
+  rendererReview: {
+    focusOn,
+    snapshot: () => {
+      const scene = relief as unknown as {
+        picker: TerrainPicker
+        activities: ActivityScenery
+        cities: CityScenery
+      }
+      const roads = detailRoads(world)
+      const landscape = world.viewLandscape ?? economicLandscape(world)
+      const plans = world.cells
+        .filter((c) => c.terrain !== 'water')
+        .map((c) =>
+          activityLayout(
+            world,
+            landscape,
+            c.id,
+            roads.filter((r) => r.a === c.id || r.b === c.id),
+            (x, z) => scene.picker.heightAt(x, z),
+          ),
+        )
+      const coast = landSurface(world)
+      const piers = plans.flatMap((p) => p.pieces).filter((p) => p.role === 'pier')
+      const carts = plans.flatMap((p) => p.motions).filter((m) => m.kind === 'cart')
+      const positions = [world.cells[85], world.cells[94]].map((p) => {
+        const screen = relief.project(p.x, p.y, 0),
+          pick = relief.locate(screen.x, screen.y)
+        return { cell: p.id, error: pick ? Math.hypot(pick.x - p.x, pick.y - p.y) : null }
+      })
+      return {
+        width: canvas.clientWidth,
+        height: canvas.clientHeight,
+        focus,
+        zoom: canvas.clientHeight / focus.span,
+        activities: scene.activities.stats,
+        visibleCities: scene.cities.group.children.slice(1).filter((g) => g.visible).length,
+        piers: piers.map((p) => ({
+          x: p.x,
+          z: p.z,
+          height: p.y,
+          rootOnLand: coast.contains(
+            p.x - (Math.sin(p.angle) * p.d) / 2,
+            p.z - (Math.cos(p.angle) * p.d) / 2,
+          ),
+          tipOnWater: !coast.contains(
+            p.x + (Math.sin(p.angle) * p.d) / 2,
+            p.z + (Math.cos(p.angle) * p.d) / 2,
+          ),
+        })),
+        carts: carts.map((m) => ({ path: m.path, pose: activityPose(m, 13.7, world) })),
+        positions,
+      }
+    },
+  },
+})
 document.querySelector('#overview')!.addEventListener('click', () => focusOn(8, 5.5, 110))
 document.querySelector('#fields')!.addEventListener('click', () => focusOn(4, 5.5, 42))
 document.querySelector('#industry')!.addEventListener('click', () => focusOn(8, 5.5, 42))
