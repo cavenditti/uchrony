@@ -1,3 +1,4 @@
+import { recordMilitaryInfluence } from './influence'
 import { publicGoods } from './ledger'
 import {
   marketStore,
@@ -199,6 +200,8 @@ export function advanceArmies(w: World) {
       r.stocks.food -= taken
       ops.food += taken
       const hardship = taken / Math.max(1, population(r) * 0.025)
+      if (taken > 0)
+        recordMilitaryInfluence(w, army.nation, r.nation, r.id, 'requisition', army.soldiers / 2000, hardship)
       r.unrest = clamp(r.unrest + hardship * 20, 0, 100)
       r.devastation = clamp(r.devastation + hardship * 0.03)
       for (const group of r.communities ?? []) {
@@ -370,6 +373,15 @@ export function advanceArmies(w: World) {
       next.population.adults,
       Math.floor((attackerLoss + defenseLoss) * (army.operations!.conduct === 'requisition' ? 0.035 : 0.012)),
     )
+    recordMilitaryInfluence(
+      w,
+      army.nation,
+      former.id,
+      next.id,
+      'attack',
+      (army.soldiers + attackerLoss) / 2000,
+      civilianLoss / Math.max(1, population(next) * 0.01),
+    )
     removeCivilianAdults(w, next, civilianLoss)
     next.deaths += civilianLoss
     w.totals.deaths += civilianLoss
@@ -377,6 +389,14 @@ export function advanceArmies(w: World) {
     army.operations!.fatigue = clamp(army.operations!.fatigue + 0.2)
     army.experience = clamp(army.experience + 0.02)
     if (attack > defense * 1.2 && army.soldiers > 200 && army.morale > 0.2) {
+      recordMilitaryInfluence(
+        w,
+        army.nation,
+        former.id,
+        next.id,
+        'victory',
+        attack / Math.max(1, attack + defense),
+      )
       next.nation = army.nation
       markOccupation(w, next.id, former.id)
       next.unrest = clamp(next.unrest + 15, 0, 100)
@@ -413,6 +433,14 @@ export function advanceArmies(w: World) {
       )
       return true
     }
+    recordMilitaryInfluence(
+      w,
+      former.id,
+      army.nation,
+      next.id,
+      'defense',
+      defense / Math.max(1, attack + defense),
+    )
     if (w.month % 3 === army.id % 3)
       warEvent(
         w,

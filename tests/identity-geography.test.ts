@@ -57,5 +57,8 @@ test('homeland generation is repeatable and preparation preserves an existing ce
   const restored = structuredClone(w)
   const before = w.regions.map((r) => identityDistribution(r.communities!, 'culture'))
   ensurePopulation(restored)
-  assert.deepEqual(restored.regions.map((r) => identityDistribution(r.communities!, 'culture')), before)
+  assert.deepEqual(
+    restored.regions.map((r) => identityDistribution(r.communities!, 'culture')),
+    before,
+  )
 })

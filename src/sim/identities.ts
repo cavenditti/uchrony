@@ -1,3 +1,4 @@
+import { advanceTradeInfluence, localImpression } from './influence'
 import { simulationMonths, periodRate } from './simulation-period'
 import { recordWorldEvent } from './event-memory'
 import { governance } from './governance'
@@ -132,13 +133,19 @@ export function evolveIdentities(world: World) {
           ...region.neighbors.map((id) => [id, 0.04 + region.infrastructure * 0.03] as [number, number]),
         ]),
     )
-  for (const route of world.routes) {
-    const strength = Math.min(
-      0.5,
-      route.volume / Math.max(100, Math.min(totals[route.from], totals[route.to]) * 0.02),
-    )
-    contacts[route.from].set(route.to, (contacts[route.from].get(route.to) ?? 0) + strength)
-    contacts[route.to].set(route.from, (contacts[route.to].get(route.from) ?? 0) + strength)
+  advanceTradeInfluence(world)
+  const commercialLanguages = world.regions.map(() => new Map<number, number>())
+  for (const trade of world.influence?.trade ?? []) {
+    const strength =
+      trade.strength *
+      (1 - (localImpression(world, trade.from, world.regions[trade.to].nation)?.opposition ?? 0))
+    contacts[trade.from].set(trade.to, (contacts[trade.from].get(trade.to) ?? 0) + strength)
+    for (const entry of distributions[trade.to].language)
+      commercialLanguages[trade.from].set(
+        entry.id,
+        (commercialLanguages[trade.from].get(entry.id) ?? 0) +
+          (strength * entry.count) / Math.max(1, totals[trade.to]),
+      )
   }
   for (const identity of state.identities)
     identity.momentum *= simulationMonths() === 1 ? 0.996 : 0.996 ** simulationMonths()
@@ -146,7 +153,14 @@ export function evolveIdentities(world: World) {
     if (!population(region)) continue
     const index = communityIndex(region.communities!),
       nation = governance(world, region.nation),
-      official = nation.identity!,
+      official =
+        region.nation >= 0
+          ? nation.identity!
+          : {
+              culture: distributions[region.id].culture[0].id,
+              language: distributions[region.id].language[0].id,
+              belief: distributions[region.id].belief[0].id,
+            },
       metrics = region.populationDynamics!,
       exposure = Object.fromEntries(AXES.map((axis) => [axis, new Map<number, number>()])) as Record<
         IdentityAxis,
@@ -259,19 +273,30 @@ export function evolveIdentities(world: World) {
       )
     }
     for (const group of [...region.communities!]) {
+      const commercial = [...commercialLanguages[region.id]]
+        .filter(([language]) => language !== group.language)
+        .sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]
+      const learningLanguage =
+        commercial && commercial[1] > 0.12 && nation.policies.languagePolicy !== 'common'
+          ? commercial[0]
+          : official.language
+      if (group.knownLanguage !== learningLanguage) {
+        group.knownLanguage = learningLanguage
+        group.fluency = group.language === learningLanguage ? 1 : 0
+      }
       const exclusion = discrimination(world, region, group),
         school = effectMultiplier(world, 'education', nation.id, region.id),
         related =
-          group.language === official.language ||
-          state.identities[group.language].parents.includes(official.language) ||
-          state.identities[official.language].parents.includes(group.language),
+          group.language === learningLanguage ||
+          state.identities[group.language].parents.includes(learningLanguage) ||
+          state.identities[learningLanguage].parents.includes(group.language),
+        commerce = commercialLanguages[region.id].get(learningLanguage) ?? 0,
         learning =
-          (0.001 + region.literacy * 0.003 + region.urban * 0.002) *
-          school *
+          ((0.001 + region.literacy * 0.003 + region.urban * 0.002) * school + commerce * 0.025) *
           (related ? 1 : 0.55) *
           (1 - exclusion * 0.3)
       group.fluency =
-        group.language === official.language
+        group.language === learningLanguage
           ? 1
           : clamp(group.fluency + (1 - group.fluency) * periodRate(learning))
       const culture = choose(state, exposure.culture),
@@ -281,7 +306,12 @@ export function evolveIdentities(world: World) {
         movement = choose(state, exposure.movement)
       if (culture !== group.culture) {
         const rate =
-          0.00022 *
+          (0.00022 +
+            Math.min(
+              1,
+              [...commercialLanguages[region.id].values()].reduce((a, b) => a + b, 0),
+            ) *
+              0.0015) *
           (0.3 + group.urban) *
           (1 - group.rootedness * 0.75) *
           (nation.policies.citizenship === 'pluralist' ? 0.35 : 1)
@@ -292,6 +322,7 @@ export function evolveIdentities(world: World) {
           periodRate(rate),
           [2, 0.5, 0.1],
           index,
+          state,
         )
       }
       const relatedNative =
@@ -299,11 +330,11 @@ export function evolveIdentities(world: World) {
         state.identities[group.language].parents.includes(language)
       if (
         language !== group.language &&
-        (language === official.language ? group.fluency > 0.5 : relatedNative)
+        ((language === group.knownLanguage && group.fluency > 0.5) || relatedNative)
       ) {
         const rate =
           0.0006 *
-          (language === official.language ? group.fluency : 0.7) *
+          (language === group.knownLanguage ? group.fluency : 0.7) *
           (nation.policies.languagePolicy === 'common' ? 1.8 : 0.35)
         metrics.languageChanges += splitCommunity(
           region,
@@ -312,6 +343,7 @@ export function evolveIdentities(world: World) {
           periodRate(rate),
           [2.5, 0.35, 0.05],
           index,
+          state,
         )
       }
       if (belief !== group.belief) {

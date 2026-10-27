@@ -190,7 +190,12 @@ export function hireFirms(w: World, r: Region) {
   for (const s of STRATA) hh[s].laborForce = 0
   for (const c of r.communities ?? []) hh[c.stratum ?? 'laborer'].laborForce += participatingLabor(c)
   const labor = STRATA.reduce((sum, s) => sum + hh[s].laborForce, 0)
-  const basket = GOODS.reduce((sum, g) => sum + householdNeed(r, g) * r.prices[g], 0)
+  // Missing industrial goods are not an outside income for a subsistence
+  // household. Their scarcity prices must not make paid farming unattractive.
+  const basket = GOODS.reduce(
+    (sum, g) => sum + householdNeed(r, g) * r.prices[g] * (g === 'food' ? 1 : (r.materialCoverage ?? 1)),
+    0,
+  )
   const p = e.producers[r.id]
   const averageSkill =
     labor > 0 ? STRATA.reduce((sum, s) => sum + hh[s].laborForce * WAGE_SKILL[s], 0) / labor : 1
@@ -221,7 +226,8 @@ export function hireFirms(w: World, r: Region) {
   )
   const privateLabor = Math.max(0, labor - publicFunds / Math.max(1e-9, averageWage))
   for (const f of firms) {
-    const benchmarkJobs = privateLabor / Math.max(1, firms.length)
+    const share = 1 / Math.max(1, firms.length)
+    const benchmarkJobs = privateLabor * share
     const oldEmployment = f.employment
     f.employment = benchmarkJobs
     const baseline = baseLaborMix(w, r, f)
@@ -232,8 +238,8 @@ export function hireFirms(w: World, r: Region) {
       // Unsatisfied subsistence/input orders remain visible even after a cash-constrained month.
       const demand = Math.max(
         f.forecast[g],
-        p.forecast[g] / Math.max(1, firms.length),
-        reserveTarget(r, g) / (g === 'food' ? 2.4 : 3) / Math.max(1, firms.length),
+        p.forecast[g] * share,
+        (reserveTarget(r, g) / (g === 'food' ? 2.4 : 3)) * share,
       )
       const plan = Math.max(0, demand + 0.25 * (demand * P.inventoryMonths - f.stocks[g]))
       f.planned[g] = plan
@@ -245,20 +251,30 @@ export function hireFirms(w: World, r: Region) {
         executable = Math.min(executable, r.stocks[input as Good] / rate / Math.max(1, firms.length))
       required[g] = q[g] > 1e-9 ? baseline[g] * clamp(executable / q[g], 0, 4) : 0
     }
+    // Premises constrain workshop jobs. Farming and extraction use the real
+    // land/resource capacities below, so a depreciating workshop cannot evict
+    // farmers or prevent a new rural enterprise from employing anyone.
+    const indoor = required.tools + required.textiles + required.arms
+    const premises = w.adaptive?.sites[`firm:${f.id}`]?.capacity ?? Infinity
+    const indoorScale = Math.min(1, premises / Math.max(1e-9, benchmarkJobs * indoor))
+    for (const good of ['tools', 'textiles', 'arms'] as const) required[good] *= indoorScale
     const needed = GOODS.reduce((sum, g) => sum + required[g], 0)
     const utilization = clamp(needed, 0.05, 0.98)
     f.laborMix = inventory()
     for (const g of GOODS) f.laborMix[g] = needed > 0 ? required[g] / needed : baseline[g]
-    f.desiredEmployment = Math.min(
-      benchmarkJobs * utilization * (1 - r.devastation * 0.5),
-      w.adaptive?.sites[`firm:${f.id}`]?.capacity ?? Infinity,
-    )
+    f.desiredEmployment = benchmarkJobs * utilization * (1 - r.devastation * 0.5)
+    // Screen the production plan that can actually be executed. A workshop
+    // switching to farming must not be rejected using its obsolete industrial
+    // mix, especially when missing inputs have already redirected its workers.
+    f.employment = benchmarkJobs
+    const plannedCapacity = firmCapacity(w, r, f, firms.length).q
+    f.employment = oldEmployment
     const valueAdded = GOODS.reduce((sum, g) => {
       const inputs = Object.entries(recipes[g] ?? {}).reduce(
         (cost, [input, rate]) => cost + r.prices[input as Good] * rate,
         0,
       )
-      return sum + (q[g] * Math.max(0, f.prices[g] - inputs)) / 1000
+      return sum + (plannedCapacity[g] * Math.max(0, f.prices[g] - inputs)) / 1000
     }, 0)
     const productivity = benchmarkJobs > 0 ? valueAdded / (benchmarkJobs * averageSkill) : 0
     const employedShare = p.previousLabor
@@ -681,7 +697,14 @@ export function finishFirms(w: World) {
       if (r.nation >= 0) w.nations[r.nation].income += f.taxes
       const owners = f.owners ?? { [householdAccount(r.id, 'owner')]: 1 },
         shares = Object.values(owners).reduce((a, b) => a + b, 0)
-      const distribution = Math.max(0, f.profit - f.taxes) * 0.45
+      // Retain a six-month operating buffer and funded construction plans.
+      // Idle cash above that buffer returns to owners; otherwise a tiny rural
+      // economy can drain all household purchasing power into dormant firms.
+      const operatingBuffer =
+        ((f.payroll + f.purchases + f.interest) * 6) / simulationMonths() +
+        f.projects.reduce((sum, project) => sum + project.cost, 0)
+      const distribution =
+        Math.max(0, f.profit - f.taxes) * 0.45 + Math.max(0, f.cash - operatingBuffer) * periodRate(0.04)
       for (const [owner, share] of Object.entries(owners)) {
         const dividend = transfer(
           w,

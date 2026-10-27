@@ -449,17 +449,39 @@ export function generateWorld(
     r.industry = 0.8
   })
   if (start === 'frontier') {
+    // A few independent market settlements provide nuclei for future city
+    // states. They begin with ordinary household assets and no government.
+    const markets = new Set(
+      regions
+        .filter(
+          (r) =>
+            r.nation === -1 &&
+            habitableLand(cells[r.center]) &&
+            r.fertility > 0.45 &&
+            !cells[r.center].river &&
+            neighbors(r.center, width, height).every((id) => habitableLand(cells[id])),
+        )
+        .sort((a, b) => hashSeed(`${seed}:market:${a.id}`) - hashSeed(`${seed}:market:${b.id}`))
+        .slice(0, Math.max(1, Math.floor(regions.length / 60)))
+        .map((r) => r.id),
+    )
     for (const r of regions) {
       const capital = r.nation >= 0
-      // Most wilderness is empty. Small independent pockets are people, not
-      // prebuilt cities, sovereign claims, or free state-owned resources.
+      // Most wilderness is empty; inhabited land includes hamlets and a few markets.
       const roll = hashSeed(`${seed}:independent:${r.id}`)
-      const people = capital ? 2500 : habitableLand(cells[r.center]) && roll % 7 === 0 ? 40 + (roll % 121) : 0
+      const market = markets.has(r.id)
+      const people = capital
+        ? 2500
+        : market
+          ? 1800 + (roll % 801)
+          : habitableLand(cells[r.center]) && roll % 7 === 0
+            ? 40 + (roll % 121)
+            : 0
       r.population = { children: Math.floor(people * 0.29), adults: Math.floor(people * 0.62), elders: 0 }
       r.population.elders = people - r.population.children - r.population.adults
-      r.urban = capital ? 1 : 0
-      r.infrastructure = capital ? 0.2 : 0.02
-      r.industry = capital ? 0.18 : people ? 0.02 : 0
+      r.urban = capital || market ? 1 : 0
+      r.infrastructure = capital ? 0.2 : market ? 0.12 : 0.02
+      r.industry = capital ? 0.18 : market ? 0.12 : people ? 0.02 : 0
       r.stocks = inventory()
       if (capital)
         Object.assign(r.stocks, {

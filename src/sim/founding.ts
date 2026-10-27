@@ -33,7 +33,23 @@ export const FOUNDING = {
   stone: 20,
   tools: 5,
   range: 24,
+  reserveMonths: 3,
 } as const
+
+// Small frontier states can send a viable pioneer group without repeatedly
+// stripping 600 people from a single young settlement.
+const PIONEERS = {
+  ...FOUNDING,
+  people: 200,
+  reserve: 600,
+  cash: 40,
+  food: 32,
+  timber: 14,
+  stone: 7,
+  tools: 2,
+  reserveMonths: 1.5,
+}
+type Expedition = { [K in keyof typeof FOUNDING]: number }
 
 /** A bounded land journey through home territory or unclaimed land. */
 function reachable(w: World, nation: number, cell: number) {
@@ -55,7 +71,7 @@ function reachable(w: World, nation: number, cell: number) {
 }
 
 /** Validate the entire expedition before any person, goods, cash or border moves. */
-export function foundingPlan(w: World, nation: number, cell: number) {
+export function foundingPlan(w: World, nation: number, cell: number, expedition: Expedition = FOUNDING) {
   const state = w.nations[nation],
     terrain = w.cells[cell],
     region = w.regions[terrain?.region]
@@ -78,7 +94,7 @@ export function foundingPlan(w: World, nation: number, cell: number) {
     )
   )
     throw new Error('Choose open land at least 1.5 km from existing homes.')
-  if (state.treasury < FOUNDING.cash) throw new Error(`Founding needs ${FOUNDING.cash} in the treasury.`)
+  if (state.treasury < expedition.cash) throw new Error(`Founding needs ${expedition.cash} in the treasury.`)
   const target =
       w.localEconomy.units[
         w.localEconomy.active.find((id) => w.localEconomy!.units[id].cells.includes(cell))!
@@ -90,24 +106,24 @@ export function foundingPlan(w: World, nation: number, cell: number) {
       (r) =>
         r.nation === nation &&
         r.id !== target.id &&
-        population(r) >= FOUNDING.people + FOUNDING.reserve &&
+        population(r) >= expedition.people + expedition.reserve &&
         path.has(r.center),
     )
     .sort((a, b) => path.get(a.center)! - path.get(b.center)! || a.id - b.id)
   if (!sources.length)
     throw new Error(
-      'A settlement within about 25 km by land must retain 1,200 people after sending 600 settlers.',
+      `A settlement within about 25 km by land must retain ${expedition.reserve} people after sending ${expedition.people} settlers.`,
     )
   const source = sources.find(
     (r) =>
-      r.stocks.food >= FOUNDING.food + population(r) * 0.026 * 3 &&
-      r.stocks.timber >= FOUNDING.timber &&
-      r.stocks.stone >= FOUNDING.stone &&
-      r.stocks.tools >= FOUNDING.tools,
+      r.stocks.food >= expedition.food + population(r) * 0.026 * expedition.reserveMonths &&
+      r.stocks.timber >= expedition.timber &&
+      r.stocks.stone >= expedition.stone &&
+      r.stocks.tools >= expedition.tools,
   )
   if (!source)
     throw new Error(
-      'The departing settlement needs 94 food, 40 timber, 20 stone and 5 tools, plus three months of food to keep at home.',
+      `The departing settlement needs ${expedition.food} food, ${expedition.timber} timber, ${expedition.stone} stone and ${expedition.tools} tools, plus ${expedition.reserveMonths} months of food to keep at home.`,
     )
   return { state, region, target, source, point }
 }
@@ -123,8 +139,9 @@ function settleFounding(
   cell: number,
   deferMesh: boolean,
   refreshLabels?: (nation: number) => void,
+  expedition: Expedition = FOUNDING,
 ) {
-  const { state, region, target, source, point } = foundingPlan(w, nation, cell)
+  const { state, region, target, source, point } = foundingPlan(w, nation, cell, expedition)
   const size = 256,
     site = createResidentialParcel(w, target.id, cell, point, {
       x: point.x - size / 2,
@@ -133,9 +150,9 @@ function settleFounding(
     })
   let materials = 0
   for (const good of ['timber', 'stone', 'tools'] as const) {
-    materials += recordUse(w, marketStore(source.id), good, FOUNDING[good])
-    source.stocks[good] -= FOUNDING[good]
-    source.consumption[good] += FOUNDING[good]
+    materials += recordUse(w, marketStore(source.id), good, expedition[good])
+    source.stocks[good] -= expedition[good]
+    source.consumption[good] += expedition[good]
   }
   // Pay the actual departing households for surveying and erecting the camp.
   const workers = STRATA.map((s) =>
@@ -150,7 +167,7 @@ function settleFounding(
       w,
       governmentAccount(nation),
       householdAccount(source.id, s),
-      (FOUNDING.cash * workers[i]) / total,
+      (expedition.cash * workers[i]) / total,
       'settlement founding wages',
     )
     w.economy!.households[source.id][s].income += paid
@@ -159,11 +176,11 @@ function settleFounding(
   state.spending += wages
   recordWages(w, source.id, producerAccount(source.id), wages)
   recordOwnCapital(w, source.id, producerAccount(source.id), materials + wages)
-  recordGift(w, marketStore(source.id), marketStore(target.id), 'food', FOUNDING.food)
-  source.stocks.food -= FOUNDING.food
-  target.stocks.food += FOUNDING.food
+  recordGift(w, marketStore(source.id), marketStore(target.id), 'food', expedition.food)
+  source.stocks.food -= expedition.food
+  target.stocks.food += expedition.food
 
-  const counts = apportion(FOUNDING.people, source.communities!.map(communitySize))
+  const counts = apportion(expedition.people, source.communities!.map(communitySize))
   const moved = STRATA.map(() => 0)
   source.communities!.forEach((group, i) => {
     const ages = apportion(counts[i], [
@@ -198,17 +215,17 @@ function settleFounding(
   // Remove exactly the departing residents from their old physical homes.
   const homes = residentialSites(w).filter((s) => s.pool === source.id)
   const departures = apportion(
-    FOUNDING.people,
+    expedition.people,
     homes.map((s) => s.residents ?? 0),
     homes.map((s) => s.residents ?? 0),
   )
   homes.forEach((s, i) => {
     s.residents! -= departures[i]
   })
-  site.capacity = 700
+  site.capacity = Math.ceil((expedition.people * 7) / 6)
   site.investedValue = materials + wages
-  site.residents = FOUNDING.people
-  w.localEconomy!.built[cell] = 700 / 12000
+  site.residents = expedition.people
+  w.localEconomy!.built[cell] = site.capacity / 12000
 
   if (region.nation === -1) {
     claimIndependentProvince(w, region, nation, false)
@@ -216,11 +233,11 @@ function settleFounding(
       w.adaptive!.jurisdictions[`${level}:${region.id}`].seat = cell
   }
   if (w.adaptive!.buildingVersion === 1) subdivideHousing(w, site)
-  source.migration -= FOUNDING.people
-  target.migration += FOUNDING.people
-  source.populationDynamics!.emigrants += FOUNDING.people
-  target.populationDynamics!.immigrants += FOUNDING.people
-  w.totals.migration += FOUNDING.people
+  source.migration -= expedition.people
+  target.migration += expedition.people
+  source.populationDynamics!.emigrants += expedition.people
+  target.populationDynamics!.immigrants += expedition.people
+  w.totals.migration += expedition.people
   aggregateDistricts(w)
   syncResidentialPopulation(w)
   if (!deferMesh) rebuildAdaptiveMesh(w)
@@ -233,10 +250,10 @@ function settleFounding(
     nation,
     region: region.id,
     title: `A settlement is founded in ${region.name}`,
-    detail: `${state.shortName} sends 600 settlers from ${source.name}, with food and a paid founding camp in the surrounding province.`,
+    detail: `${state.shortName} sends ${expedition.people} settlers from ${source.name}, with food and a paid founding camp in the surrounding province.`,
   })
 
-  return `Founded a settlement in ${region.name}. 600 people moved from ${source.name}; the camp used 120 treasury, 40 timber, 20 stone and 5 tools, and carries 94 food.`
+  return `Founded a settlement in ${region.name}. ${expedition.people} people moved from ${source.name}; the camp used ${expedition.cash} treasury, ${expedition.timber} timber, ${expedition.stone} stone and ${expedition.tools} tools, and carries ${expedition.food} food.`
 }
 
 /** Governments review productive and culturally related frontiers twice a year. */
@@ -261,26 +278,23 @@ export function advanceFounding(w: World) {
   }
   for (const n of w.nations) {
     if (
-      !crossedPeriodMonth(w.month, 1 + n.id % 3, 6) ||
+      !crossedPeriodMonth(w.month, 1 + (n.id % 3), 6) ||
       !n.ai ||
-      n.foodCoverage < 0.95 ||
+      n.foodCoverage < 0.85 ||
       n.stability < 40 ||
       w.relations.some((r) => r.treaty === 'war' && (r.a === n.id || r.b === n.id))
     )
       continue
     const candidates = w.regions
       .filter((r) => r.nation === -1 && r.neighbors.some((id) => w.regions[id].nation === n.id))
-      .sort(
-        (a, b) =>
-          frontierValue(w, n, b).score - frontierValue(w, n, a).score || a.id - b.id,
-      )
+      .sort((a, b) => frontierValue(w, n, b).score - frontierValue(w, n, a).score || a.id - b.id)
     for (const r of candidates) {
       try {
-        foundingPlan(w, n.id, r.center)
+        foundingPlan(w, n.id, r.center, PIONEERS)
       } catch {
         continue
       }
-      settleFounding(w, n.id, r.center, true, refreshLabels)
+      settleFounding(w, n.id, r.center, true, refreshLabels, PIONEERS)
       founded++
       break
     }

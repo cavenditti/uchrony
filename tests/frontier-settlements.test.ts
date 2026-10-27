@@ -43,7 +43,8 @@ test('frontier starts with one supplied settlement per state and mostly empty un
   assert(neutral.some((r) => population(r) > 0))
   assert.equal(w.nations.length, 8)
   assert.equal(w.armies.length, 0)
-  assert.equal(w.localEconomy!.cities.filter((c) => c.absorbedBy === undefined).length, 8)
+  assert(w.localEconomy!.cities.filter((c) => c.absorbedBy === undefined).length > 8)
+  assert(neutral.some((r) => population(r) >= 1800))
   for (const n of w.nations) {
     const owned = w.regions.filter((r) => r.nation === n.id)
     assert.equal(owned.length, 1)
@@ -80,6 +81,7 @@ test('founding transfers exact dated people, deposits and food, and pays for phy
     r = candidate(w),
     plan = foundingPlan(w, 0, r.center)
   const before = {
+    cities: w.localEconomy!.cities.filter((c) => c.absorbedBy === undefined).length,
     people: w.totals.population,
     source: population(plan.source),
     target: population(plan.target),
@@ -120,7 +122,7 @@ test('founding transfers exact dated people, deposits and food, and pays for phy
     700,
   )
   assert(camp.every((s) => !!s.building && s.parcel!.size >= 10 && s.parcel!.size <= 40))
-  assert.equal(w.localEconomy!.cities.filter((c) => c.absorbedBy === undefined).length, 9)
+  assert.equal(w.localEconomy!.cities.filter((c) => c.absorbedBy === undefined).length, before.cities + 1)
   assert.equal(w.adaptive!.jurisdictions[`municipality:${r.id}`].nation, 0)
   auditLedger(w)
   auditGoods(w)
@@ -160,7 +162,7 @@ test('autonomous founding uses the same resources and respects player control', 
   w.nations[0].ai = true
   advanceFounding(w)
   assert.equal(w.regions.filter((r) => r.nation >= 0).length, 9)
-  near(w.nations[0].treasury, 380)
+  near(w.nations[0].treasury, 460)
   auditLedger(w)
 })
 

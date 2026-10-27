@@ -243,6 +243,7 @@ export interface HistoryPoint {
   nations: { id: number; population: number; gdp: number; territory: number; treasury: number }[]
 }
 export interface World {
+  influence?: import('./influence').InfluenceState
   /** Persistent provenance; coarse history remains approximate after returning to monthly play. */
   fastForward?: { months: number; lastMonth: number; phase: number }
   almanac?: import('./almanac-types').Almanac

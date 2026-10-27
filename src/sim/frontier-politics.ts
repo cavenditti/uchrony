@@ -1,3 +1,4 @@
+import { localImpression } from './influence'
 import { makeNation } from './generate'
 import { advanceAlmanac } from './almanac'
 import { ensureSovereignty } from './sovereignty'
@@ -21,10 +22,10 @@ import type { City } from './district-types'
 export const FRONTIER_POLITICS = {
   accessionMonths: 120,
   mandateMonths: 36,
-  influence: 0.62,
+  influence: 0.55,
   prosperityMonths: 60,
-  cityPopulation: 2000,
-  wealthPerPerson: 0.04,
+  cityPopulation: 500,
+  wealthPerPerson: 0.012,
   contribution: 0.1,
 } as const
 
@@ -42,7 +43,7 @@ export interface FrontierProgress {
 const atWar = (w: World, id: number) =>
   w.relations.some((r) => r.treaty === 'war' && (r.a === id || r.b === id))
 const solventGovernment = (w: World, n: Nation) =>
-  n.stability >= 45 && n.legitimacy >= 45 && n.foodCoverage >= 0.9 && n.treasury >= 0 && !atWar(w, n.id)
+  n.stability >= 45 && n.legitimacy >= 45 && n.foodCoverage >= 0.7 && n.treasury >= 0 && !atWar(w, n.id)
 
 function householdFunds(w: World, units: Region[]) {
   return units.reduce(
@@ -131,10 +132,13 @@ export function advanceFrontierPolitics(w: World) {
     totalPeople = 0
   for (const unit of economicRegions(w)) {
     units[unit.province ?? unit.id].push(unit)
-    totalPeople += population(unit)
-    totalMoney += householdFunds(w, [unit])
+    // Frontier prosperity is relative to other independent communities;
+    // a state's opening treasury is not private wealth available to a free city.
+    if (unit.nation === -1) {
+      totalPeople += population(unit)
+      totalMoney += householdFunds(w, [unit])
+    }
   }
-  const averageWealth = totalMoney / Math.max(1, totalPeople)
   const cities = new Map<number, City>()
   for (const city of w.localEconomy?.cities ?? []) {
     const province = w.cells[city.nucleus].region
@@ -150,8 +154,14 @@ export function advanceFrontierPolitics(w: World) {
       const nation = w.regions[to].nation
       if (w.regions[from].nation !== -1 || nation < 0) continue
       const key = `${from}:${nation}`
-      trade.set(key, (trade.get(key) ?? 0) + route.volume)
+      trade.set(key, (trade.get(key) ?? 0) + route.volume / simulationMonths())
     }
+  }
+  for (const contact of w.influence?.trade ?? []) {
+    const nation = w.regions[contact.to].nation
+    if (w.regions[contact.from].nation !== -1 || nation < 0) continue
+    const key = `${contact.from}:${nation}`
+    trade.set(key, (trade.get(key) ?? 0) + contact.strength * population(w.regions[contact.from]) * 0.026)
   }
   const components = landComponents(w)
   const pending: { region: Region; nation: number; city?: City; capital?: number }[] = []
@@ -195,14 +205,15 @@ export function advanceFrontierPolitics(w: World) {
       const access = clamp((r.infrastructure + neighbor.infrastructure) / 2)
       const exclusion = n.policies.citizenship === 'heritage' ? (1 - affinity) * 0.25 : 0
       const appeal = clamp(
-        0.28 +
+        0.4 +
           affinity * 0.3 +
           security * 0.24 +
           relativeOutput * 0.12 +
           commerce * 0.14 +
           access * 0.1 -
           (n.policies.tax / 100) * 0.12 -
-          exclusion,
+          exclusion -
+          (localImpression(w, r.id, n.id)?.opposition ?? 0) * 0.45,
       )
       candidates.set(n.id, Math.max(candidates.get(n.id) ?? 0, appeal))
     }
@@ -211,6 +222,7 @@ export function advanceFrontierPolitics(w: World) {
     const candidate = best?.[0] ?? -1
     if (progress.nation !== candidate) {
       progress.nation = candidate
+      progress.since = w.month - elapsed
       progress.influence = 0
       progress.mandate = 0
     }
@@ -224,24 +236,25 @@ export function advanceFrontierPolitics(w: World) {
 
     const city = cities.get(r.id)
     const cash = householdFunds(w, units[r.id])
-    const capital = Math.max(12, (city?.population ?? 0) * 0.004)
-    const rich =
+    const peerWealth = Math.max(0, totalMoney - cash) / Math.max(1, totalPeople - people)
+    const capital = Math.max(1, (city?.population ?? 0) * 0.001)
+    const wealthy =
       city &&
       city.population >= FRONTIER_POLITICS.cityPopulation &&
       city.population >= people * 0.5 &&
-      r.foodCoverage >= 0.95 &&
-      r.unrest < 35 &&
-      cash / Math.max(1, people) >= Math.max(FRONTIER_POLITICS.wealthPerPerson, averageWealth * 2) &&
+      cash / Math.max(1, people) >= Math.max(FRONTIER_POLITICS.wealthPerPerson, peerWealth * 2) &&
       cash * FRONTIER_POLITICS.contribution >= capital
     if (progress.city !== (city?.id ?? null)) {
       progress.city = city?.id ?? null
       progress.prosperity = 0
     }
-    progress.prosperity = rich
-      ? progress.prosperity + elapsed
-      : Math.max(0, progress.prosperity - elapsed * 2)
+    // Wealth records the long build-up. A single poor harvest does not erase
+    // years of civic organization; food and order are checked when chartering.
+    progress.prosperity = wealthy ? progress.prosperity + elapsed : Math.max(0, progress.prosperity - elapsed)
     if (
-      rich &&
+      wealthy &&
+      r.foodCoverage >= 0.85 &&
+      r.unrest < 40 &&
       progress.prosperity >= FRONTIER_POLITICS.prosperityMonths &&
       w.nations.length + pending.filter((p) => !!p.city).length < MAX_STATE_IDENTITIES
     ) {

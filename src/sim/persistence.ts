@@ -1,3 +1,4 @@
+import { validateInfluence } from './influence-persistence'
 import { validateAlmanac } from './almanac-persistence'
 import { validateAdaptiveWorld } from './adaptive-persistence'
 import { unpackWorldSave } from './save-codec'
@@ -61,12 +62,16 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   if (
     w.fastForward !== undefined &&
     (!object(w.fastForward) ||
-      !Number.isInteger(w.fastForward.months) || !number(w.fastForward.months, 1, w.month) ||
-      !Number.isInteger(w.fastForward.lastMonth) || !number(w.fastForward.lastMonth, 1, w.month) ||
-      !Number.isInteger(w.fastForward.phase) || !number(w.fastForward.phase, 0, 5) ||
+      !Number.isInteger(w.fastForward.months) ||
+      !number(w.fastForward.months, 1, w.month) ||
+      !Number.isInteger(w.fastForward.lastMonth) ||
+      !number(w.fastForward.lastMonth, 1, w.month) ||
+      !Number.isInteger(w.fastForward.phase) ||
+      !number(w.fastForward.phase, 0, 5) ||
       w.fastForward.phase > w.fastForward.months ||
       (w.fastForward.phase > 0 && w.fastForward.lastMonth !== w.month))
-  ) fail('invalid fast-forward provenance')
+  )
+    fail('invalid fast-forward provenance')
   if (
     !number(w.startYear, 1, 10000) ||
     !number(w.rng, 0, 4294967295) ||
@@ -487,6 +492,7 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   validateIntelligence(w)
   validateForeignOffices(w)
   validateGeopolitics(w)
+  validateInfluence(w)
   validateSovereignty(w)
   validatePressures(w)
   if (w.almanac !== undefined) validateAlmanac(w, w.almanac)

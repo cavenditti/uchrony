@@ -1,3 +1,4 @@
+import { militaryImpression, recordMilitaryInfluence } from './influence'
 import { marketStore, armyStore, recordGift, recordUse } from './national-accounts'
 import { publicExpense } from './ledger'
 import { MAX_ARMIES } from './military-limits'
@@ -114,6 +115,7 @@ function mobilize(world: World, n: Nation, province: number, limit: number) {
     communities,
   }
   world.armies.push(army)
+  recordMilitaryInfluence(world, n.id, -1, r.id, 'mobilization', amount / 2000)
   ensureWarfare(world)
   recordGift(world, marketStore(r.id), armyStore(army.id), 'food', amount * 0.06)
   army.operations!.food = amount * 0.06
@@ -151,7 +153,7 @@ export function advanceGeopolitics(world: World) {
   for (const r of world.regions) {
     const old = state.owners[r.id]
     if (old !== undefined && old !== r.nation) {
-      countries.get(r.nation)!.expansion += 1
+      if (countries.has(r.nation)) countries.get(r.nation)!.expansion += 1
       const rel = relation(world, old, r.nation)
       if (rel?.treaty === 'war') markOccupation(world, r.id, old)
     }
@@ -242,7 +244,12 @@ export function advanceGeopolitics(world: World) {
           (id) => intelligenceService(world, n.id).dossiers.find((d) => d.nation === id)?.expansion ?? 0,
         ),
       ),
-      threat = clamp(wars.length * 0.7 + (strongest / Math.max(1000, power)) * 0.15 + expansionThreat * 0.07)
+      threat = clamp(
+        wars.length * 0.7 +
+          (strongest / Math.max(1000, power)) * 0.15 +
+          expansionThreat * 0.07 +
+          Math.max(0, ...[...neighbors].map((id) => militaryImpression(world, n.id, id)?.fear ?? 0)) * 0.25,
+      )
     c.threat = threat
     c.expansion *= 0.998
     c.lastTerritory = own.length
@@ -321,7 +328,11 @@ export function advanceGeopolitics(world: World) {
             rel.grievance / 150 +
             (interests.economic * 0.35 + interests.cultural * 0.4) * (0.35 + drives.ambition * 0.65),
           score =
-            motive + Math.min(0.4, (ratio - 1) * 0.2) - Math.max(0, 1 - superiority) * 0.6 - threat * 0.15
+            motive +
+            Math.min(0.4, (ratio - 1) * 0.2) -
+            Math.max(0, 1 - superiority) * 0.6 -
+            threat * 0.15 -
+            (militaryImpression(world, n.id, other.id)?.fear ?? 0) * 0.35
         return { other, score, superiority }
       })
       .sort((a, b) => b.score - a.score)

@@ -113,6 +113,53 @@ test('empty wilderness and communities beside a failing government do not accede
   assert.equal(w.sovereignty!.frontiers!.find((p) => p.region === region.id)!.influence, 0)
 })
 
+test('different cultures can integrate over a longer period without changing their language or culture', () => {
+  const { w, region } = fixture()
+  const n = w.nations[0]
+  n.identity!.culture = w.demography!.identities.find(
+    (d) => d.kind === 'culture' && d.id !== n.identity!.culture,
+  )!.id
+  n.identity!.language = w.demography!.identities.find(
+    (d) => d.kind === 'language' && d.id !== n.identity!.language,
+  )!.id
+  n.policies.citizenship = 'civic'
+  const identity = region.communities!.map((g) => [g.culture, g.language])
+  advance(w, 120)
+  assert.equal(region.nation, -1)
+  advance(w, 240)
+  assert.equal(region.nation, n.id)
+  assert.deepEqual(
+    region.communities!.map((g) => [g.culture, g.language]),
+    identity,
+  )
+})
+
+test('equally attractive neighboring states compete rather than annexing on an ID tie', () => {
+  const { w, region } = fixture()
+  const connected = landComponents(w)
+  const peer =
+    w.regions[
+      region.neighbors.find(
+        (id) =>
+          w.regions[id].nation === -1 &&
+          connected[w.regions[id].center] >= 0 &&
+          connected[w.regions[id].center] === connected[region.center],
+      )!
+    ]
+  assert(peer)
+  // Controlled political fixture: a second equally capable neighbor settles the frontier.
+  peer.nation = 1
+  peer.communities = structuredClone(w.regions[w.nations[1].capital].communities!)
+  rollupPopulation(peer)
+  peer.gdp = 0
+  peer.infrastructure = w.regions[w.nations[0].capital].infrastructure
+  w.nations[1].identity = { ...w.nations[0].identity! }
+  w.nations[1].policies = { ...w.nations[0].policies }
+  advance(w, 360)
+  assert.equal(region.nation, -1)
+  assert.equal(w.sovereignty!.frontiers!.find((p) => p.region === region.id)!.mandate, 0)
+})
+
 test('wealthy independent cities fund a full new state after years of prosperity', () => {
   const { w, region } = fixture()
   const city = w.localEconomy!.cities.find(
@@ -161,9 +208,9 @@ test('frontier progress survives saves, respects coarse elapsed time, and reject
   advance(w, 60)
   const restored = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(w))))
   const coarse = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(w))))
-  advance(w, 60)
-  advance(restored, 60)
-  for (let i = 0; i < 10; i++)
+  advance(w, 24)
+  advance(restored, 24)
+  for (let i = 0; i < 4; i++)
     withSimulationPeriod(6, () => {
       coarse.month += 6
       advanceFrontierPolitics(coarse)

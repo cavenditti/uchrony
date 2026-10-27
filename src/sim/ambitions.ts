@@ -1,3 +1,4 @@
+import { militaryImpression } from './influence'
 import {
   foreignIntelligence,
   perceivedPower,
@@ -202,6 +203,7 @@ export function strategicPressures(world: World, nation: Nation) {
         bordering: border,
         treaty: other.relation?.treaty,
         opinion: other.relation?.opinion,
+        militaryReputation: militaryImpression(world, nation.id, other.id),
         reportedLandPower: other.military?.values.effectivePower ?? null,
         ownRelativePowerEstimate: +(power / Math.max(500, force)).toFixed(2),
         resourceLeverage: resources,

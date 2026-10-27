@@ -218,8 +218,14 @@ export function buildSpatial(w: World): SpatialState {
         .filter((s) => habitableLand(w.cells[s.cell]))
         .slice(0, desired)
         .map((s) => s.cell)
-      // A capital is a seat of government, not evidence for a city-sized population.
-      if (isCapital && !sites.length && total > 0 && habitableLand(w.cells[r.center])) sites.push(r.center)
+      // Capitals retain their seat; frontier markets retain their explicitly seeded urban nucleus.
+      if (
+        ((isCapital && total > 0) ||
+          (w.settlementStart === 'frontier' && r.urban >= 0.9 && isVisibleSettlement(urbanTotal))) &&
+        !sites.length &&
+        habitableLand(w.cells[r.center])
+      )
+        sites.push(r.center)
       for (const cell of candidates) {
         if (sites.length >= desired) break
         const c = w.cells[cell]

@@ -1,3 +1,4 @@
+import { recordMilitaryInfluence } from './influence'
 import { recordWorldEvent } from './event-memory'
 import { marketStore, armyStore, fleetStore, recordGift, recordUse } from './national-accounts'
 import { publicExpense, publicGoods } from './ledger'
@@ -34,7 +35,6 @@ export function warEvent(w: World, title: string, detail: string, nation: number
     nation,
     ...(region === undefined ? {} : { region }),
   })
-
 }
 /** New formations start without supplies or an embarkation; their people are accounted separately. */
 export function initialArmyOperations(): ArmyOperations {
@@ -461,6 +461,19 @@ export function advanceNavy(w: World) {
           f.hull = f.warships + f.transports > 0 ? 0.5 : 0
         }
       }
+      const aggressor = relation(w, a.nation, b.nation)?.aggressor
+      for (const [force, opponent, strength] of [
+        [a, b, pa],
+        [b, a, pb],
+      ] as const)
+        recordMilitaryInfluence(
+          w,
+          force.nation,
+          opponent.nation,
+          null,
+          aggressor === force.nation ? 'attack' : 'defense',
+          strength / Math.max(1, pa + pb),
+        )
       fought.add(a.id)
       fought.add(b.id)
       warEvent(

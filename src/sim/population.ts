@@ -1,3 +1,4 @@
+import { random } from './random'
 import { simulationMonths, periodFlow, periodRate } from './simulation-period'
 import { landComponents } from './land-connectivity'
 import { identityHomelands } from './identity-geography'
@@ -464,11 +465,8 @@ export function updateCommunityDemography(world: World, region: Region) {
       group.grievance = clamp(group.grievance + 0.12)
       group.host = region.nation
     }
-    const language = region.nation < 0 ? group.language : nation.identity!.language
-    if (group.knownLanguage !== language) {
-      group.knownLanguage = language
-      group.fluency = group.language === language ? 1 : 0.1
-    }
+    // Secondary language learning belongs to identity evolution. Do not erase
+    // a trading language at every demographic update.
     const exclusion = discrimination(world, region, group),
       access = 1 - exclusion * 0.45
     group.health = clamp(
@@ -975,12 +973,14 @@ export function splitCommunity(
   rate: number,
   ageFactors = [1, 1, 1],
   index?: Map<string, PopulationCommunity>,
+  rounding?: { rng: number },
 ) {
   const counts = { children: 0, adults: 0, elders: 0 }
   AGES.forEach((age, index) => {
+    const expected = source.population[age] * clamp(rate * ageFactors[index], 0, 0.15)
     counts[age] = Math.min(
       source.population[age],
-      Math.floor(source.population[age] * clamp(rate * ageFactors[index], 0, 0.15)),
+      Math.floor(expected) + (rounding && random(rounding) < expected % 1 ? 1 : 0),
     )
   })
   const moved = counts.children + counts.adults + counts.elders

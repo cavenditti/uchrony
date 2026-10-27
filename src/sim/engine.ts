@@ -1,3 +1,4 @@
+import { advanceMilitaryInfluence, advanceTradeInfluence } from './influence'
 import { withLoanOriginationBatch } from './banking'
 import {
   simulationMonths,
@@ -587,6 +588,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   const coarse = detail === 'coarse'
   if (!prepared) prepareSpatialWorld(w)
   w.month += simulationMonths()
+  advanceMilitaryInfluence(w)
   w.totals.births = 0
   w.totals.deaths = 0
   w.totals.migration = 0
@@ -608,6 +610,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   advanceNavy(w)
   if (coarse) withLoanOriginationBatch(w, () => trade(w))
   else trade(w)
+  advanceTradeInfluence(w)
   fiscalPolicy(w)
   consume(w)
   aggregateDistricts(w)
