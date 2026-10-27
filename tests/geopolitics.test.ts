@@ -175,3 +175,13 @@ test('exposed small AI states form a multilateral defense league without manufac
   summarize(w, false)
   validateWorld(w)
 })
+
+test('frontier cabinets do not treat unclaimed neighboring land as a foreign state', () => {
+  const w = generateWorld('frontier-cabinets', 3, 4, undefined, 'regional', 'frontier')
+  ensureStatecraft(w)
+  const politics = ensureGeopolitics(w)
+  w.month = 24
+  for (const c of politics.countries) c.lastInitiative = -24
+  assert(w.regions.some((r) => r.nation < 0))
+  assert.doesNotThrow(() => advanceGeopolitics(w))
+})

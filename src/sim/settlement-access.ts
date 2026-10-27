@@ -22,7 +22,7 @@ export function settlementAccess(w: World, coarse = false) {
   const occupied = (home: PhysicalSite) => occupiedResidents(w, home)
   const vacancy = (home: PhysicalSite) => Math.max(0, Math.floor(home.capacity - occupied(home)))
   // Coarse housing decisions use local crowding; regional location preferences
-  // are surveyed again at the six-month boundary.
+  // return to full spatial surveys when monthly playback resumes.
   const baseUtility = coarse ? (_home: PhysicalSite) => 0 : settlementInfluence(w, pools)
   const utility = (home: PhysicalSite, people = occupied(home)) =>
     baseUtility(home) - 0.25 * (people / Math.max(1, home.capacity)) ** 2
@@ -32,7 +32,24 @@ export function settlementAccess(w: World, coarse = false) {
 /** Nearby housing pools found through the dynamic mesh, then tested against the
  * real domestic travel network. Existing long-distance/sea migration stays separate.
  */
-export function settlementMigrationOptions(w: World) {
+export function settlementMigrationOptions(w: World, coarse = false) {
+  if (coarse) {
+    // Aggregate migration uses adjacent land pools and established sea routes.
+    // Destination housing is still a hard capacity constraint; no spatial route survey.
+    syncResidentialPopulation(w)
+    return {
+      candidates: new Map<number, number[]>(),
+      vacancies: new Map(
+        [...residentialPools(w)].map(([id, homes]) => [
+          id,
+          homes.reduce(
+            (sum, home) => sum + Math.max(0, Math.floor(home.capacity - occupiedResidents(w, home))),
+            0,
+          ),
+        ]),
+      ),
+    }
+  }
   return withCommuteCostSnapshot(w, () => migrationOptions(w))
 }
 function migrationOptions(w: World) {
@@ -108,7 +125,11 @@ export function residentialDemand(w: World, access = settlementAccess(w)) {
  * retains its original pool/claims; inter-pool moves use migrateCommunities.
  * Largest remainders avoid freezing all small rural cells through per-cell floors.
  */
-export function optimizeResidentialLocations(w: World, prepared?: ReturnType<typeof settlementAccess>, months = 1) {
+export function optimizeResidentialLocations(
+  w: World,
+  prepared?: ReturnType<typeof settlementAccess>,
+  months = 1,
+) {
   if (!w.adaptive || !w.localEconomy) return
   syncResidentialPopulation(w)
   const access = prepared ?? settlementAccess(w)

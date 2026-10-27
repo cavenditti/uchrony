@@ -1,3 +1,4 @@
+import { simulationMonths } from './simulation-period'
 import { habitableLand } from './terrain-access'
 import { STRATA } from './economic-types'
 import { producerAccount, householdAccount, transfer } from './ledger'
@@ -20,8 +21,8 @@ export function advanceLandUse(
   if (!a || !w.economy || !w.localEconomy) return
   a.construction ??= []
   for (const project of a.construction) {
-    project.remaining--
-    if (project.remaining === 0) {
+    project.remaining -= simulationMonths()
+    if (project.remaining <= 0) {
       const site = a.sites[project.site]
       site.capacity += project.capacity
       site.investedValue = (site.investedValue ?? 0) + project.cost
@@ -51,7 +52,7 @@ export function advanceLandUse(
         site,
         need,
         homes.get(id) ?? [],
-        available,
+        available * simulationMonths(),
         access,
         pending,
         256,
@@ -66,7 +67,7 @@ export function advanceLandUse(
         if (plot.lanes?.length) (a.lanes ??= []).push(...plot.lanes)
         homes.get(id)!.push(site)
       }
-      const labor = inputs.labor
+      const labor = inputs.labor / simulationMonths()
       let wages = 0
       for (const s of STRATA) {
         const h = hh[s],

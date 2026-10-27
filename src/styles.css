@@ -4225,7 +4225,7 @@ summary::marker {
   border-radius: 4px;
   color: var(--ink);
   min-height: 35px;
-  min-width: 34px;
+  min-width: 40px;
   padding: 0 7px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -4615,10 +4615,8 @@ select option {
   }
   .clock-speeds button {
     min-height: 34px;
-    min-width: 35px;
-  }
-  .clock-speeds svg {
-    display: none;
+    min-width: 42px;
+    min-height: 42px;
   }
   .atlas-shell .map-scale {
     left: 14px;

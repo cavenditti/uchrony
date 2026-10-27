@@ -196,6 +196,8 @@ export interface NationalAccounting {
   >
 }
 export interface EconomicSystem {
+  /** Duration of the last goods/cash accounting period. Absent in legacy monthly saves. */
+  periodMonths?: number
   version: 1
   initialized: number
   households: Record<number, Record<EconomicStratum, HouseholdAccount>>

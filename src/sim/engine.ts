@@ -1,3 +1,12 @@
+import { withLoanOriginationBatch } from './banking'
+import {
+  simulationMonths,
+  periodFlow,
+  periodRate,
+  withSimulationPeriod,
+  crossedPeriodMonth,
+} from './simulation-period'
+import { ensureFirms } from './firms'
 import { advanceAlmanac } from './almanac'
 import { recordWorldEvent } from './event-memory'
 import { reconcileMountainTerrain } from './terrain-migration'
@@ -136,7 +145,6 @@ export function event(
     ...(nation !== undefined && nation >= 0 ? { nation } : {}),
     ...(region !== undefined ? { region } : {}),
   })
-
 }
 
 function fiscalPolicy(w: World) {
@@ -145,7 +153,7 @@ function fiscalPolicy(w: World) {
   for (const n of w.nations) {
     const regions = nationRegions(w, n.id)
     n.population = regions.reduce((s, r) => s + population(r), 0) + militaryPeople(w, n.id)
-    n.gdp = regions.reduce((s, r) => s + r.gdp, 0)
+    n.gdp = regions.reduce((s, r) => s + r.gdp, 0) / simulationMonths()
     if (!regions.length) {
       n.income = 0
       n.spending = 0
@@ -183,9 +191,11 @@ function demographics(w: World, coarse = false, mobilityMonths = 1) {
         r.devastation * 0.35 -
         (1 - (r.materialCoverage ?? 1)) * 0.06,
     )
-    r.health = clamp(r.health + (healthTarget - r.health) * 0.035)
+    r.health = clamp(r.health + (healthTarget - r.health) * periodRate(0.035))
     r.literacy = clamp(
-      r.literacy + school * 0.0003 * (1 - r.literacy) + n.technologies.governance * 0.00003,
+      r.literacy +
+        school * periodRate(0.0003) * (1 - r.literacy) +
+        periodFlow(n.technologies.governance * 0.00003),
       0,
       0.99,
     )
@@ -194,7 +204,8 @@ function demographics(w: World, coarse = false, mobilityMonths = 1) {
         Math.min(
           0.24,
           ((Object.values(w.economy!.households[r.id]).reduce((sum, h) => sum + h.transfers, 0) /
-            Math.max(1, pop)) *
+            Math.max(1, pop) /
+            simulationMonths()) *
             100 *
             14) /
             Math.max(0.01, r.prices.food),
@@ -206,7 +217,7 @@ function demographics(w: World, coarse = false, mobilityMonths = 1) {
         (1 - (r.materialCoverage ?? 1)) * 0.14 -
         n.policies.conscription * 0.012,
     )
-    r.happiness = clamp(r.happiness + (happinessTarget - r.happiness) * 0.09)
+    r.happiness = clamp(r.happiness + (happinessTarget - r.happiness) * periodRate(0.09))
     r.unrest = clamp(
       r.unrest +
         ((1 - r.happiness) * 65 +
@@ -214,7 +225,7 @@ function demographics(w: World, coarse = false, mobilityMonths = 1) {
           effectValue(w, 'cohesion', n.id, r.id) * 15 +
           r.devastation * 35 -
           r.unrest) *
-          0.06,
+          periodRate(0.06),
       0,
       100,
     )
@@ -222,15 +233,15 @@ function demographics(w: World, coarse = false, mobilityMonths = 1) {
     const investment = realService(w, r, 'infrastructure') / Math.max(1, pop / 10000)
     r.infrastructure = clamp(
       r.infrastructure +
-        investment * MODEL_PARAMETERS.infrastructureServiceProductivity -
-        r.infrastructure * MODEL_PARAMETERS.infrastructureWearMonthly -
-        r.devastation * 0.0007,
+        periodFlow(investment * MODEL_PARAMETERS.infrastructureServiceProductivity) -
+        r.infrastructure * periodRate(MODEL_PARAMETERS.infrastructureWearMonthly) -
+        periodFlow(r.devastation * 0.0007),
       w.settlementStart === 'frontier' ? 0 : 0.08,
       1.5,
     )
-    if (!w.adaptive) r.urban = clamp(r.urban + (r.industry * 0.5 - r.urban) * 0.001, 0.03, 0.92)
-    r.devastation = clamp(r.devastation - 0.008)
-    if (r.foodCoverage < 0.75 && w.month % 6 === r.id % 6 && pop > 1000)
+    if (!w.adaptive) r.urban = clamp(r.urban + (r.industry * 0.5 - r.urban) * periodRate(0.001), 0.03, 0.92)
+    r.devastation = clamp(r.devastation - periodFlow(0.008))
+    if (r.foodCoverage < 0.75 && crossedPeriodMonth(w.month, r.id % 6, 6) && pop > 1000)
       event(
         w,
         'population',
@@ -243,12 +254,12 @@ function demographics(w: World, coarse = false, mobilityMonths = 1) {
   aggregateDistricts(w)
   ageMilitaryPopulation(w)
   linkDistrictPeople(w)
-  if (!coarse) {
-    migrateCommunities(w, mobilityMonths)
-    advanceEconomicStrata(w, mobilityMonths)
+  if (!coarse || simulationMonths() > 1) {
+    migrateCommunities(w, coarse ? simulationMonths() : mobilityMonths, coarse)
+    advanceEconomicStrata(w, coarse ? simulationMonths() : mobilityMonths)
   }
   aggregateDistricts(w)
-  if (!coarse) evolveIdentities(w)
+  if (!coarse || simulationMonths() > 1) evolveIdentities(w)
   linkDistrictPeople(w)
   aggregateDistricts(w)
 }
@@ -265,7 +276,7 @@ function science(w: World) {
       continue
     }
     n.researchProgress[focus] +=
-      (nationalRealService(w, n.id, 'research') / 7) *
+      periodFlow(nationalRealService(w, n.id, 'research') / 7) *
       (0.35 + literacy) *
       (1 + n.technologies.governance * 0.07) *
       effectMultiplier(w, 'research', n.id)
@@ -492,13 +503,14 @@ export function summarize(w: World, record = true) {
       ? (w.economy.accounts.nations[n.id]?.productionGDP ?? 0)
       : regions.reduce((s, r) => s + r.gdp, 0)
   }
+  if ((w.economy?.periodMonths ?? 1) !== 1) for (const n of w.nations) n.gdp /= w.economy!.periodMonths!
   w.totals.population =
     w.nations.reduce((s, n) => s + n.population, 0) +
     w.regions.filter((r) => r.nation < 0).reduce((s, r) => s + population(r), 0)
   w.totals.gdp =
     w.nations.reduce((s, n) => s + n.gdp, 0) +
-    w.regions.filter((r) => r.nation < 0).reduce((s, r) => s + r.gdp, 0)
-  w.totals.trade = w.routes.reduce((s, r) => s + r.volume, 0)
+    w.regions.filter((r) => r.nation < 0).reduce((s, r) => s + r.gdp, 0) / (w.economy?.periodMonths ?? 1)
+  w.totals.trade = w.routes.reduce((s, r) => s + r.volume, 0) / (w.economy?.periodMonths ?? 1)
   w.totals.wars = w.relations.filter((r) => r.treaty === 'war' && isAlive(w, r.a) && isAlive(w, r.b)).length
   if (record) {
     w.history.push({
@@ -549,6 +561,17 @@ function initializeSpatialWorld(w: World) {
   }
 }
 
+/** One aggregate clearing and demographic integration, followed by physical reconciliation. */
+export function advanceCoarsePeriod(w: World, months = 6): World {
+  // Opening assets, inventories and cohorts are always initialized in monthly units.
+  prepareSpatialWorld(w)
+  ensureFirms(w)
+  ensureWarfare(w)
+  return withSimulationPeriod(months, () =>
+    withBatchedLedgerEntries(w, () => advanceMonth(w, 'coarse', true)),
+  )
+}
+
 export type TickDetail = 'monthly' | 'coarse' | 'reconcile'
 export function tick(w: World, detail: TickDetail = 'monthly'): World {
   const resumeMonthly = detail === 'monthly' && !!w.fastForward?.phase
@@ -557,10 +580,10 @@ export function tick(w: World, detail: TickDetail = 'monthly'): World {
   return result
 }
 
-function advanceMonth(w: World, detail: TickDetail): World {
+function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   const coarse = detail === 'coarse'
-  prepareSpatialWorld(w)
-  w.month++
+  if (!prepared) prepareSpatialWorld(w)
+  w.month += simulationMonths()
   w.totals.births = 0
   w.totals.deaths = 0
   w.totals.migration = 0
@@ -576,10 +599,12 @@ function advanceMonth(w: World, detail: TickDetail): World {
   if (w.statecraft) advanceStatecraft(w)
   linkDistrictPeople(w)
   for (const id of w.localEconomy!.active) refreshEndowment(w, w.localEconomy!.units[id], false)
-  produce(w, coarse)
+  if (coarse) withLoanOriginationBatch(w, () => produce(w, true))
+  else produce(w, false)
   aggregateDistricts(w)
   advanceNavy(w)
-  trade(w)
+  if (coarse) withLoanOriginationBatch(w, () => trade(w))
+  else trade(w)
   fiscalPolicy(w)
   consume(w)
   aggregateDistricts(w)
@@ -608,7 +633,12 @@ function advanceMonth(w: World, detail: TickDetail): World {
   finishEconomyMonth(w)
   if (w.adaptive?.transit)
     w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
-  advanceSettlements(w, false, access, coarse ? 0 : detail === 'reconcile' ? (w.fastForward?.phase ?? 0) + 1 : 1)
+  advanceSettlements(
+    w,
+    false,
+    access,
+    coarse ? 0 : detail === 'reconcile' ? (w.fastForward?.phase ?? 0) + 1 : 1,
+  )
   refreshCityLabels(w)
   aggregateDistricts(w)
   syncSites(w)

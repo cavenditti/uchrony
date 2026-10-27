@@ -1,3 +1,4 @@
+import { simulationMonths, periodRate } from './simulation-period'
 import { recordWorldEvent } from './event-memory'
 import { governance } from './governance'
 import { economicRegions } from './local-units'
@@ -37,7 +38,6 @@ function note(world: World, region: Region, title: string, detail: string) {
     ...(region.nation >= 0 ? { nation: region.nation } : {}),
     region: region.id,
   })
-
 }
 
 export function beginPopulationMonth(world: World) {
@@ -140,7 +140,8 @@ export function evolveIdentities(world: World) {
     contacts[route.from].set(route.to, (contacts[route.from].get(route.to) ?? 0) + strength)
     contacts[route.to].set(route.from, (contacts[route.to].get(route.from) ?? 0) + strength)
   }
-  for (const identity of state.identities) identity.momentum *= 0.996
+  for (const identity of state.identities)
+    identity.momentum *= simulationMonths() === 1 ? 0.996 : 0.996 ** simulationMonths()
   for (const region of world.regions) {
     if (!population(region)) continue
     const index = communityIndex(region.communities!),
@@ -270,7 +271,9 @@ export function evolveIdentities(world: World) {
           (related ? 1 : 0.55) *
           (1 - exclusion * 0.3)
       group.fluency =
-        group.language === official.language ? 1 : clamp(group.fluency + (1 - group.fluency) * learning)
+        group.language === official.language
+          ? 1
+          : clamp(group.fluency + (1 - group.fluency) * periodRate(learning))
       const culture = choose(state, exposure.culture),
         language =
           nation.policies.languagePolicy === 'common' ? official.language : choose(state, exposure.language),
@@ -282,7 +285,14 @@ export function evolveIdentities(world: World) {
           (0.3 + group.urban) *
           (1 - group.rootedness * 0.75) *
           (nation.policies.citizenship === 'pluralist' ? 0.35 : 1)
-        metrics.culturalChanges += splitCommunity(region, group, { culture }, rate, [2, 0.5, 0.1], index)
+        metrics.culturalChanges += splitCommunity(
+          region,
+          group,
+          { culture },
+          periodRate(rate),
+          [2, 0.5, 0.1],
+          index,
+        )
       }
       const relatedNative =
         state.identities[language].parents.includes(group.language) ||
@@ -295,7 +305,14 @@ export function evolveIdentities(world: World) {
           0.0006 *
           (language === official.language ? group.fluency : 0.7) *
           (nation.policies.languagePolicy === 'common' ? 1.8 : 0.35)
-        metrics.languageChanges += splitCommunity(region, group, { language }, rate, [2.5, 0.35, 0.05], index)
+        metrics.languageChanges += splitCommunity(
+          region,
+          group,
+          { language },
+          periodRate(rate),
+          [2.5, 0.35, 0.05],
+          index,
+        )
       }
       if (belief !== group.belief) {
         const pressure = belief === official.belief && nation.policies.beliefPolicy === 'restricted' ? 1.8 : 1
@@ -303,7 +320,7 @@ export function evolveIdentities(world: World) {
           region,
           group,
           { belief },
-          0.0007 * (0.5 + group.literacy + group.urban) * pressure * (1 - group.rootedness * 0.5),
+          periodRate(0.0007 * (0.5 + group.literacy + group.urban) * pressure * (1 - group.rootedness * 0.5)),
           [1.5, 1, 0.3],
           index,
         )
@@ -324,7 +341,7 @@ export function evolveIdentities(world: World) {
           region,
           group,
           { movement },
-          0.0014 * (0.3 + affinity),
+          periodRate(0.0014 * (0.3 + affinity)),
           [0.8, 1.2, 0.4],
           index,
         )
@@ -334,7 +351,7 @@ export function evolveIdentities(world: World) {
           region,
           group,
           { allegiance: region.nation },
-          0.0015 * group.loyalty,
+          periodRate(0.0015 * group.loyalty),
           [2, 0.8, 0.15],
           index,
         )
@@ -343,7 +360,7 @@ export function evolveIdentities(world: World) {
           region,
           group,
           { allegiance: -1 },
-          0.0015 * group.grievance,
+          periodRate(0.0015 * group.grievance),
           [0.7, 1.2, 0.5],
           index,
         )

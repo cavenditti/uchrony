@@ -218,7 +218,9 @@ export function advanceGeopolitics(world: World) {
     const c = countries.get(n.id)!,
       own = world.regions.filter((r) => r.nation === n.id),
       neighbors = new Set(
-        own.flatMap((r) => r.neighbors.map((id) => world.regions[id].nation)).filter((id) => id !== n.id),
+        own
+          .flatMap((r) => r.neighbors.map((id) => world.regions[id].nation))
+          .filter((id) => id !== n.id && world.nations[id] !== undefined),
       ),
       wars = world.relations.filter((r) => r.treaty === 'war' && (r.a === n.id || r.b === n.id)),
       enemies = new Set(wars.map((r) => (r.a === n.id ? r.b : r.a))),

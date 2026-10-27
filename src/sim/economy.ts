@@ -1,3 +1,4 @@
+import { periodFlow } from './simulation-period'
 import { governance } from './governance'
 import { matchCommuters, knownCommuteCandidates } from './commuting'
 import { MODEL_PARAMETERS as P } from './model-parameters'
@@ -80,7 +81,7 @@ export function householdNeed(r: Region, good: Good) {
     (good === 'food' ? foodEquivalentPeople(r.population) : population(r)) *
     MONTHLY_NEED[good] *
     livingStandard *
-    allocation
+    periodFlow(allocation)
   )
 }
 export function reserveTarget(r: Region, good: Good) {
@@ -256,12 +257,13 @@ export function trade(world: World) {
   const profile = corridorProfile(world)
   refreshTransport(world, profile)
   const graph = transportGraph(world, undefined, profile),
-    physicalCapacity = profile.capacity.slice(),
+    physicalCapacity = profile.capacity.map(periodFlow),
     capacity = new Map<string, number>(),
     routes = new Map<string, Route>(),
     memory = rememberedTrade(world)
   const key = (a: number, b: number) => `${Math.min(a, b)}-${Math.max(a, b)}`
-  for (let a = 0; a < graph.length; a++) for (const e of graph[a]) capacity.set(key(a, e.to), e.capacity)
+  for (let a = 0; a < graph.length; a++)
+    for (const e of graph[a]) capacity.set(key(a, e.to), periodFlow(e.capacity))
   const pathCache = new Map<number, ReturnType<typeof shortestPaths>>(),
     plans = new Map<
       string,

@@ -1,3 +1,4 @@
+import { periodFlow, simulationMonths } from './simulation-period'
 import { deliverFreight } from './freight-transit'
 import {
   GOODS,
@@ -144,7 +145,7 @@ export function districtNetwork(w: World): DistrictNetwork {
   return { graph, profile }
 }
 
-function nearby(graph: Map<number, DistrictLink[]>, from: number, maxCost: number) {
+function nearby(graph: Map<number, DistrictLink[]>, from: number, maxCost: number, maxContacts = Infinity) {
   const distance = new Map([[from, 0]]),
     previous = new Map<number, { from: number; edge: DistrictLink }>(),
     children = new Map<number, number[]>(),
@@ -162,6 +163,7 @@ function nearby(graph: Map<number, DistrictLink[]>, from: number, maxCost: numbe
         siblings = children.get(parent) ?? []
       siblings.push(current.id)
       children.set(parent, siblings)
+      if (reached.length >= maxContacts) break
     }
     for (const edge of graph.get(current.id) ?? []) {
       const cost = current.cost + edge.cost
@@ -177,7 +179,7 @@ function nearby(graph: Map<number, DistrictLink[]>, from: number, maxCost: numbe
 export function tradeDistricts(w: World, network = districtNetwork(w)) {
   const system = w.localEconomy!,
     { graph, profile } = network,
-    remaining = profile.capacity.slice(),
+    remaining = profile.capacity.map(periodFlow),
     linkRemaining = new Map<DistrictLink, number>()
   const units = economicRegions(w),
     targets = new Map(
@@ -252,7 +254,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     let at = seller
     while (at !== buyer) {
       const prev = search.previous.get(at)
-      if (!prev || (linkRemaining.get(prev.edge) ?? prev.edge.capacity) < 1e-6) return null
+      if (!prev || (linkRemaining.get(prev.edge) ?? periodFlow(prev.edge.capacity)) < 1e-6) return null
       for (const [edge, count] of prev.edge.usage) if (remaining[edge] / count < 1e-6) return null
       chain.push(prev.edge)
       at = prev.from
@@ -283,7 +285,8 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     // stocks must not leave a buyer with new debt and idle deposits.
     requested = Math.max(0, Math.min(requested, seller.stocks[good], exportable.get(sellerId)![good]))
     for (const [index, count] of path.usage) requested = Math.min(requested, remaining[index] / count)
-    for (const edge of path.chain) requested = Math.min(requested, linkRemaining.get(edge) ?? edge.capacity)
+    for (const edge of path.chain)
+      requested = Math.min(requested, linkRemaining.get(edge) ?? periodFlow(edge.capacity))
     if (requested < 1e-6) return 0
     if (donor === undefined && balance(w, payer) < requested * unitCost) {
       if (limit > (rejectedCredit.get(buyerId) ?? -Infinity)) {
@@ -318,7 +321,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     deliverFreight(w, sellerId, buyerId, good, amount, legs)
     for (const [index, count] of path.usage) remaining[index] = Math.max(0, remaining[index] - amount * count)
     for (const edge of path.chain)
-      linkRemaining.set(edge, (linkRemaining.get(edge) ?? edge.capacity) - amount)
+      linkRemaining.set(edge, (linkRemaining.get(edge) ?? periodFlow(edge.capacity)) - amount)
     // Selling quotes follow delivered acquisition costs, with bounded adjustment.
     const targetPrice = unitCost * 1000 * 1.04
     buyer.prices[good] *= Math.exp(
@@ -367,6 +370,9 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
           8 +
             system.units[id].infrastructure * 5 +
             (w.nations[system.units[id].nation]?.technologies.logistics ?? 0) * 2,
+          // Coarse clearing samples nearby markets on real corridors. Global
+          // provincial trade still runs; detailed monthly supplier search is unchanged.
+          simulationMonths() > 1 ? 32 : Infinity,
         ),
       )
     return paths.get(id)!
@@ -418,7 +424,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       while (pending.length) {
         const id = pending.pop()!
         const prev = found.previous.get(id)!
-        if ((linkRemaining.get(prev.edge) ?? prev.edge.capacity) < 1e-6) continue
+        if ((linkRemaining.get(prev.edge) ?? periodFlow(prev.edge.capacity)) < 1e-6) continue
         let open = true
         for (const [edge, count] of prev.edge.usage)
           if (remaining[edge] / count < 1e-6) {

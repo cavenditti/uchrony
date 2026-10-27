@@ -130,7 +130,9 @@ npm run test:performance -- --scale world --start settled --months 3 --repeats 1
 npm run test:performance -- --scale world --start settled --months 3 --repeats 1 --prepare --fingerprints
 ```
 
-## Playback controls and approximate Max — 27 October 2026
+## Initial playback controls and approximate Max — 27 October 2026
+
+Historical implementation and measurements; the coarse clearing below supersedes this Max path.
 
 The clock now provides play/pause and direct **1×, 2×, 4× and Max** buttons. A speed button starts playback; Space toggles playback, and keys 1–4 select those four modes. Numeric speeds target one, two or four monthly steps per second, subject to the machine's capacity. Max has no pacing cap. It publishes the map at six-month boundaries and sends lightweight progress updates between them. Work yields between expensive months; pause cannot interrupt a month already being calculated.
 
@@ -165,3 +167,34 @@ node --import tsx --test tests/playback.test.ts tests/fast-forward.test.ts tests
 ```
 
 Timings, replay fingerprints, source fingerprints and validation scope are in [the playback report](validation/playback-fast-forward-2026-10-27.json).
+
+
+## Coarse six-month Max — 27 October 2026
+
+Max now performs **one economic clearing and one demographic integration for six months**, then reconciles local details. Standard Play and 2× retain monthly integration. The controls are play, double-arrow 2×, and triple-arrow Max; the running button becomes pause. 4× is removed. Keys 1–3 select the pace and Space pauses/resumes. Pause completes the current integration step.
+
+Production capacity, household needs, paid wages, transport capacity and public spending cover the full interval. Mortality, depreciation, spoilage, interest and transition rates account for elapsed time; births are allocated to dated monthly cohorts. Funded projects age by six months. Wages and displayed income/GDP remain monthly rates, while canonical goods and financial accounts retain interval flows for auditing and saves. Forecasts change units when entering or leaving Max.
+
+The coarse clearing reuses known commuter journeys, bounds local supplier searches to 32 reachable markets on actual corridors, and retains provincial trade. Production/trade share a live lending lookup; firm reconciliation uses a separate borrower index so repayments and defaults cannot stale bank totals. Local migration uses neighbors and established sea links with actual housing vacancies and asset transfers. Housing infill uses physical materials and paid labor. Census, settlements and map sites are reconciled afterward. Detailed spatial searches return with monthly playback. Political and other detailed decisions are sampled at the interval boundary; Max may produce a different history and does not reconstruct exact skipped events.
+
+For the same settled World case used above:
+
+| Mode | Six months | CPU time |
+| --- | ---: | ---: |
+| Previous approximate Max | 80.49 s | 103.90 s |
+| Coarse Max, final trial after browser closure | **20.61 s** | **23.49 s** |
+
+That is **3.91× faster than the prior Max** and **5.09× faster than the previously measured monthly path**. Four runs ranged from 15.20 to 25.34 seconds and produced the same population and economic aggregates. This is a shared development machine, with overlapping work during some trials; these are not isolated-hardware guarantees. Startup is separate (6.8–13.6 seconds across these trials); this change claims no startup gain. Coarse GDP describes an interval average and is not directly comparable to the exact model's final-month GDP.
+
+The timing and monthly-replay evidence precede an independent identity-geography initialization change in the shared checkout. The Max change itself preserves complete initialization/two-month regional replay fingerprints. Approximate runs pass ledger, goods, banking, national-account, census and FTE checks; compressed continuation and return to monthly mode are covered. Regional settled/frontier and World frontier runs reached five years; the full browser cabinet setup passed two years, and the browser reached July 1731. These are consistency checks, not long-horizon accuracy calibration.
+
+Verification also exposed and fixed frontier diplomacy treating unclaimed land as a country and an absent-lanes property breaking structural save equality. A failed step is no longer published or saved as completed. The targeted checks pass across suite and focused repair runs; production build, desktop/mobile checks and independent UI/documentation reviews pass. The clock accessibility audit has 14 passes and no violations or incomplete checks.
+
+Reproduce a full interval with:
+
+```sh
+node --import tsx tests/performance-fast-forward.ts --scale world --mode max --months 6
+node --import tsx --test tests/fast-forward.test.ts tests/playback.test.ts tests/geopolitics.test.ts
+```
+
+Measurements, replay fingerprints and validation scope are in [the coarse Max report](validation/max-coarse-2026-10-27.json).

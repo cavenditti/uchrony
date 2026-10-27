@@ -1,3 +1,4 @@
+import { simulationMonths, periodInterest, periodRate } from './simulation-period'
 import { recordWorldEvent } from './event-memory'
 import { balance, balances, changeDeposit, ensureEconomy, governmentAccount } from './ledger'
 import { clamp, type World } from './types'
@@ -67,6 +68,8 @@ export function accountBank(w: World, account: string): Bank {
   return b.banks[id]
 }
 export function bankLoans(w: World, bank: number) {
+  const book = originationBooks.get(w)
+  if (book) return book.assets.get(bank) ?? 0
   let total = 0
   for (const loan of w.economy!.credit.loans) if (loan.bank === bank) total += loan.principal
   return total
@@ -98,6 +101,54 @@ export function settleBankAccounts(w: World, a: Bank, b: Bank, amount: number) {
   a.deposits -= amount
   b.deposits += amount
 }
+interface OriginationBook {
+  borrowers: Map<string, Loan[]>
+  assets: Map<number, number>
+}
+const originationBooks = new WeakMap<World, OriginationBook>()
+const borrowerIndexes = new WeakMap<World, Map<string, Loan[]>>()
+/** A separate live-reference index permits repayments/defaults while firms close
+ * or enter. Bank totals are deliberately not cached across those mutations. */
+export function withBorrowerLoanIndex<T>(w: World, run: () => T): T {
+  if (borrowerIndexes.has(w)) return run()
+  const index = new Map<string, Loan[]>()
+  for (const loan of w.economy!.credit.loans) {
+    const loans = index.get(loan.borrower) ?? []
+    loans.push(loan)
+    index.set(loan.borrower, loans)
+  }
+  borrowerIndexes.set(w, index)
+  try {
+    return run()
+  } finally {
+    borrowerIndexes.delete(w)
+  }
+}
+/** Max's production/trade phase only originates or tops up loans. Keep live loan
+ * references and bank totals for that phase, then discard before repayment,
+ * default, reassignment or account restructuring. Never persisted or shared.
+ */
+export function withLoanOriginationBatch<T>(w: World, run: () => T): T {
+  if (originationBooks.has(w)) return run()
+  const book: OriginationBook = { borrowers: new Map(), assets: new Map() }
+  ensureBanking(w)
+  for (const loan of w.economy!.credit.loans) {
+    const loans = book.borrowers.get(loan.borrower) ?? []
+    loans.push(loan)
+    book.borrowers.set(loan.borrower, loans)
+    book.assets.set(loan.bank!, (book.assets.get(loan.bank!) ?? 0) + loan.principal)
+  }
+  originationBooks.set(w, book)
+  try {
+    return run()
+  } finally {
+    originationBooks.delete(w)
+  }
+}
+export function loansForBorrower(w: World, borrower: string): readonly Loan[] {
+  const index = originationBooks.get(w)?.borrowers ?? borrowerIndexes.get(w)
+  return index ? (index.get(borrower) ?? []) : w.economy!.credit.loans.filter((l) => l.borrower === borrower)
+}
 export function issueBankLoan(w: World, borrower: string, requested: number, limit: number) {
   const e = ensureEconomy(w),
     b = ensureBanking(w),
@@ -105,9 +156,11 @@ export function issueBankLoan(w: World, borrower: string, requested: number, lim
   let existing: Loan | undefined,
     outstanding = 0,
     assets = 0
-  // Repeated local orders need the same three aggregates, in the original summation order.
-  for (const loan of e.credit.loans) {
-    if (loan.bank === bank.id) assets += loan.principal
+  const book = originationBooks.get(w)
+  // Ordinary monthly mode retains its original summation order exactly.
+  if (book) assets = book.assets.get(bank.id) ?? 0
+  for (const loan of book ? loansForBorrower(w, borrower) : e.credit.loans) {
+    if (!book && loan.bank === bank.id) assets += loan.principal
     if (loan.borrower === borrower) {
       outstanding += loan.principal
       if (!existing && loan.bank === bank.id) existing = loan
@@ -123,8 +176,8 @@ export function issueBankLoan(w: World, borrower: string, requested: number, lim
     existing.rate =
       ((existing.rate ?? rate) * existing.principal + rate * amount) / (existing.principal + amount)
     existing.principal += amount
-  } else
-    e.credit.loans.push({
+  } else {
+    const loan: Loan = {
       id: e.credit.nextId++,
       borrower,
       principal: amount,
@@ -136,7 +189,21 @@ export function issueBankLoan(w: World, borrower: string, requested: number, lim
       spread: P.bankLoanSpread,
       resetMonths: P.loanResetMonths,
       nextReset: w.month + P.loanResetMonths,
-    })
+    }
+    e.credit.loans.push(loan)
+    const index = borrowerIndexes.get(w)
+    if (index) {
+      const loans = index.get(borrower) ?? []
+      loans.push(loan)
+      index.set(borrower, loans)
+    }
+    if (book) {
+      const loans = book.borrowers.get(borrower) ?? []
+      loans.push(loan)
+      book.borrowers.set(borrower, loans)
+    }
+  }
+  if (book) book.assets.set(bank.id, assets + amount)
   changeDeposit(w, borrower, amount, `bank:${bank.id}`, 'bank loan origination')
   bank.deposits += amount
   if (borrower.startsWith('government:')) w.nations[Number(borrower.split(':')[1])].debt += amount
@@ -234,17 +301,17 @@ export function settleBanks(w: World) {
       loan.rate = b.centralBank.rate + loan.spread!
       loan.nextReset = w.month + loan.resetMonths!
     }
-    const due = loan.principal * (loan.rate ?? b.centralBank.rate + P.bankLoanSpread)
+    const due = loan.principal * periodInterest(loan.rate ?? b.centralBank.rate + P.bankLoanSpread)
     const interest = payBank(w, loan.borrower, loan.bank!, due, 'bank loan interest', true)
     const principal = payBank(
       w,
       loan.borrower,
       loan.bank!,
-      loan.principal * P.creditRepaymentMonthly,
+      loan.principal * periodRate(P.creditRepaymentMonthly),
       'bank loan principal',
     )
     loan.principal -= principal
-    loan.arrears = interest + 1e-8 < due ? loan.arrears + 1 : 0
+    loan.arrears = interest + 1e-8 < due ? loan.arrears + simulationMonths() : 0
     if (loan.borrower.startsWith('firm:')) e.firms![Number(loan.borrower.split(':')[1])].interest += interest
     if (loan.borrower.startsWith('producer:'))
       e.producers[Number(loan.borrower.split(':')[1])].interest += interest
@@ -275,7 +342,7 @@ export function settleBanks(w: World) {
       .reduce((sum, l) => sum + l.principal, 0)
   for (const bank of b.banks) {
     resolveBank(w, bank)
-    const charge = Math.min(bank.reserves, bank.centralBankDebt * b.centralBank.rate)
+    const charge = Math.min(bank.reserves, bank.centralBankDebt * periodInterest(b.centralBank.rate))
     bank.reserves -= charge
     bank.equity -= charge
     bank.income -= charge
@@ -304,10 +371,19 @@ export function updateMonetaryPolicy(w: World) {
     b = ensureBanking(w)
   const policy = (b.policy ??= newMonetaryPolicy(w.month - 1))
   if (policy.lastMonth >= w.month) return
-  if (e.totals.priceIndex > 0 && b.lastPriceIndex > 0)
-    observePrices(policy, Math.log(e.totals.priceIndex / b.lastPriceIndex))
+  const months = simulationMonths()
+  if (e.totals.priceIndex > 0 && b.lastPriceIndex > 0) {
+    // Interpolate the observed log price change over the elapsed calendar months.
+    const change = Math.log(e.totals.priceIndex / b.lastPriceIndex) / months
+    for (let i = 0; i < months; i++) observePrices(policy, change)
+  }
   b.centralBank.rate =
-    policyRate(b.centralBank.rate * 12, policy.inflation, e.totals.unemployment, policy) / 12
+    policyRate(
+      b.centralBank.rate * 12,
+      policy.inflation,
+      e.totals.unemployment,
+      months === 1 ? policy : { ...policy, inertia: policy.inertia ** months },
+    ) / 12
   b.lastPriceIndex = e.totals.priceIndex
   policy.lastMonth = w.month
 }

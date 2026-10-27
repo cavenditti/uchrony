@@ -402,7 +402,6 @@ export type WorkerRequest =
   | { type: 'agent-strategy'; nation: number }
   | { type: 'event-details'; event: number }
 export type WorkerResponse =
-  | { type: 'playback-progress'; months: number }
   | { type: 'places'; result: import('./almanac-types').PlaceResult }
   | { type: 'world-writing'; id: string; state: 'loading' | 'done' | 'error'; message?: string }
   | { type: 'inspection'; snapshot: import('./inspection').InspectionSnapshot }

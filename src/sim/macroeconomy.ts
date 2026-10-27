@@ -1,3 +1,5 @@
+import { withBorrowerLoanIndex } from './banking'
+import { simulationMonths, periodFlow, periodRate } from './simulation-period'
 import { governance } from './governance'
 import { archiveRetiredDistricts } from './districts'
 import { economicRegions, economicRegion } from './local-units'
@@ -83,6 +85,22 @@ export function beginEconomyMonth(w: World) {
   const e = ensureEconomy(w)
   archiveRetiredDistricts(w)
   ensureFirms(w)
+  const months = simulationMonths(),
+    previous = e.periodMonths ?? 1
+  // Forecasts and last sales share the new interval's units before smoothing.
+  if (months !== previous) {
+    const ratio = months / previous
+    for (const f of [...Object.values(e.producers), ...e.firms!])
+      for (const g of GOODS) {
+        f.forecast[g] *= ratio
+        f.sold[g] *= ratio
+      }
+  }
+  if (months !== 1 || e.periodMonths !== undefined) e.periodMonths = months
+  if (months !== 1) {
+    for (const f of Object.values(e.producers)) f.wage *= months
+    for (const f of e.firms!) f.wage *= months
+  }
   beginLedgerMonth(w)
   beginGoodsMonth(w)
   for (const n of w.nations) {
@@ -94,7 +112,8 @@ export function beginEconomyMonth(w: World) {
     for (const g of GOODS)
       f.forecast[g] =
         f.forecast[g] > 0
-          ? (1 - P.forecastAdjustment) * f.forecast[g] + P.forecastAdjustment * f.sold[g]
+          ? (1 - periodRate(P.forecastAdjustment)) * f.forecast[g] +
+            periodRate(P.forecastAdjustment) * f.sold[g]
           : householdNeed(r, g)
     f.openingStocks = { ...r.stocks }
     f.sold = inventory()
@@ -114,8 +133,11 @@ export function beginEconomyMonth(w: World) {
     f.researchServices = f.militaryServices = f.provincialServices = 0
     f.previousLabor = STRATA.reduce((sum, s) => sum + e.households[r.id][s].laborForce, 0)
     f.previousJobs = STRATA.reduce((sum, s) => sum + e.households[r.id][s].employed, 0)
-    f.capital = Math.max(0, f.capital * (1 - P.depreciationMonthly) * (1 - r.devastation * 0.002))
-    for (const project of f.projects) if (--project.remaining <= 0) f.capital += project.capital
+    f.capital = Math.max(
+      0,
+      f.capital * (1 - periodRate(P.depreciationMonthly)) * (1 - periodRate(r.devastation * 0.002)),
+    )
+    for (const project of f.projects) if ((project.remaining -= months) <= 0) f.capital += project.capital
     f.projects = f.projects.filter((p) => p.remaining > 0)
     r.industry = f.capital
     for (const s of STRATA) {
@@ -224,7 +246,10 @@ export function consumeHouseholds(w: World) {
       const disposable = Math.max(0, h.income - h.taxes + h.transfers)
       const spending = Math.min(
         h.cash,
-        Math.max(minimum, disposable * 0.85 + Math.max(0, h.cash - minimum * 3) * 0.05),
+        Math.max(
+          minimum,
+          disposable * 0.85 + Math.max(0, h.cash - (minimum * 3) / simulationMonths()) * periodRate(0.05),
+        ),
       )
       orders.push({
         s,
@@ -297,7 +322,7 @@ export function consumeHouseholds(w: World) {
       f.losses[g] += loss
     }
     if (r.materialCoverage < 0.7)
-      r.infrastructure = Math.max(0.05, r.infrastructure - (0.7 - r.materialCoverage) * 0.002)
+      r.infrastructure = Math.max(0.05, r.infrastructure - periodFlow((0.7 - r.materialCoverage) * 0.002))
   }
 }
 export function fundGovernment(w: World) {
@@ -310,7 +335,8 @@ export function fundGovernment(w: World) {
       continue
     }
     const intended =
-      Math.max(n.income * 0.95, people * 0.00002) + Math.max(0, n.treasury - n.income * 12) * 0.02
+      Math.max(n.income * 0.95, periodFlow(people * 0.00002)) +
+      Math.max(0, n.treasury - (n.income * 12) / simulationMonths()) * periodRate(0.02)
     if (n.treasury < intended)
       borrow(w, governmentAccount(n.id), intended - n.treasury, Math.max(1000, n.gdp * 24))
     const available = Math.min(n.treasury, intended),
@@ -507,7 +533,8 @@ export function settleCredit(w: World) {
 export function finishEconomyMonth(w: World) {
   const e = ensureEconomy(w)
   settleCredit(w)
-  finishFirms(w)
+  if (simulationMonths() > 1) withBorrowerLoanIndex(w, () => finishFirms(w))
+  else finishFirms(w)
   for (const r of economicRegions(w)) {
     const f = e.producers[r.id],
       nation = governance(w, r.nation)
@@ -542,6 +569,17 @@ export function finishEconomyMonth(w: World) {
   updateMonetaryPolicy(w)
   auditLedger(w)
   auditGoods(w)
+  const months = simulationMonths()
+  if (months !== 1) {
+    // Payroll used period wages so employment always remained physical FTE.
+    for (const f of Object.values(e.producers)) f.wage /= months
+    for (const f of e.firms!) f.wage /= months
+    for (const n of w.nations) {
+      n.income /= months
+      n.spending /= months
+      for (const key of Object.keys(n.budget) as (keyof typeof n.budget)[]) n.budget[key] /= months
+    }
+  }
 }
 export function summarizeEconomy(w: World) {
   const e = ensureEconomy(w)
@@ -617,6 +655,20 @@ export function summarizeEconomy(w: World) {
     totalJobs += jobs
     totalBasket += basket
     totalBaseBasket += baseBasket
+  }
+  const months = e.periodMonths ?? 1
+  if (months !== 1) {
+    for (const data of Object.values(e.national))
+      for (const key of [
+        'gdp',
+        'realOutput',
+        'consumption',
+        'investment',
+        'income',
+        'welfarePerPerson',
+      ] as const)
+        data[key] /= months
+    for (const key of ['gdp', 'realOutput', 'consumption', 'investment'] as const) e.totals[key] /= months
   }
   e.totals.unemployment = totalLabor ? clamp(1 - totalJobs / totalLabor) : 0
   e.totals.priceIndex = totalBaseBasket ? totalBasket / totalBaseBasket : 1

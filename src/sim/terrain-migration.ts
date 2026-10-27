@@ -141,12 +141,13 @@ export function reconcileMountainTerrain(w: World) {
     a.revision++
     changed = true
   }
-  a.lanes = a.lanes?.filter((l) =>
-    l.points.every((p) => {
-      const id = Math.floor(p.y / 1024) * w.width + Math.floor(p.x / 1024)
-      return w.cells[id] && habitableLand(w.cells[id])
-    }),
-  )
+  if (a.lanes)
+    a.lanes = a.lanes.filter((l) =>
+      l.points.every((p) => {
+        const id = Math.floor(p.y / 1024) * w.width + Math.floor(p.x / 1024)
+        return w.cells[id] && habitableLand(w.cells[id])
+      }),
+    )
   a.terrainVersion = 1
   if (changed) {
     syncResidentialPopulation(w)

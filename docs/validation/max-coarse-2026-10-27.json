@@ -1,0 +1,202 @@
+{
+  "date": "2026-10-27",
+  "scenario": "Settled World, performance-ledger, 129024 cells, 32 states",
+  "priorMaxMs": 80491,
+  "priorMonthlyMs": 104966,
+  "coarseWorldRuns": [
+    {
+      "scale": "world",
+      "mode": "max",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "cells": 129024,
+      "states": 32,
+      "openingPopulation": 166833007,
+      "months": 6,
+      "startupMs": 11066,
+      "elapsedMs": 16515,
+      "stepMs": [
+        16515
+      ],
+      "cpuMs": 17871,
+      "population": 168305509,
+      "gdp": 128369.92598527395,
+      "foodCoverage": 0.9904872219755244,
+      "accountingMonths": 6,
+      "approximation": {
+        "months": 6,
+        "lastMonth": 6,
+        "phase": 0
+      },
+      "validated": true
+    },
+    {
+      "scale": "world",
+      "mode": "max",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "cells": 129024,
+      "states": 32,
+      "openingPopulation": 166833007,
+      "months": 6,
+      "startupMs": 6793,
+      "elapsedMs": 15203,
+      "stepMs": [
+        15203
+      ],
+      "cpuMs": 18368,
+      "population": 168305509,
+      "gdp": 128369.92598527395,
+      "foodCoverage": 0.9904872219755244,
+      "accountingMonths": 6,
+      "approximation": {
+        "months": 6,
+        "lastMonth": 6,
+        "phase": 0
+      },
+      "validated": true
+    },
+    {
+      "scale": "world",
+      "mode": "max",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "cells": 129024,
+      "states": 32,
+      "openingPopulation": 166833007,
+      "months": 6,
+      "startupMs": 13550,
+      "elapsedMs": 25339,
+      "stepMs": [
+        25339
+      ],
+      "cpuMs": 25921,
+      "population": 168305509,
+      "gdp": 128369.92598527395,
+      "foodCoverage": 0.9904872219755244,
+      "accountingMonths": 6,
+      "approximation": {
+        "months": 6,
+        "lastMonth": 6,
+        "phase": 0
+      },
+      "validated": true
+    },
+    {
+      "scale": "world",
+      "mode": "max",
+      "seed": "performance-ledger",
+      "start": "settled",
+      "cells": 129024,
+      "states": 32,
+      "openingPopulation": 166833007,
+      "months": 6,
+      "startupMs": 9197,
+      "elapsedMs": 20606,
+      "stepMs": [
+        20606
+      ],
+      "cpuMs": 23486,
+      "population": 168305509,
+      "gdp": 128369.92598527395,
+      "foodCoverage": 0.9904872219755244,
+      "accountingMonths": 6,
+      "approximation": {
+        "months": 6,
+        "lastMonth": 6,
+        "phase": 0
+      },
+      "validated": true
+    }
+  ],
+  "representativeRun": 3,
+  "speedupVsPriorMax": 3.9061923711540327,
+  "measurementLimits": [
+    "Separate Node processes on a shared machine, not isolated hardware. Earlier trials overlapped UI QA; last trial followed browser closure.",
+    "Startup is measured separately; no startup improvement claimed.",
+    "These runs precede the concurrent identity-geography initialization change committed separately.",
+    "Coarse GDP is an average monthly flow over the interval, not the exact model final-month GDP. Approximate histories are not accuracy-qualified."
+  ],
+  "normalMonthlyReplay": {
+    "scope": "Full JSON state, initialization and two regional monthly steps, before the independent identity-geography change",
+    "before": [
+      {
+        "month": 0,
+        "hash": "9f3547353866b0837c3abc256b0a2234075620e278fb64095c9e1759788c3f02",
+        "population": 10256995
+      },
+      {
+        "month": 1,
+        "hash": "275c61b0e23158b4ba9422b0a369f6e154563a569cc67f4a747bfc7c197e1dd3",
+        "population": 10272233
+      },
+      {
+        "month": 2,
+        "hash": "305595b14c63841a8a11cf6275578d545d8c739b7a3fe3cc7b3230865ea9be98",
+        "population": 10287309
+      }
+    ],
+    "after": [
+      {
+        "month": 0,
+        "hash": "9f3547353866b0837c3abc256b0a2234075620e278fb64095c9e1759788c3f02",
+        "population": 10256995
+      },
+      {
+        "month": 1,
+        "hash": "275c61b0e23158b4ba9422b0a369f6e154563a569cc67f4a747bfc7c197e1dd3",
+        "population": 10272233
+      },
+      {
+        "month": 2,
+        "hash": "305595b14c63841a8a11cf6275578d545d8c739b7a3fe3cc7b3230865ea9be98",
+        "population": 10287309
+      }
+    ]
+  },
+  "integration": {
+    "monthsPerClearing": 6,
+    "localSupplierContacts": 32,
+    "cohorts": "One fertility/mortality integration per interval; compound mortality and six dated birth allocations.",
+    "localReconciliation": "Paid FTE, neighboring-pool migration and household claims, social transitions, housing construction, physical census and map sites.",
+    "units": "Persisted wages and displayed economic indicators remain monthly rates; canonical cash/goods ledgers retain full interval flows.",
+    "legacyPartialIntervals": "Finish the remaining months, preserve approximation provenance.",
+    "failedStep": "Do not publish partial state; discard worker state and retain completed save."
+  },
+  "validation": {
+    "build": "passed; existing large bundle warning",
+    "targetedCases": 72,
+    "execution": "Targeted suites plus focused repaired-case reruns; not the complete repository suite.",
+    "checks": [
+      "ledger, bank, national accounts, goods, census, FTE",
+      "six-month production/demand/demographic scaling and capital completion",
+      "compressed save continuation and normal-mode return",
+      "monthly view projection without mutating canonical data",
+      "frontier cabinet regression and missing lane property save parity",
+      "clock pacing, pause, switching and fatal-step publication",
+      "scenery models and river lots"
+    ],
+    "longRuns": {
+      "regionalSettledMonths": 60,
+      "regionalFrontierMonths": 60,
+      "worldFrontierMonths": 60,
+      "worldFrontierWithBrowserCabinetsMonths": 24,
+      "browserObservedMonth": 138
+    },
+    "ui": {
+      "review": "ship, independent read-only reviewer",
+      "documentation": "pass, independent read-only verification",
+      "screenshots": [
+        "max-controls-desktop-2026-10-27.png",
+        "max-controls-mobile-2026-10-27.png"
+      ],
+      "clockAxe": {
+        "passes": 14,
+        "violations": 0,
+        "incomplete": 0
+      },
+      "keyboard": "1\u20133 selection confirmed after reload; Space and selected-button pause; 4\u00d7 removed",
+      "mobile": "390x844, three42px buttons, no horizontal overflow"
+    }
+  }
+}

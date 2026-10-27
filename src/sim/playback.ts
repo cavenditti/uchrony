@@ -1,5 +1,5 @@
 export type PlaybackSpeed = number | 'max'
-export const PLAYBACK_SPEEDS = [1, 2, 4, 'max'] as const
+export const PLAYBACK_SPEEDS = [1, 2, 'max'] as const
 
 /** The clock lives beside the engine. Painting, persistence and model latency cannot gate its next tick. */
 export class Playback {
@@ -62,7 +62,8 @@ export class Playback {
       if (this.active) this.timer = setTimeout(this.advance, Math.max(1, this.due - performance.now()))
     } catch (error) {
       this.stop()
-      this.publish()
+      // A failed integration may have only partially settled its ledgers. Keep
+      // the last complete snapshot visible; never publish it as a finished step.
       this.fail(error)
     }
   }

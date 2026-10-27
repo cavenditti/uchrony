@@ -135,14 +135,62 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
   for (const shipment of world.localEconomy?.shipments ?? []) {
     const from = (shipmentTotals[shipment.from] ??= { arriving: 0, leaving: 0 })
     const to = (shipmentTotals[shipment.to] ??= { arriving: 0, leaving: 0 })
-    from.leaving += shipment.quantity
-    to.arriving += shipment.quantity
+    from.leaving += shipment.quantity / (world.economy?.periodMonths ?? 1)
+    to.arriving += shipment.quantity / (world.economy?.periodMonths ?? 1)
   }
   // Work ledgers and production forecasts are not display data. One shared empty
   // inventory also remains shared across structuredClone/postMessage. None of
   // these projected work buffers may be used to save or advance a world.
   const empty = Object.fromEntries(GOODS.map((good) => [good, 0])) as Inventory
   const e = world.economy
+  const months = e?.periodMonths ?? 1
+  const monthly = <T extends object>(data: T, keys: readonly string[]): T => {
+    if (months === 1) return data
+    const result = { ...data } as Record<string, unknown>
+    for (const key of keys)
+      if (typeof result[key] === 'number') result[key] = (result[key] as number) / months
+    return result as T
+  }
+  const inventoryRate = (data: Inventory) => monthly(data, GOODS)
+  const flowKeys = [
+    'income',
+    'taxes',
+    'transfers',
+    'expenditure',
+    'payroll',
+    'sales',
+    'purchases',
+    'interest',
+    'freight',
+    'investment',
+    'profit',
+    'grossOutput',
+    'valueAdded',
+    'realOutput',
+    'publicServices',
+  ]
+  const regionRates = <T extends World['regions'][number]>(r: T): T =>
+    months === 1
+      ? r
+      : {
+          ...monthly(r, ['gdp', 'births', 'deaths', 'migration']),
+          production: inventoryRate(r.production),
+          plannedProduction: r.plannedProduction && inventoryRate(r.plannedProduction),
+          consumption: inventoryRate(r.consumption),
+          ...(r.populationDynamics
+            ? {
+                populationDynamics: monthly(r.populationDynamics, [
+                  'immigrants',
+                  'emigrants',
+                  'refugees',
+                  'culturalChanges',
+                  'languageChanges',
+                  'beliefChanges',
+                  'politicalChanges',
+                ]),
+              }
+            : {}),
+        }
   const project = <T extends PopulationHolder>(entity: T): T => {
     const { communities: _communities, ...data } = entity
     return { ...data, census: censusOf(entity, world.month) } as T
@@ -150,6 +198,12 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
   return {
     ...rest,
     viewOnly: true,
+    ...(months !== 1
+      ? {
+          totals: monthly(world.totals, ['births', 'deaths', 'migration']),
+          routes: world.routes.map((r) => monthly(r, ['volume', 'capacity'])),
+        }
+      : {}),
     almanac: undefined,
     viewPlaces: placeLabels(world),
     viewLandscape: economicLandscape(world),
@@ -186,16 +240,48 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
                     : {}),
                 }
               : {}),
+            households: Object.fromEntries(
+              Object.entries(e.households)
+                .filter(([id]) => places.has(+id))
+                .map(([id, pools]) => [
+                  id,
+                  Object.fromEntries(
+                    Object.entries(pools).map(([stratum, h]) => [
+                      stratum,
+                      { ...monthly(h, flowKeys), consumption: inventoryRate(h.consumption) },
+                    ]),
+                  ) as typeof pools,
+                ]),
+            ),
             ledger: { ...e.ledger, opening: {}, net: {}, entries: [] },
             inventoryPrices: undefined,
-            ...(e.accounts ? { accounts: { ...e.accounts, businesses: {}, stores: {} } } : {}),
+            ...(e.accounts
+              ? {
+                  accounts: {
+                    ...e.accounts,
+                    businesses: {},
+                    stores: {},
+                    world: monthly(e.accounts.world, Object.keys(e.accounts.world)),
+                    nations: Object.fromEntries(
+                      Object.entries(e.accounts.nations).map(([id, account]) => [
+                        id,
+                        monthly(account, Object.keys(account)),
+                      ]),
+                    ),
+                    regionalValueAdded: monthly(
+                      e.accounts.regionalValueAdded,
+                      Object.keys(e.accounts.regionalValueAdded),
+                    ),
+                  },
+                }
+              : {}),
             producers: Object.fromEntries(
               Object.entries(e.producers)
                 .filter(([id]) => places.has(+id))
                 .map(([id, p]) => [
                   id,
                   {
-                    ...p,
+                    ...monthly(p, flowKeys),
                     projects: [],
                     forecast: empty,
                     planned: empty,
@@ -208,7 +294,7 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
                 ]),
             ),
             firms: firms?.map((f) => ({
-              ...f,
+              ...monthly(f, flowKeys),
               projects: [],
               prices: empty,
               production: empty,
@@ -251,7 +337,7 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
                 return [
                   id,
                   {
-                    ...data,
+                    ...regionRates(data),
                     strataCounts: strata.get(+id) ?? {},
                     ...(includes(u.nation)
                       ? {}
@@ -270,7 +356,7 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
           },
         }
       : {}),
-    regions: world.regions.map(project),
+    regions: world.regions.map((r) => project(regionRates(r))),
     armies: world.armies.map(project),
     ...(world.warfare ? { warfare: { ...world.warfare, fleets: world.warfare.fleets.map(project) } } : {}),
   }

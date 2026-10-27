@@ -1,3 +1,4 @@
+import { simulationMonths, periodFlow, periodRate } from './simulation-period'
 import { landComponents } from './land-connectivity'
 import { habitableLand } from './terrain-access'
 import { governance } from './governance'
@@ -492,12 +493,14 @@ export function updateCommunityDemography(world: World, region: Region) {
     }
     const exclusion = discrimination(world, region, group),
       access = 1 - exclusion * 0.45
-    group.health = clamp(group.health + (region.health * access + group.wealth * 0.03 - group.health) * 0.05)
+    group.health = clamp(
+      group.health + (region.health * access + group.wealth * 0.03 - group.health) * periodRate(0.05),
+    )
     group.literacy = clamp(
       group.literacy +
-        Math.max(0, region.literacy - group.literacy) * 0.04 * access +
+        Math.max(0, region.literacy - group.literacy) * periodRate(0.04) * access +
         ((education * realService(world, region, 'education')) / Math.max(1, population(region) / 10000)) *
-          0.0001 *
+          periodRate(0.0001) *
           (1 - group.literacy) *
           access,
       0,
@@ -528,12 +531,12 @@ export function updateCommunityDemography(world: World, region: Region) {
           dissatisfaction +
           (group.wealth - 0.5) * 0.08 -
           group.contentment) *
-          0.06,
+          periodRate(0.06),
     )
     group.grievance = clamp(
       group.grievance +
         (exclusion * 0.55 + (1 - group.contentment) * 0.28 + region.devastation * 0.3 - group.grievance) *
-          0.025,
+          periodRate(0.025),
     )
     group.loyalty = clamp(
       group.loyalty +
@@ -543,10 +546,10 @@ export function updateCommunityDemography(world: World, region: Region) {
           exclusion * 0.45 -
           group.grievance * 0.25 -
           group.loyalty) *
-          0.008,
+          periodRate(0.008),
     )
-    group.displacement = Math.max(0, group.displacement - 0.004)
-    group.rootedness = clamp(group.rootedness + 0.002 * (1 - region.devastation))
+    group.displacement = Math.max(0, group.displacement - periodFlow(0.004))
+    group.rootedness = clamp(group.rootedness + periodFlow(0.002) * (1 - region.devastation))
     const deprivation = 1 - (household?.foodCoverage ?? 1 - shortage)
     const deaths = cohortDeaths(group, world.month, world.demography!, deprivation, mortality)
     const births = cohortBirths(group, world.month, world.demography!, deprivation, fertility)
@@ -732,8 +735,8 @@ export function ageMilitaryPopulation(world: World) {
   for (const home of homes) settleCivilianCensus(world, home)
 }
 
-export function migrateCommunities(world: World, months = 1) {
-  const housing = settlementMigrationOptions(world)
+export function migrateCommunities(world: World, months = 1, coarse = false) {
+  const housing = settlementMigrationOptions(world, coarse)
   // Plans are simultaneous: destination communities stay unchanged until every household has chosen.
   // Marginals give the same affinity as scanning every destination group for every comparison.
   const destinations = Object.fromEntries(
@@ -1013,7 +1016,7 @@ function economicAppeal(world: World, region: Region, stratum: EconomicStratum) 
   const h = e.households[region.id][stratum],
     f = e.producers[region.id]
   const employment = h.laborForce ? Math.min(1, h.employed / h.laborForce) : 0
-  const realWage = f.wage / Math.max(0.01, region.prices.food / 14)
+  const realWage = f.wage / simulationMonths() / Math.max(0.01, region.prices.food / 14)
   return employment * 0.12 + Math.min(0.08, realWage * 20)
 }
 

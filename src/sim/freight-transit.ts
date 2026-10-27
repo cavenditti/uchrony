@@ -1,3 +1,4 @@
+import { simulationMonths } from './simulation-period'
 import { inventory, type World, type Good, type RouteLeg } from './types'
 import { cellPosition } from './physical-space'
 import { recordGift, marketStore } from './national-accounts'
@@ -29,7 +30,7 @@ export function deliverFreight(
 ) {
   const days = w.adaptive ? freightDays(w, legs) : 0
   const buyer = w.localEconomy!.units[to]
-  if (days <= 30 || !w.adaptive) {
+  if (days <= 30 * simulationMonths() || !w.adaptive) {
     buyer.stocks[good] += amount
     return
   }
@@ -42,8 +43,8 @@ export function deliverFreight(
     from,
     to,
     owner: `producer:${to}`,
-    dispatched: w.month,
-    arrives: w.month + Math.ceil(days / 30),
+    dispatched: w.month - (simulationMonths() > 1 ? simulationMonths() : 0),
+    arrives: w.month - (simulationMonths() > 1 ? simulationMonths() : 0) + Math.ceil(days / 30),
     goods: { ...inventory(), [good]: amount },
     legs,
   })

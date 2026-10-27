@@ -25,6 +25,11 @@ export function validateEconomy(w: World) {
     !obj(e.totals)
   )
     fail('missing account system')
+  if (
+    e.periodMonths !== undefined &&
+    (!Number.isInteger(e.periodMonths) || e.periodMonths < 1 || e.periodMonths > 6)
+  )
+    fail('accounting interval')
   for (const r of w.localEconomy ? Object.values(w.localEconomy.units) : w.regions) {
     const f = e.producers[r.id],
       hs = e.households[r.id]

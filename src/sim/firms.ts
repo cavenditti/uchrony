@@ -1,3 +1,5 @@
+import { loansForBorrower } from './banking'
+import { simulationMonths, periodRate, periodInterest, crossedPeriodMonth } from './simulation-period'
 import { governance } from './governance'
 import { localClimate } from './climate'
 import { recordLocalJob } from './commuting'
@@ -61,7 +63,7 @@ const recipes: Partial<Record<Good, Partial<Inventory>>> = {
 function workingCapitalLimit(w: World, f: CompetitiveFirm) {
   const sales = GOODS.reduce((sum, g) => sum + (f.forecast[g] * f.prices[g]) / 1000, 0)
   const rate = (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
-  return (sales * 0.3) / (P.creditRepaymentMonthly + rate)
+  return (sales * 0.3) / (periodRate(P.creditRepaymentMonthly) + periodInterest(rate))
 }
 const firmIndexes = new WeakMap<
   World,
@@ -166,9 +168,10 @@ export function beginFirmMonth(w: World) {
   for (const f of w.economy!.firms!) {
     if (!f.active) continue
     for (const g of GOODS)
-      f.forecast[g] = (1 - P.forecastAdjustment) * f.forecast[g] + P.forecastAdjustment * f.sold[g]
-    f.capital *= 1 - P.depreciationMonthly
-    for (const p of f.projects) if (--p.remaining <= 0) f.capital += p.capital
+      f.forecast[g] =
+        (1 - periodRate(P.forecastAdjustment)) * f.forecast[g] + periodRate(P.forecastAdjustment) * f.sold[g]
+    f.capital *= 1 - periodRate(P.depreciationMonthly)
+    for (const p of f.projects) if ((p.remaining -= simulationMonths()) <= 0) f.capital += p.capital
     f.projects = f.projects.filter((p) => p.remaining > 0)
     f.payroll = f.sales = f.purchases = f.interest = f.taxes = 0
     f.production = inventory()
@@ -267,7 +270,7 @@ export function hireFirms(w: World, r: Region) {
       reservation,
       productivity,
       bargainingPower,
-      P.wageRenegotiationMonthly,
+      periodRate(P.wageRenegotiationMonthly),
       expectedInflation / 12,
     )
     if (productivity < reservation) f.desiredEmployment = 0
@@ -276,7 +279,7 @@ export function hireFirms(w: World, r: Region) {
     // At most 30% of expected receipts can service working-capital debt.
     if (f.cash < bill) borrow(w, firmAccount(f.id), bill - f.cash, workingCapitalLimit(w, f))
     const wanted = f.wage > 0 ? Math.min(f.desiredEmployment, f.cash / (f.wage * averageSkill)) : 0
-    const retained = retainedJobs(opening, wanted, P.jobSeparationMonthly)
+    const retained = retainedJobs(opening, wanted, periodRate(P.jobSeparationMonthly))
     plans.set(f.id, { opening, retained, wanted: f.wage >= reservation ? wanted : retained })
   }
   // Existing contracts have priority over new vacancies. Migration, retirement
@@ -289,7 +292,7 @@ export function hireFirms(w: World, r: Region) {
   const matches = matchJobs(
     Math.max(0, privateLabor - retained),
     vacancies,
-    P.matchingEfficiency,
+    periodRate(P.matchingEfficiency),
     P.matchingElasticity,
   )
   let jobs = 0,
@@ -430,6 +433,7 @@ export function firmCapacity(
   q.tools = factory * mix.tools * (0.007 / 0.19 / 0.35)
   q.textiles = factory * mix.textiles * (0.013 / 0.19 / 0.5)
   q.arms = factory * mix.arms * (0.0025 / 0.19 / 0.15) * (n.policies.priority === 'military' ? 2 : 1)
+  if (simulationMonths() !== 1) for (const g of GOODS) q[g] *= simulationMonths()
   return { q }
 }
 /** Producers quote replacement-cost prices with bounded markups, not unbounded inventory inflation. */
@@ -564,37 +568,40 @@ export function restockMarket(w: World, r: Region) {
   }
 }
 export const retailDecay = (good: Good) =>
-  good === 'food' ? 0.035 : good === 'timber' || good === 'textiles' ? 0.006 : 0.001
+  periodRate(good === 'food' ? 0.035 : good === 'timber' || good === 'textiles' ? 0.006 : 0.001)
 /** Recover expected inventory loss and finance costs per sale, plus a trading margin. */
 export function retailMarkup(w: World, r: Region, good: Good) {
   const merchant = w.economy!.producers[r.id]
   const sales = Math.max(1, householdNeed(r, good), merchant.forecast[good])
   const target = reserveTarget(r, good) + householdNeed(r, good)
-  const loans = w.economy!.credit.loans.filter((l) => l.borrower === producerAccount(r.id))
+  const loans = loansForBorrower(w, producerAccount(r.id))
   const principal = loans.reduce((sum, l) => sum + l.principal, 0)
   const rate =
     principal > 0
       ? loans.reduce((sum, l) => sum + l.principal * (l.rate ?? P.policyRateMonthly + P.bankLoanSpread), 0) /
         principal
       : (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
-  return 0.04 + (Math.max(0, target - sales) * retailDecay(good) + target * rate) / sales
+  return 0.04 + (Math.max(0, target - sales) * retailDecay(good) + target * periodInterest(rate)) / sales
 }
 function invest(w: World, r: Region, f: CompetitiveFirm) {
   const hh = w.economy!.households[r.id].artisan,
     merchant = w.economy!.producers[r.id]
   const wage = f.wage * WAGE_SKILL.artisan,
-    labor = 1000,
+    labor = 1000 / simulationMonths(),
     recipe = { timber: 300, stone: 400, tools: 40 }
   const materials = Object.entries(recipe).reduce((s, [g, q]) => s + (q * r.prices[g as Good]) / 1000, 0)
   const unitCost = materials + labor * wage
   const loanRate = (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
-  const userCost =
-    realFinancingRate(loanRate, w.economy!.banking?.policy?.expectedInflation ?? 0.02) + P.depreciationMonthly
+  const userCost = periodInterest(
+    realFinancingRate(loanRate, w.economy!.banking?.policy?.expectedInflation ?? 0.02) +
+      P.depreciationMonthly,
+  )
   const operatingYield = (f.sales - f.payroll - f.purchases) / Math.max(unitCost, f.capital * unitCost)
   const target =
     operatingYield > userCost
-      ? Math.max(0, f.employment / Math.max(1, f.desiredEmployment) - 0.75) * P.investmentAdjustment +
-        f.capital * P.depreciationMonthly
+      ? Math.max(0, f.employment / Math.max(1, f.desiredEmployment) - 0.75) *
+          periodRate(P.investmentAdjustment) +
+        f.capital * periodRate(P.depreciationMonthly)
       : 0
   const amount = Math.max(
     0,
@@ -689,13 +696,13 @@ export function finishFirms(w: World) {
       f.distress =
         (f.desiredEmployment > 1 && f.employment < f.desiredEmployment * 0.05) ||
         (f.cash < Math.max(0.01, f.payroll) && f.profit < 0)
-          ? f.distress + 1
-          : Math.max(0, f.distress - 1)
+          ? f.distress + simulationMonths()
+          : Math.max(0, f.distress - simulationMonths())
       f.markup = clamp(f.markup + (inventoryValue > expectedSales * 2 ? -0.002 : 0.001), 0.04, 0.3)
       invest(w, r, f)
       // Unsold inventories spoil physically and reduce operating surplus; financial defaults do not erase goods.
       for (const g of GOODS) {
-        const loss = f.stocks[g] * (g === 'food' ? 0.035 : 0.001)
+        const loss = f.stocks[g] * periodRate(g === 'food' ? 0.035 : 0.001)
         recordUse(w, firmStore(f.id), g, loss, 'loss')
         f.stocks[g] -= loss
         merchant.losses[g] += loss
@@ -717,7 +724,7 @@ export function finishFirms(w: World) {
       e.firmExits = (e.firmExits ?? 0) + 1
     }
     if (
-      (w.month % 12 === r.id % 12 || (w.localEconomy && !firms.some((f) => f.active))) &&
+      (crossedPeriodMonth(w.month, r.id % 12, 12) || (w.localEconomy && !firms.some((f) => f.active))) &&
       population(r) > 500
     ) {
       const active = firms.filter((f) => f.active)

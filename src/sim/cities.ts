@@ -1,3 +1,4 @@
+import { periodRate } from './simulation-period'
 import {
   settlementComponents,
   settledResidentsByCell,
@@ -70,7 +71,7 @@ export function advanceSettlements(
       for (const c of local.units[id].cells) {
         const capacity = landscapeAt(w.cells[c]).resources.timber * 5000 * (1 - (local.built[c] ?? 0) * 0.8)
         const stock = local.reserves[c].timber
-        local.reserves[c].timber = stock + Math.max(0, capacity - stock) * 0.002
+        local.reserves[c].timber = stock + Math.max(0, capacity - stock) * periodRate(0.002)
       }
   if (!initialize && !w.adaptive) {
     const oldBuilt = { ...local.built }

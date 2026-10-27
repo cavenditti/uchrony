@@ -98,7 +98,6 @@ export default function App() {
   const [world, setWorld] = useState<World | null>(null),
     [running, setRunning] = useState(false),
     [speed, setSpeed] = useState<PlaybackSpeed>(1)
-  const [playbackProgress, setPlaybackProgress] = useState(0)
   const [tab, setTab] = useState<Tab>('atlas'),
     [layer, setLayer] = useState<Layer>('terrain')
   const [nation, setNation] = useState(0),
@@ -198,10 +197,6 @@ export default function App() {
     ensureSaveWorker.current = connectWriter
     connectWriter()
     instance.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
-      if (data.type === 'playback-progress') {
-        setPlaybackProgress(data.months)
-        return
-      }
       if (data.type === 'places') {
         if (data.result.request === placeSequence.current) setPlaceResult(data.result)
         return
@@ -288,7 +283,6 @@ export default function App() {
       if (data.world.cells) {
         receivedGeography.current = { key: data.mapKey, cells: data.world.cells }
       }
-      setPlaybackProgress(data.world.fastForward?.phase ?? 0)
       const cells =
         data.world.cells ??
         (receivedGeography.current?.key === data.mapKey ? receivedGeography.current.cells : undefined)
@@ -412,16 +406,18 @@ export default function App() {
         } else setRegion(null)
         return
       }
-      if (
-        e.target instanceof HTMLElement &&
-        ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'SUMMARY'].includes(e.target.tagName)
-      )
+      if (e.target instanceof HTMLElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName))
         return
+      if (['1', '2', '3'].includes(e.key)) {
+        e.preventDefault()
+        setSpeed(PLAYBACK_SPEEDS[Number(e.key) - 1])
+        return
+      }
+      if (e.target instanceof HTMLElement && ['BUTTON', 'SUMMARY'].includes(e.target.tagName)) return
       if (e.code === 'Space') {
         e.preventDefault()
         setRunning((v) => !v)
       }
-      if (['1', '2', '3', '4'].includes(e.key)) setSpeed(PLAYBACK_SPEEDS[Number(e.key) - 1])
       if (e.key === 'l' || e.key === 'L')
         setLayer((v) => {
           const list: Layer[] = [
@@ -1054,43 +1050,54 @@ export default function App() {
                 ? 'Advancing…'
                 : running
                   ? speed === 'max'
-                    ? `Approx. · ${playbackProgress}/6 months`
+                    ? 'Max · Approx. 6 months'
                     : `In motion · ${speed}×`
                   : 'Paused'}
               {world.fastForward && !(running && speed === 'max') && ' · Approx. history'}
             </span>
           </div>
           <div className="clock-controls">
-            <button
-              className={`play-button ${running ? 'running' : ''}`}
-              aria-label={running ? 'Pause simulation' : 'Play simulation'}
-              title="Play / pause (Space)"
-              onClick={() => setRunning((v) => !v)}
-            >
-              {running ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
-            </button>
             <div className="clock-speeds" role="group" aria-label="Simulation speed">
-              {PLAYBACK_SPEEDS.map((value) => (
-                <button
-                  key={value}
-                  aria-pressed={speed === value}
-                  aria-label={
-                    value === 'max' ? 'Maximum speed, approximate six-month simulation' : `Play at ${value}× speed`
-                  }
-                  title={
-                    value === 'max'
-                      ? 'As fast as possible · approximate six-month simulation (4)'
-                      : `${value}× speed (${PLAYBACK_SPEEDS.indexOf(value) + 1})`
-                  }
-                  onClick={() => {
-                    setSpeed(value)
-                    setRunning(true)
-                  }}
-                >
-                  {typeof value === 'number' && value > 1 && <FastForward size={14} aria-hidden="true" />}
-                  {value === 'max' ? 'Max' : `${value}×`}
-                </button>
-              ))}
+              {PLAYBACK_SPEEDS.map((value, index) => {
+                const playing = running && speed === value
+                const label =
+                  value === 'max'
+                    ? 'Maximum speed, approximate six-month simulation'
+                    : `Play at ${value}× speed`
+                return (
+                  <button
+                    key={value}
+                    aria-pressed={speed === value}
+                    aria-label={playing ? 'Pause simulation' : label}
+                    title={`${playing ? 'Pause' : value === 'max' ? 'Max · approximate six-month steps' : value === 1 ? 'Play' : '2× speed'} (${index + 1}) · Space to pause or resume`}
+                    onClick={() => {
+                      setSpeed(value)
+                      setRunning(!playing)
+                    }}
+                  >
+                    {playing ? (
+                      <Pause size={18} fill="currentColor" aria-hidden="true" />
+                    ) : value === 1 ? (
+                      <Play size={18} fill="currentColor" aria-hidden="true" />
+                    ) : value === 2 ? (
+                      <FastForward size={20} aria-hidden="true" />
+                    ) : (
+                      <svg
+                        width="26"
+                        height="20"
+                        viewBox="0 0 30 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="m2 5 7 7-7 7V5Zm9 0 7 7-7 7V5Zm9 0 7 7-7 7V5Z" />
+                      </svg>
+                    )}
+                  </button>
+                )
+              })}
             </div>
             <button
               className="icon-button clock-step"
@@ -1118,8 +1125,11 @@ export default function App() {
                   <CalendarDays size={16} />
                   Advance one year
                 </button>
-                <p>{busy ? 'Calculating the next month…' : 'Space to play or pause · 1–4 for speed'}</p>
-                <p>Max approximates local changes over six months. Pause takes effect after the current month.</p>
+                <p>{busy ? 'Calculating the next month…' : 'Space to play or pause · 1–3 for speed'}</p>
+                <p>
+                  Max advances six months at a time. Its history is approximate. Pause takes effect after the
+                  current step.
+                </p>
               </div>
             </details>
           </div>
@@ -1364,9 +1374,10 @@ export default function App() {
                 <div>
                   <Play size={18} />
                   <span>
-                    <strong>Set history in motion</strong>Play, 2× and 4× use the monthly model. Max runs as fast
-                    as possible, approximating local changes between six-month reviews; its history can differ.
-                    Pause takes effect after the current month. Advance one year runs twelve monthly steps while paused.
+                    <strong>Set history in motion</strong>Play and 2× use the monthly model. Max runs as fast
+                    as possible in approximate six-month steps, then updates local details; its history can
+                    differ. Pause takes effect after the current step. Advance one year runs twelve monthly
+                    steps while paused.
                   </span>
                 </div>
                 <div>
@@ -1396,7 +1407,7 @@ export default function App() {
                   <kbd>Space</kbd>Play / pause
                 </span>
                 <span>
-                  <kbd>1–4</kbd>Speed
+                  <kbd>1–3</kbd>Speed
                 </span>
                 <span>
                   <kbd>L</kbd>Map layer

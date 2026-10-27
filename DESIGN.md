@@ -202,7 +202,7 @@ Fields use a recessed slate background, a fine green-gray border, and control co
 
 ### Navigation
 
-Explore offers domain views in a lightweight menu; the active dossier section is selected locally in its header. World comparisons keep their own horizontal tabs. The compact clock exposes play/pause, direct 1×, 2×, 4× and Max buttons, and monthly stepping, with annual stepping in its menu. Selected pace uses brass text and an inset underline. Max is labelled as approximate six-month simulation; histories that have used it retain an approximation label after pausing or returning to monthly play. On mobile the date and status sit above one row of controls. The existing chronicle scope controls retain their tonal selected state.
+Explore offers domain views in a lightweight menu; the active dossier section is selected locally in its header. World comparisons keep their own horizontal tabs. The compact clock exposes three icon buttons: a play triangle for standard speed, a double arrow for 2× and a triple arrow for Max. The active running button becomes pause; selecting another starts that pace. Monthly stepping remains beside them, with annual stepping in the menu. Keyboard shortcuts 1–3 select the pace; Space pauses or resumes. Selected pace uses brass text and an inset underline. Max is labelled as approximate six-month simulation; histories that have used it retain an approximation label after pausing or returning to monthly play. On mobile the date and status sit above one row of controls. The existing chronicle scope controls retain their tonal selected state.
 
 ### State Rows and Dossiers
 

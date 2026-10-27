@@ -56,7 +56,14 @@ function currentStore(w: World, key: string) {
   if (kind === 'transit') {
     const shipment = w.adaptive?.transit?.find((s) => s.id === id)
     if (!shipment) return undefined
-    return { region: shipment.to, nation: economicNation(w, shipment.to), owner: shipment.owner, government: false, quantity: shipment.goods, prices: economicRegion(w, shipment.to).prices }
+    return {
+      region: shipment.to,
+      nation: economicNation(w, shipment.to),
+      owner: shipment.owner,
+      government: false,
+      quantity: shipment.goods,
+      prices: economicRegion(w, shipment.to).prices,
+    }
   }
   if (kind === 'market') {
     const r = economicRegion(w, id)
@@ -233,7 +240,10 @@ export function recordGoodsSale(
     valueAdded(w, s.region, paid - cost)
   }
   // A firm's own goods sell at its quote. Any changed quote is a holding gain, not new output.
-  else if (Math.abs(cost - paid) > 1e-7) throw new Error('Firm sale must use its quoted inventory price')
+  else if (Math.abs(cost - paid) > 1e-7)
+    throw new Error(
+      `Firm sale must use its quoted inventory price: ${fromStore}/${good}, cost ${cost}, paid ${paid}, quantity ${amount}, quote ${s.price[good]}`,
+    )
   recordExternal(w, s.nation, buyer.nation, paid)
   if (buyer.kind === 'household') national(w, buyer.nation).consumption += paid
   if (buyer.kind === 'business' && buyer.account)

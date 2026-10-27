@@ -1,3 +1,4 @@
+import { simulationMonths } from './simulation-period'
 import { habitableLand } from './terrain-access'
 import type { World } from './types'
 import type { PhysicalSite } from './adaptive-types'
@@ -62,7 +63,7 @@ export function planHousingInvestment(
         inputs.timber <= unit.stocks.timber &&
         inputs.stone <= unit.stocks.stone &&
         inputs.labor <= availableLabor &&
-        inputs.labor * sponsor.wage <= sponsor.cash
+        inputs.labor * (sponsor.wage / simulationMonths()) <= sponsor.cash
       )
     }
     let lo = 0,
@@ -82,7 +83,9 @@ export function planHousingInvestment(
     if (lo <= 1e-6) return
     const inputs = inputsFor(lo),
       cost =
-        inputs.timber * unit.prices.timber + inputs.stone * unit.prices.stone + inputs.labor * sponsor.wage
+        inputs.timber * unit.prices.timber +
+        inputs.stone * unit.prices.stone +
+        inputs.labor * (sponsor.wage / simulationMonths())
     choices.push({ site, plot, spaces: lo, inputs, cost: cost / lo })
   }
   // Reuse vacant/partly developed plots near the demanded location before
@@ -104,7 +107,7 @@ export function planHousingInvestment(
     const lowerBound =
       (minimum.timber * unit.prices.timber +
         minimum.stone * unit.prices.stone +
-        minimum.labor * sponsor.wage) /
+        minimum.labor * (sponsor.wage / simulationMonths())) /
       need
     if (choices.some((c) => c.cost <= lowerBound))
       return choices.sort((a, b) => a.cost - b.cost || a.site.id.localeCompare(b.site.id))[0]

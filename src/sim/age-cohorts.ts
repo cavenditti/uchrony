@@ -1,3 +1,4 @@
+import { simulationMonths, periodFlow } from './simulation-period'
 import { apportion } from './allocation'
 import { random } from './random'
 import { MODEL_PARAMETERS as P } from './model-parameters'
@@ -128,7 +129,7 @@ export function cohortDeaths(
       probability =
         month - c[0] >= P.maximumAgeMonths
           ? 1
-          : -Math.expm1(-annualMortality(age, group.health, shortage, multiplier) / 12)
+          : -Math.expm1(-periodFlow(annualMortality(age, group.health, shortage, multiplier)) / 12)
     for (const sex of [1, 2] as const) {
       const dead = Math.min(c[sex], expectedInteger(rng, c[sex] * probability))
       c[sex] -= dead
@@ -177,14 +178,22 @@ export function cohortBirths(
   const hadEmpty = write < group.ageCohorts!.length
   const scheduleTFR = 5 * P.fertilityAnnual.reduce((sum, rate) => sum + rate, 0)
   const modifier = (desiredFertility(group) / scheduleTFR) * (1 - shortage * 0.8) * multiplier
-  const births = expectedInteger(rng, expected * Math.max(0, modifier))
+  const births = expectedInteger(rng, periodFlow(expected) * Math.max(0, modifier))
   if (births) {
     const female = expectedInteger(rng, births * P.femaleBirthShare)
-    const existing = group.ageCohorts!.find((c) => c[0] === month)
-    if (existing) {
-      existing[1] += female
-      existing[2] += births - female
-    } else group.ageCohorts!.push([month, female, births - female])
+    const months = simulationMonths(),
+      male = births - female
+    for (let i = 0; i < months; i++) {
+      const born = month - months + i + 1
+      const girls = months === 1 ? female : Math.floor(female / months) + Number(i < female % months)
+      const boys = months === 1 ? male : Math.floor(male / months) + Number(i < male % months)
+      if (!girls && !boys) continue
+      const existing = group.ageCohorts!.find((c) => c[0] === born)
+      if (existing) {
+        existing[1] += girls
+        existing[2] += boys
+      } else group.ageCohorts!.push([born, girls, boys])
+    }
   }
   if (hadEmpty) {
     write = 0

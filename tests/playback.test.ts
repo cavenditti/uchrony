@@ -64,7 +64,8 @@ test('an expensive month yields so controls and asynchronous completions can run
 
 test('fatal local simulation errors stop playback and report the actual error', (t) => {
   let now = 0,
-    failure: unknown
+    failure: unknown,
+    paints = 0
   t.mock.method(performance, 'now', () => now)
   t.mock.timers.enable({ apis: ['setTimeout'] })
   const expected = new Error('ledger failure')
@@ -72,7 +73,9 @@ test('fatal local simulation errors stop playback and report the actual error', 
     () => {
       throw expected
     },
-    () => {},
+    () => {
+      paints++
+    },
     (error) => {
       failure = error
     },
@@ -81,6 +84,7 @@ test('fatal local simulation errors stop playback and report the actual error', 
   now = 100
   t.mock.timers.tick(100)
   assert.equal(failure, expected)
+  assert.equal(paints, 0, 'a failed partial integration must never be published or autosaved')
   clock.stop()
 })
 
@@ -93,9 +97,9 @@ test('Max has no pacing cap, publishes completed intervals and yields to pause',
   const clock = new Playback(
     (speed) => {
       assert.equal(speed, 'max')
-      months++
-      now += 2
-      return months % 6 === 0
+      months += 6
+      now += 200
+      return true
     },
     () => {
       paints++
@@ -106,9 +110,6 @@ test('Max has no pacing cap, publishes completed intervals and yields to pause',
     },
   )
   clock.start('max')
-  t.mock.timers.tick(1)
-  assert.equal(months, 4, 'eight milliseconds of work yields before the interval ends')
-  assert.equal(paints, 0)
   t.mock.timers.tick(1)
   assert.equal(months, 6)
   assert.equal(paints, 1)

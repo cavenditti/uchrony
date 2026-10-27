@@ -18,7 +18,7 @@ import { pendingAdvice, submitAdvice, withdrawAdvice } from './advisors'
 import { geographyKey } from '../map/geometry'
 import { DEFAULT_WORLD_SCALE, WORLD_SCALES } from './scale'
 import { Playback } from './playback'
-import { fastForwardMonth } from './fast-forward'
+import { fastForwardStep } from './fast-forward'
 import { ensurePopulation } from './population'
 import { ensureIntelligence } from './intelligence'
 import { ensureWarfare } from './navy'
@@ -216,13 +216,23 @@ async function connection() {
 const playback = new Playback(
   (speed) => {
     if (!world) return false
-    const ready = speed === 'max' ? fastForwardMonth(world) : (tick(world), true)
-    if (speed === 'max') send({ type: 'playback-progress', months: world.fastForward!.phase || 6 })
+    const ready = speed === 'max' ? fastForwardStep(world) : (tick(world), true)
     revision++
     return ready
   },
   () => publish(),
-  (error) => send({ type: 'error', message: error instanceof Error ? error.message : 'Simulation stopped.' }),
+  (error) => {
+    // Reject further use of a partially advanced world. The last completed save
+    // remains available; async model jobs cannot apply to this discarded state.
+    world = null
+    playbackIntent++
+    mailbox.reset()
+    clearTimeout(backgroundPublish)
+    send({
+      type: 'error',
+      message: `${error instanceof Error ? error.message : 'Simulation stopped.'} Reload to restore the last completed save.`,
+    })
+  },
 )
 function reset() {
   geographyPublished = false
