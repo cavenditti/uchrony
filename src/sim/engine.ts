@@ -58,6 +58,7 @@ import { advanceIntelligence, configureIntelligence } from './intelligence'
 import { advanceDiplomaticOffices, foreignOfficeContext } from './diplomatic-friction'
 import { advanceSovereignty } from './sovereignty'
 import { advanceFrontierPolitics } from './frontier-politics'
+import { absorbUnclaimedEnclaves } from './territorial-expansion'
 import { reinforceArmies } from './military-personnel'
 import { advancePressures } from './pressures'
 import { validateSettings } from './settings'
@@ -661,6 +662,8 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
     reinforceArmies(w)
   }
   advanceSovereignty(w)
+  // Enclosed land has no accession waiting period or independent charter race.
+  absorbUnclaimedEnclaves(w)
   advanceFrontierPolitics(w)
   linkDistrictPeople(w)
   reconcileJurisdictionSovereignty(w)
@@ -672,6 +675,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   // Max retains aggregate housing demand even during its periodic plot review.
   advanceLandUse(w, access, coarse, detail !== 'monthly')
   if (!decisionPolicy().realCosts) advanceFounding(w)
+  if (absorbUnclaimedEnclaves(w)) reconcileJurisdictionSovereignty(w)
   refreshAdaptiveTotals(w)
   finishEconomyMonth(w)
   if (w.adaptive?.transit)
@@ -733,6 +737,10 @@ export function applyCommand(w: World, command: Command): string {
     aggregateDistricts(w)
   }
   const result = executeCommand(w, command)
+  if (command.type === 'found-settlement' && absorbUnclaimedEnclaves(w)) {
+    reconcileJurisdictionSovereignty(w)
+    refreshCityLabels(w)
+  }
   if (w.localEconomy) {
     linkDistrictPeople(w)
     aggregateDistricts(w)
