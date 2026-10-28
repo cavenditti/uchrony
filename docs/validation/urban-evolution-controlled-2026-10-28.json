@@ -1,0 +1,1305 @@
+{
+  "kind": "prescribed steady population and labour, existing finite funds/materials, 48-month treatments",
+  "sourceHash": "98ee4c6871595d44d6fbdc3c74f0771a48088a50d173f04d39a5ebaa8273fdaf",
+  "checks": [
+    "constant population and employment",
+    "money, timber and stone conservation",
+    "floor area conservation",
+    "disabled controls unchanged",
+    "physical treatment effects",
+    "equal monthly and six-month physical outcomes"
+  ],
+  "runs": [
+    {
+      "scenario": "fixed market",
+      "enabled": false,
+      "step": 1,
+      "elapsedMs": 4.117084000000091,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43768570534486567,
+          "production": 0.3953750770127552,
+          "market": 0.4425858386363868,
+          "logistics": 0.19807440887991629,
+          "civic": 0.3885380469451636
+        },
+        "residents": 68.87221752344361,
+        "jobs": 66.89029379842233,
+        "freight": 0,
+        "services": 0,
+        "congestion": 0.23177057032123188,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "fixed market",
+      "enabled": false,
+      "step": 6,
+      "elapsedMs": 1.750791999999933,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43768570534486567,
+          "production": 0.3953750770127552,
+          "market": 0.4425858386363868,
+          "logistics": 0.19807440887991629,
+          "civic": 0.3885380469451636
+        },
+        "residents": 68.87221752344361,
+        "jobs": 66.89029379842233,
+        "freight": 0,
+        "services": 0,
+        "congestion": 0.23177057032123188,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "fixed market",
+      "enabled": true,
+      "step": 1,
+      "elapsedMs": 27.624374999999986,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 176,
+        "vacancies": 80,
+        "occupiedBuildings": 15,
+        "buildings": 17,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "f08842205482e0c366e8d3abec46e29181ed828b7c266bcff98b7807168b9014",
+        "olderBuildings": 10,
+        "averageCondition": 0.978611765,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": [
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:0",
+              "fixture:1"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "widen",
+            "status": "occupied",
+            "sites": [],
+            "displaced": 0
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:10",
+              "fixture:11"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:13",
+              "fixture:12"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:14",
+              "fixture:15"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:16",
+              "fixture:17"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:2",
+              "fixture:3"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:22",
+              "fixture:21"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "funded",
+            "sites": [
+              "fixture:4",
+              "fixture:5"
+            ],
+            "displaced": 8
+          }
+        ]
+      },
+      "score": {
+        "scores": {
+          "housing": 0.4378933269260474,
+          "production": 0.39481503864170114,
+          "market": 0.4413768003433801,
+          "logistics": 0.19826315577189962,
+          "civic": 0.3872346352061653
+        },
+        "residents": 68.15351815503693,
+        "jobs": 66.89029379842233,
+        "freight": 0,
+        "services": 0,
+        "congestion": 0.2308268358613152,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "fixed market",
+      "enabled": true,
+      "step": 6,
+      "elapsedMs": 16.28566699999999,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 176,
+        "vacancies": 80,
+        "occupiedBuildings": 15,
+        "buildings": 17,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "f08842205482e0c366e8d3abec46e29181ed828b7c266bcff98b7807168b9014",
+        "olderBuildings": 10,
+        "averageCondition": 0.978611765,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": [
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:0",
+              "fixture:1"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "widen",
+            "status": "occupied",
+            "sites": [],
+            "displaced": 0
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:10",
+              "fixture:11"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:13",
+              "fixture:12"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:14",
+              "fixture:15"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:16",
+              "fixture:17"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:2",
+              "fixture:3"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "occupied",
+            "sites": [
+              "fixture:22",
+              "fixture:21"
+            ],
+            "displaced": 8
+          },
+          {
+            "kind": "consolidate",
+            "status": "funded",
+            "sites": [
+              "fixture:4",
+              "fixture:5"
+            ],
+            "displaced": 8
+          }
+        ]
+      },
+      "score": {
+        "scores": {
+          "housing": 0.4378933269260474,
+          "production": 0.39481503864170114,
+          "market": 0.4413768003433801,
+          "logistics": 0.19826315577189962,
+          "civic": 0.3872346352061653
+        },
+        "residents": 68.15351815503693,
+        "jobs": 66.89029379842233,
+        "freight": 0,
+        "services": 0,
+        "congestion": 0.2308268358613152,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "freight specialization",
+      "enabled": false,
+      "step": 1,
+      "elapsedMs": 2.343417000000045,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43768570534486567,
+          "production": 0.6893243593434847,
+          "market": 0.5209723139245814,
+          "logistics": 0.7369814264862538,
+          "civic": 0.3885380469451636
+        },
+        "residents": 68.87221752344361,
+        "jobs": 66.89029379842233,
+        "freight": 1457.426862718775,
+        "services": 0,
+        "congestion": 0.23177057032123188,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "freight specialization",
+      "enabled": false,
+      "step": 6,
+      "elapsedMs": 4.357749999999896,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43768570534486567,
+          "production": 0.694349384693885,
+          "market": 0.5223123206846881,
+          "logistics": 0.7461939729619876,
+          "civic": 0.3885380469451636
+        },
+        "residents": 68.87221752344361,
+        "jobs": 66.89029379842233,
+        "freight": 8744.561176312649,
+        "services": 0,
+        "congestion": 0.23177057032123188,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "freight specialization",
+      "enabled": true,
+      "step": 1,
+      "elapsedMs": 26.33499999999981,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 175.20000000000002,
+        "vacancies": 79.20000000000002,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 0.97165,
+        "uses": {
+          "housing": 7884,
+          "production": 251.99999999999997,
+          "market": 0,
+          "logistics": 503.99999999999994,
+          "civic": 0
+        },
+        "projects": [
+          {
+            "kind": "widen",
+            "status": "occupied",
+            "sites": [],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:0"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:1"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:10"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:15"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:11"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:12"
+            ],
+            "displaced": 0
+          }
+        ]
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43285839194840553,
+          "production": 0.6802961535683778,
+          "market": 0.5074318703353768,
+          "logistics": 0.7338452366500333,
+          "civic": 0.37648591860031644
+        },
+        "residents": 64.13510702538674,
+        "jobs": 58.70349195672046,
+        "freight": 1457.426862718775,
+        "services": 0,
+        "congestion": 0.21443841109936118,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "freight specialization",
+      "enabled": true,
+      "step": 6,
+      "elapsedMs": 24.168124999999918,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 1,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 175.20000000000002,
+        "vacancies": 79.20000000000002,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 0.97165,
+        "uses": {
+          "housing": 7884,
+          "production": 251.99999999999997,
+          "market": 0,
+          "logistics": 503.99999999999994,
+          "civic": 0
+        },
+        "projects": [
+          {
+            "kind": "widen",
+            "status": "occupied",
+            "sites": [],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:0"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:1"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:10"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:15"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:11"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:12"
+            ],
+            "displaced": 0
+          }
+        ]
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43285839194840553,
+          "production": 0.6853211789187781,
+          "market": 0.5087718770954835,
+          "logistics": 0.7430577831257672,
+          "civic": 0.37648591860031644
+        },
+        "residents": 64.13510702538674,
+        "jobs": 58.70349195672046,
+        "freight": 8744.561176312649,
+        "services": 0,
+        "congestion": 0.21443841109936118,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "decline and recovery",
+      "enabled": false,
+      "step": 1,
+      "elapsedMs": 2.841207999999824,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 0.93,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 0.93,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43768570534486567,
+          "production": 0.6893243593434847,
+          "market": 0.5209723139245814,
+          "logistics": 0.7369814264862538,
+          "civic": 0.3885380469451636
+        },
+        "residents": 68.87221752344361,
+        "jobs": 66.89029379842233,
+        "freight": 1457.426862718775,
+        "services": 0,
+        "congestion": 0.23177057032123188,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "decline and recovery",
+      "enabled": false,
+      "step": 6,
+      "elapsedMs": 1.6248329999998532,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 0.93,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 0.93,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43768570534486567,
+          "production": 0.694349384693885,
+          "market": 0.5223123206846881,
+          "logistics": 0.7461939729619876,
+          "civic": 0.3885380469451636
+        },
+        "residents": 68.87221752344361,
+        "jobs": 66.89029379842233,
+        "freight": 8744.561176312649,
+        "services": 0,
+        "congestion": 0.23177057032123188,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "decline and recovery",
+      "enabled": true,
+      "step": 1,
+      "elapsedMs": 24.828125,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 0.93,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 183.60000000000002,
+        "vacancies": 87.60000000000001,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "093004dd1b70b5a18c023f690fcd64d403de228114e79e61d5ba0e52f4e70ecf",
+        "olderBuildings": 20,
+        "averageCondition": 0.97345,
+        "uses": {
+          "housing": 8388,
+          "production": 0,
+          "market": 0,
+          "logistics": 251.99999999999997,
+          "civic": 0
+        },
+        "projects": [
+          {
+            "kind": "replace",
+            "status": "occupied",
+            "sites": [
+              "fixture:0"
+            ],
+            "displaced": 4
+          },
+          {
+            "kind": "widen",
+            "status": "occupied",
+            "sites": [],
+            "displaced": 0
+          },
+          {
+            "kind": "replace",
+            "status": "occupied",
+            "sites": [
+              "fixture:1"
+            ],
+            "displaced": 4
+          },
+          {
+            "kind": "replace",
+            "status": "occupied",
+            "sites": [
+              "fixture:2"
+            ],
+            "displaced": 4
+          },
+          {
+            "kind": "replace",
+            "status": "occupied",
+            "sites": [
+              "fixture:3"
+            ],
+            "displaced": 4
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:10"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:11"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "funded",
+            "sites": [
+              "fixture:12"
+            ],
+            "displaced": 0
+          }
+        ]
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43659927404155713,
+          "production": 0.683463948997963,
+          "market": 0.5106431800911267,
+          "logistics": 0.7365225090814922,
+          "civic": 0.3784152021148499
+        },
+        "residents": 64.13510702538674,
+        "jobs": 63.46256238299662,
+        "freight": 1457.426862718775,
+        "services": 0,
+        "congestion": 0.22091098383253172,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    },
+    {
+      "scenario": "decline and recovery",
+      "enabled": true,
+      "step": 6,
+      "elapsedMs": 20.086249999999836,
+      "opening": {
+        "month": 240,
+        "residents": 96,
+        "capacity": 192,
+        "vacancies": 96,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "8f3151cf10b3e82585ee972a90dd037ad9bd67be472344ab058a9074d6f1e8b5",
+        "olderBuildings": 24,
+        "averageCondition": 0.93,
+        "uses": {
+          "housing": 8640,
+          "production": 0,
+          "market": 0,
+          "logistics": 0,
+          "civic": 0
+        },
+        "projects": []
+      },
+      "ending": {
+        "month": 288,
+        "residents": 96,
+        "capacity": 183.60000000000002,
+        "vacancies": 87.60000000000001,
+        "occupiedBuildings": 24,
+        "buildings": 24,
+        "footprintArea": 8640,
+        "employment": 80,
+        "pendingCapacity": 0,
+        "laneMeters": 480,
+        "geometryHash": "093004dd1b70b5a18c023f690fcd64d403de228114e79e61d5ba0e52f4e70ecf",
+        "olderBuildings": 20,
+        "averageCondition": 0.97345,
+        "uses": {
+          "housing": 8388,
+          "production": 0,
+          "market": 0,
+          "logistics": 251.99999999999997,
+          "civic": 0
+        },
+        "projects": [
+          {
+            "kind": "replace",
+            "status": "occupied",
+            "sites": [
+              "fixture:0"
+            ],
+            "displaced": 4
+          },
+          {
+            "kind": "widen",
+            "status": "occupied",
+            "sites": [],
+            "displaced": 0
+          },
+          {
+            "kind": "replace",
+            "status": "occupied",
+            "sites": [
+              "fixture:1"
+            ],
+            "displaced": 4
+          },
+          {
+            "kind": "replace",
+            "status": "occupied",
+            "sites": [
+              "fixture:2"
+            ],
+            "displaced": 4
+          },
+          {
+            "kind": "replace",
+            "status": "occupied",
+            "sites": [
+              "fixture:3"
+            ],
+            "displaced": 4
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:10"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "occupied",
+            "sites": [
+              "fixture:11"
+            ],
+            "displaced": 0
+          },
+          {
+            "kind": "convert",
+            "status": "funded",
+            "sites": [
+              "fixture:12"
+            ],
+            "displaced": 0
+          }
+        ]
+      },
+      "score": {
+        "scores": {
+          "housing": 0.43659927404155713,
+          "production": 0.6884889743483633,
+          "market": 0.5119831868512335,
+          "logistics": 0.7457350555572261,
+          "civic": 0.3784152021148499
+        },
+        "residents": 64.13510702538674,
+        "jobs": 63.46256238299662,
+        "freight": 8744.561176312649,
+        "services": 0,
+        "congestion": 0.22091098383253172,
+        "reasons": {
+          "housing": "Access to jobs and funded services, balanced against crowding and workshop nuisance.",
+          "production": "Nearby workers, suppliers and freight access reduce operating distances.",
+          "market": "Reachable customers and workplaces support local trade; nearby competitors reduce the advantage.",
+          "logistics": "Recorded freight and nearby production support storage and handling space.",
+          "civic": "Reachable residents with limited existing service provision create local need."
+        }
+      }
+    }
+  ],
+  "accessExperiments": [
+    {
+      "scenario": "detoured approach to a crossing (prescribed abstraction)",
+      "beforeMinutes": 13.658536585365853,
+      "duringMinutes": 13.658536585365853,
+      "afterMinutes": 5.853658536585366,
+      "paidCost": 23.04,
+      "materials": {
+        "timber": 3.84,
+        "stone": 48,
+        "labor": 23.04
+      }
+    },
+    {
+      "scenario": "internal accounting boundary",
+      "surveyedPlots": 24,
+      "plotsInNeighbouringPool": 24,
+      "routeMinutes": 3.0487804878048776,
+      "renamingChangedAccess": false
+    }
+  ]
+}

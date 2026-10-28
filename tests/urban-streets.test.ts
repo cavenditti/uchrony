@@ -58,3 +58,16 @@ test('foreign or flooded land cannot host a cross-boundary plot', () => {
     /crosses/,
   )
 })
+
+test('route geometry follows access projections and reuses source trees without changing results', () => {
+  const { w } = urbanFixture()
+  ensureUrbanFabric(w)
+  const from = { x: 790, y: 420 },
+    to = { x: 1000, y: 445 }
+  const route = urbanStreetRoute(w, from, to)!
+  assert.ok(route)
+  assert.ok(route.points.some((p) => p.x === 790 && p.y === 430))
+  assert.ok(route.points.some((p) => p.x === 1000 && p.y === 430))
+  urbanStreetRoute(w, from, { x: 1100, y: 430 })
+  assert.deepEqual(urbanStreetRoute(w, from, to), urbanStreetRoute(structuredClone(w), from, to))
+})

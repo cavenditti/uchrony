@@ -95,6 +95,7 @@ export function updateUrbanStreetLoads(w: World) {
     if (best) best.lane.load = (best.lane.load ?? 0) + people
   }
   // Load changes route costs even when the physical line remains unchanged.
+  w.adaptive!.urban!.streetRevision++
   w.adaptive!.revision++
 }
 

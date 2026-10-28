@@ -1,0 +1,82 @@
+{
+  "baseCommit": "98a48f3616524e710c253d01591dc2956414ed3a",
+  "finalSourceCopySimHash": "abd83e477da2018727c9db06c9482dab79a87a0dfac74ca1fedd90fc88a7cdf6",
+  "controlledSimHash": "98ee4c6871595d44d6fbdc3c74f0771a48088a50d173f04d39a5ebaa8273fdaf",
+  "note": "Shared dirty checkout; hashes identify working sources, not solely the base commit. The full-engine report retains its own snapshot hash. Later consolidation footprint and legacy survey changes are covered by the final targeted tests; frontier runs skip legacy survey.",
+  "checks": {
+    "urbanBuildingRenderingSettlementSuite": {
+      "passed": 69,
+      "failed": 0,
+      "log": "/tmp/urban-regression-final.txt"
+    },
+    "renewalAfterFinalGeometryFix": {
+      "passed": 6,
+      "failed": 0,
+      "log": "/tmp/urban-renewal-final.txt"
+    },
+    "expandedLegacySuite": {
+      "passed": 4,
+      "failed": 0,
+      "log": "/tmp/urban-survey-large-final.txt"
+    },
+    "adaptiveWorld": {
+      "initialPassed": 9,
+      "initialFailed": 1,
+      "fixedFixtureRerunPassed": 1,
+      "remainingFailures": 0
+    },
+    "controlledComparisons": {
+      "runs": 12,
+      "physicalSpeedEquivalence": true,
+      "accessExperiments": 2
+    },
+    "build": "TypeScript and production Vite build passed; existing large-chunk advisory",
+    "generatedLegacyIntegration": {
+      "seed": "Urban legacy qualification",
+      "months": 6,
+      "surveyedBuildings": 16,
+      "worldValidation": true,
+      "browserImportedMonth": 6,
+      "browserAdvancedAndSavedMonth": 7
+    }
+  },
+  "finalOwnedFiles": {
+    "src/sim/urban-types.ts": "794dfb095a9be4c38de216d7fca4e520b7230a78a1d9bd86e6fe5c736b9ca521",
+    "src/sim/urban-fabric.ts": "b374a49776114b053ec1a94a1802e7b9e2f9f8b4ec6f86bb81cf6b32e4c7e967",
+    "src/sim/urban-construction.ts": "d3e95ef1caf0ab4d934fcdf435500bd29d08238d23753fd29d8a712bd0a31bc2",
+    "src/sim/urban-renewal.ts": "d0860d4efbf36429ee7f431cc9e3b14421c52de161b5f52b8b3d1cf8c75f2faf",
+    "src/sim/urban-projects.ts": "9df508992c669ac805100bc28cf25dbec4a6ea2322402674e4588b1268cf737d",
+    "src/sim/urban-streets.ts": "4841f33cfc480b1f09906dd0a67a932b3ade69fbaa525763844b3ebb8a63dc3f",
+    "src/sim/urban-street-works.ts": "de0db89b5835796ea54ba88921c9a1583dcf6ffed4aebcb0a9102603766b2ff4",
+    "src/sim/urban-survey.ts": "e6db712477ff898f761f37761293f0175c790a7359723f2120ae06825a861f61",
+    "src/sim/urban-location.ts": "980a7932d096898fcc8b609310afc92294f8876202b3cfcc5da24aadf1a0bd22",
+    "src/sim/urban-character.ts": "e0b1e2e710c4365daf86d66ef6719dec0e48c9df64db25f840e08b31fc35fb82",
+    "src/sim/urban-land.ts": "52d4d1b5e7091cd984fe481d7571cb8c3b3333d89ae42cf00f79608d801cbc1f",
+    "src/sim/urban-growth.ts": "7595dc17ad7a00e0952043a8108a83c0eae043d4fd19d43314ce5b29636c0242",
+    "src/sim/building-lots.ts": "57c5a4fd0cf5f891b37b95a610df64552606ecd34861e6328ade2ec7cfca4c80",
+    "src/map/settlement-scenery.ts": "b913de6a027543be32e0ac90f78ed18e215d8e04e1553faf55db9d9d3e2a83c9"
+  },
+  "distinctRegressionCases": 81,
+  "regressionFiles": {
+    "tests/urban-evolution-baseline.test.ts": 4,
+    "tests/urban-fabric.test.ts": 5,
+    "tests/urban-streets.test.ts": 5,
+    "tests/urban-location.test.ts": 4,
+    "tests/urban-renewal.test.ts": 6,
+    "tests/urban-street-works.test.ts": 5,
+    "tests/urban-character.test.ts": 2,
+    "tests/building-lots.test.ts": 5,
+    "tests/city-rendering.test.ts": 11,
+    "tests/settlement-dynamics.test.ts": 13,
+    "tests/urban-blocks-demand.test.ts": 7,
+    "tests/urban-survey.test.ts": 4,
+    "tests/adaptive-world.test.ts": 10
+  },
+  "endurance": {
+    "runs": 4,
+    "monthsPerRun": 120,
+    "sourceHash": "713f0ba8ed11a9093e2ef69b3927826b3bab6e4bba7afcc9bb1a4b430fd10e52",
+    "conservationAndSaveContinuation": true
+  },
+  "completedDate": "2026-10-29"
+}

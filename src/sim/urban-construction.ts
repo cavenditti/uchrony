@@ -58,6 +58,7 @@ export function advanceUrbanConstruction(w: World) {
       site.fabric!.altered = p.started + p.duration
       if (['replace', 'consolidate'].includes(p.kind)) site.fabric!.built = p.started + p.duration
       site.investedValue = (openingValue + p.cost) / Math.max(1, p.after.length)
+      site.capitalOwner ??= p.sponsor
       site.openingCapacity = openingCapacity / Math.max(1, p.after.length)
       delete site.retired
     }

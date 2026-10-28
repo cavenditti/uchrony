@@ -41,7 +41,14 @@ export interface UrbanStreetGraph {
 }
 const caches = new WeakMap<
   World,
-  { month: number; revision: number; length: number; graph: UrbanStreetGraph }
+  {
+    month: number
+    revision: number
+    streetRevision: number
+    lanes: SettlementLane[]
+    length: number
+    graph: UrbanStreetGraph
+  }
 >()
 
 /** Intersections are geometric, including T-junctions and internal boundary crossings. */
@@ -49,8 +56,21 @@ export function urbanStreetGraph(w: World): UrbanStreetGraph {
   const lanes = w.adaptive?.lanes ?? [],
     revision = w.adaptive?.revision ?? 0
   const cached = caches.get(w)
-  if (cached && cached.month === w.month && cached.revision === revision && cached.length === lanes.length)
+  const streetRevision = w.adaptive?.urban?.streetRevision ?? 0
+  if (
+    cached &&
+    cached.streetRevision === streetRevision &&
+    cached.lanes === lanes &&
+    cached.length === lanes.length
+  ) {
+    if (cached.month !== w.month || cached.revision !== revision) {
+      refreshStreetBuildings(w, cached.graph)
+      queryCaches.delete(cached.graph)
+      cached.month = w.month
+      cached.revision = revision
+    }
     return cached.graph
+  }
   const raw: Segment[] = [],
     index = new SpatialBuckets<Segment>(128)
   for (const lane of lanes)
@@ -133,6 +153,12 @@ export function urbanStreetGraph(w: World): UrbanStreetGraph {
       graph.segments.push({ a, b, minutes, meters, lane: s.lane })
     }
   }
+  refreshStreetBuildings(w, graph)
+  caches.set(w, { month: w.month, revision, streetRevision, lanes, length: lanes.length, graph })
+  return graph
+}
+function refreshStreetBuildings(w: World, graph: UrbanStreetGraph) {
+  graph.buildings = new SpatialBuckets(128)
   for (const s of Object.values(w.adaptive?.sites ?? {}))
     if (s.building && s.retired === undefined && !s.premises)
       graph.buildings.insert(
@@ -142,9 +168,26 @@ export function urbanStreetGraph(w: World): UrbanStreetGraph {
         Math.max(...s.building.map((p) => p.x)),
         Math.max(...s.building.map((p) => p.y)),
       )
-  caches.set(w, { month: w.month, revision, length: lanes.length, graph })
-  return graph
 }
+interface Attachment {
+  s: UrbanStreetGraph['segments'][number]
+  point: PointMeters
+  t: number
+  walk: number
+}
+interface PathTree {
+  distances: Map<number, number>
+  previous: Map<number, { from: number; lane: SettlementLane }>
+  roots: Map<number, Attachment>
+}
+const queryCaches = new WeakMap<
+  UrbanStreetGraph,
+  {
+    attachments: Map<string, Attachment[]>
+    edges: Map<string, boolean>
+    trees: Map<string, PathTree>
+  }
+>()
 
 export function urbanAccessSegment(
   w: World,
@@ -179,73 +222,118 @@ export function urbanStreetRoute(w: World, from: PointMeters, to: PointMeters, l
   const nation = w.regions[w.cells[urbanCellAt(w, from)]?.region]?.nation
   if (nation === undefined || w.regions[w.cells[urbanCellAt(w, to)]?.region]?.nation !== nation) return null
   const g = urbanStreetGraph(w)
-  const attach = (p: PointMeters) =>
-    [...g.buckets.query(p.x - 64, p.y - 64, p.x + 64, p.y + 64)]
+  let cache = queryCaches.get(g)
+  if (!cache) {
+    cache = { attachments: new Map(), edges: new Map(), trees: new Map() }
+    queryCaches.set(g, cache)
+  }
+  const clear = (a: number, b: number) => {
+    const key = `${nation}:${Math.min(a, b)}:${Math.max(a, b)}`
+    let value = cache!.edges.get(key)
+    if (value === undefined) {
+      value = urbanLandSegment(w, g.nodes[a], g.nodes[b], nation)
+      cache!.edges.set(key, value)
+    }
+    return value
+  }
+  const attach = (p: PointMeters) => {
+    const key = `${nation}:${p.x}:${p.y}`
+    const saved = cache!.attachments.get(key)
+    if (saved) return saved
+    const candidates = [...g.buckets.query(p.x - 64, p.y - 64, p.x + 64, p.y + 64)]
       .map((id) => {
         const s = g.segments[id],
           q = streetProjection(p, g.nodes[s.a], g.nodes[s.b])
         return { s, ...q, walk: distance(p, q.point) / (4000 / 60) }
       })
-      .filter(
-        (a) =>
-          a.walk <= 64 / (4000 / 60) &&
-          urbanLandSegment(w, g.nodes[a.s.a], g.nodes[a.s.b], nation) &&
-          urbanAccessSegment(w, p, a.point),
-      )
+      .filter((a) => a.walk <= 64 / (4000 / 60))
       .sort((a, b) => a.walk - b.walk || a.s.a - b.s.a)
-      .slice(0, 3)
+    const result: Attachment[] = []
+    for (const a of candidates) {
+      if (clear(a.s.a, a.s.b) && urbanAccessSegment(w, p, a.point)) result.push(a)
+      if (result.length === 3) break
+    }
+    if (cache!.attachments.size >= 8192) cache!.attachments.clear()
+    cache!.attachments.set(key, result)
+    return result
+  }
   const starts = attach(from),
     ends = attach(to)
   if (!starts.length || !ends.length) return undefined
-  const distances = new Map<number, number>(),
-    previous = new Map<number, { from: number; lane: SettlementLane }>()
-  const queue = new MinHeap()
-  const roots = new Map<number, SettlementLane>()
-  let endpointLanes: SettlementLane[] = []
-  for (const a of starts)
-    for (const [node, cost] of [
-      [a.s.a, a.walk + a.s.minutes * a.t],
-      [a.s.b, a.walk + a.s.minutes * (1 - a.t)],
-    ]) {
-      if (cost < (distances.get(node) ?? Infinity)) {
-        distances.set(node, cost)
-        queue.push(node, cost)
-        roots.set(node, a.s.lane)
+  const treeKey = `${nation}:${from.x}:${from.y}:${limit}`
+  let tree = cache.trees.get(treeKey)
+  if (!tree) {
+    const distances = new Map<number, number>(),
+      previous = new Map<number, { from: number; lane: SettlementLane }>(),
+      roots = new Map<number, Attachment>()
+    const queue = new MinHeap()
+    for (const a of starts)
+      for (const [node, cost] of [
+        [a.s.a, a.walk + a.s.minutes * a.t],
+        [a.s.b, a.walk + a.s.minutes * (1 - a.t)],
+      ]) {
+        if (cost < (distances.get(node) ?? Infinity)) {
+          distances.set(node, cost)
+          queue.push(node, cost)
+          roots.set(node, a)
+        }
+      }
+    while (queue.size) {
+      const cur = queue.pop()
+      if (cur.cost !== distances.get(cur.id) || cur.cost > limit) continue
+      for (const e of g.edges[cur.id]) {
+        const cost = cur.cost + e.minutes
+        if (
+          cost > limit ||
+          cost >= (distances.get(e.to) ?? Infinity) ||
+          distance(from, g.nodes[e.to]) > 2600 ||
+          !clear(cur.id, e.to)
+        )
+          continue
+        distances.set(e.to, cost)
+        previous.set(e.to, { from: cur.id, lane: e.lane })
+        queue.push(e.to, cost)
+        roots.set(e.to, roots.get(cur.id)!)
       }
     }
+    tree = { distances, previous, roots }
+    if (cache.trees.size >= 16) cache.trees.delete(cache.trees.keys().next().value!)
+    cache.trees.set(treeKey, tree)
+  }
+  const { distances, previous, roots } = tree
   let best = Infinity,
-    end = -1
+    end = -1,
+    endpointLanes: SettlementLane[] = [],
+    departure: PointMeters | undefined,
+    arrival: PointMeters | undefined
   for (const a of starts)
     for (const b of ends)
-      if (a.s === b.s) best = Math.min(best, a.walk + b.walk + Math.abs(a.t - b.t) * a.s.minutes)
-  while (queue.size) {
-    const item = queue.pop()
-    const cur = { node: item.id, cost: item.cost }
-    if (cur.cost !== distances.get(cur.node) || cur.cost > limit || cur.cost > best) continue
-    for (const e of ends) {
-      const tail =
-        cur.node === e.s.a ? e.s.minutes * e.t : cur.node === e.s.b ? e.s.minutes * (1 - e.t) : Infinity
-      if (cur.cost + e.walk + tail < best) {
-        best = cur.cost + e.walk + tail
-        end = cur.node
-        endpointLanes = [roots.get(cur.node)!, e.s.lane].filter(Boolean)
+      if (a.s === b.s) {
+        const cost = a.walk + b.walk + Math.abs(a.t - b.t) * a.s.minutes
+        if (cost < best) {
+          best = cost
+          endpointLanes = [a.s.lane]
+          departure = a.point
+          arrival = b.point
+        }
+      }
+  for (const e of ends)
+    for (const [node, tail] of [
+      [e.s.a, e.s.minutes * e.t],
+      [e.s.b, e.s.minutes * (1 - e.t)],
+    ]) {
+      const cost = (distances.get(node) ?? Infinity) + e.walk + tail
+      if (cost < best) {
+        best = cost
+        end = node
+        endpointLanes = [roots.get(node)!.s.lane, e.s.lane]
+        departure = roots.get(node)!.point
+        arrival = e.point
       }
     }
-    for (const e of g.edges[cur.node]) {
-      const target = g.nodes[e.to]
-      if (distance(from, target) > 2600 || !urbanLandSegment(w, g.nodes[cur.node], target, nation)) continue
-      const cost = cur.cost + e.minutes
-      if (cost <= limit && cost < (distances.get(e.to) ?? Infinity)) {
-        distances.set(e.to, cost)
-        previous.set(e.to, { from: cur.node, lane: e.lane })
-        queue.push(e.to, cost)
-        roots.set(e.to, roots.get(cur.node)!)
-      }
-    }
-  }
   if (!Number.isFinite(best) || best > limit) return null
   const lanes = new Set<SettlementLane>(endpointLanes),
-    points: PointMeters[] = [to]
+    points: PointMeters[] = arrival ? [arrival, to] : [to]
   while (end >= 0) {
     points.unshift(g.nodes[end])
     const prev = previous.get(end)
@@ -253,6 +341,7 @@ export function urbanStreetRoute(w: World, from: PointMeters, to: PointMeters, l
     lanes.add(prev.lane)
     end = prev.from
   }
+  if (departure) points.unshift(departure)
   points.unshift(from)
   if (!lanes.size) for (const a of starts) for (const b of ends) if (a.s === b.s) lanes.add(a.s.lane)
   return {

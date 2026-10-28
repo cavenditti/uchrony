@@ -15,7 +15,7 @@ Each milestone is committed separately. Existing economy, agriculture, policy an
 | 4 | Funded repair, extension, conversion, replacement and consolidation | Complete: staged works, vacancy reservations, material/payment/national-account reconciliation and save/speed checks; 14 focused checks and type check passed |
 | 5 | Funded street connections, widening and local realignment | Complete: clear-width checks, retained junctions, staged route improvements and boundary tests; 10 focused checks and type check passed |
 | 6 | Derived neighbourhood character, physical building forms and explanations | Complete: recorded-use rendering and local explanations; 25 focused checks, production build, 1440 px/390 px component checks and fresh UI review passed |
-| 7 | Controlled comparisons, full-world trajectories, save/speed/performance and browser qualification | Pending |
+| 7 | Controlled comparisons, full-world trajectories, save/speed/performance and browser qualification | Complete: 12 controlled trajectories, 4 ten-year Regional runs, conservation and save continuation, legacy integration, production build and desktop/mobile checks; timing limits recorded in the validation report |
 
 ## Contracts
 
@@ -33,3 +33,5 @@ Each milestone is committed separately. Existing economy, agriculture, policy an
 Controlled cases: mature market town at fixed population; improved river crossing; neighbouring accounting areas; industrial decline/recovery. Measure physical changes, vacancies, employment distribution, accessibility, construction, displacement and retained older fabric. Compare each with an unchanged or disabled-mechanism control. Check resource/payment conservation, invalid saves, deterministic continuation and non-mutating observer queries. Run longer worlds on varied terrain, then inspect the real map/inspector on desktop and mobile.
 
 Mechanism references: [Simutrans](https://github.com/simutrans/simutrans/blob/master/src/simutrans/world/simcity.cc), [Julius](https://github.com/bvschaik/julius/blob/master/src/building/house_evolution.c), [Widelands](https://github.com/widelands/widelands/blob/master/src/economy/road.cc), [OpenTTD](https://wiki.openttd.org/en/Manual/Towns), [Freeciv](https://github.com/freeciv/freeciv/blob/main/server/cityturn.c). These inform mechanisms, not numeric calibration.
+
+Delivery evidence and limits: [Urban evolution qualification](../validation/urban-evolution-2026-10-28.md).

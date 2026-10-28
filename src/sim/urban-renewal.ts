@@ -37,11 +37,17 @@ export function planUrbanRenewal(
   }
   if (kind === 'convert') {
     const dominant = dominantUrbanUse(site),
+      housingBefore = shape.fabric.uses.housing,
       share = Math.min(shape.fabric.uses[dominant], shape.fabric.floorArea * 0.35)
     if (dominant === use || share <= 1) return undefined
     shape.fabric.uses[dominant] -= share
     shape.fabric.uses[use] += share
-    shape.capacity = shape.fabric.uses.housing / 28
+    // Preserve existing residential density when removing housing. A spacious
+    // low-capacity home must not gain residents' places by becoming a workshop.
+    shape.capacity =
+      shape.fabric.uses.housing < housingBefore
+        ? (shape.capacity * shape.fabric.uses.housing) / housingBefore
+        : shape.capacity + (shape.fabric.uses.housing - housingBefore) / 28
   }
   if (kind === 'replace' || kind === 'consolidate') {
     const points = before.flatMap((s) => s.building!),
@@ -53,7 +59,11 @@ export function planUrbanRenewal(
     shape.cell = urbanCellAt(w, shape.point)
     const angle = nearestFrontage(w, shape.point)?.angle ?? 0
     const width = partner ? right - left : Math.sqrt(polygonArea(shape.building)) * 1.1
-    const depth = partner ? bottom - top : Math.sqrt(polygonArea(shape.building)) / 1.1
+    const footprint = before.reduce((n, s) => n + polygonArea(s.building!), 0)
+    // Spanning the gap between lots must not turn that gap into free floor area.
+    const depth = partner
+      ? Math.min(bottom - top, footprint / width)
+      : Math.sqrt(polygonArea(shape.building)) / 1.1
     shape.building = rectangularFootprint(shape.point, width, depth, angle)
     const size =
       Math.max(
@@ -127,18 +137,35 @@ export function advanceUrbanRenewal(w: World) {
     (s) => s.retired === undefined && s.building && s.parcel && s.fabric && !s.premises,
   )
   for (const s of sites)
-    if (!pending.has(s.id)) s.fabric!.condition = Math.max(0.4, s.fabric!.condition - elapsed * 0.0006)
+    if (!pending.has(s.id)) {
+      const aging = Math.max(0, w.month - Math.max(previous, s.fabric!.altered))
+      s.fabric!.condition = Math.max(0.4, Math.round((s.fabric!.condition - aging * 0.0006) * 1e9) / 1e9)
+    }
   if (Math.floor(previous / 6) === Math.floor(w.month / 6)) return
   const locations = urbanLocationSnapshot(w)
-  const candidates = sites
-    .filter((s) => !pending.has(s.id) && w.month - s.fabric!.altered >= 24)
-    .sort((a, b) => a.id.localeCompare(b.id))
-  const limit = Math.min(48, candidates.length),
-    offset = (Math.floor(w.month / 6) * 48) % Math.max(1, candidates.length)
+  const pools = new Map<number, PhysicalSite[]>()
+  for (const site of sites)
+    if (!pending.has(site.id) && w.month - site.fabric!.altered >= 24) {
+      const list = pools.get(site.pool) ?? []
+      list.push(site)
+      pools.set(site.pool, list)
+    }
+  const poolIds = [...pools.keys()].sort((a, b) => a - b)
+  const offset = (Math.floor(w.month / 6) * 6) % Math.max(1, poolIds.length)
+  const candidates: PhysicalSite[] = []
+  for (let i = 0; i < Math.min(6, poolIds.length); i++) {
+    const list = pools.get(poolIds[(offset + i) % poolIds.length])!
+    list.sort(
+      (a, b) =>
+        a.fabric!.condition - b.fabric!.condition ||
+        a.fabric!.altered - b.fabric!.altered ||
+        a.id.localeCompare(b.id),
+    )
+    candidates.push(...list.slice(0, 8))
+  }
   const funded = new Set<number>()
-  for (let i = 0; i < limit; i++) {
-    const site = candidates[(offset + i) % candidates.length]
-    if (funded.has(site.pool) || pending.has(site.id)) continue
+  for (const site of candidates) {
+    if (pending.has(site.id)) continue
     const location = locations(site),
       current = dominantUrbanUse(site),
       p = w.economy?.producers[site.pool]
@@ -164,6 +191,7 @@ export function advanceUrbanRenewal(w: World) {
     const use = allowed.reduce((best, next) => (score(next) > score(best) ? next : best), current)
     recordUrbanPressure(w, site, use, score(use))
     const persistent = w.month - u.pressure[site.id].since >= 6
+    if (funded.has(site.pool)) continue
     let project
     if (site.fabric!.condition < 0.62) project = planUrbanRenewal(w, site, 'replace')
     if (!project && site.fabric!.condition < 0.83) project = planUrbanRenewal(w, site, 'repair')
@@ -173,6 +201,7 @@ export function advanceUrbanRenewal(w: World) {
       project = planUrbanRenewal(w, site, 'extend')
     if (
       !project &&
+      use === current &&
       w.month - site.fabric!.altered >= 60 &&
       (site.residents ?? 0) < site.capacity * 0.65 &&
       location.residents + location.jobs > 30

@@ -7,8 +7,8 @@ import { footprintConnection } from './residential-geometry'
 import { polygonArea } from './physical-space'
 import { laneTouchesRiver } from './river-lanes'
 import { STRATA } from './economic-types'
-import { producerAccount, householdAccount, balance, transfer } from './ledger'
-import { marketStore, recordUse, recordWages, recordOwnCapital } from './national-accounts'
+import { producerAccount, householdAccount, governmentAccount, balance, transfer } from './ledger'
+import { marketStore, recordUse, recordWages, recordOwnCapital, recordService } from './national-accounts'
 import { simulationMonths } from './simulation-period'
 
 export const activeUrbanProject = (p: UrbanProject) =>
@@ -212,30 +212,51 @@ export function fundUrbanProject(w: World, project: UrbanProject, budgetShare = 
   const available = STRATA.reduce((n, s) => n + Math.max(0, hh[s].laborForce - hh[s].employed), 0)
   const { timber, stone, labor } = project.inputs,
     months = simulationMonths()
-  const wages = (labor * p.wage) / months
+  const wages = labor * p.wage
+  const contractor = producerAccount(project.pool)
+  const invoice = wages + timber * r.prices.timber + stone * r.prices.stone
+  const existingOwner = project.before.map((s) => a.sites[s.site].capitalOwner).find(Boolean)
+  const alternatives = existingOwner
+    ? [existingOwner]
+    : project.lane
+      ? [governmentAccount(r.nation)]
+      : [
+          ...project.after
+            .flatMap((s) => s.fabric.occupants)
+            .filter((id) => id.startsWith('firm:') && e.firms?.[Number(id.slice(5))]?.active),
+          householdAccount(project.pool, 'owner'),
+        ]
+  const sponsor =
+    wages <= balance(w, contractor) * budgetShare
+      ? contractor
+      : alternatives.find((id) => invoice <= balance(w, id) * budgetShare)
   if (
     ![timber, stone, labor, wages].every((v) => Number.isFinite(v) && v >= 0) ||
     timber > r.stocks.timber * budgetShare ||
     stone > r.stocks.stone * budgetShare ||
     labor > available * months * budgetShare ||
-    wages > balance(w, project.sponsor) * budgetShare
+    !sponsor
   )
     return false
+  if (sponsor !== contractor) {
+    transfer(w, sponsor, contractor, invoice, 'urban construction contract')
+    recordService(w, project.pool, r.nation, contractor, invoice, true)
+  }
   let paid = 0
   for (const stratum of STRATA) {
     const h = hh[stratum],
       share = Math.max(0, h.laborForce - h.employed) / Math.max(1e-9, available)
     const payment = transfer(
       w,
-      project.sponsor,
+      contractor,
       householdAccount(project.pool, stratum),
       wages * share,
       'urban construction wages',
     )
     h.income += payment
-    h.employed += payment / p.wage
+    h.employed += payment / (p.wage * months)
     paid += payment
-    recordWages(w, project.pool, project.sponsor, payment)
+    recordWages(w, project.pool, contractor, payment)
   }
   const materials =
     recordUse(w, marketStore(project.pool), 'timber', timber) +
@@ -244,8 +265,9 @@ export function fundUrbanProject(w: World, project: UrbanProject, budgetShare = 
   r.stocks.stone -= stone
   r.consumption.timber += timber
   r.consumption.stone += stone
-  recordOwnCapital(w, project.pool, project.sponsor, paid + materials)
-  project.cost = paid + materials
+  if (sponsor === contractor) recordOwnCapital(w, project.pool, contractor, paid + materials)
+  project.sponsor = sponsor
+  project.cost = sponsor === contractor ? paid + materials : invoice
   project.displaced = moves
   for (const d of moves) {
     a.sites[d.from].residents = (a.sites[d.from].residents ?? 0) - d.people

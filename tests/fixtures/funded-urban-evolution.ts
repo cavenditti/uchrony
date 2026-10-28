@@ -1,9 +1,9 @@
-import { urbanFixture } from './urban-evolution'
+import { urbanFixture, type UrbanScenario } from './urban-evolution'
 import { generateWorld } from '../../src/sim/generate'
 import { ensureDistrictEconomy } from '../../src/sim/districts'
 import { ensureUrbanFabric } from '../../src/sim/urban-fabric'
-export function fundedUrbanFixture() {
-  const { w, sites } = urbanFixture()
+export function fundedUrbanFixture(scenario: UrbanScenario = 'market') {
+  const { w, sites } = urbanFixture(scenario)
   const economyWorld = generateWorld('Urban funding')
   ensureDistrictEconomy(economyWorld)
   // Actual complete accounts and stocks; the physical scenario is prescribed.

@@ -15,6 +15,7 @@ import { urbanLocationSnapshot } from './urban-location'
 import { advanceUrbanRenewal } from './urban-renewal'
 import { activeUrbanProject } from './urban-projects'
 import { advanceUrbanStreets } from './urban-street-works'
+import { advanceUrbanSurvey } from './urban-survey'
 
 /** Housing-space development has physical inputs and paid labor. No imputed rent removes cash. */
 export function advanceLandUse(
@@ -26,6 +27,7 @@ export function advanceLandUse(
   const a = w.adaptive
   if (!a || !w.economy || !w.localEconomy) return
   ensureUrbanFabric(w)
+  advanceUrbanSurvey(w)
   advanceUrbanConstruction(w)
   advanceUrbanRenewal(w)
   advanceUrbanStreets(w)

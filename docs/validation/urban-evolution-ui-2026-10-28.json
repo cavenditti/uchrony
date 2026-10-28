@@ -1,12 +1,60 @@
 {
   "scope": "Existing urban renderer and local inspection components in a prescribed, explicitly labelled neighbourhood",
-  "desktop": [1440, 1000],
-  "mobile": [390, 844],
+  "desktop": [
+    1440,
+    1000
+  ],
+  "mobile": [
+    390,
+    844
+  ],
   "horizontalOverflow": false,
-  "newPanelAccessibility": { "passed": 11, "violations": 0, "incomplete": 0 },
-  "detector": { "primaryFindings": 0, "legacyAdvisories": 409 },
-  "finishReview": { "initial": "fix", "correction": "Use the defined --line separator token", "verdict": "ship", "scope": "Existing UI extension and scored separator correction" },
+  "newPanelAccessibility": {
+    "passed": 11,
+    "violations": 0,
+    "incomplete": 0
+  },
+  "detector": {
+    "primaryFindings": 0,
+    "legacyAdvisories": 409
+  },
+  "finishReview": {
+    "initial": "fix",
+    "correction": "Use the defined --line separator token",
+    "verdict": "ship",
+    "scope": "Existing UI extension and scored separator correction"
+  },
   "documentation": "Incumbent design files checked and preserved",
   "evidence": ".impeccable/review/urban-evolution/desktop.png and mobile.png",
-  "limitations": ["Controlled component captures are separate from the final complete-application checks", "Small overview buildings do not qualify every close-range facade"]
+  "limitations": [
+    "Controlled construction captures and complete-application legacy-world checks have separate scope",
+    "Small overview buildings do not qualify every close-range facade"
+  ],
+  "completeApplication": {
+    "sourceCopy": "/tmp/uchrony-urban-final",
+    "desktop": [
+      1440,
+      1000
+    ],
+    "mobile": [
+      390,
+      844
+    ],
+    "horizontalOverflow": false,
+    "phoneRefreshAndClose": true,
+    "runtimeErrors": 0,
+    "legacyPanel": "Unsurveyed neighbourhood; explicit explanation of aggregate housing",
+    "captures": [
+      ".impeccable/review/urban-evolution/app-desktop.png",
+      ".impeccable/review/urban-evolution/app-mobile.png"
+    ],
+    "importAndContinue": {
+      "seed": "Urban legacy qualification",
+      "states": 8,
+      "loadedMonth": 6,
+      "advancedMonth": 7,
+      "autosaveReadback": "Saved Aug 1720",
+      "runtimeErrors": 0
+    }
+  }
 }

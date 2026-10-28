@@ -188,6 +188,9 @@ test('a representative commute starts at its sampled home and uses its own trave
   Object.assign(home, { x: center.x - 200, y: center.y })
   Object.assign(workplace, { cell: home.cell, x: center.x + 200, y: center.y })
   w.cells[home.cell].terrain = 'plains'
+  // Publish the fixture's moved sites before querying cached mesh membership,
+  // just as the simulation does after a physical change.
+  w.adaptive!.revision++
   w.adaptive!.commutingRows = []
   w.adaptive!.commuting = [
     {

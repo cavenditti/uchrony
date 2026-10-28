@@ -11,10 +11,11 @@ import { withSimulationPeriod } from '../src/sim/simulation-period'
 import { generateWorld } from '../src/sim/generate'
 import { ensureDistrictEconomy } from '../src/sim/districts'
 import { beginEconomyMonth } from '../src/sim/macroeconomy'
-import { balances, auditLedger } from '../src/sim/ledger'
+import { balances, auditLedger, transfer } from '../src/sim/ledger'
 import { auditBanks } from '../src/sim/banking'
 import { physicalStocks, auditGoods } from '../src/sim/goods-accounting'
 import { reconcileGDP, auditNationalAccounts } from '../src/sim/national-accounts'
+import { polygonArea } from '../src/sim/physical-space'
 
 test('all five renewal choices have real geometry and staged capacity', () => {
   const { w, sites } = urbanFixture()
@@ -30,8 +31,21 @@ test('all five renewal choices have real geometry and staged capacity', () => {
     assert.ok(p, kind)
     assert.ok(p.inputs.labor > 0 && p.inputs.timber > 0)
     assert.equal(p.status, 'proposed')
-    if (kind === 'convert') assert.ok(p.after[0].fabric.uses.market > 0)
-    if (kind === 'consolidate') assert.equal(p.after[0].capacity, 16)
+    if (kind === 'convert') {
+      assert.ok(p.after[0].fabric.uses.market > 0)
+      assert.equal(p.after[0].capacity, sites[0].capacity * 0.65)
+    }
+    if (kind === 'consolidate') {
+      assert.equal(p.after[0].capacity, 16)
+      assert.ok(
+        Math.abs(
+          polygonArea(p.after[0].building) -
+            polygonArea(sites[0].building!) -
+            polygonArea(sites[1].building!),
+        ) < 1e-6,
+      )
+      assert.ok(polygonArea(p.after[0].building) <= p.after[0].fabric.floorArea + 1e-6)
+    }
   }
 })
 
@@ -89,45 +103,67 @@ test('calendar completion agrees at monthly and six-month integration intervals'
 })
 
 test('urban funding reconciles the complete goods, money and national accounts', () => {
-  const w = generateWorld('Urban capital accounts')
-  ensureDistrictEconomy(w)
-  const physical = urbanFixture()
-  w.adaptive = physical.w.adaptive
-  // Move the prescribed building into one real market's land. It retains a real
-  // footprint but these checks focus on accounting, not generated geography.
-  const cell = w.cells.find((c) => c.region === 0 && c.terrain === 'plains')!
-  assert.ok(cell)
-  const site = physical.sites[0]
-  const x = ((cell.id % w.width) + 0.5) * 1024,
-    y = (Math.floor(cell.id / w.width) + 0.5) * 1024
-  const dx = x - site.x,
-    dy = y - site.y
-  site.x = x
-  site.y = y
-  site.cell = cell.id
-  site.parcel!.x += dx
-  site.parcel!.y += dy
-  site.building = site.building!.map((p) => ({ x: p.x + dx, y: p.y + dy }))
-  w.adaptive!.sites = { [site.id]: site }
-  w.adaptive!.lanes = []
-  ensureUrbanFabric(w)
-  for (const h of Object.values(w.economy!.households[0])) {
-    h.laborForce = 1000
-    h.employed = 0
+  for (const external of [false, true]) {
+    const w = generateWorld('Urban capital accounts')
+    ensureDistrictEconomy(w)
+    const physical = urbanFixture()
+    w.adaptive = physical.w.adaptive
+    // Move the prescribed building into one real market's land. It retains a real
+    // footprint but these checks focus on accounting, not generated geography.
+    const cell = w.cells.find((c) => c.region === 0 && c.terrain === 'plains')!
+    assert.ok(cell)
+    const site = physical.sites[0]
+    const x = ((cell.id % w.width) + 0.5) * 1024,
+      y = (Math.floor(cell.id / w.width) + 0.5) * 1024
+    const dx = x - site.x,
+      dy = y - site.y
+    site.x = x
+    site.y = y
+    site.cell = cell.id
+    site.parcel!.x += dx
+    site.parcel!.y += dy
+    site.building = site.building!.map((p) => ({ x: p.x + dx, y: p.y + dy }))
+    w.adaptive!.sites = { [site.id]: site }
+    w.adaptive!.lanes = []
+    ensureUrbanFabric(w)
+    for (const h of Object.values(w.economy!.households[0])) {
+      h.laborForce = 1000
+      h.employed = 0
+    }
+    if (external)
+      transfer(
+        w,
+        'producer:0',
+        'household:0:owner',
+        w.economy!.producers[0].cash,
+        'fixture ownership funding',
+      )
+    beginEconomyMonth(w)
+    for (const h of Object.values(w.economy!.households[0])) {
+      h.laborForce = 1000
+      h.employed = 0
+    }
+    const before = physicalStocks(w)
+    const project = planUrbanRenewal(w, site, 'repair')!
+    assert.ok(project)
+    assert.ok(fundUrbanProject(w, project, 1))
+    assert.equal(project.sponsor, external ? 'household:0:owner' : 'producer:0')
+    reconcileGDP(w)
+    auditGoods(w)
+    auditLedger(w)
+    auditBanks(w)
+    auditNationalAccounts(w)
+    assert.ok(Math.abs(physicalStocks(w).timber - before.timber + project.inputs.timber) < 1e-6)
   }
-  beginEconomyMonth(w)
-  for (const h of Object.values(w.economy!.households[0])) {
-    h.laborForce = 1000
-    h.employed = 0
-  }
-  const before = physicalStocks(w)
-  const project = planUrbanRenewal(w, site, 'repair')!
-  assert.ok(project)
-  assert.ok(fundUrbanProject(w, project, 1))
-  reconcileGDP(w)
-  auditGoods(w)
-  auditLedger(w)
-  auditBanks(w)
-  auditNationalAccounts(w)
-  assert.ok(Math.abs(physicalStocks(w).timber - before.timber + project.inputs.timber) < 1e-6)
+})
+
+test('the same person-months cost the same wages at monthly and six-month speeds', () => {
+  const { w, sites } = fundedUrbanFixture(),
+    coarse = structuredClone(w)
+  const monthlyProject = planUrbanRenewal(w, sites[0], 'repair')!
+  const coarseProject = planUrbanRenewal(coarse, coarse.adaptive!.sites[sites[0].id], 'repair')!
+  assert.ok(fundUrbanProject(w, monthlyProject, 1))
+  withSimulationPeriod(6, () => assert.ok(fundUrbanProject(coarse, coarseProject, 1)))
+  assert.equal(monthlyProject.cost, coarseProject.cost)
+  assert.deepEqual(balances(w), balances(coarse))
 })

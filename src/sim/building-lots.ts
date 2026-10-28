@@ -5,6 +5,7 @@ import { surveyBuildingPlots } from './urban-growth'
 import { apportion } from './allocation'
 import { divideStock } from './districts'
 import { compactResidence, createResidentialParcel, residentialSites } from './residential-sites'
+import { polygonArea } from './physical-space'
 
 export const LOT_SPAN = 16
 export const BUILDING_CAPACITY = 8
@@ -49,6 +50,13 @@ export function subdivideHousing(
     compactResidence(source) || future > 0,
     neighbors,
   )
+  if (!plots.length) return
+  if (
+    a.buildingVersion !== 1 &&
+    source.capacity * 28 > plots.reduce((n, p) => n + polygonArea(p.building) * 4, 0)
+  )
+    return
+  const fabric = source.fabric && structuredClone(source.fabric)
   const weights = plots.map((p) => p.weight)
   const capacity = divideStock(source.capacity, weights),
     opening = divideStock(source.openingCapacity, weights)
@@ -63,9 +71,22 @@ export function subdivideHousing(
     site.openingCapacity = opening[i]
     site.openingBuilt = built[i]
     site.investedValue = capital[i]
+    site.capitalOwner = source.capitalOwner
     site.residents = people[i]
     site.founded = source.founded
     site.building = plot.building
+    if (fabric) {
+      const share = weights[i] / weights.reduce((n, weight) => n + weight, 0)
+      site.fabric = {
+        ...structuredClone(fabric),
+        floorArea: fabric.floorArea * share,
+        uses: Object.fromEntries(
+          Object.entries(fabric.uses).map(([use, area]) => [use, area * share]),
+        ) as typeof fabric.uses,
+        survey: 'recorded',
+        predecessors: i ? [...fabric.predecessors, source.id] : fabric.predecessors,
+      }
+    }
     return site
   })
   a.construction = (a.construction ?? []).filter((p) => p.site !== source.id)
