@@ -14,6 +14,7 @@ import { coarseHousingDemand } from './housing-demand'
 import { urbanLocationSnapshot } from './urban-location'
 import { advanceUrbanRenewal } from './urban-renewal'
 import { activeUrbanProject } from './urban-projects'
+import { advanceUrbanStreets } from './urban-street-works'
 
 /** Housing-space development has physical inputs and paid labor. No imputed rent removes cash. */
 export function advanceLandUse(
@@ -27,6 +28,7 @@ export function advanceLandUse(
   ensureUrbanFabric(w)
   advanceUrbanConstruction(w)
   advanceUrbanRenewal(w)
+  advanceUrbanStreets(w)
   a.construction ??= []
   for (const project of a.construction) {
     project.remaining -= simulationMonths()

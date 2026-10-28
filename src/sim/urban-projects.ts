@@ -2,7 +2,7 @@ import type { World } from './types'
 import type { PhysicalSite, PointMeters } from './adaptive-types'
 import type { UrbanProject, UrbanProjectKind, UrbanShape } from './urban-types'
 import { urbanShape } from './urban-construction'
-import { urbanLand } from './urban-land'
+import { urbanLand, urbanLandSegment } from './urban-land'
 import { footprintConnection } from './residential-geometry'
 import { polygonArea } from './physical-space'
 import { laneTouchesRiver } from './river-lanes'
@@ -173,6 +173,40 @@ export function fundUrbanProject(w: World, project: UrbanProject, budgetShare = 
   if (project.before.some((s) => JSON.stringify(urbanShape(a.sites[s.site])) !== JSON.stringify(s)))
     return false
   if (project.after.some((s) => !urbanShapeClear(w, s, new Set(project.sites)))) return false
+  if (project.lane) {
+    const lane = project.lane
+    if (
+      lane.width < 1 ||
+      lane.width > 8 ||
+      lane.points.length < 2 ||
+      laneTouchesRiver(w, lane.points, lane.width)
+    )
+      return false
+    if (
+      lane.id &&
+      !a.lanes?.some(
+        (l) =>
+          l.id === lane.id &&
+          l.pool === project.pool &&
+          JSON.stringify(l.points) === JSON.stringify(lane.before),
+      )
+    )
+      return false
+    for (let i = 1; i < lane.points.length; i++) {
+      const segment = [lane.points[i - 1], lane.points[i]]
+      if (!urbanLandSegment(w, segment[0], segment[1], r.nation)) return false
+      if (
+        Object.values(a.sites).some(
+          (s) =>
+            s.retired === undefined &&
+            s.building &&
+            !s.premises &&
+            footprintConnection(segment, s.building).distance < lane.width / 2 + 1,
+        )
+      )
+        return false
+    }
+  }
   const moves = rehousing(w, project)
   if (!moves) return false
   const available = STRATA.reduce((n, s) => n + Math.max(0, hh[s].laborForce - hh[s].employed), 0)
