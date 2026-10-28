@@ -1,4 +1,6 @@
 import { simulationMonths } from './simulation-period'
+import { ensureUrbanFabric } from './urban-fabric'
+import { advanceUrbanConstruction } from './urban-construction'
 import { habitableLand } from './terrain-access'
 import { STRATA } from './economic-types'
 import { producerAccount, householdAccount, transfer } from './ledger'
@@ -19,6 +21,8 @@ export function advanceLandUse(
 ) {
   const a = w.adaptive
   if (!a || !w.economy || !w.localEconomy) return
+  ensureUrbanFabric(w)
+  advanceUrbanConstruction(w)
   a.construction ??= []
   for (const project of a.construction) {
     project.remaining -= simulationMonths()

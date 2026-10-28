@@ -10,6 +10,9 @@ export interface SpatialBounds {
   size: number
 }
 export interface SettlementLane {
+  id?: string
+  load?: number
+  upgraded?: number
   pool: number
   founded: number
   width: number
@@ -18,6 +21,9 @@ export interface SettlementLane {
   bridge?: true
 }
 export interface PhysicalSite extends PointMeters {
+  fabric?: import('./urban-types').UrbanBuilding
+  /** A firm's exact leased/owned physical premises; accounts remain with its economic entity. */
+  premises?: string
   id: string
   cell: number
   pool: number
@@ -75,6 +81,7 @@ export interface CommuteFlow {
   cells?: number[]
 }
 export interface AdaptiveWorld {
+  urban?: import('./urban-types').UrbanEvolution
   version: 1
   initialized: number
   revision: number

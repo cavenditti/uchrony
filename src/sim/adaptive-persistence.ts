@@ -1,4 +1,5 @@
 import { habitableLand } from './terrain-access'
+import { validateUrbanFabric } from './urban-fabric'
 import { GOODS, population, type World } from './types'
 import { rebuildAdaptiveMesh } from './adaptive-world'
 import { STRATA } from './economic-types'
@@ -7,6 +8,7 @@ import { cellPolygon, pointInPolygon, METERS_PER_MAP_UNIT } from './physical-spa
 export function validateAdaptiveWorld(w: World) {
   const a = w.adaptive
   if (!a) return
+  validateUrbanFabric(w)
   const fail = (detail: string): never => {
     throw new Error(`Invalid adaptive world: ${detail}`)
   }

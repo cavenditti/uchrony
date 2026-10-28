@@ -9,7 +9,7 @@ Each milestone is committed separately. Existing economy, agriculture, policy an
 | Milestone | Deliverable | Status |
 | --- | --- | --- |
 | 0 | Controlled market, bridge, boundary and recovery scenarios; reproducible measurements | Complete: 4 deterministic, non-mutating census tests |
-| 1 | Persistent building uses, condition and project lifecycle; save validation | Pending |
+| 1 | Persistent building uses, condition and project lifecycle; save validation | Complete: migration, invalid-state and construction/save checks |
 | 2 | Local street accessibility and continuous development across accounting areas | Pending |
 | 3 | Local activity preferences and bounded clustering | Pending |
 | 4 | Funded repair, extension, conversion, replacement and consolidation | Pending |
