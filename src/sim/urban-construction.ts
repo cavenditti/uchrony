@@ -30,6 +30,8 @@ export function advanceUrbanConstruction(w: World) {
       continue
     }
     const retained = new Set(p.after.map((s) => s.site))
+    const openingValue = p.before.reduce((n, s) => n + (a.sites[s.site].investedValue ?? 0), 0)
+    const openingCapacity = p.before.reduce((n, s) => n + a.sites[s.site].openingCapacity, 0)
     for (const shape of p.after) {
       const site = a.sites[shape.site]
       Object.assign(site, {
@@ -41,7 +43,8 @@ export function advanceUrbanConstruction(w: World) {
         fabric: structuredClone(shape.fabric),
       })
       site.fabric!.altered = p.started + p.duration
-      site.investedValue = (site.investedValue ?? 0) + p.cost / Math.max(1, p.after.length)
+      site.investedValue = (openingValue + p.cost) / Math.max(1, p.after.length)
+      site.openingCapacity = openingCapacity / Math.max(1, p.after.length)
       delete site.retired
     }
     for (const shape of p.before)
@@ -49,6 +52,8 @@ export function advanceUrbanConstruction(w: World) {
         const site = a.sites[shape.site]
         site.capacity = 0
         site.residents = 0
+        site.investedValue = 0
+        site.openingCapacity = 0
         site.retired = p.started + p.duration
         site.fabric!.successors = [...retained]
       }

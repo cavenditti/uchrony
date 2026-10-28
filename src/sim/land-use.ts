@@ -12,6 +12,8 @@ import { planHousingInvestment } from './housing-investment'
 import { MODEL_PARAMETERS } from './model-parameters'
 import { coarseHousingDemand } from './housing-demand'
 import { urbanLocationSnapshot } from './urban-location'
+import { advanceUrbanRenewal } from './urban-renewal'
+import { activeUrbanProject } from './urban-projects'
 
 /** Housing-space development has physical inputs and paid labor. No imputed rent removes cash. */
 export function advanceLandUse(
@@ -24,6 +26,7 @@ export function advanceLandUse(
   if (!a || !w.economy || !w.localEconomy) return
   ensureUrbanFabric(w)
   advanceUrbanConstruction(w)
+  advanceUrbanRenewal(w)
   a.construction ??= []
   for (const project of a.construction) {
     project.remaining -= simulationMonths()
@@ -35,6 +38,8 @@ export function advanceLandUse(
   }
   a.construction = a.construction.filter((p) => p.remaining > 0)
   const pending = new Set(a.construction.map((p) => p.site))
+  for (const project of a.urban?.projects ?? [])
+    if (activeUrbanProject(project)) for (const site of project.sites) pending.add(site)
   const access = prepared ?? settlementAccess(w)
   const homes = residentialPools(w),
     demand = aggregateDemand ? coarseHousingDemand(w, access) : residentialDemand(w, access)

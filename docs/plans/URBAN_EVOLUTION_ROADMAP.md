@@ -12,7 +12,7 @@ Each milestone is committed separately. Existing economy, agriculture, policy an
 | 1 | Persistent building uses, condition and project lifecycle; save validation | Complete: migration, invalid-state and construction/save checks |
 | 2 | Local street accessibility and continuous development across accounting areas | Complete: junction, route improvement, cross-area frontage and excluded-land checks |
 | 3 | Local activity preferences and bounded clustering | Complete: causal housing ranking, saturation, freight response and conserved workplace distribution; 8 focused checks passed |
-| 4 | Funded repair, extension, conversion, replacement and consolidation | Pending |
+| 4 | Funded repair, extension, conversion, replacement and consolidation | Complete: staged works, vacancy reservations, material/payment/national-account reconciliation and save/speed checks; 14 focused checks and type check passed |
 | 5 | Funded street connections, widening and local realignment | Pending |
 | 6 | Derived neighbourhood character, physical building forms and explanations | Pending |
 | 7 | Controlled comparisons, full-world trajectories, save/speed/performance and browser qualification | Pending |

@@ -29,16 +29,22 @@ interface Source extends PointMeters {
 
 /** Distribute a firm's existing jobs among real premises, retaining unsurveyed
  * employment at its legacy support until enough floor space actually exists. */
-export function urbanEmploymentLocations(w: World, firm: CompetitiveFirm) {
+export function urbanEmploymentIndex(w: World) {
+  const result = new Map<string, PhysicalSite[]>()
+  for (const site of Object.values(w.adaptive?.sites ?? {}))
+    if (site.retired === undefined && site.building)
+      for (const id of site.fabric?.occupants ?? []) {
+        const list = result.get(id) ?? []
+        list.push(site)
+        result.set(id, list)
+      }
+  return result
+}
+
+export function urbanEmploymentLocations(w: World, firm: CompetitiveFirm, index = urbanEmploymentIndex(w)) {
   const anchor = w.adaptive?.sites[`firm:${firm.id}`]
   if (!anchor || !firm.active) return []
-  const premises = Object.values(w.adaptive!.sites).filter(
-    (s) =>
-      s.retired === undefined &&
-      s.building &&
-      s.fabric?.occupants.includes(`firm:${firm.id}`) &&
-      s.id !== anchor.id,
-  )
+  const premises = (index.get(`firm:${firm.id}`) ?? []).filter((s) => s.id !== anchor.id)
   const capacities = premises.map(
     (s) =>
       (s.fabric!.uses.production + s.fabric!.uses.logistics) /

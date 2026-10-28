@@ -6,6 +6,7 @@ import { movementNeighbors, CELL_METERS } from './grid'
 import { realService } from './public-services'
 import { residentialPools } from './residential-sites'
 import { landscapeAt } from './landscape'
+import { urbanEmploymentIndex, urbanEmploymentLocations } from './urban-location'
 import {
   appendInfluenceTree,
   solveInfluence,
@@ -37,6 +38,7 @@ export function influenceSnapshot(w: World, pools = residentialPools(w), toleran
     list.push({ x, y, jobs, services })
     sources.set(cell, list)
   }
+  const premises = urbanEmploymentIndex(w)
   for (const firm of w.economy?.firms ?? []) {
     const site = a.sites[`firm:${firm.id}`]
     if (!firm.active || !site || site.retired !== undefined) continue
@@ -44,7 +46,9 @@ export function influenceSnapshot(w: World, pools = residentialPools(w), toleran
       0,
       1 - (firm.laborMix?.food ?? (firm.specialization === 'agricultural' ? 1 : 0.5)),
     )
-    add(site.cell, site.x, site.y, (firm.employment + (firm.labor?.unfilled ?? 0)) * nonfarm, 0)
+    for (const placed of urbanEmploymentLocations(w, firm, premises))
+      add(placed.site.cell, placed.site.x, placed.site.y, placed.workers * nonfarm, 0)
+    add(site.cell, site.x, site.y, (firm.labor?.unfilled ?? 0) * nonfarm, 0)
   }
   // Real service output is paid labor, distributed among legal service offices.
   // A title, capital flag, or empty municipality supplies no attraction by itself.
