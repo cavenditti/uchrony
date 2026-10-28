@@ -1,6 +1,7 @@
 import type { World } from './types'
 import type { PhysicalSite } from './adaptive-types'
 import { polygonArea } from './physical-space'
+import { urbanCellAt } from './urban-land'
 import { URBAN_USES, type FloorUses, type UrbanBuilding, type UrbanUse } from './urban-types'
 
 export const floorUses = (use: UrbanUse = 'housing', area = 0): FloorUses =>
@@ -134,7 +135,7 @@ export function validateUrbanFabric(w: World) {
       !number(p.benefit) ||
       !number(p.duration, 1) ||
       !p.inputs ||
-      Object.values(p.inputs).some((v) => !number(v)) ||
+      [p.inputs.timber, p.inputs.stone, p.inputs.labor].some((v) => !number(v)) ||
       !Array.isArray(p.sites) ||
       p.sites.some((id) => !a.sites[id]) ||
       !Array.isArray(p.before) ||
@@ -146,6 +147,14 @@ export function validateUrbanFabric(w: World) {
     if (!['proposed', 'cancelled'].includes(p.status) && p.started === undefined)
       fail('unfunded active project')
     if (p.status === 'occupied' && p.completed === undefined) fail('undated completion')
+    if (p.status !== 'occupied' && p.completed !== undefined) fail('premature completion')
+    if (
+      new Set(p.sites).size !== p.sites.length ||
+      p.before.length !== p.sites.length ||
+      new Set(p.after.map((s) => s.site)).size !== p.after.length ||
+      [...p.before, ...p.after].some((s) => !p.sites.includes(s.site))
+    )
+      fail('project identity')
     if (!['occupied', 'cancelled', 'proposed'].includes(p.status))
       for (const id of p.sites) {
         if (occupied.has(id)) fail('overlapping construction')
@@ -163,7 +172,17 @@ export function validateUrbanFabric(w: World) {
         !number(s.parcel.size, 1) ||
         !Array.isArray(s.building) ||
         s.building.length !== 4 ||
-        s.building.some((p) => !point(p))
+        s.building.some(
+          (p) =>
+            !point(p) ||
+            p.x < s.parcel.x ||
+            p.y < s.parcel.y ||
+            p.x > s.parcel.x + s.parcel.size ||
+            p.y > s.parcel.y + s.parcel.size,
+        ) ||
+        urbanCellAt(w, s.point) !== s.cell ||
+        polygonArea(s.building) < 1 ||
+        s.capacity * 28 > s.fabric.uses.housing + 1e-5
       )
         fail('project geometry')
       check(s.fabric)
@@ -193,9 +212,30 @@ export function validateUrbanFabric(w: World) {
     )
       fail('pressure')
   const lanes = new Set<string>()
-  for (const l of a.lanes ?? [])
+  for (const l of a.lanes ?? []) {
+    if (l.load !== undefined && !number(l.load)) fail('street load')
+    if (l.upgraded !== undefined && !date(l.upgraded)) fail('street date')
     if (l.id) {
       if (lanes.has(l.id)) fail('duplicate street identity')
+      const sequence = /^street:(\d+)$/.exec(l.id)
+      if (sequence && Number(sequence[1]) >= u.nextLane) fail('street sequence')
       lanes.add(l.id)
     }
+  }
+  const history = new Set<number>()
+  for (const event of u.history) {
+    const project = u.projects.find((p) => p.id === event.project)
+    if (
+      !project ||
+      project.status !== 'occupied' ||
+      history.has(event.project) ||
+      event.month !== project.completed ||
+      event.kind !== project.kind ||
+      !Array.isArray(event.sites) ||
+      event.sites.some((id) => !a.sites[id]) ||
+      typeof event.reason !== 'string'
+    )
+      fail('completion history')
+    history.add(event.project)
+  }
 }

@@ -1,7 +1,7 @@
 import type { World } from './types'
 import type { PhysicalSite, PointMeters } from './adaptive-types'
 import type { UrbanProject, UrbanProjectKind, UrbanShape } from './urban-types'
-import { urbanShape } from './urban-construction'
+import { urbanShape, projectUrbanResidents } from './urban-construction'
 import { urbanLand, urbanLandSegment } from './urban-land'
 import { footprintConnection } from './residential-geometry'
 import { polygonArea } from './physical-space'
@@ -260,6 +260,7 @@ export function fundUrbanProject(w: World, project: UrbanProject, budgetShare = 
   project.started = w.month
   u.nextProject++
   u.projects.push(project)
+  projectUrbanResidents(w, new Set(project.before.map((s) => a.sites[s.site].pool)))
   a.revision++
   return true
 }

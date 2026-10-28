@@ -311,6 +311,7 @@ export function viewSnapshot(world: World, detailNation?: number | null): Omit<W
       ? {
           adaptive: {
             ...world.adaptive,
+            urban: undefined,
             sites: {},
             commuting: [],
             commutingRows: [],

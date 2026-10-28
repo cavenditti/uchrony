@@ -1,3 +1,4 @@
+import { fundedUrbanFixture } from './fixtures/funded-urban-evolution'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { urbanFixture } from './fixtures/urban-evolution'
@@ -14,25 +15,6 @@ import { balances, auditLedger } from '../src/sim/ledger'
 import { auditBanks } from '../src/sim/banking'
 import { physicalStocks, auditGoods } from '../src/sim/goods-accounting'
 import { reconcileGDP, auditNationalAccounts } from '../src/sim/national-accounts'
-
-function fundedFixture() {
-  const { w, sites } = urbanFixture()
-  const economyWorld = generateWorld('Urban funding')
-  ensureDistrictEconomy(economyWorld)
-  // Actual complete accounts and stocks; the physical scenario is prescribed.
-  w.economy = economyWorld.economy
-  w.nations = economyWorld.nations
-  w.institutions = economyWorld.institutions
-  const r = economyWorld.localEconomy!.units[0]
-  Object.assign(w.localEconomy!.units[0], { stocks: r.stocks, consumption: r.consumption })
-  for (const h of Object.values(w.economy!.households[0])) {
-    h.laborForce = 1000
-    h.employed = 0
-  }
-  w.economy!.producers[0].wage = 1
-  ensureUrbanFabric(w)
-  return { w, sites }
-}
 
 test('all five renewal choices have real geometry and staged capacity', () => {
   const { w, sites } = urbanFixture()
@@ -54,7 +36,7 @@ test('all five renewal choices have real geometry and staged capacity', () => {
 })
 
 test('unaffordable projects and occupied cities without spare accommodation are unchanged', () => {
-  const { w, sites } = fundedFixture()
+  const { w, sites } = fundedUrbanFixture()
   const project = planUrbanRenewal(w, sites[0], 'replace')!
   w.localEconomy!.units[0].stocks.timber = 0
   const before = JSON.stringify(w)
@@ -68,7 +50,7 @@ test('unaffordable projects and occupied cities without spare accommodation are 
 })
 
 test('replacement conserves residents, consumes materials, pays workers and survives a save', () => {
-  const { w, sites } = fundedFixture()
+  const { w, sites } = fundedUrbanFixture()
   const p = planUrbanRenewal(w, sites[0], 'replace')!
   const people = urbanMetrics(w).residents,
     stocks = w.localEconomy!.units[0].stocks.timber
@@ -92,7 +74,7 @@ test('replacement conserves residents, consumes materials, pays workers and surv
 })
 
 test('calendar completion agrees at monthly and six-month integration intervals', () => {
-  const { w, sites } = fundedFixture()
+  const { w, sites } = fundedUrbanFixture()
   assert.ok(fundUrbanProject(w, planUrbanRenewal(w, sites[0], 'replace')!, 1))
   const coarse = structuredClone(w)
   for (let m = 0; m < 6; m++) {

@@ -9,6 +9,8 @@ import { STRATA, type EconomicStratum } from './economic-types'
 import type { World } from './types'
 import type { SpatialBounds } from './adaptive-types'
 import type { PopulationCommunity } from './population-types'
+import { urbanCharacter, type UrbanCharacter } from './urban-character'
+import { urbanEmploymentIndex, urbanEmploymentLocations } from './urban-location'
 
 /** Conditional age/sex sampling from the census, using a separate, stateless display hash. */
 function representativePerson(
@@ -73,6 +75,7 @@ export interface RepresentativeRoutine {
   journeys?: { start: number; end: number; points: { x: number; y: number }[] }[]
 }
 export interface InspectionSnapshot {
+  urban?: UrbanCharacter
   request: number
   revision: number
   month: number
@@ -109,7 +112,11 @@ export function inspectWorld(w: World, request: InspectionRequest): InspectionSn
   if (request.month !== undefined && request.month !== w.month)
     throw new Error('The requested month is no longer current; refresh inspection.')
   const members = queryAdaptiveSitesInBounds(w, b)
-  const firmJobs = new Map((w.economy?.firms ?? []).map((f) => [`firm:${f.id}`, f.active ? f.employment : 0]))
+  const firmJobs = new Map<string, number>(),
+    premises = urbanEmploymentIndex(w)
+  for (const firm of w.economy?.firms ?? [])
+    for (const p of urbanEmploymentLocations(w, firm, premises))
+      firmJobs.set(p.site.id, (firmJobs.get(p.site.id) ?? 0) + p.workers)
   const counts = (s: (typeof members)[number]) =>
     s.kind === 'residential' ? (s.residents ?? w.localEconomy!.units[s.pool].residents[s.cell] ?? 0) : 0
   const people = members.reduce((sum, s) => sum + counts(s), 0)
@@ -218,8 +225,9 @@ export function inspectWorld(w: World, request: InspectionRequest): InspectionSn
     revision: w.adaptive.revision,
     month: w.month,
     bounds: { ...b },
+    urban: urbanCharacter(w, members, b),
     population: people,
-    representedWorkers: members.reduce((sum, s) => sum + (firmJobs.get(s.entity) ?? 0), 0),
+    representedWorkers: members.reduce((sum, s) => sum + (firmJobs.get(s.id) ?? 0), 0),
     capacity: members.filter((s) => s.kind === 'residential').reduce((sum, s) => sum + s.capacity, 0),
     jurisdictions: activeJurisdictions(w)
       .filter((j) => j.cells.some((c) => memberCells.has(c)))
@@ -231,7 +239,7 @@ export function inspectWorld(w: World, request: InspectionRequest): InspectionSn
       y: s.y,
       capacity: s.capacity,
       residents: counts(s),
-      jobs: firmJobs.get(s.entity) ?? 0,
+      jobs: firmJobs.get(s.id) ?? 0,
     })),
     routines,
     totalSites: members.length,

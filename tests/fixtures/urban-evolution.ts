@@ -34,6 +34,8 @@ export function urbanFixture(scenario: UrbanScenario = 'market') {
   }
   const cells = Array.from({ length: 6 }, (_, id) => ({
     id,
+    q: id % 3,
+    r: Math.floor(id / 3),
     x: ((id % 3) + 0.5) * 12,
     y: (Math.floor(id / 3) + 0.5) * 12,
     region: scenario === 'boundary' ? id % 3 : 0,

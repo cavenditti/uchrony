@@ -6,6 +6,8 @@ import { renderedLand } from './land-surface'
 import type { UrbanForm } from './urban-form'
 import { parcelLayout } from './parcel-layout'
 import { riverHalfWidth, riverPoint, type RiverCurve } from './rivers'
+import { URBAN_USES, type UrbanUse } from '../sim/urban-types'
+import { activeUrbanProject } from '../sim/urban-projects'
 
 export type CityPoint = { x: number; z: number }
 export type CityBuilding = CityPoint & {
@@ -15,7 +17,10 @@ export type CityBuilding = CityPoint & {
   angle: number
   roof: 'gable' | 'hip' | 'flat'
   tone: number
-  use?: 'housing' | 'workshop'
+  use?: UrbanUse | 'workshop'
+  works?: boolean
+  condition?: number
+  mixed?: boolean
   storeys?: number
   representedCapacity?: number
 }
@@ -96,7 +101,26 @@ export function describeCity(
     ? Math.hypot(footprint[1].x - footprint[0].x, footprint[1].y - footprint[0].y) *
       Math.hypot(footprint[2].x - footprint[1].x, footprint[2].y - footprint[1].y)
     : 0
-  const storeys = Math.max(1, Math.ceil(((capacity ?? 0) * 28) / Math.max(1, floorArea)))
+  const fabric = recorded?.fabric
+  const use = URBAN_USES.reduce(
+    (a, b) => ((fabric?.uses[b] ?? 0) > (fabric?.uses[a] ?? 0) ? b : a),
+    'housing',
+  )
+  const project = world.adaptive?.urban?.projects.find(
+    (p) => activeUrbanProject(p) && p.sites.includes(homeId),
+  )
+  const works =
+    recorded && 'works' in recorded
+      ? recorded.works
+      : project
+        ? {
+            stage: project.status,
+            progress: Math.min(1, ((world as World).month - project.started!) / project.duration),
+            disruptive: ['replace', 'consolidate'].includes(project.kind),
+          }
+        : undefined
+  const storeys = Math.max(1, Math.ceil((fabric?.floorArea ?? (capacity ?? 0) * 28) / Math.max(1, floorArea)))
+  const progress = works?.disruptive ? Math.max(0.12, works.progress) : 1
   const building: CityBuilding | undefined = footprint
     ? {
         x: footprint.reduce((n, p) => n + p.x, 0) / footprint.length / scale,
@@ -104,12 +128,22 @@ export function describeCity(
         width: Math.hypot(footprint[1].x - footprint[0].x, footprint[1].y - footprint[0].y) / scale,
         depth: Math.hypot(footprint[2].x - footprint[1].x, footprint[2].y - footprint[1].y) / scale,
         angle: -Math.atan2(footprint[1].y - footprint[0].y, footprint[1].x - footprint[0].x),
-        height: (3.2 * storeys) / scale,
+        height: ((use === 'logistics' || use === 'production' ? 4 : 3.2) * storeys * progress) / scale,
         storeys,
         representedCapacity: capacity,
-        roof: seed % 5 === 0 ? 'hip' : 'gable',
+        roof:
+          works?.disruptive || use === 'logistics'
+            ? 'flat'
+            : use === 'civic'
+              ? 'hip'
+              : seed % 5 === 0
+                ? 'hip'
+                : 'gable',
         tone: reliefRandom(seed),
-        use: 'housing',
+        use,
+        works: !!works,
+        condition: fabric?.condition ?? 1,
+        mixed: !!fabric && fabric.uses[use] < fabric.floorArea * 0.85,
       }
     : undefined
   return {

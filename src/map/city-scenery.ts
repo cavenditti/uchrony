@@ -161,7 +161,7 @@ export class CityScenery {
           Math.max(lift, base - floor),
           b.depth + footing,
         )
-        color.set(palette.walls).multiplyScalar(0.94 + b.tone * 0.1)
+        color.set(palette.walls).multiplyScalar((0.94 + b.tone * 0.1) * (0.78 + 0.22 * (b.condition ?? 1)))
         put(0, b, base + b.height / 2, b.width, b.height, b.depth)
         const physical = city.form || city.building
         const roofHeight = physical
@@ -271,7 +271,13 @@ export class CityScenery {
     const corners = footprint(b.x, b.z, b.width + footing * 2, b.depth + footing * 2, b.angle)
     if (!corners.every((p) => renderedLand(this.geography, p.x, p.z))) return null
     // Older saves recorded lots inside the visible channel; never draw them underwater.
-    if (inRiverChannel(this.geography, corners.map((p) => ({ x: p.x, y: p.z })))) return null
+    if (
+      inRiverChannel(
+        this.geography,
+        corners.map((p) => ({ x: p.x, y: p.z })),
+      )
+    )
+      return null
     const floors = corners.map((p) => this.height(p.x, p.z))
     const high = Math.max(...floors),
       floor = Math.min(...floors, this.height(b.x, b.z))
@@ -419,7 +425,9 @@ export class CityScenery {
       const placement = this.placement(city, b)
       if (!placement) continue
       const { floor, footing, lift, base } = placement
-      const wall = new THREE.Color(palette.walls).multiplyScalar(0.94 + b.tone * 0.1)
+      const wall = new THREE.Color(palette.walls).multiplyScalar(
+        (0.94 + b.tone * 0.1) * (0.78 + 0.22 * (b.condition ?? 1)),
+      )
       const roof = new THREE.Color(palette.roof).multiplyScalar(0.88 + b.tone * 0.22)
       trim.push({
         x: b.x,
@@ -459,7 +467,12 @@ export class CityScenery {
           x: b.x + u * Math.cos(b.angle) + v * Math.sin(b.angle),
           z: b.z - u * Math.sin(b.angle) + v * Math.cos(b.angle),
         })
-        const columns = b.use === 'workshop' ? 3 : 2 + Number(b.width > b.depth * 1.2)
+        const columns =
+          b.use === 'logistics'
+            ? 1
+            : b.use === 'production' || b.use === 'workshop'
+              ? 3
+              : 2 + Number(b.width > b.depth * 1.2)
         for (const side of [-1, 1])
           for (let row = 0; row < bands; row++)
             for (let column = 0; column < columns; column++) {
@@ -478,12 +491,27 @@ export class CityScenery {
         trim.push({
           ...door,
           y: base + (b.height / bands) * 0.22,
-          w: b.width * 0.14,
+          w: b.width * (b.use === 'logistics' || b.use === 'market' || b.mixed ? 0.3 : 0.14),
           h: (b.height / bands) * 0.44,
           d: b.depth * 0.025,
           a: b.angle,
           color: new THREE.Color(palette.trim).multiplyScalar(0.55),
         })
+        if (b.works) {
+          for (const u of [-0.55, 0.55])
+            for (const v of [-0.55, 0.55]) {
+              const p = facade(u * b.width, v * b.depth)
+              trim.push({
+                ...p,
+                y: base + b.height * 0.6,
+                w: b.width * 0.025,
+                h: b.height * 1.2,
+                d: b.depth * 0.025,
+                a: b.angle,
+                color: new THREE.Color(palette.trim),
+              })
+            }
+        }
         continue
       }
       const offset = (u: number, v: number) => ({

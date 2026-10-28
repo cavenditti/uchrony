@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, RefreshCw, Play, Pause } from 'lucide-react'
 import type { InspectionSnapshot } from '../sim/inspection'
+import { UrbanCharacter } from './UrbanCharacter'
 
 export function LocalInspection({
   snapshot,
@@ -65,6 +66,7 @@ export function LocalInspection({
           .map((j) => j.name)
           .join(' · ')}
       </p>
+      {snapshot.urban && <UrbanCharacter character={snapshot.urban} />}
       <svg
         className="local-inspection-map"
         viewBox="0 0 100 100"

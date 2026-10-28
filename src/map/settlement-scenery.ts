@@ -26,7 +26,7 @@ export function settlementPlaces(world: World): SettlementPlace[] {
   if (world.adaptive.buildingVersion === 1) {
     const labels = new Map(cities.flatMap((city) => (city.siteIds ?? []).map((id) => [id, city] as const)))
     return [...homes.values()]
-      .filter((home) => home.building && home.capacity > 0)
+      .filter((home) => home.building)
       .map((home) => {
         const city = labels.get(home.id)
         return {

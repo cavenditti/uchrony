@@ -274,6 +274,8 @@ export interface World {
     y?: number
     parcel?: import('./adaptive-types').SpatialBounds
     building?: import('./adaptive-types').PointMeters[]
+    fabric?: Pick<import('./urban-types').UrbanBuilding, 'floorArea' | 'uses' | 'condition' | 'built' | 'altered'>
+    works?: { stage: string; progress: number; disruptive: boolean }
     developed?: boolean
     construction?: number
   }[]

@@ -1157,6 +1157,7 @@ export function WorldMap({
           )}
           {pickedBlock && (
             <div className="picked-cell">
+              {pickedBlock.character && <strong>{pickedBlock.character}</strong>}
               <span>
                 128 m block · {compact(pickedBlock.residents)} residents · {compact(pickedBlock.jobs)} jobs
               </span>

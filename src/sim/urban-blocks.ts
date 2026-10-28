@@ -3,9 +3,16 @@ import type { PointMeters, SpatialBounds } from './adaptive-types'
 import { clipPolygon, polygonArea } from './physical-space'
 import { residentialSites, occupiedResidents } from './residential-sites'
 import { CELL_METERS } from './grid'
+import { urbanCharacterName } from './urban-character'
+import { floorUses } from './urban-fabric'
+import { URBAN_USES, type FloorUses } from './urban-types'
+import { urbanEmploymentIndex, urbanEmploymentLocations } from './urban-location'
+import { activeUrbanProject } from './urban-projects'
 
 export const URBAN_BLOCK_SPAN = 128
 export interface UrbanBlock {
+  character?: string
+  floorUses?: FloorUses
   id: string
   bounds: SpatialBounds
   residents: number
@@ -96,8 +103,15 @@ export function urbanBlocks(w: World, span = URBAN_BLOCK_SPAN): UrbanBlock[] {
     if (city.absorbedBy === undefined) for (const id of city.sites ?? []) centres.set(id, city.id)
   const pending = new Map<string, number>()
   for (const p of w.adaptive.construction ?? []) pending.set(p.site, (pending.get(p.site) ?? 0) + p.capacity)
+  for (const p of w.adaptive.urban?.projects ?? [])
+    if (activeUrbanProject(p))
+      for (const s of p.after)
+        pending.set(
+          s.site,
+          (pending.get(s.site) ?? 0) + Math.max(0, s.capacity - w.adaptive.sites[s.site].capacity),
+        )
   for (const site of residentialSites(w)) {
-    if (!(site.capacity || occupiedResidents(w, site) || pending.has(site.id))) continue
+    if (!(site.building || site.capacity || occupiedResidents(w, site) || pending.has(site.id))) continue
     const block = get(site),
       people = occupiedResidents(w, site)
     block.residents += people
@@ -108,17 +122,17 @@ export function urbanBlocks(w: World, span = URBAN_BLOCK_SPAN): UrbanBlock[] {
     const centre = centres.get(site.id)
     if (centre !== undefined && !block.centres.includes(centre)) block.centres.push(centre)
     if (site.building) {
+      block.floorUses ??= floorUses()
+      if (site.fabric) for (const use of URBAN_USES) block.floorUses[use] += site.fabric.uses[use]
       block.buildings++
       visit(site.building, (b) => {
         b.builtArea += polygonArea(clipPolygon(site.building!, b.bounds))
       })
     }
   }
-  for (const firm of w.economy?.firms ?? []) {
-    const site = w.adaptive.sites[`firm:${firm.id}`]
-    if (firm.active && site && site.retired === undefined && firm.employment > 0)
-      get(site).jobs += firm.employment
-  }
+  const premises = urbanEmploymentIndex(w)
+  for (const firm of w.economy?.firms ?? [])
+    for (const placed of urbanEmploymentLocations(w, firm, premises)) get(placed.site).jobs += placed.workers
   for (const lane of w.adaptive.lanes ?? [])
     for (let i = 1; i < lane.points.length; i++) {
       const a = lane.points[i - 1],
@@ -131,6 +145,7 @@ export function urbanBlocks(w: World, span = URBAN_BLOCK_SPAN): UrbanBlock[] {
     .filter((b) => b.residents || b.capacity || b.construction || b.jobs || b.builtArea || b.laneMeters)
     .map((b) => {
       b.centres.sort((a, b) => a - b)
+      b.character = urbanCharacterName(b.floorUses ?? floorUses())
       b.use =
         b.jobs > 0
           ? b.residents > 0

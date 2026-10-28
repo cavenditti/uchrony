@@ -14,7 +14,7 @@ Each milestone is committed separately. Existing economy, agriculture, policy an
 | 3 | Local activity preferences and bounded clustering | Complete: causal housing ranking, saturation, freight response and conserved workplace distribution; 8 focused checks passed |
 | 4 | Funded repair, extension, conversion, replacement and consolidation | Complete: staged works, vacancy reservations, material/payment/national-account reconciliation and save/speed checks; 14 focused checks and type check passed |
 | 5 | Funded street connections, widening and local realignment | Complete: clear-width checks, retained junctions, staged route improvements and boundary tests; 10 focused checks and type check passed |
-| 6 | Derived neighbourhood character, physical building forms and explanations | Pending |
+| 6 | Derived neighbourhood character, physical building forms and explanations | Complete: recorded-use rendering and local explanations; 25 focused checks, production build, 1440 px/390 px component checks and fresh UI review passed |
 | 7 | Controlled comparisons, full-world trajectories, save/speed/performance and browser qualification | Pending |
 
 ## Contracts

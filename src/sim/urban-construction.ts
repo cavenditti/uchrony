@@ -2,6 +2,19 @@ import type { World } from './types'
 import type { PhysicalSite } from './adaptive-types'
 import type { UrbanShape } from './urban-types'
 
+export function projectUrbanResidents(w: World, pools: ReadonlySet<number>) {
+  if (!w.localEconomy || !w.adaptive) return
+  for (const pool of pools) {
+    const unit = w.localEconomy.units[pool]
+    for (const cell of unit.cells) unit.residents[cell] = 0
+  }
+  for (const s of Object.values(w.adaptive.sites))
+    if (s.kind === 'residential' && s.retired === undefined && pools.has(s.pool)) {
+      const unit = w.localEconomy.units[s.pool]
+      unit.residents[s.cell] = (unit.residents[s.cell] ?? 0) + (s.residents ?? 0)
+    }
+}
+
 export function urbanShape(site: PhysicalSite): UrbanShape {
   if (!site.parcel || !site.building || !site.fabric)
     throw new Error('Redevelopment requires surveyed premises')
@@ -43,6 +56,7 @@ export function advanceUrbanConstruction(w: World) {
         fabric: structuredClone(shape.fabric),
       })
       site.fabric!.altered = p.started + p.duration
+      if (['replace', 'consolidate'].includes(p.kind)) site.fabric!.built = p.started + p.duration
       site.investedValue = (openingValue + p.cost) / Math.max(1, p.after.length)
       site.openingCapacity = openingCapacity / Math.max(1, p.after.length)
       delete site.retired
@@ -89,6 +103,7 @@ export function advanceUrbanConstruction(w: World) {
     p.status = 'occupied'
     p.completed = p.started + p.duration
     u.history.push({ month: p.completed, project: p.id, kind: p.kind, sites: [...p.sites], reason: p.reason })
+    projectUrbanResidents(w, new Set(p.before.map((s) => a.sites[s.site].pool)))
     a.revision++
   }
 }
