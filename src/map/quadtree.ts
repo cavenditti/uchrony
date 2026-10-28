@@ -87,8 +87,12 @@ export function visibleMapLeaves(world: World, window: MapWindow) {
  * footprint. Totals include offscreen descendants, so panning cannot change a
  * square's density. Land area is summed before division, including coastal cells. */
 export function visiblePopulationCells(world: World, window: MapWindow, scale: number) {
+  return visibleMapCells(world, window, populationMinimumSize(world, scale))
+}
+
+function populationMinimumSize(world: World, scale: number) {
   const meters = world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT
-  return visibleMapCells(world, window, (MIN_POPULATION_SQUARE_PIXELS * meters) / scale)
+  return (MIN_POPULATION_SQUARE_PIXELS * meters) / scale
 }
 
 function visibleMapCells(world: World, window: MapWindow, minimumSize: number) {
@@ -111,6 +115,16 @@ function visibleMapCells(world: World, window: MapWindow, minimumSize: number) {
 }
 
 export function mapLeafAt(world: World, point: PointMeters): MapLeaf | undefined {
+  return mapCellAt(world, point, 0)
+}
+
+/** Pick the same ancestor used for population shading at the current zoom.
+ * Its totals cover all descendants, even when the underlying leaf is empty. */
+export function mapPopulationCellAt(world: World, point: PointMeters, scale: number) {
+  return mapCellAt(world, point, populationMinimumSize(world, scale))
+}
+
+function mapCellAt(world: World, point: PointMeters, minimumSize: number): MapLeaf | undefined {
   if (
     !Number.isFinite(point.x) ||
     !Number.isFinite(point.y) ||
@@ -125,6 +139,7 @@ export function mapLeafAt(world: World, point: PointMeters): MapLeaf | undefined
   let id = 'r',
     bounds = rootBounds(world)
   while (branches.has(id)) {
+    if (bounds.size / 2 < minimumSize) return { id, bounds, ...branches.get(id)! }
     const q = quadrant(point, bounds)
     id += q
     bounds = nodeBounds(bounds, `r${q}`)

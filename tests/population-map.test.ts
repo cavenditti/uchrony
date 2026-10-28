@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   MIN_POPULATION_SQUARE_PIXELS,
   mapLeafAt,
+  mapPopulationCellAt,
   visibleMapLeaves,
   visiblePopulationCells,
 } from '../src/map/quadtree'
@@ -117,14 +118,48 @@ test('zoom reveals finer density squares and exact picking remains independent',
   assert.deepEqual(visiblePopulationCells(world, window, 8), coarse)
 })
 
+test('population picking reports the displayed square total over an empty child', () => {
+  const world = fixture(),
+    point = { x: 100, y: 100 }
+  assert.equal(mapLeafAt(world, point)!.population, 0)
+  assert.deepEqual(mapPopulationCellAt(world, point, 0.1), visiblePopulationCells(world, window, 0.1)[0])
+  assert.equal(mapPopulationCellAt(world, point, 0.1)!.population, 120)
+  // At close zoom the now-visible empty child correctly reports zero again.
+  assert.deepEqual(mapPopulationCellAt(world, point, 2), mapLeafAt(world, point))
+})
+
+test('population picking matches every rendered square across zoom levels and boundaries', () => {
+  const world = fixture()
+  for (const scale of [0.001, 0.1, MIN_POPULATION_SQUARE_PIXELS / 64, 0.2, 2])
+    for (const cell of visiblePopulationCells(world, window, scale)) {
+      const { x, y, size } = cell.bounds
+      for (const point of [
+        { x, y },
+        { x: x + size / 2, y: y + size / 2 },
+        { x: x + size - 1e-6, y: y + size - 1e-6 },
+      ])
+        assert.deepEqual(mapPopulationCellAt(world, point, scale), cell)
+    }
+  for (const point of [
+    { x: -1, y: 0 },
+    { x: CELL_METERS, y: 0 },
+    { x: 0, y: CELL_METERS },
+    { x: NaN, y: 0 },
+    { x: 0, y: Infinity },
+  ])
+    assert.equal(mapPopulationCellAt(world, point, 0.1), undefined)
+})
+
 test('new population snapshots and adaptive revisions invalidate cached totals', () => {
   const world = fixture()
   assert.equal(visiblePopulationCells(world, window, 0.1)[0].population, 120)
   world.viewMesh = { ...world.viewMesh!, population: world.viewMesh!.population.slice() }
   world.viewMesh.population[0] = 240
+  assert.equal(mapPopulationCellAt(world, { x: 100, y: 100 }, 0.1)!.population, 240)
   assert.equal(visiblePopulationCells(world, window, 0.1)[0].population, 240)
   world.viewMesh.population[0] = 360
   world.adaptive!.revision++
+  assert.equal(mapPopulationCellAt(world, { x: 100, y: 100 }, 0.1)!.population, 360)
   assert.equal(visiblePopulationCells(world, window, 0.1)[0].population, 360)
 })
 
@@ -136,4 +171,5 @@ test('population rendering handles empty projections and viewports smaller than 
   assert.equal(root[0].population, 120)
   world.viewMesh = undefined
   assert.deepEqual(visiblePopulationCells(world, window, 0.1), [])
+  assert.equal(mapPopulationCellAt(world, { x: 1, y: 1 }, 0.1), undefined)
 })

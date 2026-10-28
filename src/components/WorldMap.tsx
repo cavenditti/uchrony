@@ -28,7 +28,7 @@ import { CELL_SIZE, CELL_METERS } from '../sim/grid'
 import { contains, zoomAt } from '../map/geometry'
 import { buildAtlas, drawAtlas, drawPlaceLabels, terrainColors } from '../map/renderer'
 import { drawQuadtree } from '../map/quadtree-renderer'
-import { mapLeafAt, mapBuildingAt, mapUrbanBlockAt } from '../map/quadtree'
+import { mapLeafAt, mapPopulationCellAt, mapBuildingAt, mapUrbanBlockAt } from '../map/quadtree'
 import { freightOverlay, drawFreight } from '../map/trade'
 import { population, type World, type Layer } from '../sim/types'
 import { dominantIdentity, identityAxis, identityColor } from '../map/identity'
@@ -455,7 +455,11 @@ export function WorldMap({
           ctx.stroke()
         }
         if (hover) {
-          const cell = !isRelief && mapLeafAt(world, hover.point)
+          const cell =
+            !isRelief &&
+            (layer === 'population'
+              ? mapPopulationCellAt(world, hover.point, scale)
+              : mapLeafAt(world, hover.point))
           ctx.fillStyle = '#f5efd72b'
           if (cell) {
             const b = cell.bounds,
@@ -604,10 +608,22 @@ export function WorldMap({
     return null
   }
   const maxZoom = Math.max(32, 160 / fit)
-  const hoveredLeaf = !isRelief && hover ? mapLeafAt(world, hover.point) : undefined
-  const pickedLeaf = !isRelief && picked ? mapLeafAt(world, picked.point) : undefined
+  const hoveredCell =
+    !isRelief && hover
+      ? layer === 'population'
+        ? mapPopulationCellAt(world, hover.point, scale)
+        : mapLeafAt(world, hover.point)
+      : undefined
+  const pickedCell =
+    !isRelief && picked
+      ? layer === 'population'
+        ? mapPopulationCellAt(world, picked.point, scale)
+        : mapLeafAt(world, picked.point)
+      : undefined
   const pickedBuilding = !isRelief && picked ? mapBuildingAt(world, picked.point) : undefined
-  const hoveredBuilding = !isRelief && hover ? mapBuildingAt(world, hover.point) : undefined
+  const pickedDetailBuilding = layer !== 'population' ? pickedBuilding : undefined
+  const hoveredBuilding =
+    !isRelief && layer !== 'population' && hover ? mapBuildingAt(world, hover.point) : undefined
   const pickedBlock = !isRelief && picked ? mapUrbanBlockAt(world, picked.point) : undefined
   const placeContextTop = picked ? Math.max(70, Math.min(picked.y + 14, size.h - 540)) : 70
   const blockCentres =
@@ -1114,22 +1130,27 @@ export function WorldMap({
             {compact(population(world.regions[picked.id]))} people <span>·</span>{' '}
             {world.regions[picked.id].terrain}
           </p>
-          {pickedLeaf && (
+          {pickedCell && (
             <div className="picked-cell">
               <span>
-                {pickedBuilding
-                  ? `Building · ${pickedBuilding.residents} residents · ${Math.floor(pickedBuilding.capacity)} spaces`
-                  : `${pickedLeaf.bounds.size.toLocaleString()} m cell · ${compact(pickedLeaf.population)} residents · ${compact(pickedLeaf.jobs)} jobs`}
+                {pickedDetailBuilding
+                  ? `Building · ${pickedDetailBuilding.residents} residents · ${Math.floor(pickedDetailBuilding.capacity)} spaces`
+                  : `${pickedCell.bounds.size.toLocaleString()} m ${layer === 'population' ? 'square' : 'cell'} · ${layer === 'population' ? Math.round(pickedCell.population).toLocaleString() : compact(pickedCell.population)} residents · ${compact(pickedCell.jobs)} jobs`}
               </span>
               {onInspectArea && (
                 <button
                   className="text-button"
                   onClick={() => {
-                    onInspectArea(pickedBuilding?.parcel ?? pickedLeaf.bounds)
+                    onInspectArea(pickedDetailBuilding?.parcel ?? pickedCell.bounds)
                     setPicked(null)
                   }}
                 >
-                  {pickedBuilding ? 'Inspect building' : 'Inspect this cell'} <ArrowUpRight size={14} />
+                  {pickedDetailBuilding
+                    ? 'Inspect building'
+                    : layer === 'population'
+                      ? 'Inspect this square'
+                      : 'Inspect this cell'}{' '}
+                  <ArrowUpRight size={14} />
                 </button>
               )}
             </div>
@@ -1246,8 +1267,8 @@ export function WorldMap({
           <small>
             {hoveredBuilding
               ? `Building · ${hoveredBuilding.residents} residents · ${Math.floor(hoveredBuilding.capacity)} spaces`
-              : hoveredLeaf
-                ? `${hoveredLeaf.bounds.size.toLocaleString()} m cell · ${Math.round(hoveredLeaf.population).toLocaleString()} residents`
+              : hoveredCell
+                ? `${hoveredCell.bounds.size.toLocaleString()} m ${layer === 'population' ? 'square' : 'cell'} · ${Math.round(hoveredCell.population).toLocaleString()} residents`
                 : `${population(world.regions[hover.id]).toLocaleString()} people · ${world.regions[hover.id].terrain}`}
           </small>
         </div>

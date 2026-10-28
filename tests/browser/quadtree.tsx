@@ -44,6 +44,7 @@ function Fixture() {
   const peaks = world.cells.filter(highMountain)
   const highest = peaks.reduce((best, c) => (c.elevation > best.elevation ? c : best), peaks[0])
   Object.assign(window, {
+    quadtreeWorld: world,
     quadtreeReport: {
       month: world.month,
       mountainCells: peaks.length,
