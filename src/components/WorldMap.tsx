@@ -158,7 +158,7 @@ export function WorldMap({
   const quantitativeLegend =
     layer === 'population'
       ? {
-          label: isRelief ? 'District people / cell · log scale' : 'Residents / km² · quadtree cells',
+          label: isRelief ? 'District people / cell · log scale' : 'Residents / km² · averaged by square',
           colors: '#c7d1a4, #3a7661',
           ticks: (isRelief ? [0, populationScale.midpoint, populationScale.maximum] : [0, 1000, 60000]).map(
             (n) => Math.round(n).toLocaleString(),

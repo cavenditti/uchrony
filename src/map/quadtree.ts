@@ -1,5 +1,5 @@
 import { mapHomesSnapshot, mapMeshSnapshot, type MapMesh } from '../sim/map-snapshot'
-import { nodeBounds, quadrant, rootBounds, pointInPolygon } from '../sim/physical-space'
+import { nodeBounds, quadrant, rootBounds, pointInPolygon, METERS_PER_MAP_UNIT } from '../sim/physical-space'
 import { CELL_METERS } from '../sim/grid'
 import type { SpatialBounds, PointMeters } from '../sim/adaptive-types'
 import type { World } from '../sim/types'
@@ -19,13 +19,15 @@ export interface MapLeaf {
   landArea: number
 }
 export type UrbanPlot = NonNullable<World['viewHomes']>[number] & { parcel: SpatialBounds }
+type MapTotals = Pick<MapLeaf, 'population' | 'jobs' | 'landArea'>
+export const MIN_POPULATION_SQUARE_PIXELS = 12
 const cache = new WeakMap<
   World,
   {
     revision: number | undefined
     mesh: MapMesh | undefined
     indices: Map<string, number>
-    branches: Set<string>
+    branches: Map<string, MapTotals>
     plots: Map<number, UrbanPlot[]>
     blocks: Map<string, UrbanBlock>
   }
@@ -33,13 +35,28 @@ const cache = new WeakMap<
 
 function index(world: World) {
   const prior = cache.get(world)
-  if (prior && prior.revision === world.adaptive?.revision) return prior
+  if (
+    prior &&
+    prior.revision === world.adaptive?.revision &&
+    (!world.viewOnly || prior.mesh === world.viewMesh)
+  )
+    return prior
   const mesh = mapMeshSnapshot(world),
     indices = new Map<string, number>(),
-    branches = new Set<string>()
+    branches = new Map<string, MapTotals>()
   mesh?.addresses.forEach((id, i) => {
     indices.set(id, i)
-    for (let j = 1; j < id.length; j++) branches.add(id.slice(0, j))
+    for (let j = 1; j < id.length; j++) {
+      const parent = id.slice(0, j)
+      let totals = branches.get(parent)
+      if (!totals) {
+        totals = { population: 0, jobs: 0, landArea: 0 }
+        branches.set(parent, totals)
+      }
+      totals.population += mesh.population[i]
+      totals.jobs += mesh.jobs[i]
+      totals.landArea += mesh.landArea[i]
+    }
   })
   const plots = new Map<number, UrbanPlot[]>()
   for (const home of mapHomesSnapshot(world)) {
@@ -63,6 +80,18 @@ function leaf(mesh: MapMesh, id: string, bounds: SpatialBounds, i: number): MapL
 
 /** Traverse only visible branches; zoom changes drawing, never the simulation mesh. */
 export function visibleMapLeaves(world: World, window: MapWindow) {
+  return visibleMapCells(world, window, 0)
+}
+
+/** Combine subpixel residents into world-aligned squares with a readable screen
+ * footprint. Totals include offscreen descendants, so panning cannot change a
+ * square's density. Land area is summed before division, including coastal cells. */
+export function visiblePopulationCells(world: World, window: MapWindow, scale: number) {
+  const meters = world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT
+  return visibleMapCells(world, window, (MIN_POPULATION_SQUARE_PIXELS * meters) / scale)
+}
+
+function visibleMapCells(world: World, window: MapWindow, minimumSize: number) {
   const { mesh, indices, branches } = index(world),
     result: MapLeaf[] = []
   if (!mesh) return result
@@ -70,7 +99,12 @@ export function visibleMapLeaves(world: World, window: MapWindow) {
     if (!intersects(bounds, window)) return
     const i = indices.get(id)
     if (i !== undefined) result.push(leaf(mesh, id, bounds, i))
-    else if (branches.has(id)) for (let q = 0; q < 4; q++) visit(id + q, nodeBounds(bounds, `r${q}`))
+    else {
+      const totals = branches.get(id)
+      if (!totals) return
+      if (bounds.size / 2 < minimumSize) result.push({ id, bounds, ...totals })
+      else for (let q = 0; q < 4; q++) visit(id + q, nodeBounds(bounds, `r${q}`))
+    }
   }
   visit('r', rootBounds(world))
   return result

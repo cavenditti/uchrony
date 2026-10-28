@@ -1,4 +1,10 @@
-import { visibleMapLeaves, visibleUrbanPlots, urbanPlotDensity, type MapWindow } from './quadtree'
+import {
+  visibleMapLeaves,
+  visiblePopulationCells,
+  visibleUrbanPlots,
+  urbanPlotDensity,
+  type MapWindow,
+} from './quadtree'
 import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
 import { CELL_METERS } from '../sim/grid'
 import type { World, Layer } from '../sim/types'
@@ -17,13 +23,14 @@ export function drawQuadtree(
 ) {
   if (!world.adaptive) return
   const meters = world.adaptive.metersPerMapUnit ?? METERS_PER_MAP_UNIT
-  const cells = visibleMapLeaves(world, window)
+  const cells =
+    layer === 'population' ? visiblePopulationCells(world, window, scale) : visibleMapLeaves(world, window)
   ctx.save()
   ctx.beginPath()
   ctx.rect(0, 0, (world.width * CELL_METERS) / meters, (world.height * CELL_METERS) / meters)
   ctx.clip()
-  // Population is shown at the same resolution as the active solver, including
-  // unincorporated countryside. Zero-land leaves never acquire a density tint.
+  // Population and grid lines share a readable display resolution. Density is
+  // total residents / total land area; zero-land squares never acquire a tint.
   if (layer === 'population') {
     ctx.save()
     ctx.clip(land, 'evenodd')

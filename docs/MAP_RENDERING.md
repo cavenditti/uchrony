@@ -2,6 +2,14 @@
 
 Uchrony's map extends the existing cabinet-map visual world with a three-dimensional landscape. The browser renders raised terrain, forests, and small settlements while retaining the atlas's data layers, province selection, and dossier controls. The interface still uses slate surfaces, brass actions, and Alegreya place names. Landscape colors are cartographic data and materials, not a new interface palette.
 
+## Readable population squares — 28 October 2026
+
+In Quadtree's Population layer, fine simulation leaves aggregate into aligned ancestor squares at least 12 CSS pixels wide. The traversal stops before a subdivision would fall below that size; coarser existing leaves remain intact. At extreme zoom-out the root is the final limit. Population grid lines use the same display squares, and zooming in reveals the original leaves.
+
+Every ancestor stores the recursive sum of its descendants' population, jobs and land area. Shading uses total residents divided by total land area in km² on the existing fixed logarithmic scale; it never averages child colors or child densities. Water contributes no land area, and shading stays clipped to the coastline. Cached totals include descendants outside the viewport, so panning cannot recolor a square. Population snapshots and adaptive revisions invalidate those totals. The simulation mesh, physical-cell picking, other layers and 3D remain unchanged.
+
+Validation: production build and 11 focused tests passed, including concentrated subpixel populations, recursive sums across mixed depths, conservation, coastal areas, viewport clipping, zoom thresholds and snapshot invalidation. The isolated quadtree fixture was inspected at 1440 × 1000, at close zoom, and at 390 × 844, with no browser runtime errors or horizontal overflow. Captures are under `.impeccable/review/population-density/`; they qualify the rendering fixture, not long-run simulation behavior.
+
 ## Using the map
 
 The initial presentation is **3D**, tilted toward the landscape, with the **Terrain** layer selected. The lower-right presentation control switches between **3D** and the original flat **Atlas**. In 3D, **View from above** changes the camera to an overhead view; **Tilt the landscape** restores the angle. The camera is orthographic, with these two fixed angles and no orbit rotation.
