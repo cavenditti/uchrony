@@ -11,6 +11,7 @@ import { residentialPools, createResidentialParcel } from './residential-sites'
 import { planHousingInvestment } from './housing-investment'
 import { MODEL_PARAMETERS } from './model-parameters'
 import { coarseHousingDemand } from './housing-demand'
+import { urbanLocationSnapshot } from './urban-location'
 
 /** Housing-space development has physical inputs and paid labor. No imputed rent removes cash. */
 export function advanceLandUse(
@@ -37,6 +38,13 @@ export function advanceLandUse(
   const access = prepared ?? settlementAccess(w)
   const homes = residentialPools(w),
     demand = aggregateDemand ? coarseHousingDemand(w, access) : residentialDemand(w, access)
+  let locations: ReturnType<typeof urbanLocationSnapshot> | undefined
+  const preference = a.urban?.enabled
+    ? (point: { x: number; y: number }) => {
+        locations ??= urbanLocationSnapshot(w)
+        return locations(point).scores.housing
+      }
+    : undefined
   for (const id of w.localEconomy.active) {
     const r = w.localEconomy.units[id],
       p = w.economy.producers[id],
@@ -61,6 +69,7 @@ export function advanceLandUse(
         pending,
         256,
         !coarse,
+        preference,
       )
       if (!investment) continue
       site = investment.site

@@ -1,7 +1,7 @@
 import { simulationMonths } from './simulation-period'
 import { habitableLand } from './terrain-access'
 import type { World } from './types'
-import type { PhysicalSite } from './adaptive-types'
+import type { PhysicalSite, PointMeters } from './adaptive-types'
 import { compactResidence, findResidentialParcel } from './residential-sites'
 import { residentialFootprint, footprintConnection, localWalkingConnection } from './residential-geometry'
 import { cellPolygon, polygonArea } from './physical-space'
@@ -32,6 +32,7 @@ export function planHousingInvestment(
   pending: ReadonlySet<string> = new Set(w.adaptive!.construction?.map((p) => p.site)),
   catchmentMeters = 1000,
   surveyExpansion = true,
+  locationPreference?: (point: PointMeters) => number,
 ) {
   const unit = w.localEconomy!.units[target.pool],
     sponsor = w.economy!.producers[target.pool]
@@ -43,6 +44,20 @@ export function planHousingInvestment(
     inputs: ReturnType<typeof housingInputs>
     cost: number
   }[] = []
+  const choose = () =>
+    choices
+      .sort(
+        (a, b) =>
+          a.cost - b.cost || Number(!!a.plot) - Number(!!b.plot) || a.site.id.localeCompare(b.site.id),
+      )
+      .slice(0, 8)
+      .map((choice) => ({
+        choice,
+        adjusted:
+          choice.cost /
+          (1 + 0.3 * Math.max(0, Math.min(1, locationPreference?.(choice.plot?.point ?? choice.site) ?? 0))),
+      }))
+      .sort((a, b) => a.adjusted - b.adjusted || a.choice.site.id.localeCompare(b.choice.site.id))[0]?.choice
   const consider = (site: PhysicalSite, plot?: Plot, accessMeters?: number) => {
     const area = plot
       ? plot.building
@@ -109,8 +124,7 @@ export function planHousingInvestment(
         minimum.stone * unit.prices.stone +
         minimum.labor * (sponsor.wage / simulationMonths())) /
       need
-    if (choices.some((c) => c.cost <= lowerBound))
-      return choices.sort((a, b) => a.cost - b.cost || a.site.id.localeCompare(b.site.id))[0]
+    if (choices.some((c) => c.cost <= lowerBound)) return choose()
     const plot = findResidentialParcel(w, target, homes)
     if (plot) {
       const footprint = [
@@ -127,7 +141,5 @@ export function planHousingInvestment(
       if (connection) consider(target, plot, connection.distance)
     }
   }
-  return choices.sort(
-    (a, b) => a.cost - b.cost || Number(!!a.plot) - Number(!!b.plot) || a.site.id.localeCompare(b.site.id),
-  )[0]
+  return choose()
 }
