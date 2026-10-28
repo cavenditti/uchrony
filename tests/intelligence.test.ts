@@ -65,6 +65,19 @@ test('states receive partial charts, uncertain dossiers and own forces, with no 
   assert.match(c.intelligence.limits, /unknown, not zero/)
 })
 
+test('a known province becoming unclaimed updates the chart without inventing a foreign state', () => {
+  const { w, s } = fixture('abandoned intelligence')
+  const home = w.regions.find((r) => r.nation === s.nation)!
+  const target = w.regions[home.neighbors[0]]
+  const entry = s.chart.find((r) => r.id === target.id)
+  assert(entry)
+  target.nation = -1
+  w.month++
+  assert.doesNotThrow(() => advanceIntelligence(w))
+  assert.equal(s.chart.find((r) => r.id === target.id)?.nation, -1)
+  assert(!s.dossiers.some((d) => d.nation < 0))
+})
+
 test('changing hidden foreign armies, fleets, treasury, research, reserves and private motives does not change an actor’s context', () => {
   const { w, target } = fixture('knowledge-leak-check'),
     before = stateAgentContext(w, 0, true)

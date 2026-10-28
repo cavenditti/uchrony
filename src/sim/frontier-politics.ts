@@ -1,3 +1,4 @@
+import { expansionParameters } from './expansion-parameters'
 import { localImpression } from './influence'
 import { makeNation } from './generate'
 import { advanceAlmanac } from './almanac'
@@ -20,12 +21,20 @@ import type { City } from './district-types'
 
 /** Synthetic model thresholds, in elapsed months and existing household money. */
 export const FRONTIER_POLITICS = {
-  accessionMonths: 120,
-  mandateMonths: 36,
+  get accessionMonths() {
+    return expansionParameters().accessionMonths
+  },
+  get mandateMonths() {
+    return expansionParameters().mandateMonths
+  },
   influence: 0.55,
-  prosperityMonths: 60,
+  get prosperityMonths() {
+    return expansionParameters().prosperityMonths
+  },
   cityPopulation: 500,
-  wealthPerPerson: 0.012,
+  get wealthPerPerson() {
+    return expansionParameters().charterWealthPerPerson
+  },
   contribution: 0.1,
 } as const
 
@@ -228,7 +237,8 @@ export function advanceFrontierPolitics(w: World) {
     }
     // Rival states with comparable appeal prevent automatic winner-takes-all accession.
     const target = best ? clamp(best[1] - (ranked[1]?.[1] ?? 0) * 0.45) : 0
-    progress.influence += (target - progress.influence) * (1 - 0.985 ** elapsed)
+    progress.influence +=
+      (target - progress.influence) * (1 - (1 - expansionParameters().influenceRate) ** elapsed)
     progress.mandate =
       people > 0 && progress.influence >= FRONTIER_POLITICS.influence
         ? progress.mandate + elapsed
@@ -237,7 +247,11 @@ export function advanceFrontierPolitics(w: World) {
     const city = cities.get(r.id)
     const cash = householdFunds(w, units[r.id])
     const peerWealth = Math.max(0, totalMoney - cash) / Math.max(1, totalPeople - people)
-    const capital = Math.max(1, (city?.population ?? 0) * 0.001)
+    const parameters = expansionParameters()
+    const capital = Math.max(
+      parameters.charterMinimumCapital,
+      (city?.population ?? 0) * parameters.charterCapitalPerPerson,
+    )
     const wealthy =
       city &&
       city.population >= FRONTIER_POLITICS.cityPopulation &&
@@ -255,15 +269,15 @@ export function advanceFrontierPolitics(w: World) {
       wealthy &&
       r.foodCoverage >= 0.85 &&
       r.unrest < 40 &&
-      progress.prosperity >= FRONTIER_POLITICS.prosperityMonths &&
+      progress.prosperity >= expansionParameters().prosperityMonths &&
       w.nations.length + pending.filter((p) => !!p.city).length < MAX_STATE_IDENTITIES
     ) {
       pending.push({ region: r, nation: -1, city, capital })
     } else if (
       candidate >= 0 &&
       people > 0 &&
-      progress.mandate >= FRONTIER_POLITICS.mandateMonths &&
-      w.month - progress.since >= FRONTIER_POLITICS.accessionMonths
+      progress.mandate >= expansionParameters().mandateMonths &&
+      w.month - progress.since >= expansionParameters().accessionMonths
     ) {
       pending.push({ region: r, nation: candidate })
     }

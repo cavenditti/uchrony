@@ -7,6 +7,10 @@ import { trade, transportGraph } from '../src/sim/economy'
 import { validateWorld } from '../src/sim/persistence'
 import { freightOverlay, pointAlong } from '../src/map/trade'
 import { inventory, type Cell, type Region, type Route, type World } from '../src/sim/types'
+import { advanceHarbors, HARBOR_INERTIA } from '../src/sim/harbors'
+import { withSimulationPeriod } from '../src/sim/simulation-period'
+import { restoreWorld } from '../src/sim/persistence'
+import { packWorldSave } from '../src/sim/save-codec'
 
 // Small geographic fixtures isolate physical routing from the economic model.
 function map(rows: string[]): World {
@@ -50,6 +54,96 @@ function assertLegs(w: World, from: number, to: number, legs: NonNullable<Route[
   }
   assert.equal(at, w.regions[to].center)
 }
+
+test('harbors persist through quiet trade months and fade only after sustained disuse', () => {
+  const w = map(['A..B'])
+  w.month = 1
+  w.routes = [
+    {
+      id: 'sea',
+      from: 0,
+      to: 1,
+      path: [0, 1],
+      sea: true,
+      legs: [{ mode: 'sea', cells: [0, 1, 2, 3] }],
+      goods: inventory(),
+      volume: 12,
+      value: 0,
+      capacity: 20,
+      international: true,
+    },
+  ]
+  advanceHarbors(w)
+  assert.equal(freightOverlay(w, 0, null).ports.length, 2)
+  const recorded = JSON.stringify(w.harbors)
+  advanceHarbors(w)
+  assert.equal(
+    JSON.stringify(w.harbors),
+    recorded,
+    'repeated observation cannot accelerate harbor development',
+  )
+  w.routes = []
+  w.month = 2
+  advanceHarbors(w)
+  const quiet = freightOverlay(w, 0, null)
+  assert.equal(quiet.ports.length, 2)
+  assert.equal(quiet.corridors.length, 0, 'remembering a port must not fabricate ships or shipments')
+  assert(quiet.ports.every((p) => p.volume === 0 && p.opacity === 1))
+  const before = JSON.stringify(w)
+  freightOverlay(w, 0, null)
+  assert.equal(JSON.stringify(w), before)
+  w.month = 49
+  advanceHarbors(w)
+  assert(freightOverlay(w, 0, null).ports.every((p) => p.opacity > 0 && p.opacity < 1))
+  w.month = 1 + HARBOR_INERTIA.idleMonths
+  advanceHarbors(w)
+  assert.equal(freightOverlay(w, 0, null).ports.length, 0)
+})
+
+test('harbor memory uses monthly throughput at every speed and survives validated saves', () => {
+  const w = generateWorld('Harbor memory', 3, 4)
+  const link = transportNetwork(w).links.find((l) => l.legs.some((leg) => leg.mode === 'sea'))!
+  assert(link)
+  w.month = 0
+  w.routes = [
+    {
+      id: 'sea',
+      from: link.from,
+      to: link.to,
+      path: [link.from, link.to],
+      sea: true,
+      legs: link.legs,
+      goods: inventory(),
+      volume: 12,
+      value: 0,
+      capacity: 20,
+      international: true,
+    },
+  ]
+  advanceHarbors(w)
+  const coarse = structuredClone(w)
+  for (let month = 1; month <= 6; month++) {
+    w.month = month
+    advanceHarbors(w)
+  }
+  coarse.month = 6
+  coarse.routes[0].volume *= 6
+  withSimulationPeriod(6, () => advanceHarbors(coarse))
+  for (let i = 0; i < w.harbors!.length; i++)
+    assert(Math.abs(w.harbors![i].throughput - coarse.harbors![i].throughput) < 1e-9)
+  w.routes = []
+  validateWorld(w)
+  const restored = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(w))))
+  w.month = restored.month = 12
+  withSimulationPeriod(6, () => {
+    advanceHarbors(w)
+    advanceHarbors(restored)
+  })
+  assert.deepEqual(w.harbors, restored.harbors)
+  const broken = structuredClone(w)
+  broken.harbors![0].updated = w.month + 1
+  assert.throws(() => validateWorld(broken), /harbor/)
+})
 
 test('shipping navigates around a headland and cannot connect separated water bodies', () => {
   const rows = Array.from({ length: 9 }, () => [...'...........'])

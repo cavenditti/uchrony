@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
 import { validatePopulation } from '../src/sim/population-persistence'
 import type { PopulationCommunity } from '../src/sim/population-types'
+import { STRATA } from '../src/sim/economic-types'
 
 test('large-map census capacity scales without bypassing census checks or import bounds', () => {
   const world = generateWorld('Large census validation', 3, 8, undefined, 'regional')
@@ -33,6 +34,22 @@ test('large-map census capacity scales without bypassing census checks or import
     population: { children: 110, adults: 110, elders: 110 },
   }))
   validatePopulation(world) // 154,000 valid, distinct civilian profiles, plus military.
+  const dense = communities.flatMap((g) =>
+    STRATA.map((stratum) => ({
+      ...g,
+      stratum,
+      population: { children: 100, adults: 100, elders: 100 },
+    })),
+  )
+  const sparse = world.regions
+  world.regions = Array.from({ length: 300 }, (_, id) => ({
+    ...source,
+    id,
+    communities: dense,
+    population: { children: dense.length * 100, adults: dense.length * 100, elders: dense.length * 100 },
+  }))
+  validatePopulation(world) // 165,000 distinct profiles in a dense checked census.
+  world.regions = sparse
   world.regions[0] = { ...world.regions[0], population: { children: 111, adults: 110, elders: 110 } }
   assert.throws(() => validatePopulation(world), /ages disagree/)
   // Legacy duplicate recovery still cannot accept an unbounded census on a small map.

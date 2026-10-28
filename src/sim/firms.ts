@@ -1,3 +1,5 @@
+import { decisionPolicy } from './decision-policy'
+import { expansionParameters } from './expansion-parameters'
 import { loansForBorrower } from './banking'
 import { simulationMonths, periodRate, periodInterest, crossedPeriodMonth } from './simulation-period'
 import { governance } from './governance'
@@ -207,7 +209,7 @@ export function hireFirms(w: World, r: Region) {
       ? reservationWage(
           basket / (1000 * labor * averageSkill),
           consumption,
-          P.reservationConsumptionShare,
+          decisionPolicy().workDisutility,
           P.consumptionRiskAversion,
         )
       : 0
@@ -612,18 +614,30 @@ function invest(w: World, r: Region, f: CompetitiveFirm) {
     realFinancingRate(loanRate, w.economy!.banking?.policy?.expectedInflation ?? 0.02) +
       P.depreciationMonthly,
   )
-  const operatingYield = (f.sales - f.payroll - f.purchases) / Math.max(unitCost, f.capital * unitCost)
+  // Renewal runs before retail. Count only forecast sales still unsatisfied and
+  // backed by current inventory; wholesale sales have already entered f.sold.
+  // Treating the unfinished period's cash receipts as final profits otherwise
+  // excludes firms that sell directly to households from capital renewal.
+  const remainingSales = decisionPolicy().renewal
+    ? GOODS.reduce(
+        (sum, g) =>
+          sum + (Math.min(f.stocks[g], Math.max(0, f.forecast[g] - f.sold[g])) * f.prices[g]) / 1000,
+        0,
+      )
+    : 0
+  const operatingYield =
+    (f.sales + remainingSales - f.payroll - f.purchases) / Math.max(unitCost, f.capital * unitCost)
   const target =
     operatingYield > userCost
       ? Math.max(0, f.employment / Math.max(1, f.desiredEmployment) - 0.75) *
-          periodRate(P.investmentAdjustment) +
+          periodRate(decisionPolicy().investmentAdjustment) +
         f.capital * periodRate(P.depreciationMonthly)
       : 0
   const amount = Math.max(
     0,
     Math.min(
       target,
-      (f.cash * 0.25) / Math.max(1e-9, unitCost),
+      (f.cash * decisionPolicy().investmentShare) / Math.max(1e-9, unitCost),
       Math.max(0, hh.laborForce - hh.employed) / labor,
       r.stocks.timber / 300,
       r.stocks.stone / 400,
@@ -677,6 +691,12 @@ function invest(w: World, r: Region, f: CompetitiveFirm) {
   f.projects.push({ remaining: P.constructionMonths, capital: amount, cost })
   merchant.investment += cost
 }
+/** Fund capital before public hiring and residential construction consume all
+ * remaining workers and materials. Every project still pays wages and inputs. */
+export function investProductiveCapital(w: World) {
+  if (!decisionPolicy().renewal) return
+  for (const r of economicRegions(w)) for (const f of regionalFirms(w, r.id)) if (f.active) invest(w, r, f)
+}
 export function finishFirms(w: World) {
   const e = ensureEconomy(w)
   for (const r of economicRegions(w)) {
@@ -722,7 +742,7 @@ export function finishFirms(w: World) {
           ? f.distress + simulationMonths()
           : Math.max(0, f.distress - simulationMonths())
       f.markup = clamp(f.markup + (inventoryValue > expectedSales * 2 ? -0.002 : 0.001), 0.04, 0.3)
-      invest(w, r, f)
+      if (!decisionPolicy().renewal) invest(w, r, f)
       // Unsold inventories spoil physically and reduce operating surplus; financial defaults do not erase goods.
       for (const g of GOODS) {
         const loss = f.stocks[g] * periodRate(g === 'food' ? 0.035 : 0.001)
@@ -748,7 +768,7 @@ export function finishFirms(w: World) {
     }
     if (
       (crossedPeriodMonth(w.month, r.id % 12, 12) || (w.localEconomy && !firms.some((f) => f.active))) &&
-      population(r) > 500
+      population(r) > expansionParameters().enterprisePopulation
     ) {
       const active = firms.filter((f) => f.active)
       let slot = firms.find((f) => !f.active)
@@ -756,7 +776,14 @@ export function finishFirms(w: World) {
         ? Math.min(24, Math.max(2, Math.ceil(Math.sqrt(population(r) / 15000))))
         : 3
       const owner = householdAccount(r.id, 'owner'),
-        seed = Math.max(1, population(r) * 0.00015)
+        // Tiny camps need a small farm or workshop. Full towns retain the
+        // ordinary operating-capital floor; cheap entry everywhere would
+        // drain their civic savings into undercapitalized competitors.
+        seed = Math.max(
+          expansionParameters().enterpriseEquity,
+          Math.min(1, (population(r) / 500) ** 2),
+          population(r) * 0.00015,
+        )
       if (!slot && w.localEconomy && active.length < target && balance(w, owner) >= seed * 2) {
         slot = newFirm(w, r, e.firms!.length)
         e.firms!.push(slot)

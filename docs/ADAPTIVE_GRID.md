@@ -58,7 +58,6 @@ Home destinations are ranked once per pool rather than sorted for every origin. 
 
 `tests/settlement-influence.test.ts` covers exhaustive field-error bounds, 100,000 coincident sources, real worker-count equivalence, failure recovery, city-label independence, funded service attraction and complete monthly/save continuation. `node --import tsx tests/qualify-influence.ts` records dense-field and World-scale field measurements. The million-home case is a numeric workload, not a claim that the full economy can advance a million independent household accounts at the same speed. The exact financial, cohort, trade, political and military phases remain serial.
 
-
 ### Qualification on 26 October 2026
 
 - 67 focused adaptive economy, housing, influence, rendering and save tests passed; all 11 autosave tests passed with their local endpoint enabled. The final rendering/playback rerun passed all 12 tests. Production TypeScript/Vite build passed.
@@ -67,7 +66,6 @@ Home destinations are ranked once per pool rather than sorted for every origin. 
 - The broad run completed 342 passing tests before final fixes. Its local HTTP permission failure and district-trade regression passed targeted reruns. An exact-save institution comparison still fails on signed zero; the same failure was reproduced from the unchanged baseline. The century-scale simulation test was stopped after more than half an hour; this change has no new century-scale qualification.
 
 To reproduce the browser qualification, build `tests/browser/influence.config.ts`, preview that config, open `/tests/browser/influence.html`, and run the qualification. `/tests/browser/urban-density.html` exercises the same town renderer separately.
-
 
 ## Map-first urban detail — 26 October 2026
 
@@ -81,12 +79,11 @@ The default Quadtree view shows actual cells, density-shaded urban plots, vacant
 
 Validation for this pass: 54 focused tests and the production build passed. The isolated browser ran six months, from 160 to 167 developed plots with 524 pending projects and 605 changed displayed plots; these are one seeded scenario, not growth targets. Desktop (1440 × 900), phone (390 × 844), and optional 3D switching were checked. World-scale geometry retained 178,364,230 residents in 81,321 leaves; its mesh projection was 3,064,704 bytes. Timing and memory details, including measurement limitations, are in the report.
 
-
 ## Frontier settlement and building lots
 
 New worlds created in the app use `settlementStart: "frontier"`. Each state begins with one supplied settlement of 2,500 residents and 500 treasury; most provinces remain genuinely unclaimed (`nation: -1`). Roughly one in seven unclaimed provinces has a small independent rural population; the others are empty. Existing settled saves are retained. The generator's optional `settled` mode remains available to reproduce existing test fixtures.
 
-Founding moves 600 dated residents and their proportional deposits, liabilities and ownership claims from an accessible source pool, retaining at least 1,200 residents there. A camp costs 120 treasury, 40 timber, 20 stone and 5 tools, and carries 94 food; the source also retains three months of food. Founding is limited to nearby land passage through home or unclaimed territory. The current sovereignty unit remains a province, so founding claims that surrounding province, not an arbitrary quadtree leaf. Autonomous states assess eligible adjacent land yearly, beginning in their first year. Independent communities use local production, trade and demographic rules without a government account or automatic state membership.
+Founding moves 600 dated residents and their proportional deposits, liabilities and ownership claims from an accessible source pool, retaining at least 1,200 residents there. A camp costs 120 treasury, 40 timber, 20 stone and 5 tools, and carries 94 food; the source also retains three months of food. Founding is limited to nearby land passage through home or unclaimed territory. The current sovereignty unit remains a province, so founding claims that surrounding province, not an arbitrary quadtree leaf. Autonomous states use a smaller funded 120-person expedition and review eligible adjacent land quarterly (earlier under reported peer pressure), retaining 300 residents and half a month of food at home. Their range is 40 cells; manual expeditions retain the larger requirements above. Independent communities use local production, trade and demographic rules without a government account or automatic state membership.
 
 Frontier housing has persistent building footprints (`buildingVersion: 1`). The initial 26 October implementation used 16 m lots; new surveys now use the varied frontage layouts described below. Rural homes remain scattered. Subdivision preserves every resident, capacity, opening capital and paid construction commitment. It creates no household accounts, markets, firms or money: production, prices, taxes, dated populations and accounts retain their larger economic pools. House locations and the urban classifier use the finer physical records.
 

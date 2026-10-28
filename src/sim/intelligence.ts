@@ -107,7 +107,11 @@ function chartProvince(
   const r = w.regions[id]
   if (!r) return
   const old = chart ? chart.get(id) : s.chart.find((p) => p.id === id)
-  if (old && old.nation !== r.nation && r.nation !== s.nation) dossier(w, s, r.nation)!.expansion += 1
+  if (old && old.nation !== r.nation && r.nation !== s.nation) {
+    const successor = dossier(w, s, r.nation)
+    // Abandoned territory has no sovereign dossier and is not foreign expansion.
+    if (successor) successor.expansion += 1
+  }
   const entry = {
     id,
     name: r.name,

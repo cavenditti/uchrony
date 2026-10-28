@@ -11,6 +11,8 @@
     "test:performance": "node --import tsx tests/performance.ts",
     "test:soak": "node --import tsx tests/soak.ts",
     "evaluate:history": "node --import tsx scripts/evaluate-us-history.ts",
+    "tune:decisions": "node --import tsx scripts/tune-decision-policy.ts",
+    "evaluate:expansion": "node --import tsx scripts/evaluate-expansion.ts",
     "format": "prettier --write src server tests vite.config.ts index.html package.json tsconfig.json",
     "format:check": "prettier --check src server tests vite.config.ts index.html package.json tsconfig.json",
     "test:trade-stability": "node --import tsx tests/trade-stability.ts",

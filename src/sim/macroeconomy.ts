@@ -1,3 +1,6 @@
+import { decisionPolicy } from './decision-policy'
+import { competitivePressure } from './competitive-pressure'
+import { expansionParameters } from './expansion-parameters'
 import { withBorrowerLoanIndex } from './banking'
 import { simulationMonths, periodFlow, periodRate } from './simulation-period'
 import { governance } from './governance'
@@ -167,6 +170,18 @@ export function householdDemand(prices: Inventory, subsistence: Inventory, budge
     const extra = budget - minimum
     for (const g of GOODS)
       result[g] = subsistence[g] + (budgetShares[g] * extra) / Math.max(1e-9, prices[g] / 1000)
+    const satiation = decisionPolicy().foodSatiation
+    if (satiation !== undefined) {
+      const limit = subsistence.food * satiation
+      const released = (Math.max(0, result.food - limit) * prices.food) / 1000
+      result.food = Math.min(result.food, limit)
+      // Diet quantity saturates. Additional purchasing power bids for other
+      // goods, or remains saved when those goods cannot be supplied.
+      for (const g of GOODS)
+        if (g !== 'food')
+          result[g] +=
+            (released * budgetShares[g]) / (1 - budgetShares.food) / Math.max(1e-9, prices[g] / 1000)
+    }
   } else {
     let left = Math.max(0, budget)
     for (const g of GOODS) {
@@ -275,7 +290,15 @@ export function consumeHouseholds(w: World) {
           ),
         )
         const demand = quantities.reduce((sum, q) => sum + q, 0)
-        const fill = demand > 0 ? Math.min(1, offer.stocks[g] / demand) : 0
+        // The wholesaler retains a bounded working inventory for next period's
+        // workshop orders. Otherwise retail can empty every input each period,
+        // permanently shutting tools -> arms and replacement-capital chains.
+        // Food is never withheld from residents for this purpose.
+        const reserved =
+          decisionPolicy().renewal && offer.seller === f && g !== 'food'
+            ? Math.min(offer.stocks[g] * 0.5, f.inputTargets[g])
+            : 0
+        const fill = demand > 0 ? Math.min(1, Math.max(0, offer.stocks[g] - reserved) / demand) : 0
         orders.forEach((o, i) => {
           const amount = Math.min(offer.stocks[g], quantities[i] * fill)
           if (amount <= 1e-9) return
@@ -339,14 +362,27 @@ export function fundGovernment(w: World) {
       Math.max(0, n.treasury - (n.income * 12) / simulationMonths()) * periodRate(0.02)
     if (n.treasury < intended)
       borrow(w, governmentAccount(n.id), intended - n.treasury, Math.max(1000, n.gdp * 24))
-    const available = Math.min(n.treasury, intended),
+    const expansion = expansionParameters()
+    const compete =
+      n.ai &&
+      expansion.peerWeight > 0 &&
+      n.foodCoverage >= expansion.minimumFood &&
+      n.stability >= expansion.minimumStability
+        ? competitivePressure(w, n)
+        : undefined
+    const frontier = w.regions.some(
+      (r) => r.nation === -1 && r.neighbors.some((id) => w.regions[id].nation === n.id),
+    )
+    const savings = frontier && compete ? expansion.savingShare * compete.urgency : 0
+    const development = compete ? expansion.developmentShare * (compete.urgency + compete.peer) : 0
+    const available = Math.min(n.treasury, intended) * (1 - savings),
       weights = {
         welfare: n.policies.welfare,
-        education: n.policies.education,
+        education: n.policies.education + development * 12,
         military: n.policies.military,
-        research: n.policies.research,
+        research: n.policies.research + development * 16,
         administration: 12,
-        infrastructure: 18,
+        infrastructure: 18 + development * 24,
       }
     const sum = Object.values(weights).reduce((a, b) => a + b, 0)
     for (const key of Object.keys(weights) as (keyof typeof weights)[])
@@ -379,7 +415,10 @@ export function fundGovernment(w: World) {
     // Apply a common staffing fill ratio to all services. Category iteration must
     // not let schooling consume every worker before research/administration hire.
     const serviceKeys = ['education', 'military', 'research', 'administration', 'infrastructure'] as const
-    const requestedServices = serviceKeys.reduce((sum, key) => sum + n.budget[key], 0)
+    // Keep an explicit share of the military appropriation available for actual
+    // recruitment and supplies; staffing must not spend the same allocation first.
+    const militaryReserve = decisionPolicy().realCosts ? n.budget.military * 0.5 : 0
+    const requestedServices = serviceKeys.reduce((sum, key) => sum + n.budget[key], 0) - militaryReserve
     const staffing = new Map(
       own.map((r) => {
         const f = e.producers[r.id],
@@ -393,7 +432,7 @@ export function fundGovernment(w: World) {
       }),
     )
     for (const key of ['education', 'military', 'research', 'administration', 'infrastructure'] as const) {
-      const allocation = n.budget[key]
+      const allocation = n.budget[key] - (key === 'military' ? militaryReserve : 0)
       let delivered = 0
       for (const r of own) {
         delivered += purchasePublicLabor(
@@ -404,7 +443,7 @@ export function fundGovernment(w: World) {
           `public ${key} services`,
         )
       }
-      n.budget[key] = delivered
+      n.budget[key] = delivered + (key === 'military' ? militaryReserve : 0)
       n.spending += delivered
     }
     n.budget.welfare = welfarePaid
@@ -556,7 +595,14 @@ export function finishEconomyMonth(w: World) {
         w,
         producerAccount(r.id),
         householdAccount(r.id, 'owner'),
-        Math.max(0, f.profit) * P.dividendShare,
+        Math.max(0, f.profit) * P.dividendShare +
+          Math.max(
+            0,
+            f.cash -
+              ((f.purchases + f.freight + f.interest) * 6) / simulationMonths() -
+              f.projects.reduce((sum, project) => sum + project.cost, 0),
+          ) *
+            periodRate(decisionPolicy().merchantRelease),
         'dividends',
       )
       e.households[r.id].owner.income += dividends

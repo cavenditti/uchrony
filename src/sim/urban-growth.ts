@@ -330,7 +330,15 @@ export function surveyBuildingPlots(
     fresh.push(deck)
     addStreet(deck)
     if (distance(anchor, a) > 1) {
-      const approach = { pool: source.pool, founded: w.month, width: 5.5, points: [anchor, a] }
+      // An anchor may be a live residential site. Persist geometry only: a
+      // shared household reference would mutate roads after a census, unlike
+      // the independent objects reconstructed from a JSON save.
+      const approach = {
+        pool: source.pool,
+        founded: w.month,
+        width: 5.5,
+        points: [anchor, a].map(({ x, y }) => ({ x, y })),
+      }
       fresh.push(approach)
       addStreet(approach)
     }

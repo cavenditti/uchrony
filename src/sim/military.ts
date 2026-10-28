@@ -1,3 +1,5 @@
+import { decisionPolicy, domesticMonthlyWage } from './decision-policy'
+import { simulationMonths } from './simulation-period'
 import { recordMilitaryInfluence } from './influence'
 import { publicGoods } from './ledger'
 import {
@@ -226,10 +228,11 @@ export function advanceArmies(w: World) {
     const payroll = clamp(
       n.budget.military /
         Math.max(
-          1,
+          decisionPolicy().realCosts ? 1e-9 : 1,
           allForces(w)
             .filter((f) => f.nation === n.id)
-            .reduce((s, a) => s + a.soldiers, 0) * 0.008,
+            .reduce((s, a) => s + a.soldiers, 0) *
+            (decisionPolicy().realCosts ? domesticMonthlyWage(w, n.id) * simulationMonths() : 0.008),
         ),
     )
     for (const group of army.communities ?? [])

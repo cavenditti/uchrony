@@ -1,5 +1,8 @@
+import { decisionPolicy, domesticMonthlyWage } from './decision-policy'
 import { recordWorldEvent } from './event-memory'
-import { crossedPeriodMonth } from './simulation-period'
+import { simulationMonths } from './simulation-period'
+import { competitivePressure } from './competitive-pressure'
+import { expansionParameters } from './expansion-parameters'
 import { claimIndependentProvince, frontierValue } from './territorial-expansion'
 import { habitableLand } from './terrain-access'
 import { subdivideHousing } from './building-lots'
@@ -36,29 +39,36 @@ export const FOUNDING = {
   reserveMonths: 3,
 } as const
 
-// Small frontier states can send a viable pioneer group without repeatedly
-// stripping 600 people from a single young settlement.
-const PIONEERS = {
-  ...FOUNDING,
-  people: 200,
-  reserve: 600,
-  cash: 40,
-  food: 32,
-  timber: 14,
-  stone: 7,
-  tools: 2,
-  reserveMonths: 1.5,
+/** A settlement pays the same per-resident costs at every expedition size. */
+export function pioneerExpedition(w?: World, nation?: number): Expedition {
+  const p = expansionParameters(),
+    scale = p.pioneerPeople / 200
+  return {
+    ...FOUNDING,
+    people: p.pioneerPeople,
+    reserve: p.homeReserve,
+    cash:
+      w && nation !== undefined && decisionPolicy().realCosts
+        ? p.pioneerPeople * domesticMonthlyWage(w, nation) * 6
+        : 40 * scale,
+    food: 32 * scale,
+    timber: 14 * scale,
+    stone: 7 * scale,
+    tools: 2 * scale,
+    range: p.range,
+    reserveMonths: p.homeFoodMonths,
+  }
 }
 type Expedition = { [K in keyof typeof FOUNDING]: number }
 
 /** A bounded land journey through home territory or unclaimed land. */
-function reachable(w: World, nation: number, cell: number) {
+function reachable(w: World, nation: number, cell: number, range: number) {
   const distance = new Map([[cell, 0]]),
     queue = [cell]
   for (let i = 0; i < queue.length; i++) {
     const c = queue[i],
       steps = distance.get(c)!
-    if (steps === FOUNDING.range) continue
+    if (steps === range) continue
     for (const next of neighbors(c, w.width, w.height)) {
       const terrain = w.cells[next],
         owner = w.regions[terrain.region]?.nation
@@ -99,7 +109,7 @@ export function foundingPlan(w: World, nation: number, cell: number, expedition:
       w.localEconomy.units[
         w.localEconomy.active.find((id) => w.localEconomy!.units[id].cells.includes(cell))!
       ],
-    path = reachable(w, nation, cell)
+    path = reachable(w, nation, cell, expedition.range)
   const sources = w.localEconomy.active
     .map((id) => w.localEconomy!.units[id])
     .filter(
@@ -112,7 +122,7 @@ export function foundingPlan(w: World, nation: number, cell: number, expedition:
     .sort((a, b) => path.get(a.center)! - path.get(b.center)! || a.id - b.id)
   if (!sources.length)
     throw new Error(
-      `A settlement within about 25 km by land must retain ${expedition.reserve} people after sending ${expedition.people} settlers.`,
+      `A settlement within the overland expedition range must retain ${expedition.reserve} people after sending ${expedition.people} settlers.`,
     )
   const source = sources.find(
     (r) =>
@@ -256,7 +266,7 @@ function settleFounding(
   return `Founded a settlement in ${region.name}. ${expedition.people} people moved from ${source.name}; the camp used ${expedition.cash} treasury, ${expedition.timber} timber, ${expedition.stone} stone and ${expedition.tools} tools, and carries ${expedition.food} food.`
 }
 
-/** Governments review productive and culturally related frontiers twice a year. */
+/** Governments periodically review productive and culturally related frontiers. */
 export function advanceFounding(w: World) {
   if (!w.localEconomy || !w.adaptive || !w.economy) return
   let founded = 0
@@ -276,27 +286,66 @@ export function advanceFounding(w: World) {
         : settlementComponents(w)
     refreshCityLabels(w, components)
   }
+  const p = expansionParameters()
   for (const n of w.nations) {
+    const expedition = pioneerExpedition(w, n.id)
+    const pressure = p.peerWeight > 0 ? competitivePressure(w, n) : undefined
+    const cycle =
+      pressure && pressure.peer * p.peerWeight > 0.3 ? Math.max(2, p.reviewMonths / 2) : p.reviewMonths
+    const offset = (1 + (n.id % 3)) % cycle
+    const reviews =
+      Math.floor((w.month - offset) / cycle) - Math.floor((w.month - simulationMonths() - offset) / cycle)
     if (
-      !crossedPeriodMonth(w.month, 1 + (n.id % 3), 6) ||
+      reviews <= 0 ||
       !n.ai ||
-      n.foodCoverage < 0.85 ||
-      n.stability < 40 ||
+      n.foodCoverage < p.minimumFood ||
+      n.stability < p.minimumStability ||
       w.relations.some((r) => r.treaty === 'war' && (r.a === n.id || r.b === n.id))
     )
       continue
-    const candidates = w.regions
-      .filter((r) => r.nation === -1 && r.neighbors.some((id) => w.regions[id].nation === n.id))
-      .sort((a, b) => frontierValue(w, n, b).score - frontierValue(w, n, a).score || a.id - b.id)
-    for (const r of candidates) {
-      try {
-        foundingPlan(w, n.id, r.center, PIONEERS)
-      } catch {
-        continue
+    for (let review = 0; review < reviews; review++) {
+      const candidates = w.regions
+        .filter((r) => r.nation === -1 && r.neighbors.some((id) => w.regions[id].nation === n.id))
+        .sort((a, b) => frontierValue(w, n, b).score - frontierValue(w, n, a).score || a.id - b.id)
+      let settled = false
+      for (const r of candidates) {
+        const home = w.cells[w.regions[n.capital].center]
+        const cells = [
+          r.center,
+          ...r.cells
+            .filter((id) => id !== r.center && habitableLand(w.cells[id]))
+            .sort(
+              (a, b) =>
+                Math.hypot(w.cells[a].q - home.q, w.cells[a].r - home.r) -
+                  Math.hypot(w.cells[b].q - home.q, w.cells[b].r - home.r) || a - b,
+            ),
+        ]
+          .filter((id) => {
+            if (!decisionPolicy().renewal) return true
+            const point = cellPosition(w, id)
+            return !residentialSites(w).some(
+              (s) =>
+                (s.residents! > 0 ||
+                  s.capacity > 0 ||
+                  w.adaptive!.construction?.some((p) => p.site === s.id)) &&
+                Math.hypot(s.x - point.x, s.y - point.y) < 1500,
+            )
+          })
+          .slice(0, p.sitesPerProvince)
+        for (const cell of cells) {
+          try {
+            foundingPlan(w, n.id, cell, expedition)
+          } catch {
+            continue
+          }
+          settleFounding(w, n.id, cell, true, refreshLabels, expedition)
+          founded++
+          settled = true
+          break
+        }
+        if (settled) break
       }
-      settleFounding(w, n.id, r.center, true, refreshLabels, PIONEERS)
-      founded++
-      break
+      if (!settled) break
     }
   }
   if (founded) {

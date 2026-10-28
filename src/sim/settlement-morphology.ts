@@ -3,7 +3,7 @@ import { CELL_METERS } from './grid'
 import type { PhysicalSite } from './adaptive-types'
 import { residentialSites, occupiedResidents, compactResidence } from './residential-sites'
 import { residentialFootprint, footprintConnection, localWalkingConnection } from './residential-geometry'
-import { SETTLEMENT, isVisibleSettlement } from './settlement-model'
+import { SETTLEMENT } from './settlement-model'
 import { riverCrossing, riverWidthNear } from '../map/rivers'
 
 export interface SettlementComponent {
@@ -17,7 +17,11 @@ export interface SettlementComponent {
  * or municipal membership. A narrow street/park gap or a river crossing can
  * connect urban fabric; a sea gap or an inaccessible route cannot.
  */
-export function settlementComponents(w: World, nations?: ReadonlySet<number>): SettlementComponent[] {
+export function settlementComponents(
+  w: World,
+  nations?: ReadonlySet<number>,
+  minimumPopulation: number = SETTLEMENT.villagePopulation,
+): SettlementComponent[] {
   const eligible = residentialSites(w)
     .filter((s) => {
       if (!s.parcel) return false
@@ -95,7 +99,7 @@ export function settlementComponents(w: World, nations?: ReadonlySet<number>): S
       }
     }
     const people = members.reduce((sum, s) => sum + occupiedResidents(w, s), 0)
-    if (!isVisibleSettlement(people)) continue
+    if (people < minimumPopulation) continue
     members.sort((a, b) => a.id.localeCompare(b.id))
     const nucleus = [...members].sort(
       (a, b) => occupiedResidents(w, b) - occupiedResidents(w, a) || a.id.localeCompare(b.id),

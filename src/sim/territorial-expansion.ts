@@ -1,3 +1,4 @@
+import { expansionParameters } from './expansion-parameters'
 import { communitySize } from './population'
 import { clamp, population, type Nation, type Region, type World } from './types'
 
@@ -27,7 +28,11 @@ export function frontierValue(world: World, nation: Nation, region: Region) {
   const at = world.cells[region.center],
     home = world.cells[world.regions[nation.capital].center]
   const distance = Math.hypot(at.x - home.x, at.y - home.y)
-  return { economic, cultural, score: economic + cultural * 1.2 + 0.3 / (1 + distance / 20) }
+  return {
+    economic,
+    cultural,
+    score: economic * expansionParameters().economicWeight + cultural * 1.2 + 0.3 / (1 + distance / 20),
+  }
 }
 
 /** Political integration changes jurisdiction, not ancestry, goods, or homes. */

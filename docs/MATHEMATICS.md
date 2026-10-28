@@ -14,7 +14,7 @@ $$
 \mathbb E[B_t]=\frac{T}{2.505}\,(1-0.8s)\,\xi_B\sum_a\frac{F_a f_a}{12}
 $$
 
-Planned lifetime fertility $T$ is desired surviving children divided by expected childhood survival. Desired children are $2.3+1.2(1-\ell)(1-v)-0.6v\ell$, with literacy $\ell$ and urbanization $v$. Food shortage is $s$; $\xi_B$ is the active fertility-effect multiplier.
+Planned lifetime fertility $T$ is desired surviving children divided by expected childhood survival. Desired children are $2.3+1.2(1-\ell)(1-v)-0.6v\ell$, with literacy $\ell$ and urban opportunity exposure $v$. In adaptive worlds, each connected occupied residential footprint contributes $\min(1,N/50{,}000)$, weighted by its actual residents into their economic district; rural residents contribute zero. Physical density alone does not make a farming village metropolitan. The baseline comparison profile and non-adaptive worlds retain their previous urban-share input. Food shortage is $s$; $\xi_B$ is the active fertility-effect multiplier.
 
 $$
 \Pr(\text{death in month})=1-e^{-\widetilde h/12}
@@ -35,6 +35,8 @@ q_g^*&=\gamma_g+\frac{\beta_g(B-S)}{p_g},\qquad B\ge S
 $$
 
 Here $z^+=\max(0,z)$ and discretionary shares satisfy $\sum_g\beta_g=1$. This is a Stone–Geary linear expenditure system above subsistence. Below it, purchases are rationed food first. Strata submit affordable orders together; scarce lots are allocated proportionally at each seller's quote. Spending cannot exceed deposits or available goods. [IMF: linear expenditure systems](https://www.imf.org/external/pubs/ft/wp/2003/wp03204.pdf).
+
+In model 6, food quantity saturates at $1.5\gamma_{\mathrm{food}}$. Spending released by this cap is redistributed among nonfood goods in proportion to their discretionary shares; unavailable purchases remain savings. Wholesalers retain at most half their nonfood inventory against forecast workshop-input orders, so households cannot permanently empty production chains. Food is excluded from this business reserve.
 
 ## Labor participation and matching
 
@@ -58,7 +60,7 @@ Reservation compensation $b$ uses the consumption–leisure marginal rate of sub
 $$
 \begin{aligned}
 c&=0.7c_{\mathrm{food}}+0.3c_{\mathrm{materials}}\\
-b&=0.65kc^2,\qquad \beta=0.5(1-u_{t-1})\\
+b&=0.40758kc^2,\qquad \beta=0.5(1-u_{t-1})\\
 w^*&=b+\beta(y-b)^+\\
 w_t&=\frac{11}{12}w_{t-1}e^{\pi^e/12}+\frac{1}{12}w^*
 \end{aligned}
@@ -133,11 +135,11 @@ $$
 \begin{aligned}
 r^{\mathrm{real}}&=(1+r^{\mathrm{loan}})e^{-\pi^e/12}-1\\
 \text{invest only if}\quad
-\frac{\text{sales}-\text{payroll}-\text{inputs}}{\max(c_K,Kc_K)}&>r^{\mathrm{real}}+\delta
+\frac{\text{sales}+\widehat R-\text{payroll}-\text{inputs}}{\max(c_K,Kc_K)}&>r^{\mathrm{real}}+\delta
 \end{aligned}
 $$
 
-$c_K$ is unit construction cost. Desired additions replace depreciation and respond to utilization; actual construction requires materials, unused artisan labor and at most 25% of firm deposits. Projects take six months. Materials and labor are paid, capitalized and counted once in GDP. Persistent financial distress can liquidate a firm; new entry transfers existing owner funds.
+$c_K$ is unit construction cost. Because investment precedes retail, $\widehat R$ includes expected remaining retail receipts, bounded by actual inventory and the unsatisfied part of the sales forecast. Expected receipts affect the return estimate only; funding must already exist. Desired additions replace depreciation and respond to utilization; actual construction requires materials, unused artisan labor and at most 23.396% of firm deposits. The utilization adjustment is 0.03502 monthly. Funded productive investment is considered before public hiring and household consumption. Projects take six months. Materials and labor are paid, capitalized and counted once in GDP. Persistent financial distress can liquidate a firm; new entry transfers existing owner funds.
 
 ## Government, welfare and research
 
@@ -147,7 +149,7 @@ $$
 G^*=\max(0.95T,\,0.00002N)+0.02(D_G-12T)^+
 $$
 
-Actual spending is limited by treasury deposits and approved credit. Budget shares buy available workers or make funded transfers. Welfare creates household income only when paid and contributes no GDP by itself. Nonmarket services are valued at paid cost; their real output uses reference wages.
+Actual spending is limited by treasury deposits and approved credit. Budget shares buy available workers or make funded transfers. Half the military allocation remains available for recruitment and supplies rather than civilian service hiring; its budget therefore includes a funded operations envelope. Recruitment and automatic settlement labor obligations each cost six current domestic monthly wages per person. Welfare creates household income only when paid and contributes no GDP by itself. Nonmarket services are valued at paid cost; their real output uses reference wages.
 
 $$
 \Delta H=\frac{Q_R^0}{7}(0.35+\ell)(1+0.07g)\xi_R

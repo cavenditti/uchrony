@@ -216,6 +216,15 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       typeof n.ai !== 'boolean'
     )
       fail(`invalid state ${i}`)
+    if (
+      n.extinct !== undefined &&
+      (!Number.isInteger(n.extinct) ||
+        !number(n.extinct, 0, w.month) ||
+        n.population !== 0 ||
+        n.ai ||
+        w.regions.some((r) => r.nation === i))
+    )
+      fail('invalid extinct state')
     if (!['mercantile', 'expansionist', 'scholarly', 'agrarian'].includes(n.personality))
       fail('invalid state personality')
     if (
@@ -409,6 +418,26 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       const key = `${lane.from}-${lane.to}`
       if (seen.has(key)) fail('duplicate remembered trade lane')
       seen.add(key)
+    }
+  }
+  if (w.harbors !== undefined) {
+    if (!Array.isArray(w.harbors) || w.harbors.length > w.cells.length) fail('invalid harbor memory')
+    const seen = new Set<number>()
+    for (const harbor of w.harbors) {
+      if (
+        !object(harbor) ||
+        !Number.isInteger(harbor.cell) ||
+        !w.cells[harbor.cell] ||
+        seen.has(harbor.cell) ||
+        !number(harbor.throughput) ||
+        [harbor.since, harbor.updated, harbor.lastActive].some(
+          (m) => !Number.isInteger(m) || !number(m, 0, w.month),
+        ) ||
+        harbor.since > harbor.lastActive ||
+        harbor.lastActive > harbor.updated
+      )
+        fail('invalid remembered harbor')
+      seen.add(harbor.cell)
     }
   }
   if (w.corridors !== undefined) {

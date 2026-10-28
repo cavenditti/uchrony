@@ -161,6 +161,7 @@ export function cohortBirths(
   rng: { rng: number },
   shortage: number,
   multiplier = 1,
+  urbanOpportunity = group.urban,
 ) {
   ensureAges(group, month)
   let expected = 0,
@@ -177,7 +178,10 @@ export function cohortBirths(
   }
   const hadEmpty = write < group.ageCohorts!.length
   const scheduleTFR = 5 * P.fertilityAnnual.reduce((sum, rate) => sum + rate, 0)
-  const modifier = (desiredFertility(group) / scheduleTFR) * (1 - shortage * 0.8) * multiplier
+  const modifier =
+    (desiredFertility({ ...group, urban: urbanOpportunity }) / scheduleTFR) *
+    (1 - shortage * 0.8) *
+    multiplier
   const births = expectedInteger(rng, periodFlow(expected) * Math.max(0, modifier))
   if (births) {
     const female = expectedInteger(rng, births * P.femaleBirthShare)

@@ -1,3 +1,7 @@
+import { decisionPolicy, recruitmentCost } from './decision-policy'
+import { crossedPeriodMonth } from './simulation-period'
+import { competitivePressure } from './competitive-pressure'
+import { expansionParameters } from './expansion-parameters'
 import { militaryImpression, recordMilitaryInfluence } from './influence'
 import { marketStore, armyStore, recordGift, recordUse } from './national-accounts'
 import { publicExpense } from './ledger'
@@ -83,19 +87,21 @@ export function markOccupation(world: World, region: number, former: number) {
 }
 function mobilize(world: World, n: Nation, province: number, limit: number) {
   const r = world.regions[province],
+    unitCost = recruitmentCost(world, n.id),
+    minimum = decisionPolicy().realCosts ? 20 : 100,
     amount = Math.floor(
       Math.min(
         limit,
         r.population.adults * 0.02,
-        Math.max(0, n.treasury) / 0.2,
-        (Math.max(0, n.budget.military) * 0.4) / 0.2,
+        Math.max(0, n.treasury) / unitCost,
+        (Math.max(0, n.budget.military) * 0.4) / unitCost,
         r.stocks.arms / 0.012,
         Math.max(0, r.stocks.food - population(r) * 0.02) / 0.06,
       ),
     )
-  if (amount < 100 || world.armies.length >= MAX_ARMIES) return
+  if (amount < minimum || world.armies.length >= MAX_ARMIES) return
   const communities = takeCivilianAdults(world, r, amount)
-  publicExpense(world, n.id, amount * 0.2, 'mobilization', r.id)
+  publicExpense(world, n.id, amount * unitCost, 'mobilization', r.id)
   recordUse(world, marketStore(r.id), 'arms', amount * 0.012)
   r.stocks.arms -= amount * 0.012
   r.consumption.arms += amount * 0.012
@@ -107,7 +113,7 @@ function mobilize(world: World, n: Nation, province: number, limit: number) {
     region: r.id,
     target: null,
     soldiers: amount,
-    establishment: Math.max(1000, amount),
+    establishment: decisionPolicy().realCosts ? Math.max(50, amount) : Math.max(1000, amount),
     morale: 0.55,
     supply: 0.85,
     experience: 0.02,
@@ -255,6 +261,7 @@ export function advanceGeopolitics(world: World) {
     c.lastTerritory = own.length
     if (!n.ai) continue
     const drives = n.character!.leader.politics!.drives
+    const competition = expansionParameters().militaryDrive > 0 ? competitivePressure(world, n) : undefined
     if (wars.length || threat > 0.55) {
       n.policies.military = Math.max(n.policies.military, Math.round(25 + threat * 25))
       n.policies.priority = 'military'
@@ -298,11 +305,14 @@ export function advanceGeopolitics(world: World) {
         } else if (invader) {
           army.target = invader.id
           army.operations!.stance = 'march'
-        } else if (army.operations!.stance === 'entrench' && army.soldiers >= 500)
+        } else if (
+          army.operations!.stance === 'entrench' &&
+          army.soldiers >= (decisionPolicy().realCosts ? 50 : 500)
+        )
           army.operations!.stance = 'march'
       }
     }
-    if (!world.statecraft || world.month % 3 !== n.id % 3 || world.month - c.lastInitiative < 18) continue
+    if (!crossedPeriodMonth(world.month, n.id % 3, 3) || world.month - c.lastInitiative < 18) continue
     if (!foreignPolicyMandate(world, n.id, [n.id])) continue
     if (wars.length && drives.riskTolerance < 0.95) continue
     const options = [...neighbors]
@@ -313,12 +323,18 @@ export function advanceGeopolitics(world: World) {
       })
       .map((other) => {
         const rel = relation(world, n.id, other.id)!,
-          ratio = power / Math.max(500, perceivedPower(world, n.id, other.id)),
+          ratio =
+            power / Math.max(decisionPolicy().realCosts ? 30 : 500, perceivedPower(world, n.id, other.id)),
           deterrence = perceivedAllies(world, n.id, other.id).reduce(
             (sum, id) => sum + perceivedPower(world, n.id, id),
             0,
           ),
-          superiority = power / Math.max(500, perceivedPower(world, n.id, other.id) + deterrence * 0.6),
+          superiority =
+            power /
+            Math.max(
+              decisionPolicy().realCosts ? 30 : 500,
+              perceivedPower(world, n.id, other.id) + deterrence * 0.6,
+            ),
           interests = reportedExpansionInterests(world, n, other.id),
           motive =
             drives.ambition * 0.35 +
@@ -326,7 +342,10 @@ export function advanceGeopolitics(world: World) {
             drives.opportunism * 0.2 +
             Math.max(0, -rel.opinion) / 160 +
             rel.grievance / 150 +
-            (interests.economic * 0.35 + interests.cultural * 0.4) * (0.35 + drives.ambition * 0.65),
+            (interests.economic * 0.35 + interests.cultural * 0.4) * (0.35 + drives.ambition * 0.65) +
+            expansionParameters().militaryDrive *
+              (interests.economic + (competition?.peer ?? 0)) *
+              drives.riskTolerance,
           score =
             motive +
             Math.min(0.4, (ratio - 1) * 0.2) -
@@ -339,12 +358,12 @@ export function advanceGeopolitics(world: World) {
     const best = options[0]
     if (
       !best ||
-      power < 500 ||
+      power < (decisionPolicy().realCosts ? 30 : 500) ||
       n.foodCoverage < 0.85 ||
       n.stability < 30 ||
-      n.treasury < 200 ||
+      n.treasury < (decisionPolicy().realCosts ? recruitmentCost(world, n.id) * 50 : 200) ||
       best.superiority < 1.3 - drives.riskTolerance * 0.65 ||
-      best.score < 0.7
+      best.score < decisionPolicy().warThreshold
     )
       continue
     if (random(state) > 0.08 + drives.riskTolerance * 0.16) continue
@@ -549,7 +568,7 @@ export function advanceGeopolitics(world: World) {
           for (const member of members)
             if (world.nations[member].ai) admitDiplomaticConsent(world, member, offer)
       }
-      if (world.month % 12 !== attacker.id % 12) continue
+      if (!crossedPeriodMonth(world.month, attacker.id % 12, 12)) continue
       const peers = alive.filter(
         (member) =>
           member.ai &&
@@ -626,4 +645,78 @@ export function advanceGeopolitics(world: World) {
     }
     settleConventionalOffers(world)
   }
+  advanceNativeAccords(world)
+}
+
+/** A diplomacy record is bookkeeping, not a switch that disables native peace
+ * and commerce. Each autonomous signatory consents through the ordinary rules. */
+export function advanceNativeAccords(world: World) {
+  if (!world.statecraft) return
+  const state = ensureGeopolitics(world)
+  for (const rel of world.relations) {
+    const a = world.nations[rel.a],
+      b = world.nations[rel.b]
+    if (
+      !a?.ai ||
+      !b?.ai ||
+      a.extinct !== undefined ||
+      b.extinct !== undefined ||
+      !world.regions.some((r) => r.nation === a.id) ||
+      !world.regions.some((r) => r.nation === b.id)
+    )
+      continue
+    const resolve = (a.character!.effective.assertiveness + b.character!.effective.assertiveness) / 2
+    let kind: 'peace' | 'trade' | 'alliance' | undefined
+    if (rel.treaty === 'war' && rel.warExhaustion > 30 + resolve * 20) kind = 'peace'
+    else if (crossedPeriodMonth(world.month, 0, 3)) {
+      const commerce = (a.character!.effective.commercialism + b.character!.effective.commercialism) / 2
+      const patience = (a.character!.effective.patience + b.character!.effective.patience) / 2
+      if (rel.treaty === 'neutral' && rel.opinion > 35 && random(state) < 0.05 + commerce * 0.2)
+        kind = 'trade'
+      else if (rel.treaty === 'trade' && rel.opinion > 68 && random(state) < 0.025 + patience * 0.08)
+        kind = 'alliance'
+    }
+    if (!kind) continue
+    const pending = world.statecraft.offers.find(
+      (o) =>
+        o.status === 'proposed' &&
+        o.parties.includes(a.id) &&
+        o.parties.includes(b.id) &&
+        o.terms.some((t) => t.kind === kind),
+    )
+    const offer =
+      pending ??
+      submitStandingOffer(world, a.id, {
+        title:
+          `${a.shortName}–${b.shortName} ${kind === 'peace' ? 'armistice' : kind === 'trade' ? 'trade accord' : 'alliance'}`.slice(
+            0,
+            140,
+          ),
+        parties: [a.id, b.id],
+        visibility: 'public',
+        duration: 12,
+        supersedes: 0,
+        terms: [
+          {
+            kind,
+            from: a.id,
+            to: b.id,
+            amount: 0,
+            good: '',
+            field: '',
+            regions: [],
+            duration: kind === 'peace' ? 60 : 0,
+            text:
+              kind === 'peace'
+                ? 'Both cabinets accept a ceasefire at the current borders after sustained war exhaustion.'
+                : 'Both cabinets accept closer relations on the strength of their established relationship.',
+          },
+        ],
+      })
+    if (offer) {
+      admitDiplomaticConsent(world, a.id, offer)
+      admitDiplomaticConsent(world, b.id, offer)
+    }
+  }
+  settleConventionalOffers(world)
 }

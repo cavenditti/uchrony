@@ -129,7 +129,7 @@ export function refreshCityLabels(w: World, prepared?: SettlementComponent[]) {
   }
   const componentBySite = new Map<string, number>()
   physical?.forEach((part, i) => part.sites.forEach((site) => componentBySite.set(site.id, i)))
-  const active = local.cities.filter((c) => c.absorbedBy === undefined),
+  const active = local.cities.filter((c) => c.absorbedBy === undefined && c.abandoned === undefined),
     claimed = new Set<number>(),
     componentAt = new Int32Array(w.cells.length).fill(-1)
   components.forEach((cells, i) => cells.forEach((cell) => (componentAt[cell] = i)))
@@ -240,17 +240,31 @@ export function refreshCityLabels(w: World, prepared?: SettlementComponent[]) {
     city.population = cells.reduce((sum, c) => sum + residents[c], 0)
     city.kind = settlementKind(city.population)
   }
-  // Shrinking settlements keep their identities and names, available for later revival.
+  // Falling below the map's label threshold is not extinction. Keep the real
+  // remaining census; abandon an identity only when its last residents leave.
   for (const city of active)
     if (!claimed.has(city.id)) {
       separateCentre(w, city)
-      city.cells = []
-      if (city.sites) city.sites = []
-      city.population = 0
+      if (city.sites && w.adaptive) {
+        city.sites = city.sites.filter(
+          (id) => (w.adaptive!.sites[id]?.residents ?? 0) > 0 && !componentBySite.has(id),
+        )
+        city.cells = [...new Set(city.sites.map((id) => w.adaptive!.sites[id].cell))]
+        city.population = city.sites.reduce((sum, id) => sum + w.adaptive!.sites[id].residents!, 0)
+        if (city.sites.length && !city.sites.includes(city.nucleusSite!)) {
+          city.nucleusSite = city.sites[0]
+          city.nucleus = w.adaptive.sites[city.nucleusSite].cell
+        }
+      } else {
+        city.cells = city.cells.filter((c) => residents[c] > 0 && componentAt[c] < 0)
+        city.population = city.cells.reduce((sum, c) => sum + residents[c], 0)
+      }
+      city.kind = settlementKind(city.population)
+      if (!city.population) city.abandoned = w.month
     }
   const cityAt = new Map<number, City>()
   for (const city of local.cities)
-    if (city.absorbedBy === undefined)
+    if (city.absorbedBy === undefined && city.abandoned === undefined)
       for (const c of city.cells) {
         const previous = cityAt.get(c)
         if (

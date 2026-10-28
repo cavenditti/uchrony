@@ -445,7 +445,7 @@ export function populationTension(world: World, region: Region) {
     ) / Math.max(1, total)
   )
 }
-export function updateCommunityDemography(world: World, region: Region) {
+export function updateCommunityDemography(world: World, region: Region, urbanOpportunity?: number) {
   const nation = governance(world, region.nation),
     mortality = effectMultiplier(world, 'mortality', nation.id, region.id),
     fertility = effectMultiplier(world, 'birthRate', nation.id, region.id),
@@ -528,7 +528,14 @@ export function updateCommunityDemography(world: World, region: Region) {
     group.rootedness = clamp(group.rootedness + periodFlow(0.002) * (1 - region.devastation))
     const deprivation = 1 - (household?.foodCoverage ?? 1 - shortage)
     const deaths = cohortDeaths(group, world.month, world.demography!, deprivation, mortality)
-    const births = cohortBirths(group, world.month, world.demography!, deprivation, fertility)
+    const births = cohortBirths(
+      group,
+      world.month,
+      world.demography!,
+      deprivation,
+      fertility,
+      urbanOpportunity,
+    )
     region.births += births
     region.deaths += deaths
   }

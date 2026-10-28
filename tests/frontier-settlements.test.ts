@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
 import { prepareSpatialWorld, applyCommand, tick } from '../src/sim/engine'
-import { foundingPlan, advanceFounding, FOUNDING } from '../src/sim/founding'
+import { foundingPlan, advanceFounding, FOUNDING, pioneerExpedition } from '../src/sim/founding'
 import { population, GOODS } from '../src/sim/types'
 import { balances, auditLedger } from '../src/sim/ledger'
 import { physicalStocks, auditGoods } from '../src/sim/goods-accounting'
@@ -160,9 +160,10 @@ test('autonomous founding uses the same resources and respects player control', 
   advanceFounding(w)
   assert.equal(w.regions.filter((r) => r.nation >= 0).length, 8)
   w.nations[0].ai = true
+  const cost = pioneerExpedition(w, 0).cash
   advanceFounding(w)
   assert.equal(w.regions.filter((r) => r.nation >= 0).length, 9)
-  near(w.nations[0].treasury, 460)
+  near(w.nations[0].treasury, 500 - cost)
   auditLedger(w)
 })
 

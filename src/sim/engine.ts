@@ -1,3 +1,12 @@
+import { decisionPolicy } from './decision-policy'
+import { investProductiveCapital } from './firms'
+import { competitivePressure } from './competitive-pressure'
+import { urbanOpportunityByDistrict } from './urban-demography'
+import { retireEmptyStates } from './extinction'
+import { advanceHarbors } from './harbors'
+import { expansionParameters } from './expansion-parameters'
+import { reportedExpansionInterests } from './ambitions'
+import { perceivedPower } from './intelligence'
 import { advanceMilitaryInfluence, advanceTradeInfluence } from './influence'
 import { withLoanOriginationBatch } from './banking'
 import {
@@ -177,6 +186,7 @@ function fiscalPolicy(w: World) {
 
 function demographics(w: World, coarse = false, mobilityMonths = 1) {
   ensurePopulation(w)
+  const urbanOpportunity = urbanOpportunityByDistrict(w)
   for (const r of economicRegions(w)) {
     const n = governance(w, r.nation),
       pop = population(r)
@@ -232,7 +242,7 @@ function demographics(w: World, coarse = false, mobilityMonths = 1) {
       0,
       100,
     )
-    updateCommunityDemography(w, r)
+    updateCommunityDemography(w, r, urbanOpportunity?.get(r.id))
     const investment = realService(w, r, 'infrastructure') / Math.max(1, pop / 10000)
     r.infrastructure = clamp(
       r.infrastructure +
@@ -327,7 +337,7 @@ function diplomacy(w: World) {
     rel.opinion = clamp(rel.opinion + (exchange ? 0.15 : -0.015) - rel.grievance * 0.001, -100, 100)
     rel.grievance = Math.max(0, rel.grievance - 0.08)
     if (rel.treaty === 'war') {
-      rel.warExhaustion += 0.7 + (2 - a.foodCoverage - b.foodCoverage) * 1.5
+      rel.warExhaustion += periodFlow(0.7 + (2 - a.foodCoverage - b.foodCoverage) * 1.5)
       const resolve = (a.character!.effective.assertiveness + b.character!.effective.assertiveness) / 2
       if (!w.statecraft && rel.warExhaustion > 30 + resolve * 20 && a.ai && b.ai) {
         rel.treaty = 'truce'
@@ -382,12 +392,27 @@ function diplomacy(w: World) {
     const aggressor = [a, b]
       .filter((n) => n.ai && n.character!.effective.assertiveness > 0.62)
       .sort((a, b) => b.character!.effective.assertiveness - a.character!.effective.assertiveness)[0]
+    const militaryDrive = expansionParameters().militaryDrive
+    const rival = aggressor?.id === a.id ? b : a
+    const pressure = aggressor && militaryDrive > 0 ? competitivePressure(w, aggressor) : undefined
+    const interests =
+      aggressor && militaryDrive > 0 ? reportedExpansionInterests(w, aggressor, rival.id) : undefined
+    const initiative = militaryDrive * ((pressure?.peer ?? 0) + (interests?.economic ?? 0))
+    const capable =
+      !aggressor ||
+      !militaryDrive ||
+      (aggressor.foodCoverage >= 0.8 &&
+        perceivedPower(w, aggressor.id, aggressor.id) >=
+          Math.max(100, perceivedPower(w, aggressor.id, rival.id) * 0.8))
     if (
       aggressor?.ai &&
+      capable &&
       foreignPolicyMandate(w, aggressor.id, [aggressor.id]) &&
       rel.treaty === 'neutral' &&
       bordering(w, a.id, b.id) &&
-      random(w) < (rel.opinion < 0 ? 0.09 : 0.02) * aggressor.character!.effective.assertiveness &&
+      random(w) <
+        ((rel.opinion < 0 ? 0.09 : 0.02) + initiative * 0.08) *
+          aggressor.character!.effective.assertiveness &&
       aggressor.stability > 50
     ) {
       rel.treaty = 'war'
@@ -595,6 +620,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   ensureWarfare(w)
   beginPopulationMonth(w)
   beginEconomyMonth(w)
+  retireEmptyStates(w)
   arriveFreight(w)
   aggregateDistricts(w)
   worldEvents(w)
@@ -610,8 +636,15 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   advanceNavy(w)
   if (coarse) withLoanOriginationBatch(w, () => trade(w))
   else trade(w)
+  advanceHarbors(w)
   advanceTradeInfluence(w)
+  investProductiveCapital(w)
   fiscalPolicy(w)
+  if (decisionPolicy().realCosts) {
+    advanceArmies(w)
+    reinforceArmies(w)
+    advanceFounding(w)
+  }
   consume(w)
   aggregateDistricts(w)
   advanceDiplomaticOffices(w)
@@ -620,10 +653,13 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   advanceGeopolitics(w)
   linkDistrictPeople(w)
   demographics(w, coarse, detail === 'reconcile' ? (w.fastForward?.phase ?? 0) + 1 : 1)
+  retireEmptyStates(w)
   science(w)
   diplomacy(w)
-  advanceArmies(w)
-  reinforceArmies(w)
+  if (!decisionPolicy().realCosts) {
+    advanceArmies(w)
+    reinforceArmies(w)
+  }
   advanceSovereignty(w)
   advanceFrontierPolitics(w)
   linkDistrictPeople(w)
@@ -635,7 +671,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   const access = settlementAccess(w, coarse)
   // Max retains aggregate housing demand even during its periodic plot review.
   advanceLandUse(w, access, coarse, detail !== 'monthly')
-  advanceFounding(w)
+  if (!decisionPolicy().realCosts) advanceFounding(w)
   refreshAdaptiveTotals(w)
   finishEconomyMonth(w)
   if (w.adaptive?.transit)
@@ -711,6 +747,8 @@ export function applyCommand(w: World, command: Command): string {
   return result
 }
 function executeCommand(w: World, command: Command): string {
+  if ('nation' in command && command.nation !== null && w.nations[command.nation]?.extinct !== undefined)
+    throw new Error('That state has ceased to exist.')
   if (command.type === 'found-settlement') return foundSettlement(w, command.nation, command.cell)
   if (command.type === 'intelligence') {
     configureIntelligence(w, command.nation, command.budgetShare, command.priority, command.focus)
@@ -810,7 +848,7 @@ function executeCommand(w: World, command: Command): string {
   }
   if (command.type === 'control') {
     if (command.nation !== null && !w.nations[command.nation]) throw new Error('That state does not exist.')
-    w.nations.forEach((n) => (n.ai = n.id !== command.nation))
+    w.nations.forEach((n) => (n.ai = n.extinct === undefined && n.id !== command.nation))
     return command.nation === null
       ? 'Observer mode: all states govern themselves.'
       : `You now govern ${w.nations[command.nation].name}.`

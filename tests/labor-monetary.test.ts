@@ -1,3 +1,4 @@
+import { investProductiveCapital } from '../src/sim/firms'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { matchJobs, bargainWage, retainedJobs, reservationWage } from '../src/sim/labor-market'
@@ -158,6 +159,7 @@ test('a higher real financing cost stops otherwise funded low-return investment'
       1000 * f.wage * WAGE_SKILL.artisan
     f.sales = Math.max(unitCost, f.capital * unitCost) * 0.01
     w.economy!.households[r.id].artisan.laborForce = 100
+    investProductiveCapital(w)
     finishFirms(w)
     auditLedger(w)
     auditBanks(w)

@@ -3,12 +3,18 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
 import { ensureStatecraft, settleConventionalOffers } from '../src/sim/statecraft'
-import { advanceGeopolitics, ensureGeopolitics, markOccupation } from '../src/sim/geopolitics'
+import {
+  advanceGeopolitics,
+  advanceNativeAccords,
+  ensureGeopolitics,
+  markOccupation,
+} from '../src/sim/geopolitics'
 import { intelligenceService } from '../src/sim/intelligence'
 import { applyCommand, summarize } from '../src/sim/engine'
 import { allForces } from '../src/sim/forces'
 import { population, relation, type World } from '../src/sim/types'
 import { validateWorld } from '../src/sim/persistence'
+import { withSimulationPeriod } from '../src/sim/simulation-period'
 
 const people = (w: World) =>
   w.regions.reduce((s, r) => s + population(r), 0) + allForces(w).reduce((s, a) => s + a.soldiers, 0)
@@ -184,4 +190,71 @@ test('frontier cabinets do not treat unclaimed neighboring land as a foreign sta
   for (const c of politics.countries) c.lastInitiative = -24
   assert(w.regions.some((r) => r.nation < 0))
   assert.doesNotThrow(() => advanceGeopolitics(w))
+})
+
+test('native cabinets negotiate exhausted wars even after diplomacy records exist, preserving human consent', () => {
+  const w = ready('native-peace')
+  w.nations[0].ai = w.nations[1].ai = true
+  const rel = relation(w, 0, 1)!
+  rel.treaty = 'war'
+  rel.warExhaustion = 100
+  rel.since = 0
+  const controlled = structuredClone(w)
+  controlled.nations[1].ai = false
+  for (let i = 0; i < 4; i++) {
+    advanceNativeAccords(w)
+    advanceNativeAccords(controlled)
+    w.month += 6
+    controlled.month += 6
+  }
+  assert.equal(relation(w, 0, 1)!.treaty, 'truce')
+  assert.equal(relation(controlled, 0, 1)!.treaty, 'war')
+  assert(!controlled.statecraft!.offers.some((o) => o.signatures.some((s) => s.nation === 1)))
+})
+
+test('native commerce continues after a diplomatic record is initialized', () => {
+  const w = ready('native-commerce')
+  w.nations[0].ai = w.nations[1].ai = true
+  relation(w, 0, 1)!.treaty = 'neutral'
+  relation(w, 0, 1)!.opinion = 90
+  for (let i = 0; i < 48; i++) {
+    withSimulationPeriod(6, () => advanceNativeAccords(w))
+    w.month += 6
+  }
+  assert(['trade', 'alliance'].includes(relation(w, 0, 1)!.treaty))
+})
+
+test('Max speed reviews cabinets in every quarterly offset instead of permanently skipping two thirds', () => {
+  for (const offset of [0, 1, 2]) {
+    const w = ready('survival-league-0', 16)
+    const actor = w.nations.find(
+      (n) =>
+        n.id % 3 === offset &&
+        w.regions.some((r) => r.nation === n.id && r.neighbors.some((id) => w.regions[id].nation !== n.id)),
+    )!.id
+    const border = w.regions.find(
+      (r) => r.nation === actor && r.neighbors.some((id) => w.regions[id].nation !== actor),
+    )!
+    const victim = w.regions[border.neighbors.find((id) => w.regions[id].nation !== actor)!].nation
+    w.nations[actor].ai = true
+    const drives = w.nations[actor].character!.leader.politics!.drives
+    drives.ambition = drives.dominance = drives.opportunism = drives.riskTolerance = 1
+    for (const rel of w.relations) if ([rel.a, rel.b].includes(actor)) rel.treaty = 'alliance'
+    const rel = relation(w, actor, victim)!
+    rel.treaty = 'neutral'
+    rel.opinion = -75
+    rel.grievance = 60
+    for (const a of w.armies) if (a.nation === victim) a.morale = 0.1
+    // Native-only worlds have never enabled optional model deliberation.
+    delete w.statecraft
+    for (let i = 0; i < 40 && relation(w, actor, victim)!.treaty !== 'war'; i++) {
+      w.month += 6
+      withSimulationPeriod(6, () => advanceGeopolitics(w))
+    }
+    assert.equal(
+      relation(w, actor, victim)!.treaty,
+      'war',
+      `cabinet ${actor} must receive a strategic review`,
+    )
+  }
 })

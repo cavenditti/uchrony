@@ -122,6 +122,8 @@ export interface Policies {
 }
 export interface Nation {
   id: number
+  /** Historical identity remains addressable after the last resident dies. */
+  extinct?: number
   name: string
   shortName: string
   color: string
@@ -300,6 +302,7 @@ export interface World {
   armies: Army[]
   routes: Route[]
   tradeLanes?: TradeLane[]
+  harbors?: { cell: number; since: number; updated: number; lastActive: number; throughput: number }[]
   corridors?: CorridorTrace[]
   corridorPlan?: CorridorPlan
   historical?: HistoricalState

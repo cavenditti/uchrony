@@ -1,6 +1,6 @@
-/** Synthetic scenario coefficients. The model guide reads these same values. */
+/** Synthetic scenario coefficients. Economic policy weights live in decision-policy.ts. */
 export const MODEL_PARAMETERS = {
-  version: 5,
+  version: 6,
   bankCount: 3,
   bankCapitalRatio: 0.1,
   policyRateMonthly: 0.0015,
@@ -19,7 +19,6 @@ export const MODEL_PARAMETERS = {
   matchingElasticity: 0.5,
   wageRenegotiationMonthly: 1 / 12,
   workerBargainingPower: 0.5,
-  reservationConsumptionShare: 0.65,
   consumptionRiskAversion: 2,
   loanResetMonths: 3,
   referenceUnemployment: 0.04,
@@ -35,7 +34,6 @@ export const MODEL_PARAMETERS = {
   inventoryMonths: 2,
   depreciationMonthly: 0.0015,
   constructionMonths: 6,
-  investmentAdjustment: 0.025,
   dividendShare: 0.2,
   creditRepaymentMonthly: 0.015,
   defaultAfterMonths: 12,

@@ -1,3 +1,4 @@
+import { investProductiveCapital } from '../src/sim/firms'
 import { rebaseEndowments } from './fixtures/endowment'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -258,6 +259,7 @@ test('construction cannot overdraw a limiting stock through floating-point multi
   // Investment now also needs a positive return above its financing cost.
   firm.sales = 1
   w.economy!.households[0].artisan.laborForce = 100
+  investProductiveCapital(w)
   finishFirms(w)
   assert(firm.projects.length > 0)
   assert.equal(r.stocks.timber, 0)

@@ -7,6 +7,7 @@ import {
   type RoadCurve,
 } from './road-curves'
 import { traversableLegs } from '../sim/transport'
+import { harborVisibility } from '../sim/harbors'
 import { StringTable } from './string-table'
 import type { Route, World } from '../sim/types'
 import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
@@ -36,7 +37,12 @@ export interface FreightCorridor {
 /** Every physical edge is painted once, even when many shipments share it. */
 export function freightOverlay(world: World, nation: number, region: number | null) {
   const segments = new StringTable<FreightSegment>(),
-    ports = new Map<number, { cell: number; volume: number; selected: number }>(),
+    ports = new Map<number, { cell: number; volume: number; selected: number; opacity: number }>(
+      (world.harbors ?? []).map((p) => [
+        p.cell,
+        { cell: p.cell, volume: 0, selected: 0, opacity: harborVisibility(world, p) },
+      ]),
+    ),
     terminals = new Set(world.regions.map((r) => r.center))
   let legacy = false
   for (const route of world.routes) {
@@ -53,7 +59,7 @@ export function freightOverlay(world: World, nation: number, region: number | nu
       if (leg.mode === 'sea')
         for (const cell of [leg.cells[0], leg.cells[leg.cells.length - 1]]) {
           terminals.add(cell)
-          const port = ports.get(cell) ?? { cell, volume: 0, selected: 0 }
+          const port = ports.get(cell) ?? { cell, volume: 0, selected: 0, opacity: 1 }
           port.volume += route.volume
           if (selected) port.selected += route.volume
           ports.set(cell, port)
@@ -154,7 +160,7 @@ export function freightOverlay(world: World, nation: number, region: number | nu
       )
     corridor.distance = corridor.lengths.at(-1) ?? 0
   }
-  return { corridors, ports: [...ports.values()], legacy }
+  return { corridors, ports: [...ports.values()].filter((p) => p.opacity > 0), legacy }
 }
 
 export function pointAlong(world: World, corridor: FreightCorridor, distance: number) {
@@ -266,7 +272,7 @@ export function drawFreight(
   for (const port of overlay.ports) {
     const c = world.cells[port.cell],
       radius = (port.selected > 0 ? 3 : 2) / scale
-    ctx.globalAlpha = focused && port.selected === 0 ? 0.3 : 1
+    ctx.globalAlpha = (focused && port.selected === 0 ? 0.3 : 1) * port.opacity
     ctx.fillStyle = '#28444d'
     ctx.strokeStyle = '#f3deb0'
     ctx.lineWidth = 1 / scale

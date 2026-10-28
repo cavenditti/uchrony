@@ -1,3 +1,4 @@
+import { decisionPolicy, recruitmentCost } from './decision-policy'
 import { marketStore, armyStore, recordGift, recordUse } from './national-accounts'
 import { publicExpense } from './ledger'
 import { MAX_ARMIES } from './military-limits'
@@ -11,8 +12,15 @@ export function initializeEstablishments(world: World) {
 }
 export function reinforceArmies(world: World) {
   initializeEstablishments(world)
-  const remaining = new Map(world.nations.map((n) => [n.id, Math.max(0, n.budget.military * 0.15)]))
+  const remaining = new Map(
+    world.nations.map((n) => [
+      n.id,
+      Math.max(0, n.budget.military * (decisionPolicy().realCosts ? 0.5 : 0.15)),
+    ]),
+  )
   for (const nation of world.nations) {
+    const cadre = decisionPolicy().realCosts ? 20 : 100,
+      training = recruitmentCost(world, nation.id) * cadre
     const own = world.regions.filter((r) => r.nation === nation.id)
     if (!own.length || nation.policies.military <= 0 || nation.policies.conscription <= 0) continue
     if (world.armies.length < MAX_ARMIES && !world.armies.some((a) => a.nation === nation.id)) {
@@ -22,28 +30,28 @@ export function reinforceArmies(world: World) {
             r.foodCoverage > 0.9 &&
             r.unrest < 65 &&
             r.population.adults > 500 &&
-            r.stocks.arms >= 1.2 &&
-            r.stocks.food >= population(r) * 0.025 + 4,
+            r.stocks.arms >= cadre * 0.012 &&
+            r.stocks.food >= population(r) * 0.025 + cadre * 0.04,
         )
         .sort(
           (a, b) =>
             (b.id === nation.capital ? 1 : 0) - (a.id === nation.capital ? 1 : 0) ||
             b.infrastructure - a.infrastructure,
         )[0]
-      if (source && nation.treasury >= 20 && (remaining.get(nation.id) ?? 0) >= 20) {
-        const communities = takeCivilianAdults(world, source, 100)
-        publicExpense(world, nation.id, 20, 'military cadre', source.id)
-        remaining.set(nation.id, remaining.get(nation.id)! - 20)
-        recordUse(world, marketStore(source.id), 'arms', 1.2)
-        source.stocks.arms -= 1.2
-        source.consumption.arms += 1.2
+      if (source && nation.treasury >= training && (remaining.get(nation.id) ?? 0) >= training) {
+        const communities = takeCivilianAdults(world, source, cadre)
+        publicExpense(world, nation.id, training, 'military cadre', source.id)
+        remaining.set(nation.id, remaining.get(nation.id)! - training)
+        recordUse(world, marketStore(source.id), 'arms', cadre * 0.012)
+        source.stocks.arms -= cadre * 0.012
+        source.consumption.arms += cadre * 0.012
         const army: Army = {
           id: world.nextArmy++,
           nation: nation.id,
           name: `${nation.shortName} Territorial Corps`,
           region: source.id,
           target: null,
-          soldiers: 100,
+          soldiers: cadre,
           establishment: Math.min(3000, Math.max(500, Math.floor(nation.population * 0.002))),
           morale: 0.65,
           supply: 1,
@@ -53,9 +61,9 @@ export function reinforceArmies(world: World) {
         }
         world.armies.push(army)
         ensureWarfare(world)
-        recordGift(world, marketStore(source.id), armyStore(army.id), 'food', 4)
-        source.stocks.food -= 4
-        army.operations!.food = 4
+        recordGift(world, marketStore(source.id), armyStore(army.id), 'food', cadre * 0.04)
+        source.stocks.food -= cadre * 0.04
+        army.operations!.food = cadre * 0.04
         warEvent(
           world,
           `${nation.shortName} rebuilds its military cadre`,
@@ -84,7 +92,9 @@ export function reinforceArmies(world: World) {
       continue
     const formations = world.armies.filter((a) => a.nation === n.id).length,
       nationalTarget = Math.floor(
-        n.population * (0.0015 + n.policies.conscription * 0.0007) * (0.6 + n.policies.military / 50),
+        n.population *
+          (Math.max(0.0015, decisionPolicy().readiness) + n.policies.conscription * 0.0007) *
+          (0.6 + n.policies.military / 50),
       ),
       target = Math.min(
         army.establishment!,
@@ -97,8 +107,8 @@ export function reinforceArmies(world: World) {
           target - army.soldiers,
           Math.ceil(army.establishment! * 0.04),
           Math.floor(r.population.adults * 0.003 * willingness),
-          Math.floor(Math.max(0, n.treasury) / 0.2),
-          Math.floor((remaining.get(n.id) ?? 0) / 0.2),
+          Math.floor(Math.max(0, n.treasury) / recruitmentCost(world, n.id)),
+          Math.floor((remaining.get(n.id) ?? 0) / recruitmentCost(world, n.id)),
           Math.floor(r.stocks.arms / 0.012),
           Math.floor(Math.max(0, r.stocks.food - population(r) * 0.025) / 0.04),
         ),
@@ -110,8 +120,8 @@ export function reinforceArmies(world: World) {
     army.soldiers += recruits
     army.replacements = recruits
     army.experience = (army.experience * before + 0.02 * recruits) / army.soldiers
-    publicExpense(world, n.id, recruits * 0.2, 'military recruitment', r.id)
-    remaining.set(n.id, remaining.get(n.id)! - recruits * 0.2)
+    publicExpense(world, n.id, recruits * recruitmentCost(world, n.id), 'military recruitment', r.id)
+    remaining.set(n.id, remaining.get(n.id)! - recruits * recruitmentCost(world, n.id))
     recordUse(world, marketStore(r.id), 'arms', recruits * 0.012)
     recordGift(world, marketStore(r.id), armyStore(army.id), 'food', recruits * 0.04)
     r.stocks.arms -= recruits * 0.012

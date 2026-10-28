@@ -532,7 +532,7 @@ export function generateWorld(
       world.relations.push({
         a,
         b,
-        opinion: Math.round(random(world) * 75 - 30),
+        opinion: Math.round(random(world) * 75 - 30) || 0,
         treaty: random(world) > 0.65 ? 'trade' : 'neutral',
         since: 0,
         warExhaustion: 0,

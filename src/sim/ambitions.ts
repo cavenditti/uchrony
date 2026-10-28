@@ -1,3 +1,4 @@
+import { competitivePressure } from './competitive-pressure'
 import { militaryImpression } from './influence'
 import {
   foreignIntelligence,
@@ -168,6 +169,7 @@ export function strategicPressures(world: World, nation: Nation) {
     ),
     drives = nation.character?.leader.politics?.drives
   return {
+    competitivePressure: competitivePressure(world, nation),
     frontierOpportunities: knownMap(world, nation.id)
       .filter((r) => r.nation === -1 && neighbors.has(r.id))
       .map((r) => ({

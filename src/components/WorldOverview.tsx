@@ -65,7 +65,10 @@ export function WorldOverview({
       'infrastructure',
     ])
   const states = useMemo(
-      () => world.nations.filter((n) => world.regions.some((r) => r.nation === n.id)),
+      () =>
+        world.nations.filter(
+          (n) => n.extinct === undefined && n.population > 0 && world.regions.some((r) => r.nation === n.id),
+        ),
       [world],
     ),
     institutions = (world.institutions?.organizations ?? []).filter(

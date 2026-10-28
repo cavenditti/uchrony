@@ -124,9 +124,9 @@ test('different cultures can integrate over a longer period without changing the
   )!.id
   n.policies.citizenship = 'civic'
   const identity = region.communities!.map((g) => [g.culture, g.language])
-  advance(w, 120)
+  advance(w, 36)
   assert.equal(region.nation, -1)
-  advance(w, 240)
+  advance(w, 324)
   assert.equal(region.nation, n.id)
   assert.deepEqual(
     region.communities!.map((g) => [g.culture, g.language]),
@@ -205,7 +205,7 @@ test('wealthy independent cities fund a full new state after years of prosperity
 
 test('frontier progress survives saves, respects coarse elapsed time, and rejects corrupt fields', () => {
   const { w, region } = fixture()
-  advance(w, 60)
+  advance(w, 12)
   const restored = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(w))))
   const coarse = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(w))))
   advance(w, 24)

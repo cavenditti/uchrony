@@ -62,7 +62,8 @@ export function validatePopulation(world: World, allowDuplicateCommunities = fal
   }
   let groups = 0
   const validateGroups = (communities: PopulationCommunity[] | undefined) => {
-    if (!Array.isArray(communities) || communities.length > (world.localEconomy ? 65536 : 4096)) fail('invalid communities')
+    if (!Array.isArray(communities) || communities.length > (world.localEconomy ? 65536 : 4096))
+      fail('invalid communities')
     groups += communities!.length
     const keys = new Set<string>(),
       totals = { children: 0, adults: 0, elders: 0 }
@@ -158,7 +159,17 @@ export function validatePopulation(world: World, allowDuplicateCommunities = fal
   // The former fixed ceiling rejected a valid 1,400-province world after six
   // simulated years. Keep a bounded import budget, scaled to map size; the
   // per-holder limits and every individual census invariant still apply.
-  const communityBudget = Math.min(1_000_000, Math.max(150_000, world.regions.length * 512))
+  // Mature dense worlds can contain more valid identity/occupation combinations
+  // than a sparse map of the same area. Use the checked census, not cached totals;
+  // the absolute import ceiling and every per-holder/cohort bound remain in force.
+  const residents = world.regions.reduce(
+    (sum, r) => sum + r.population.children + r.population.adults + r.population.elders,
+    0,
+  )
+  const communityBudget = Math.min(
+    1_000_000,
+    Math.max(150_000, world.regions.length * 512, Math.floor(residents / 64)),
+  )
   if (groups > communityBudget) fail('census exceeds the supported resolution')
   for (const state of world.nations) {
     if (

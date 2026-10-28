@@ -313,7 +313,11 @@ export function advanceAlmanac(w: World, force = false) {
   }
   for (const n of w.nations) {
     const p = entry(w, `nation:${n.id}`, 'nation', w.regions[n.capital]?.center ?? 0, n.name)
-    state(w, p, { government: n.government, population: Math.round(n.population) })
+    state(w, p, {
+      government: n.government,
+      population: Math.round(n.population),
+      status: n.extinct === undefined ? 'active' : 'extinct',
+    })
     const leader = n.character?.leader
     if (leader) {
       const person = entry(w, `leader:${n.id}:${leader.generation}`, 'person', p.cell, leader.name, {
@@ -322,7 +326,7 @@ export function advanceAlmanac(w: World, force = false) {
         since: leader.since,
       })
       person.related = [...new Set([...person.related, p.id])]
-      state(w, person, { status: 'serving' })
+      state(w, person, { status: n.extinct === undefined ? 'serving' : 'former leader' })
       for (const id of p.related.filter((id) => id.startsWith(`leader:${n.id}:`) && id !== person.id))
         state(w, a.entries[id], { status: 'former leader' })
       if (!p.related.includes(person.id)) p.related.push(person.id)

@@ -35,6 +35,7 @@ export interface City {
   kind: 'village' | 'town' | 'city'
   parents: number[]
   absorbedBy?: number
+  abandoned?: number
   lastNameChange: number
   /** Occupied physical parcels; several independent settlements may share one terrain sample. */
   sites?: string[]

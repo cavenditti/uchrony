@@ -182,6 +182,11 @@ export function validateDistrictEconomy(w: World) {
     )
       fail('city identity')
     if (!['village', 'town', 'city'].includes(c.kind)) fail('city kind')
+    if (
+      c.abandoned !== undefined &&
+      (!int(c.abandoned, c.founded, w.month) || c.population !== 0 || c.cells.length || c.sites?.length)
+    )
+      fail('abandoned city')
     cityIds.add(c.id)
     if (
       c.standing !== undefined &&

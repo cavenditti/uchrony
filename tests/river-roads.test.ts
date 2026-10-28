@@ -11,6 +11,8 @@ import { prepareSpatialWorld, tick } from '../src/sim/engine'
 import { validateWorld, restoreWorld } from '../src/sim/persistence'
 import { packWorldSave } from '../src/sim/save-codec'
 import { groundRoads } from '../src/map/ground-roads'
+import { fastForwardStep } from '../src/sim/fast-forward'
+import { EXPANSION_PROFILES, withExpansionParameters } from '../src/sim/expansion-parameters'
 
 function channel(flow = 12) {
   const width = 9,
@@ -41,6 +43,19 @@ function channel(flow = 12) {
   } as unknown as World
   return { w, x: 4.5 * CELL_METERS, y: 4.5 * CELL_METERS }
 }
+
+test('a bridge approach anchored at a house records coordinates rather than a live census object', () => {
+  const w = generateWorld('Maritime republics', 3, 8, undefined, 'regional', 'frontier')
+  withExpansionParameters(EXPANSION_PROFILES.baseline, () => {
+    fastForwardStep(w)
+    fastForwardStep(w)
+  })
+  const lanes = w.adaptive!.lanes!
+  assert(lanes.some((lane) => lane.bridge && lane.founded === 12))
+  const saved = JSON.stringify(lanes)
+  for (const site of Object.values(w.adaptive!.sites)) if (site.residents !== undefined) site.residents++
+  assert.equal(JSON.stringify(lanes), saved, 'a census change cannot mutate recorded road geometry')
+})
 
 test('a surveyed bridge is short, perpendicular and dry at both abutments', () => {
   const { w, x, y } = channel()
@@ -171,6 +186,12 @@ test('old water-crossing tangles become dry streets and a connected shared bridg
   const sites = JSON.stringify(w.adaptive!.sites)
   assert(reconcileRiverLanes(w))
   const lanes = w.adaptive!.lanes!
+  assert(
+    lanes.every((lane) =>
+      lane.points.every((p) => Object.keys(p).every((key) => key === 'x' || key === 'y')),
+    ),
+    'street geometry must not retain mutable residential records',
+  )
   const bridges = lanes.filter((l) => l.bridge)
   assert.equal(bridges.length, 1)
   assert(

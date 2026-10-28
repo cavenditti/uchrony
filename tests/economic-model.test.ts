@@ -1,3 +1,4 @@
+import { investProductiveCapital } from '../src/sim/firms'
 import { rebaseEndowments } from './fixtures/endowment'
 import { ensureFirms, regionalFirms } from '../src/sim/firms'
 import test from 'node:test'
@@ -370,6 +371,7 @@ test('private construction pays and taxes labor without creating extra workers o
   const h = e.households[0].artisan,
     income = h.income,
     taxes = h.taxes
+  investProductiveCapital(w)
   finishEconomyMonth(w)
   assert(firm.projects.length > 0)
   assert(h.income > income)
