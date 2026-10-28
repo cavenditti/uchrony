@@ -1,4 +1,5 @@
 import { habitableLand } from './terrain-access'
+import { urbanLand } from './urban-land'
 import { validateUrbanFabric } from './urban-fabric'
 import { GOODS, population, type World } from './types'
 import { rebuildAdaptiveMesh } from './adaptive-world'
@@ -105,7 +106,9 @@ export function validateAdaptiveWorld(w: World) {
             !p ||
             !finite(p.x) ||
             !finite(p.y) ||
-            !unit.cells.some((id) => pointInPolygon(p, cellPolygon(w, id))),
+            !(a.urban?.enabled
+              ? urbanLand(w, p, unit.nation) >= 0
+              : unit.cells.some((id) => pointInPolygon(p, cellPolygon(w, id)))),
         )
       )
         fail('invalid lane geometry or owner')
@@ -144,7 +147,11 @@ export function validateAdaptiveWorld(w: World) {
           { x: p.x + p.size, y: p.y },
           { x: p.x, y: p.y + p.size },
           { x: p.x + p.size, y: p.y + p.size },
-        ].every((point) => pointInPolygon(point, cellPolygon(w, site.cell)))
+        ].every((point) =>
+          a.urban?.enabled
+            ? urbanLand(w, point, w.localEconomy!.units[site.pool].nation) >= 0
+            : pointInPolygon(point, cellPolygon(w, site.cell)),
+        )
       )
         fail('residential parcel crosses its source land')
       if (

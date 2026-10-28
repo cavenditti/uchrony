@@ -1,3 +1,4 @@
+import { urbanStreetRoute } from './urban-streets'
 import { habitableLand } from './terrain-access'
 import { governance } from './governance'
 import { localWalkingConnection } from './residential-geometry'
@@ -127,6 +128,8 @@ function siteMinutes(
   limit: number,
   accessibilityOnly: boolean,
 ) {
+  const street = urbanStreetRoute(w, from, to, limit)
+  if (street !== undefined) return street && street.minutes <= limit ? street.minutes : null
   if (from.cell === to.cell) {
     const route = localWalkingConnection(w, from, to, w.regions[w.cells[from.cell].region]?.nation, [
       from.cell,
@@ -214,6 +217,8 @@ export function commuteSiteRoute(
   to: Pick<PhysicalSite, 'cell' | 'x' | 'y'>,
   limit = 90,
 ) {
+  const street = urbanStreetRoute(w, from, to, limit)
+  if (street !== undefined) return street
   if (from.cell === to.cell) {
     const route = localWalkingConnection(w, from, to, w.regions[w.cells[from.cell].region]?.nation, [
       from.cell,
@@ -448,10 +453,11 @@ function matchCommuterOffers(w: World, known?: CommuteCandidates) {
     const origin = cellPosition(w, r.center)
     const routes = new Map<number, Offer['routes'][number] | null>()
     const retained = known?.get(r.id)
-    const candidates = (known
-      ? [...(retained?.keys() ?? [])].map((id) => bySite.get(`firm:${id}`)).filter((f) => f !== undefined)
-      : search!(origin, 6000).map((site) => bySite.get(site.id)!))
-      .sort((a, b) => a.id - b.id)
+    const candidates = (
+      known
+        ? [...(retained?.keys() ?? [])].map((id) => bySite.get(`firm:${id}`)).filter((f) => f !== undefined)
+        : search!(origin, 6000).map((site) => bySite.get(site.id)!)
+    ).sort((a, b) => a.id - b.id)
     const available: typeof firms = [],
       weights: number[] = [],
       journeys: Offer['routes'] = []

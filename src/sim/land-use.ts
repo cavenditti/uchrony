@@ -66,10 +66,14 @@ export function advanceLandUse(
       site = investment.site
       const { plot, spaces, inputs } = investment
       if (plot) {
-        site = createResidentialParcel(w, id, plot.cell, plot.point, plot.parcel)
+        const host = 'pool' in plot && typeof plot.pool === 'number' ? plot.pool : id
+        site = createResidentialParcel(w, host, plot.cell, plot.point, plot.parcel)
+        site.capitalOwner = producerAccount(id)
         if (plot.building) site.building = plot.building
         if (plot.lanes?.length) (a.lanes ??= []).push(...plot.lanes)
-        homes.get(id)!.push(site)
+        const hostHomes = homes.get(site.pool) ?? []
+        hostHomes.push(site)
+        homes.set(site.pool, hostHomes)
       }
       const labor = inputs.labor / simulationMonths()
       let wages = 0
@@ -96,7 +100,14 @@ export function advanceLandUse(
       r.consumption.timber += timber
       r.consumption.stone += stone
       recordOwnCapital(w, id, producerAccount(id), wages + materials)
-      a.construction.push({ site: site.id, capacity: spaces, cost: wages + materials, remaining: 3 })
+      a.construction.push({
+        site: site.id,
+        capacity: spaces,
+        cost: wages + materials,
+        remaining: 3,
+        sponsor: producerAccount(id),
+        host: site.pool,
+      })
       pending.add(site.id)
     }
   }

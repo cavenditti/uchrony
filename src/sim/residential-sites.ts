@@ -1,3 +1,4 @@
+import { urbanLand } from './urban-land'
 import { habitableLand } from './terrain-access'
 import { buildingFootprint, LOT_SPAN } from './building-lots'
 import { apportion } from './allocation'
@@ -174,7 +175,11 @@ export function createResidentialParcel(
       { x: parcel.x + parcel.size, y: parcel.y },
       { x: parcel.x, y: parcel.y + parcel.size },
       { x: parcel.x + parcel.size, y: parcel.y + parcel.size },
-    ].every((p) => pointInPolygon(p, cellPolygon(w, cell)))
+    ].every((p) =>
+      w.adaptive?.urban?.enabled
+        ? urbanLand(w, p, unit.nation) >= 0
+        : pointInPolygon(p, cellPolygon(w, cell)),
+    )
   )
     throw new Error('Residential plot crosses its source land')
   const id = `residence:${a.nextResidence!++}`

@@ -6,6 +6,7 @@ import type { World } from './types'
 import { CELL_METERS } from './grid'
 import { hashSeed } from './random'
 import { cellPolygon, pointInPolygon } from './physical-space'
+import { urbanLand, urbanHost } from './urban-land'
 import { footprintConnection } from './residential-geometry'
 import { SpatialBuckets } from './spatial-buckets'
 import { inRiverChannel } from '../map/rivers'
@@ -13,6 +14,7 @@ import { laneTouchesRiver, nearbyRiverBank, surveyRiverBridge } from './river-la
 
 export interface BuildingPlot {
   cell: number
+  pool?: number
   point: PointMeters
   parcel: SpatialBounds
   building: PointMeters[]
@@ -40,7 +42,13 @@ export function rectangularFootprint(point: PointMeters, width: number, depth: n
 }
 
 function surveyContext(w: World, source: PhysicalSite, existing: PhysicalSite[], opening: boolean) {
+  const continuous = !opening && !!w.adaptive?.urban?.enabled
+  const nation = w.localEconomy!.units[source.pool].nation
   const owned = new Set(w.localEconomy!.units[source.pool].cells)
+  if (continuous)
+    existing = Object.values(w.adaptive!.sites).filter(
+      (s) => s.retired === undefined && !s.premises && Math.hypot(s.x - source.x, s.y - source.y) < 1800,
+    )
   const obstacles = existing.filter((s) => (!opening || s.id !== source.id) && (s.capacity > 0 || s.building))
   const shapes = obstacles.map(
     (s) =>
@@ -67,7 +75,7 @@ function surveyContext(w: World, source: PhysicalSite, existing: PhysicalSite[],
   const land = (p: PointMeters) => {
     if (p.x < 0 || p.y < 0 || p.x >= w.width * CELL_METERS || p.y >= w.height * CELL_METERS) return -1
     const cell = Math.floor(p.y / CELL_METERS) * w.width + Math.floor(p.x / CELL_METERS)
-    return owned.has(cell) && habitableLand(w.cells[cell]) ? cell : -1
+    return continuous ? urbanLand(w, p, nation) : owned.has(cell) && habitableLand(w.cells[cell]) ? cell : -1
   }
   const clear = (shape: PointMeters[], gap: number) => {
     const box = {
@@ -165,7 +173,14 @@ export function surveyBuildingPlots(
 ): { plots: BuildingPlot[]; lanes: SettlementLane[] } {
   const context = surveyContext(w, source, existing, opening)
   const lanes = [
-    ...(w.adaptive!.lanes ?? []).filter((l) => l.pool === source.pool),
+    ...(w.adaptive!.lanes ?? []).filter(
+      (l) =>
+        l.pool === source.pool ||
+        (!opening &&
+          w.adaptive?.urban?.enabled &&
+          w.localEconomy!.units[l.pool]?.nation === w.localEconomy!.units[source.pool].nation &&
+          l.points.some((p) => distance(p, source) < 1800)),
+    ),
     ...tradeFrontages(w, source),
   ]
   const fresh: SettlementLane[] = [],
@@ -232,7 +247,14 @@ export function surveyBuildingPlots(
       { x: parcel.x + span, y: parcel.y + span },
       { x: parcel.x, y: parcel.y + span },
     ]
-    if (!corners.every((p) => context.land(p) === cell && pointInPolygon(p, cellPolygon(w, cell)))) return
+    if (
+      !corners.every((p) =>
+        !opening && w.adaptive?.urban?.enabled
+          ? context.land(p) >= 0
+          : context.land(p) === cell && pointInPolygon(p, cellPolygon(w, cell)),
+      )
+    )
+      return
     const relief =
       Math.max(...building.map((p) => settlementElevation(w, p))) -
       Math.min(...building.map((p) => settlementElevation(w, p)))
@@ -260,7 +282,15 @@ export function surveyBuildingPlots(
     )
       return
     const weight = (width * depth * (1 + centrality * (type > 0.65 ? 1.3 : 0.25))) / 32
-    const plot = { cell, point, parcel, building, weight, lanes: [...fresh] }
+    const plot = {
+      cell,
+      pool: !opening && w.adaptive?.urban?.enabled ? urbanHost(w, cell) : source.pool,
+      point,
+      parcel,
+      building,
+      weight,
+      lanes: [...fresh],
+    }
     context.add(building)
     plots.push(plot)
   }

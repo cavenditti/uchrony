@@ -24,6 +24,7 @@ export interface PhysicalSite extends PointMeters {
   fabric?: import('./urban-types').UrbanBuilding
   /** A firm's exact leased/owned physical premises; accounts remain with its economic entity. */
   premises?: string
+  capitalOwner?: string
   id: string
   cell: number
   pool: number
@@ -109,7 +110,14 @@ export interface AdaptiveWorld {
     goods: import('./types').Inventory
     legs: import('./types').RouteLeg[]
   }[]
-  construction?: { site: string; capacity: number; cost: number; remaining: number }[]
+  construction?: {
+    site: string
+    capacity: number
+    cost: number
+    remaining: number
+    sponsor?: string
+    host?: number
+  }[]
   migration: { source: 'legacy'; month: number; assumptions: string[] }
   reviewMonth: number
   residentialVersion?: 1
