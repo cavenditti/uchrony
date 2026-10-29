@@ -9,6 +9,19 @@ export function validateGeopolitics(w: World) {
     throw new Error('Invalid strategic or occupation state in this save.')
   }
   for (const r of w.regions) {
+    const c = r.control
+    if (
+      c !== undefined &&
+      (!c ||
+        !nation(c.nation) ||
+        c.nation === r.nation ||
+        !integer(c.since, 0, w.month) ||
+        !integer(c.lastPillage, -1, w.month) ||
+        typeof c.spoils !== 'number' ||
+        !Number.isFinite(c.spoils) ||
+        c.spoils < 0)
+    )
+      fail()
     const o = r.occupation
     if (
       o !== undefined &&
@@ -18,6 +31,23 @@ export function validateGeopolitics(w: World) {
         !integer(o.since, 0, w.month) ||
         !unit(o.resistance) ||
         !integer(o.settled, 0, w.month))
+    )
+      fail()
+  }
+  for (const n of w.nations) {
+    const p = n.development
+    if (
+      p !== undefined &&
+      (!p ||
+        !['agriculture', 'industry', 'logistics', 'medicine', 'military', 'governance'].includes(p.focus) ||
+        !integer(p.started, 0, w.month) ||
+        p.review !== p.started + 60 ||
+        ['baselineOutput', 'targetOutput', 'currentOutput', 'revenue', 'appropriation', 'borrowed'].some(
+          (k) => {
+            const v = p[k as keyof typeof p]
+            return typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1e14
+          },
+        ))
     )
       fail()
   }

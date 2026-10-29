@@ -9,8 +9,7 @@ import { multiCentreHousingDemand } from './housing-demand'
 import { apportion } from './allocation'
 import { occupiedResidents, residentialPools, syncResidentialPopulation } from './residential-sites'
 
-const SEARCH_METERS = 6000
-const MONTHLY_MOVING_HAZARD = 1 - Math.exp(-SETTLEMENT.annualMovingHazard / 12)
+const monthlyMovingHazard = () => 1 - Math.exp(-SETTLEMENT.annualMovingHazard / 12)
 
 /** A monthly spatial-choice snapshot. Recursive mesh queries prune distant sites;
  * the economic alternatives remain exact owners, never an averaged bank account.
@@ -96,7 +95,7 @@ function migrationOptions(w: World) {
       const accessible = accessibleFrom(home)
       for (const target of search(
         home,
-        SEARCH_METERS,
+        SETTLEMENT.searchMeters,
         (s) =>
           s.kind === 'residential' &&
           s.pool !== id &&
@@ -137,7 +136,7 @@ export function optimizeResidentialLocations(
     const r = w.localEconomy.units[id],
       homes = access.homes(id)
     if (homes.length < 2) continue
-    const hazard = months === 1 ? MONTHLY_MOVING_HAZARD : 1 - (1 - MONTHLY_MOVING_HAZARD) ** months
+    const hazard = months === 1 ? monthlyMovingHazard() : 1 - (1 - monthlyMovingHazard()) ** months
     const budgets = apportion(Math.floor(population(r) * hazard), homes.map(access.occupied))
     const plans: { from: PhysicalSite; to: PhysicalSite; wanted: number; gain: number; minutes: number }[] =
       []
@@ -153,7 +152,7 @@ export function optimizeResidentialLocations(
       for (const { to, score } of ranked) {
         const gain = score - originUtility
         if (gain <= SETTLEMENT.movingFriction) break
-        if (to === from || Math.hypot(to.x - from.x, to.y - from.y) > SEARCH_METERS) continue
+        if (to === from || Math.hypot(to.x - from.x, to.y - from.y) > SETTLEMENT.searchMeters) continue
         const minutes = commuteSiteMinutes(w, from, to, SETTLEMENT.accessMinutes)
         if (minutes === null) continue
         const net = gain - SETTLEMENT.movingFriction - minutes / 600

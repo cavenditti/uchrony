@@ -1,3 +1,4 @@
+import { configurationValues } from './configuration-context'
 /** Rates are annualized nominal fractions; inflation is annual log change.
  * A zero lower bound is a policy-regime assumption, not an inflation ceiling.
  */
@@ -39,15 +40,9 @@ export function policyRate(
 export function newMonetaryPolicy(month: number): MonetaryPolicy {
   return {
     regime: 'inflation-target',
-    target: 0.02,
-    neutralRealRate: 0.02,
-    referenceUnemployment: 0.04,
-    inflationResponse: 0.5,
-    unemploymentResponse: 1,
-    inertia: 0.85,
-    expectationAdjustment: 1 / 24,
-    expectedInflation: 0.02,
-    inflation: 0.02,
+    ...configurationValues().monetary,
+    expectedInflation: configurationValues().monetary.target,
+    inflation: configurationValues().monetary.target,
     logChanges: [],
     lastMonth: month,
   }

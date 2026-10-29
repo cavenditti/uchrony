@@ -1,0 +1,71 @@
+<figure class="figure" id="fig-circulation" aria-labelledby="circulation-title">
+  <p class="figure-kicker">Figure 1 · mechanism</p>
+  <h3 id="circulation-title">Give excess cash a route back</h3>
+  <svg
+    class="cash-wide"
+    viewBox="0 0 400 318"
+    role="img"
+    aria-labelledby="cash-title cash-desc"
+    style="max-width: 430px; margin: auto"
+  >
+    <title id="cash-title">The merchant cash loop</title>
+    <desc id="cash-desc">
+      Households spend at merchants. Merchants protect operating and construction reserves. A bounded share of
+      excess cash returns to owner households, who can spend again. Previously that excess accumulated.
+    </desc>
+    <defs>
+      <marker
+        id="cash-arrow"
+        viewBox="0 0 8 8"
+        refX="7"
+        refY="4"
+        markerWidth="7"
+        markerHeight="7"
+        orient="auto"
+      >
+        <path d="M1 1L7 4L1 7" fill="none" stroke="var(--muted)" stroke-width="1.2" />
+      </marker>
+    </defs>
+    <rect class="surface" x="93" y="5" width="214" height="64" />
+    <text x="200" y="32" text-anchor="middle">Households</text>
+    <text class="soft" x="200" y="53" text-anchor="middle">including business owners</text>
+    <path class="edge" d="M307 37H354V137H307" marker-end="url(#cash-arrow)" />
+    <text class="soft" x="347" y="83" text-anchor="end">purchases</text>
+    <rect class="surface" x="93" y="107" width="214" height="64" />
+    <text x="200" y="135" text-anchor="middle">Merchant cash</text>
+    <text class="soft" x="200" y="156" text-anchor="middle">protect the reserve first</text>
+    <path class="edge" d="M143 171V219" marker-end="url(#cash-arrow)" />
+    <path class="edge" d="M260 171V219" marker-end="url(#cash-arrow)" />
+    <rect x="63" y="226" width="145" height="77" fill="var(--soft-rust)" />
+    <text x="135" y="251" text-anchor="middle">Keep</text>
+    <text class="soft" x="135" y="272" text-anchor="middle">6 months’ costs</text>
+    <text class="soft" x="135" y="291" text-anchor="middle">+ commitments</text>
+    <rect x="220" y="226" width="166" height="77" fill="var(--soft-blue)" />
+    <text x="303" y="251" text-anchor="middle">Excess</text>
+    <text class="soft" x="303" y="272" text-anchor="middle">limited distributions</text>
+    <text class="soft" x="303" y="291" text-anchor="middle">to actual owners</text>
+    <path class="edge" d="M303 303V314H21V37H93" marker-end="url(#cash-arrow)" />
+    <text class="soft" transform="translate(14 190) rotate(-90)" text-anchor="middle">
+      owners can spend again
+    </text>
+  </svg>
+  <div class="cash-compact">
+    <div class="cash-loop">
+      <div class="node">Households<small>including business owners</small></div>
+      <div class="arrow"><small>buy goods</small><span aria-hidden="true">↓</span></div>
+      <div class="node">
+        Merchant cash<small>Keep 6 months’ costs<br />+ construction commitments</small>
+      </div>
+      <div class="arrow">
+        <small>distribute a limited share of the excess</small><span aria-hidden="true">↓</span>
+      </div>
+      <div class="node soft">Actual owners<small>can spend again</small></div>
+    </div>
+    <p class="cash-return">↶ Back into household spending</p>
+  </div>
+  <figcaption>
+    Previously, excess cash accumulated while household demand weakened. The revised rule redistributes
+    existing cash after protecting business needs.
+    <strong>It does not create money or pay every household.</strong>
+  </figcaption>
+</figure>

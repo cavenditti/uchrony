@@ -1,3 +1,4 @@
+import { withWorldConfiguration } from './configuration'
 import { advanceAlmanac, queryPlaces, writingContext, acceptWriting } from './almanac'
 import { defaultModelSettings, isWritingTask, type ModelTask } from './model-tasks'
 import type { WritingRequest } from './almanac-types'
@@ -18,7 +19,6 @@ import { pendingAdvice, submitAdvice, withdrawAdvice } from './advisors'
 import { geographyKey } from '../map/geometry'
 import { DEFAULT_WORLD_SCALE, WORLD_SCALES } from './scale'
 import { Playback } from './playback'
-import { fastForwardStep } from './fast-forward'
 import { ensurePopulation } from './population'
 import { ensureIntelligence } from './intelligence'
 import { ensureWarfare } from './navy'
@@ -214,11 +214,11 @@ async function connection() {
   }
 }
 const playback = new Playback(
-  (speed) => {
+  () => {
     if (!world) return false
-    const ready = speed === 'max' ? fastForwardStep(world) : (tick(world), true)
+    tick(world)
     revision++
-    return ready
+    return true
   },
   () => publish(),
   (error) => {
@@ -326,7 +326,7 @@ async function launch(
       )
         return
       try {
-        accept(result.proposal, result.model)
+        withWorldConfiguration(world!, () => accept(result.proposal, result.model))
         if (!isWritingTask(role)) advanceAlmanac(world, true)
         const provenance = (world.modelProvenance ??= {
           accepted: 0,
@@ -598,9 +598,13 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       return
     }
     if (data.type === 'inspect') {
+      const request = data.request
       try {
         if (!world) throw new Error('No world to inspect.')
-        send({ type: 'inspection', snapshot: inspectWorld(world, data.request) })
+        send({
+          type: 'inspection',
+          snapshot: withWorldConfiguration(world, () => inspectWorld(world!, request)),
+        })
       } catch (error) {
         send({
           type: 'inspection-error',
@@ -683,23 +687,27 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     }
     let message: string | undefined
     if (action.type === 'generate') {
-      reset()
       const scale = action.scale ?? DEFAULT_WORLD_SCALE
-      world = generateWorld(
+      const generated = generateWorld(
         action.seed,
         action.continents,
         action.nations ?? WORLD_SCALES[scale].states,
         action.settings,
         scale,
-        'frontier',
+        action.start ?? 'frontier',
+        action.configuration,
       )
+      // Prepare the replacement completely before retiring the current world.
+      // Validation or initialization failure leaves the current save and state intact.
+      prepareSpatialWorld(generated)
+      advanceAlmanac(generated, true)
+      ensurePopulation(generated)
+      ensureHistory(generated)
+      ensureStatecraft(generated)
+      summarize(generated)
+      reset()
+      world = generated
       mapKey = geographyKey(world.cells)
-      prepareSpatialWorld(world)
-      advanceAlmanac(world, true)
-      ensurePopulation(world)
-      ensureHistory(world)
-      ensureStatecraft(world)
-      summarize(world)
       void connection().then(schedule)
     } else if (action.type === 'load') {
       const restored = restoreWorld(action.world)

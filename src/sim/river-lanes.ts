@@ -1,3 +1,4 @@
+import { parameterGroup } from './configuration-context'
 import type { PointMeters, SettlementLane } from './adaptive-types'
 import type { World } from './types'
 import { inRiverChannel, riverSectionsNear } from '../map/rivers'
@@ -8,7 +9,7 @@ import { SpatialBuckets } from './spatial-buckets'
 import { settlementElevation } from './settlement-terrain'
 
 /** Local streets leave room for a bank path; crossings are scarce shared links. */
-export const RIVER_ROADS = { setback: 4, approach: 14, maxSpan: 360, spacing: 320, search: 180 } as const
+export const RIVER_ROADS = parameterGroup('riverRoads')
 const distance = (a: PointMeters, b: PointMeters) => Math.hypot(b.x - a.x, b.y - a.y)
 const midpoint = (lane: SettlementLane) => ({
   x: (lane.points[0].x + lane.points[1].x) / 2,

@@ -1,43 +1,5 @@
-/** Synthetic scenario coefficients. Economic policy weights live in decision-policy.ts. */
-export const MODEL_PARAMETERS = {
-  version: 6,
-  bankCount: 3,
-  bankCapitalRatio: 0.1,
-  policyRateMonthly: 0.0015,
-  bankLoanSpread: 0.0015,
-  adultAgeMonths: 216,
-  retirementAgeMonths: 780,
-  maximumAgeMonths: 1320,
-  femaleBirthShare: 0.488,
-  childFoodEquivalent: 0.65,
-  elderFoodEquivalent: 0.85,
-  desiredChildrenBase: 2.3,
-  ruralFamilyMotive: 1.2,
-  urbanFamilyCost: 0.6,
-  jobSeparationMonthly: 0.015,
-  matchingEfficiency: 0.65,
-  matchingElasticity: 0.5,
-  wageRenegotiationMonthly: 1 / 12,
-  workerBargainingPower: 0.5,
-  consumptionRiskAversion: 2,
-  loanResetMonths: 3,
-  referenceUnemployment: 0.04,
-  infrastructureServiceProductivity: 0.005,
-  infrastructureWearMonthly: 0.0015,
-  fertilityAnnual: [0.018, 0.115, 0.145, 0.12, 0.075, 0.025, 0.003],
-  infantHazardAnnual: 0.055,
-  childHazardAnnual: 0.002,
-  adultHazardAnnual: 0.0015,
-  ageingHazardScale: 0.00018,
-  ageingHazardSlope: 0.085,
-  forecastAdjustment: 0.18,
-  inventoryMonths: 2,
-  depreciationMonthly: 0.0015,
-  constructionMonths: 6,
-  dividendShare: 0.2,
-  creditRepaymentMonthly: 0.015,
-  defaultAfterMonths: 12,
-  defaultRecovery: 0.35,
-  mobilityMonthly: 0.0005,
-  fullBuiltPopulationPerCell: 48000,
-} as const
+/** Compatibility names; all defaults and validation now live in configuration. */
+import { parameterGroup } from './configuration-context'
+export { DEFAULT_MODEL_PARAMETERS } from './configuration-defaults'
+export type { ModelParameters } from './configuration-defaults'
+export const MODEL_PARAMETERS = parameterGroup('model')

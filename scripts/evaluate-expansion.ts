@@ -1,5 +1,6 @@
 import { DECISION_POLICIES, withDecisionPolicy, type DecisionPolicy } from '../src/sim/decision-policy'
 import { dynamicsDiagnostics } from './dynamics-diagnostics'
+import { simulationSettings, validateSettings } from '../src/sim/settings'
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { generateWorld } from '../src/sim/generate'
@@ -34,6 +35,7 @@ const scale = option('scale', 'regional') as 'regional' | 'continental' | 'world
 const output = option('output', '/tmp/uchrony-expansion-run.json')
 const snapshot = option('snapshot', '')
 const resume = option('resume', '')
+const abundance = option('abundance', '')
 const policyFile = option('policy', '')
 const decision = policyFile ? 'custom' : option('decision', 'legacy')
 const policy: DecisionPolicy = policyFile
@@ -63,6 +65,7 @@ const revision = hash.digest('hex'),
 const w = resume
   ? restoreWorld(JSON.parse(readFileSync(resume, 'utf8')))
   : generateWorld(seed, 3, 8, undefined, scale, start)
+if (abundance) w.simulation = validateSettings({ ...simulationSettings(w), abundance: Number(abundance) })
 const startMonth = w.month,
   duration = months - startMonth,
   initialStates = w.nations.length
@@ -71,6 +74,11 @@ const initialPopulation = w.totals.population,
   initialClaims = w.regions.filter((r) => r.nation >= 0).length
 const seenEvents = new Set(w.events.map((e) => e.id))
 const counts = {
+  developmentPrograms: 0,
+  productiveProjects: 0,
+  pillages: 0,
+  annexations: 0,
+  farmProjects: 0,
   founding: 0,
   accessions: 0,
   charters: 0,
@@ -119,6 +127,31 @@ function sample(world: World) {
     unemployment: world.economy?.totals.unemployment ?? 0,
     realOutputPerPersonMonth: (world.economy?.totals.realOutput ?? 0) / Math.max(1, world.totals.population),
     monthlyTrade: world.routes.reduce((s, r) => s + r.volume, 0) / (world.economy?.periodMonths ?? 1),
+    fundedFarmProjects: world.farmProjects?.length ?? 0,
+    meanAgricultureTechnology:
+      living.reduce((sum, n) => sum + n.technologies.agriculture, 0) / Math.max(1, living.length),
+    meanTechnology:
+      living.reduce((sum, n) => sum + Object.values(n.technologies).reduce((s, v) => s + v, 0), 0) /
+      Math.max(1, living.length),
+    treasury: living.reduce((sum, n) => sum + n.treasury, 0),
+    publicDebt: living.reduce((sum, n) => sum + n.debt, 0),
+    stateFinances: living.map((n) => ({
+      id: n.id,
+      treasury: n.treasury,
+      debt: n.debt,
+      revenue: n.income,
+      spending: n.spending,
+      investment: n.capitalSpending ?? 0,
+      dividends: n.enterpriseIncome ?? 0,
+      budget: n.budget,
+      appropriation: n.development?.appropriation,
+      programRevenue: n.development?.revenue,
+      unemployment: world.economy?.national[n.id]?.unemployment,
+      valueAdded: n.gdp,
+    })),
+    fiscalBalance: living.reduce((sum, n) => sum + n.income - n.spending, 0),
+    occupations: world.regions.filter((r) => r.control).length,
+    activePrograms: living.filter((n) => n.development).length,
     wars: world.relations.filter((r) => r.treaty === 'war').length,
     meanStability: living.reduce((s, n) => s + n.stability, 0) / Math.max(1, living.length),
     meanPeerPressure:
@@ -141,6 +174,8 @@ withExpansionParameters(EXPANSION_PROFILES[profile], () =>
         for (const e of w.events) {
           if (seenEvents.has(e.id)) continue
           seenEvents.add(e.id)
+          if (/funds (farm equipment|tool workshops|textile workshops)/.test(e.title))
+            counts.productiveProjects++
           if (e.title.startsWith('A settlement is founded')) counts.founding++
           if (e.title.includes(' joins ')) counts.accessions++
           if (e.title.includes('establishes an independent state')) {
@@ -150,6 +185,10 @@ withExpansionParameters(EXPANSION_PROFILES[profile], () =>
           if (e.title.includes('trade accord')) counts.tradeAccords++
           if (e.title.includes('form an alliance')) counts.alliances++
           if (e.title.includes('secedes')) counts.secessions++
+          if (e.title.includes('funds farmland improvements')) counts.farmProjects++
+          if (e.title.includes('adopts a five-year')) counts.developmentPrograms++
+          if (e.title.includes(' pillages ')) counts.pillages++
+          if (e.title.includes(' annexes ')) counts.annexations++
         }
         w.regions.forEach((r, i) => {
           if (r.nation >= 0 && priorOwners[i] >= 0 && r.nation !== priorOwners[i]) counts.conquests++
@@ -246,6 +285,7 @@ withExpansionParameters(EXPANSION_PROFILES[profile], () =>
         parameters: EXPANSION_PROFILES[profile],
         decision,
         policy,
+        simulation: simulationSettings(w),
         startMonth,
         diagnostics,
         measurementVersion: 2, // realOutput is already monthly in national accounts

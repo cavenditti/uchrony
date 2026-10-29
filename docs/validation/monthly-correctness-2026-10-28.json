@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-28",
+  "scope": "Disable approximate app playback; refresh commute discovery and accessibility while preserving regular monthly results.",
+  "source": {
+    "beforeSha256": "a06d0f1d26e3c4cd43070e61b59087444109c6fdeb1cb2b9e339e57c44565141",
+    "isolatedAfterSha256": "b7fa0d02f2bff7c092a4284646792a9f7d43cc90715b90c75077cfdf9b3e2734",
+    "note": "Frozen copies include pre-existing working changes. The checkout changed concurrently, so the exact replay used isolated copies. Final App copy-only wrapping and 1\u20132 shortcut help correction followed the frozen build. The complete shared-checkout production build passed after the interruption."
+  },
+  "regressions": {
+    "before": {
+      "passed": 0,
+      "failed": 3
+    },
+    "after": {
+      "passed": 3,
+      "failed": 0
+    },
+    "cases": [
+      "Empty commute history discovers a funded reachable vacancy (35 FTE).",
+      "Devastation invalidates a retained route before wages are paid.",
+      "Ownership changes invalidate a retained route before wages are paid."
+    ]
+  },
+  "focusedTests": {
+    "passed": 22,
+    "failed": 0,
+    "suites": [
+      "commute-discovery",
+      "playback",
+      "fast-forward",
+      "performance-economy-population"
+    ],
+    "sharedCheckoutFinal": {
+      "passed": 22,
+      "failed": 0,
+      "durationMs": 38979.77175
+    }
+  },
+  "regularReplay": {
+    "engine": "/private/tmp/uchrony-monthly-correctness",
+    "referenceEngine": "/private/tmp/uchrony-regular-reference.tFyIXU",
+    "seed": "performance-ledger",
+    "start": "settled",
+    "generationMs": 377,
+    "generationCpuMs": 604,
+    "fromMonth": 0,
+    "months": 3,
+    "repeats": 1,
+    "cells": 8064,
+    "communities": 2285,
+    "results": [
+      {
+        "ms": 3031,
+        "preparationMs": 259,
+        "preparationCpuMs": 497,
+        "startupMs": 636,
+        "monthsPerSecond": 0.99,
+        "tickMs": [
+          1274,
+          994,
+          763
+        ],
+        "cpuMs": 5157,
+        "tickCpuMs": [
+          2138,
+          1770,
+          1249
+        ],
+        "processPeakRssMiB": 851,
+        "finalHash": "c497a7bb738853023ef0d28215b9f4b0deca6ddbc5c1846707c92a583abda3ef",
+        "referenceMs": 2815,
+        "identicalMonths": 3
+      }
+    ]
+  },
+  "build": {
+    "isolatedProduction": "passed",
+    "sharedCheckout": "passed on final check after concurrent work settled"
+  },
+  "browser": {
+    "isolatedProduction": true,
+    "desktop": [
+      1440,
+      1000
+    ],
+    "phone": [
+      390,
+      844
+    ],
+    "onlySpeeds": [
+      1,
+      2
+    ],
+    "key3": "no effect while paused",
+    "legacyMaxRequest": {
+      "fromMonth": 6,
+      "toMonth": 7,
+      "accountingMonths": 1,
+      "preservedApproximationMonths": 6
+    },
+    "twoTimesPlayback": "advanced regular months and paused successfully",
+    "approximateHistoryLabel": "retained",
+    "simulationErrors": [],
+    "phoneHorizontalOverflow": false
+  },
+  "limits": [
+    "One seed and three monthly comparisons; no long-horizon accuracy claim.",
+    "No throughput improvement claimed.",
+    "Coarse integration remains available only to direct development calls; app worker uses tick().",
+    "Full repository test suite not run."
+  ]
+}

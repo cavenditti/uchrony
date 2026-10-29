@@ -1,3 +1,4 @@
+import { parameterGroup } from './configuration-context'
 import type { World } from './types'
 import { population } from './types'
 import type { City } from './district-types'
@@ -10,14 +11,7 @@ import { settlementKind } from './settlement-model'
 
 /** Synthetic calibration from monthly 50-year paired-centre scenarios (see
  * docs/URBAN_CENTRES.md). Repeated refreshes cannot accelerate elapsed time. */
-export const URBAN_INTEGRATION = {
-  incorporationMonths: 120,
-  mergerMonths: 240,
-  prestigeRatio: 1.5,
-  wealthRatio: 1.25,
-  mergerPrestigeRatio: 2,
-  mergerWealthRatio: 1.75,
-} as const
+export const URBAN_INTEGRATION = parameterGroup('urbanIntegration')
 
 export function setCentreSites(city: City, sites: PhysicalSite[]) {
   city.sites = sites.map((s) => s.id).sort()

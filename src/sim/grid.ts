@@ -2,8 +2,9 @@ import { highMountain } from './terrain-access'
 
 /** One terrain sample occupies an aligned 1,024 m square. Numerical leaves may
  * aggregate samples or subdivide them; physical entities keep their own positions. */
-export const CELL_SIZE = 12
-export const CELL_METERS = 1024
+import { CELL_SIZE } from './simulation-invariants'
+export { CELL_SIZE } from './simulation-invariants'
+export { CELL_METERS } from './simulation-invariants'
 export const GRID_TOPOLOGY = 'square-v1' as const
 
 /** Clockwise face neighbours: north, east, south, west. Missing edges keep their slot. */

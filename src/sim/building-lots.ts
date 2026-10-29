@@ -7,8 +7,9 @@ import { divideStock } from './districts'
 import { compactResidence, createResidentialParcel, residentialSites } from './residential-sites'
 import { polygonArea } from './physical-space'
 
-export const LOT_SPAN = 16
-export const BUILDING_CAPACITY = 8
+export { LOT_SPAN } from './simulation-invariants'
+import { BUILDING_CAPACITY } from './simulation-invariants'
+export { BUILDING_CAPACITY } from './simulation-invariants'
 
 /** A persistent building inside its surveyed lot, independent of camera and mesh.
  * Small variations describe the physical footprint; capacity still comes only
@@ -71,7 +72,8 @@ export function subdivideHousing(
     site.openingCapacity = opening[i]
     site.openingBuilt = built[i]
     site.investedValue = capital[i]
-    site.capitalOwner = source.capitalOwner
+    if (source.capitalOwner !== undefined) site.capitalOwner = source.capitalOwner
+    else delete site.capitalOwner
     site.residents = people[i]
     site.founded = source.founded
     site.building = plot.building

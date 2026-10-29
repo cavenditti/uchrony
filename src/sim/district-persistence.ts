@@ -291,9 +291,12 @@ export function validateDistrictEconomy(w: World) {
       !obj(f.owners) ||
       Object.entries(f.owners!).some(
         ([a, v]) =>
-          !/^household:\d+:(smallholder|laborer|artisan|professional|owner)$/.test(a) ||
           !num(v) ||
-          !w.economy!.households[Number(a.split(':')[1])],
+          !(
+            (/^government:\d+$/.test(a) && w.nations[Number(a.split(':')[1])]) ||
+            (/^household:\d+:(smallholder|laborer|artisan|professional|owner)$/.test(a) &&
+              w.economy!.households[Number(a.split(':')[1])])
+          ),
       )
     )
       fail('firm site or ownership')

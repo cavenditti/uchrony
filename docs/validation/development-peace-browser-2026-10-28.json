@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-28",
+  "browser": "Google Chrome",
+  "scope": "Isolated fixture using actual ArmyLogistics and PeaceNegotiation components and applyCommand; the user simulation was not changed.",
+  "checks": {
+    "pillage": {
+      "treasuryReceiptK": 1.657,
+      "legalOwnerStayedDefender": true
+    },
+    "explicitAnnexation": {
+      "message": "Belhaven annexed; local resistance remains."
+    },
+    "negotiatedPeace": {
+      "paymentK": 10,
+      "province": "Belhaven",
+      "signaturesRequired": 2,
+      "settlementMonth": 14,
+      "finalOwner": "Aurelia",
+      "controller": null,
+      "finalTreasuryK": 979.85
+    },
+    "mobile": {
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "horizontalOverflow": false
+    },
+    "designDetector": []
+  },
+  "screenshots": [
+    "development-peace-chrome.png",
+    "development-peace-chrome-mobile.png",
+    "development-economy-chrome.png",
+    "development-economy-chrome-mobile.png"
+  ],
+  "economyDisplay": {
+    "date": "2026-10-29",
+    "scope": "Isolated WorldOverview component with illustrative small balances; no live save modified.",
+    "smallPositiveBalanceK": 0.003,
+    "supplierDebtK": 0.003,
+    "totalDebtK": 0.004,
+    "enterpriseInvestmentK": 0.006,
+    "enterpriseIncomeK": 0.008,
+    "beforeEnterpriseInvestmentK": 0.009,
+    "desktop": {
+      "viewportWidth": 1440,
+      "documentWidth": 1440
+    },
+    "mobile": {
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "tableScrollWidth": 2206
+    }
+  }
+}

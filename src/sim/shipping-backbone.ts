@@ -1,9 +1,10 @@
+import { parameterGroup } from './configuration-context'
 import { corridorGeography } from './corridors'
 import { MinHeap } from './heap'
 import { developmentAllowance, ROAD_BACKBONE } from './road-backbone'
 import type { RouteLeg, World } from './types'
 
-export const SHIPPING_BACKBONE = { maximumDetour: 2, shortcutRatio: 1.35 } as const
+export const SHIPPING_BACKBONE = parameterGroup('shipping')
 
 /** Join shipping on water junctions, without forcing intermediate port calls.
  * The network is assembled from surveyed navigable paths; every harbor and its

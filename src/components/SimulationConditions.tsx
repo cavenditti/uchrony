@@ -1,3 +1,6 @@
+import { useId } from 'react'
+import { ParameterLabel } from './ParameterHelp'
+import { configurationHelp } from '../sim/configuration-help'
 import type { SimulationSettings } from '../sim/settings'
 
 export function SimulationConditions({
@@ -7,12 +10,20 @@ export function SimulationConditions({
   value: SimulationSettings
   onChange: (value: SimulationSettings) => void
 }) {
+  const prefix = useId()
   const change = (key: keyof SimulationSettings, number: number) => onChange({ ...value, [key]: number })
   return (
     <div className="simulation-conditions">
-      <label className="select-label">
-        Destabilizing pressures
-        <select value={value.instability} onChange={(e) => change('instability', Number(e.target.value))}>
+      <div className="select-label">
+        <ParameterLabel htmlFor={`${prefix}-instability`} label="Destabilizing pressures">
+          {configurationHelp('conditions.instability')}
+        </ParameterLabel>
+        <select
+          id={`${prefix}-instability`}
+          aria-describedby={`${prefix}-instability-help`}
+          value={value.instability}
+          onChange={(e) => change('instability', Number(e.target.value))}
+        >
           <option value={0}>Quiet — no additional disturbances</option>
           <option value={0.5}>Occasional — about one per year</option>
           <option value={1}>Unsettled — about two per year</option>
@@ -24,10 +35,14 @@ export function SimulationConditions({
           can overlap. Existing effects run their course. Ordinary shortages, politics and climate still
           operate at Quiet.
         </small>
-      </label>
-      <label className="select-label">
-        Resource abundance
+      </div>
+      <div className="select-label">
+        <ParameterLabel htmlFor={`${prefix}-abundance`} label="Resource abundance">
+          {configurationHelp('conditions.abundance')}
+        </ParameterLabel>
         <input
+          id={`${prefix}-abundance`}
+          aria-describedby={`${prefix}-abundance-help`}
           type="range"
           min={0.35}
           max={1.6}
@@ -43,10 +58,14 @@ export function SimulationConditions({
           Scales harvests and raw extraction. Geography, productive capacity, household needs and transport
           determine who has enough. Changing this preserves existing stockpiles.
         </small>
-      </label>
-      <label className="select-label">
-        Political extremes
+      </div>
+      <div className="select-label">
+        <ParameterLabel htmlFor={`${prefix}-extremity`} label="Political extremes">
+          {configurationHelp('conditions.extremity')}
+        </ParameterLabel>
         <input
+          id={`${prefix}-extremity`}
+          aria-describedby={`${prefix}-extremity-help`}
           type="range"
           min={0}
           max={2}
@@ -62,7 +81,7 @@ export function SimulationConditions({
           Amplifies political convictions and shapes future leaders. Existing ambitions persist; institutions,
           constituencies and material constraints still matter.
         </small>
-      </label>
+      </div>
     </div>
   )
 }

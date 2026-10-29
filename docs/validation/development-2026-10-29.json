@@ -1,0 +1,604 @@
+{
+  "date": "2026-10-29",
+  "scope": "One-seed paired 150-year coarse calibration plus final-model monthly continuation; not historical or World-scale qualification.",
+  "controlRevision": "9cb80b77b09f3319f3cf0009d64d8cfdb24f66cc794037d6060e6d2b73b2aff9",
+  "trialRevision": "ab3090ae30d946ba24cde262237c3220edd0e7bcdfb64c3cddbc62966a3c2d1d",
+  "finalContinuationRevision": "218fac319b9074fc5e8eeeea0cfc02a40e3385a09d45ca1611d76cd9b97c3a9d",
+  "lastTenYears": {
+    "control": {
+      "food": 0.9391071180161699,
+      "unemployment": 0.04102923628233466,
+      "realOutputPerPersonMonth": 0.0006908864960198763,
+      "fiscalBalance": 0.014726700136414672
+    },
+    "development": {
+      "food": 0.9895387170990059,
+      "unemployment": 0.03596191218317636,
+      "realOutputPerPersonMonth": 0.0009202950459930075,
+      "fiscalBalance": 0.07541053508021509
+    }
+  },
+  "final": {
+    "control": {
+      "month": 1800,
+      "population": 115504,
+      "populationRatio": 3.9807003032809485,
+      "claimed": 110,
+      "claimedShare": 0.6111111111111112,
+      "livingStates": 8,
+      "createdStates": 0,
+      "largestLandShare": 0.3,
+      "effectiveStates": 6.186094069529652,
+      "food": 0.949073262673554,
+      "unemployment": 0.03438650919875996,
+      "realOutputPerPersonMonth": 0.0006999069659848796,
+      "monthlyTrade": 1688.6994789801508,
+      "fundedFarmProjects": 0,
+      "meanAgricultureTechnology": 0,
+      "meanTechnology": 0,
+      "treasury": 224.26019546245436,
+      "publicDebt": 7.671164952083936,
+      "stateFinances": [
+        {
+          "id": 0,
+          "treasury": 1.2211970567460917,
+          "debt": 2.632824432506813,
+          "revenue": 0.0602052302592013,
+          "spending": 0.09075832064441303,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.035079942649362254,
+            "education": 0.00844519572906604,
+            "military": 0.02773923855225689,
+            "research": 0.007462356487340814,
+            "administration": 0.004557485381696684,
+            "infrastructure": 0.007775420694738709
+          },
+          "unemployment": 0.003548510098430935,
+          "valueAdded": -0.25516274336528894
+        },
+        {
+          "id": 1,
+          "treasury": 21.334493353752514,
+          "debt": 0,
+          "revenue": 0.10205732216557006,
+          "spending": 0.0771387913396142,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.05346416912331756,
+            "education": 0.0036224545463634135,
+            "military": 0.07335249520455896,
+            "research": 0.0035491857168789844,
+            "administration": 0.00242669117988423,
+            "infrastructure": 0.005627114972804003
+          },
+          "unemployment": 1.1102230246251565e-16,
+          "valueAdded": -2.736586998056673
+        },
+        {
+          "id": 2,
+          "treasury": 0.15973101300233838,
+          "debt": 0,
+          "revenue": 0.020142087139758215,
+          "spending": 0.021533976778709937,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.009271989511525162,
+            "education": 0.005265631144545792,
+            "military": 0.007600556371949184,
+            "research": 0.004856065930178053,
+            "administration": 0.001998254396199695,
+            "infrastructure": 0.0035373719023926477
+          },
+          "unemployment": 0.12720968088368645,
+          "valueAdded": -0.2641118014411575
+        },
+        {
+          "id": 3,
+          "treasury": 0.28094659131154365,
+          "debt": 1.1757250025766712,
+          "revenue": 0.023151184161329667,
+          "spending": 0.04806748261046773,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.012873379876549297,
+            "education": 0.005890017685322859,
+            "military": 0.005933240693414474,
+            "research": 0.00522375593856474,
+            "administration": 0.0029583010970989595,
+            "infrastructure": 0.004877332810748148
+          },
+          "unemployment": 0.0021226479281634125,
+          "valueAdded": 0.11362425901149108
+        },
+        {
+          "id": 4,
+          "treasury": 2.2553339881180468,
+          "debt": 2.8049516913378625,
+          "revenue": 0.1110533453969194,
+          "spending": 0.12993051746964993,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.06512199713050673,
+            "education": 0.018990584210862225,
+            "military": 0.057035202538434,
+            "research": 0.01683401488994899,
+            "administration": 0.0069437160473459795,
+            "infrastructure": 0.011363590240231522
+          },
+          "unemployment": 0.022879720689118033,
+          "valueAdded": -1.0824394131056483
+        },
+        {
+          "id": 5,
+          "treasury": 186.90742038201103,
+          "debt": 0,
+          "revenue": 0.24216220994738705,
+          "spending": 0.40335782769485,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.23575722116842832,
+            "education": 0.020229813015509437,
+            "military": 0.5089990929553235,
+            "research": 0.01916001305052805,
+            "administration": 0.016545326760320164,
+            "infrastructure": 0.03494451711091215
+          },
+          "unemployment": 0.004771700021325209,
+          "valueAdded": -22.7045588679606
+        },
+        {
+          "id": 6,
+          "treasury": 1.5200587323716874,
+          "debt": 1.0576638256625894,
+          "revenue": 0.07946137917875278,
+          "spending": 0.10030597923509788,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.036196322841521515,
+            "education": 0.013660113135934593,
+            "military": 0.037151781461433574,
+            "research": 0.01240560850489692,
+            "administration": 0.006335864374199133,
+            "infrastructure": 0.011480565336371346
+          },
+          "unemployment": 0.062412180069770895,
+          "valueAdded": 0.35023307028698786
+        },
+        {
+          "id": 7,
+          "treasury": 10.581014345141122,
+          "debt": 0,
+          "revenue": 0.12208471861014043,
+          "spending": 0.17239213940914097,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.11057327200588514,
+            "education": 0.012343425721913515,
+            "military": 0.07966581076852133,
+            "research": 0.010895577213795277,
+            "administration": 0.00690495361914547,
+            "infrastructure": 0.012027769808726996
+          },
+          "unemployment": 0.011486920370530562,
+          "valueAdded": 0.9795590113667805
+        }
+      ],
+      "fiscalBalance": -0.28316755832288476,
+      "occupations": 0,
+      "activePrograms": 0,
+      "wars": 0,
+      "meanStability": 65.09043781272379,
+      "meanPeerPressure": 0.1479823034699127
+    },
+    "development": {
+      "month": 1800,
+      "population": 141698,
+      "populationRatio": 4.883443617314585,
+      "claimed": 110,
+      "claimedShare": 0.6111111111111112,
+      "livingStates": 8,
+      "createdStates": 0,
+      "largestLandShare": 0.2545454545454545,
+      "effectiveStates": 6.729699666295885,
+      "food": 0.9981099614018872,
+      "unemployment": 0.05232516899183082,
+      "realOutputPerPersonMonth": 0.0008328330010152076,
+      "monthlyTrade": 2405.451346618423,
+      "fundedFarmProjects": 0,
+      "meanAgricultureTechnology": 2.25,
+      "meanTechnology": 7.375,
+      "treasury": 747.0948985311019,
+      "publicDebt": 0,
+      "stateFinances": [
+        {
+          "id": 0,
+          "treasury": 60.18936967277337,
+          "debt": 0,
+          "revenue": 0.06932885312829601,
+          "spending": 0.1463108472381282,
+          "investment": 0,
+          "dividends": 0.001243086000536853,
+          "budget": {
+            "welfare": 0.08573116353858014,
+            "education": 0.009689317733255693,
+            "military": 0.0686172442156213,
+            "research": 0.013810421435166304,
+            "administration": 0.005347986744952305,
+            "infrastructure": 0.016704642094035233
+          },
+          "appropriation": 4.141833981448142,
+          "programRevenue": 0.07390410606513026,
+          "unemployment": 0.021573719791112222,
+          "valueAdded": -2.780543888102196
+        },
+        {
+          "id": 1,
+          "treasury": 354.4376760146114,
+          "debt": 0,
+          "revenue": 2.6534947960979154,
+          "spending": 1.9690524539456258,
+          "investment": 0.010063476701444122,
+          "dividends": 0.4342592501130273,
+          "budget": {
+            "welfare": 0.49169484896385285,
+            "education": 0.23969614824198368,
+            "military": 0.7763716500732879,
+            "research": 0.35410187012202726,
+            "administration": 0.12422522087777639,
+            "infrastructure": 0.43798388952470857
+          },
+          "appropriation": 37.41559055512043,
+          "programRevenue": 2.5702604386797177,
+          "unemployment": 1.1102230246251565e-16,
+          "valueAdded": 11.770238057224404
+        },
+        {
+          "id": 2,
+          "treasury": 50.926320583643786,
+          "debt": 0,
+          "revenue": 0.011756204974315494,
+          "spending": 0.08122931689037717,
+          "investment": 0,
+          "dividends": 0,
+          "budget": {
+            "welfare": 0.05773701127705008,
+            "education": 0.004797845085796068,
+            "military": 0.024919200349627278,
+            "research": 0.006108345910371027,
+            "administration": 0.0017326852241423731,
+            "infrastructure": 0.006130319723307385
+          },
+          "appropriation": 3.1228848323104907,
+          "programRevenue": 0.00854917079336943,
+          "unemployment": 2.220446049250313e-16,
+          "valueAdded": 0.09329108919286717
+        },
+        {
+          "id": 3,
+          "treasury": 72.42778403320112,
+          "debt": 0,
+          "revenue": 0.13684242022697946,
+          "spending": 0.23388774971289014,
+          "investment": 3.234389424113724e-06,
+          "dividends": 0.0005287986112294484,
+          "budget": {
+            "welfare": 0.16125074384285934,
+            "education": 0.014286014373510595,
+            "military": 0.049306913682830376,
+            "research": 0.019852010808699222,
+            "administration": 0.0072359247961658575,
+            "infrastructure": 0.022542091416882983
+          },
+          "appropriation": 5.358574757167316,
+          "programRevenue": 0.14454158732403152,
+          "unemployment": 0,
+          "valueAdded": 0.4178061692857799
+        },
+        {
+          "id": 4,
+          "treasury": 29.109268159948307,
+          "debt": 0,
+          "revenue": 0.20946888466123706,
+          "spending": 0.2930489356667381,
+          "investment": 0.024682791507761245,
+          "dividends": 0.04494531653575731,
+          "budget": {
+            "welfare": 0.05421002739338191,
+            "education": 0.048380607304856126,
+            "military": 0.06410748250070078,
+            "research": 0.0607067089920256,
+            "administration": 0.017103453365021625,
+            "infrastructure": 0.056853156757995106
+          },
+          "appropriation": 3.237397510119646,
+          "programRevenue": 0.19814580712058838,
+          "unemployment": 0.14554363969226103,
+          "valueAdded": 0.4957254946912279
+        },
+        {
+          "id": 5,
+          "treasury": 64.53755758493854,
+          "debt": 0,
+          "revenue": 0.0910859119058066,
+          "spending": 0.18941220291539174,
+          "investment": 0.0007242563292198877,
+          "dividends": 0.00994960415283939,
+          "budget": {
+            "welfare": 0.04988302952192405,
+            "education": 0.023802750792981848,
+            "military": 0.11556817447012246,
+            "research": 0.035390933433055854,
+            "administration": 0.01315415655268822,
+            "infrastructure": 0.04322078273506763
+          },
+          "appropriation": 4.572333229411919,
+          "programRevenue": 0.09110993353919145,
+          "unemployment": 0.11265845504872385,
+          "valueAdded": -1.3879415309738132
+        },
+        {
+          "id": 6,
+          "treasury": 26.567698372888355,
+          "debt": 0,
+          "revenue": 0.0272440647562573,
+          "spending": 0.09356624580586691,
+          "investment": 0,
+          "dividends": 0.0006420456938532241,
+          "budget": {
+            "welfare": 0.039862581388353434,
+            "education": 0.009582338242820086,
+            "military": 0.02185495707792581,
+            "research": 0.013312855838861763,
+            "administration": 0.004827643635914849,
+            "infrastructure": 0.015141640122377795
+          },
+          "appropriation": 1.773971175171881,
+          "programRevenue": 0.025177492769356682,
+          "unemployment": 0.06116173346028331,
+          "valueAdded": -1.2576695015144026
+        },
+        {
+          "id": 7,
+          "treasury": 88.89922410909706,
+          "debt": 0,
+          "revenue": 0.03509069136353398,
+          "spending": 0.11421797298665948,
+          "investment": 0.00043583350309917473,
+          "dividends": 0.001693472983124724,
+          "budget": {
+            "welfare": 0.08621723634628838,
+            "education": 0.0041942285890342245,
+            "military": 0.11959266617938946,
+            "research": 0.0062362424313518764,
+            "administration": 0.002318175525502475,
+            "infrastructure": 0.007615732002900957
+          },
+          "appropriation": 5.57955738388845,
+          "programRevenue": 0.03418579418213676,
+          "unemployment": 0,
+          "valueAdded": -5.850788285387217
+        }
+      ],
+      "fiscalBalance": 0.11358610195266372,
+      "occupations": 0,
+      "activePrograms": 8,
+      "wars": 0,
+      "meanStability": 71.56349632690399,
+      "meanPeerPressure": 0.10474151239394804
+    }
+  },
+  "finalContinuation": {
+    "start": 960,
+    "end": 984,
+    "validation": {
+      "population": true,
+      "annualAccounting": true,
+      "saveContinuation": true
+    },
+    "final": {
+      "month": 984,
+      "population": 64419,
+      "populationRatio": 1.0216967217014798,
+      "claimed": 109,
+      "claimedShare": 0.6055555555555555,
+      "livingStates": 8,
+      "createdStates": 0,
+      "largestLandShare": 0.24770642201834864,
+      "effectiveStates": 6.8164084911072855,
+      "food": 0.9593165948538437,
+      "unemployment": 0.0004168435587822428,
+      "realOutputPerPersonMonth": 0.0011165585340406014,
+      "monthlyTrade": 1241.8203715054924,
+      "fundedFarmProjects": 0,
+      "meanAgricultureTechnology": 1,
+      "meanTechnology": 3.25,
+      "treasury": 1411.439922072025,
+      "publicDebt": 0,
+      "stateFinances": [
+        {
+          "id": 0,
+          "treasury": 158.64871501166434,
+          "debt": 0,
+          "revenue": 0.09633065123057725,
+          "spending": 0.24567332465388247,
+          "investment": 0.00037799237754034324,
+          "dividends": 0.0015040111665489003,
+          "budget": {
+            "welfare": 0.20017065604479578,
+            "education": 0.006997936862302686,
+            "military": 0.14403110495711008,
+            "research": 0.00960998574919547,
+            "administration": 0.003352839193502643,
+            "infrastructure": 0.010643034531102725
+          },
+          "appropriation": 1.6988751332520822,
+          "programRevenue": 0.10162456666399526,
+          "unemployment": 1.1102230246251565e-16,
+          "valueAdded": -2.103936999985249
+        },
+        {
+          "id": 1,
+          "treasury": 289.7894686319115,
+          "debt": 0,
+          "revenue": 1.7896352431075844,
+          "spending": 0.8938312655347614,
+          "investment": 0,
+          "dividends": 0.08990824300706973,
+          "budget": {
+            "welfare": 0.5940065970198648,
+            "education": 0.04696751701163868,
+            "military": 0.3066289649943743,
+            "research": 0.05878207240566256,
+            "administration": 0.015365134439422692,
+            "infrastructure": 0.0555221979247206
+          },
+          "appropriation": 4.494971778053354,
+          "programRevenue": 1.4987234075120615,
+          "unemployment": 0,
+          "valueAdded": -3.0087092758304474
+        },
+        {
+          "id": 2,
+          "treasury": 145.5321928486476,
+          "debt": 0,
+          "revenue": 0.007908496576573805,
+          "spending": 0.16232759683361167,
+          "investment": 0,
+          "dividends": 0.0008354095749653524,
+          "budget": {
+            "welfare": 0.1189072165157884,
+            "education": 0.0024732037080878936,
+            "military": 0.1294215737270274,
+            "research": 0.003248106774425568,
+            "administration": 0.0008909670544492206,
+            "infrastructure": 0.0033129678163522146
+          },
+          "appropriation": 1.470763079898281,
+          "programRevenue": 0.012362224291718148,
+          "unemployment": 0,
+          "valueAdded": -0.05576586503255231
+        },
+        {
+          "id": 3,
+          "treasury": 166.18596772188184,
+          "debt": 0,
+          "revenue": 0.28915389768211314,
+          "spending": 0.27540505886952543,
+          "investment": 0,
+          "dividends": 0.0014896714145974685,
+          "budget": {
+            "welfare": 0.24035333144324347,
+            "education": 0.007867612943121462,
+            "military": 0.12290621599426894,
+            "research": 0.009911155078448912,
+            "administration": 0.0029776912065242116,
+            "infrastructure": 0.009283561605440466
+          },
+          "appropriation": 1.8849447817806757,
+          "programRevenue": 0.2115403719191433,
+          "unemployment": 0,
+          "valueAdded": 1.8501586909731487
+        },
+        {
+          "id": 4,
+          "treasury": 136.50092136100622,
+          "debt": 0,
+          "revenue": 0.6317793673777309,
+          "spending": 0.4814730115657336,
+          "investment": 0,
+          "dividends": 0.04898091849993741,
+          "budget": {
+            "welfare": 0.30106075959320155,
+            "education": 0.03172200520689487,
+            "military": 0.1706095612584696,
+            "research": 0.04100039385561762,
+            "administration": 0.011660517782179717,
+            "infrastructure": 0.03817955521906697
+          },
+          "appropriation": 2.0554217609362695,
+          "programRevenue": 0.6345445163751572,
+          "unemployment": 0,
+          "valueAdded": -5.729591646468562
+        },
+        {
+          "id": 5,
+          "treasury": 168.86434679421717,
+          "debt": 0,
+          "revenue": 0.2502761715276568,
+          "spending": 0.35077287795656076,
+          "investment": 0,
+          "dividends": 0.00840758325580296,
+          "budget": {
+            "welfare": 0.17377319717745032,
+            "education": 0.0363317115633201,
+            "military": 0.2665337820262658,
+            "research": 0.046968493334398904,
+            "administration": 0.013264098750251165,
+            "infrastructure": 0.04392454250109601
+          },
+          "appropriation": 1.9970909652432072,
+          "programRevenue": 0.2795148715367161,
+          "unemployment": 0.0040778117287649795,
+          "valueAdded": 0.20015388387144073
+        },
+        {
+          "id": 6,
+          "treasury": 150.75105046661545,
+          "debt": 0,
+          "revenue": 0.05893826756451487,
+          "spending": 0.22884923267977503,
+          "investment": 0,
+          "dividends": 0.002174564762088196,
+          "budget": {
+            "welfare": 0.12381599394796082,
+            "education": 0.014652628082054099,
+            "military": 0.14337821936774964,
+            "research": 0.019082295957757796,
+            "administration": 0.00545449781977205,
+            "infrastructure": 0.018396260524564095
+          },
+          "appropriation": 1.5828423190268677,
+          "programRevenue": 0.06686376629763491,
+          "unemployment": 0,
+          "valueAdded": -1.0793814097146754
+        },
+        {
+          "id": 7,
+          "treasury": 195.16725923608087,
+          "debt": 0,
+          "revenue": 0.06598947675337266,
+          "spending": 0.2519750676254197,
+          "investment": 0,
+          "dividends": 0.0049063552213146995,
+          "budget": {
+            "welfare": 0.16329350338673296,
+            "education": 0.010940620383320235,
+            "military": 0.22817644577820087,
+            "research": 0.01364184934058127,
+            "administration": 0.0037825780153828343,
+            "infrastructure": 0.012424795728183382
+          },
+          "appropriation": 2.084713599874979,
+          "programRevenue": 0.11600086408248228,
+          "unemployment": 0,
+          "valueAdded": -4.63053746589182
+        }
+      ],
+      "fiscalBalance": 0.29970413610085406,
+      "occupations": 0,
+      "activePrograms": 8,
+      "wars": 1,
+      "meanStability": 71.04962937066522,
+      "meanPeerPressure": 0.15156073324923233
+    }
+  }
+}

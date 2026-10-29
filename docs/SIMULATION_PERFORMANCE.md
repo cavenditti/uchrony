@@ -1,5 +1,13 @@
 # Simulation performance
 
+## Regular monthly playback — 28 October 2026
+
+Max is temporarily disabled while correctness and regular monthly throughput take priority. The app offers Play and 2×, both calling the same monthly engine; the worker cannot dispatch coarse integration. Legacy `max` playback requests fall back to regular 1×. Space toggles playback and keys 1–2 select the pace. Existing saves retain their approximation provenance and display **Approx. history** when applicable; their next step uses the monthly model, including reconciliation of an inherited partial interval.
+
+The coarse engine remains available to development benchmarks and compatibility tests, but its old timings below are historical. Retained commuter history now preserves route identifiers only: every matching round discovers current vacancies and computes routes against current access, including damage and ownership. An empty history cannot freeze recruitment, and an old route cannot bypass a newly inaccessible province. These corrections intentionally change experimental coarse outcomes; regular monthly matching retains its search and settlement order.
+
+Validation: all three new commute regressions fail before the fix and pass afterward. The frozen change passes 22 focused tests, a production build, and a complete-state comparison after each of three regular Regional months. Desktop and phone checks confirm the two playback controls, an inactive old Max shortcut, and a legacy Max worker request advancing exactly one monthly step while preserving approximation history. After concurrent changes settled, the shared checkout also passed the production build and all 22 focused tests. See [the correctness record](validation/monthly-correctness-2026-10-28.json); no speedup or long-horizon calibration is claimed.
+
 The monthly rules, settlement order, population accounting and random streams remain deterministic. The performance work targets repeated searches, temporary objects and derived spatial data. It does not skip economic months, reduce the physical building detail, or change the spatial influence tolerance.
 
 ## Changes

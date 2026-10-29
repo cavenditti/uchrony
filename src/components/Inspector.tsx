@@ -1,6 +1,8 @@
+import { supplierDebt } from '../sim/supplier-credit'
 import { DistrictEconomies } from './DistrictEconomies'
 import { spatialState } from '../sim/spatial'
 import { MacroAccounts } from './EconomicAccounts'
+import { PeaceNegotiation } from './PeaceNegotiation'
 import { StateAdvisor } from './StateAdvisor'
 import { StateSecurity } from './StateSecurity'
 import { IntelligenceOffice } from './IntelligenceOffice'
@@ -514,7 +516,7 @@ export function Inspector({
               <Metric icon={Coins} label="Treasury" value={money(n.treasury)} />
             </div>
             <div className="data-row">
-              <span>Tax revenue / month</span>
+              <span>Public revenue / month</span>
               <b className="positive">+{money(n.income)}</b>
             </div>
             <div className="data-row">
@@ -525,7 +527,38 @@ export function Inspector({
               <span>Public debt</span>
               <b className={n.debt > 0 ? 'negative' : ''}>{money(n.debt)}</b>
             </div>
+            <div className="data-row">
+              <span>Included: compensation owed to suppliers</span>
+              <b>{money(supplierDebt(w, n.id))}</b>
+            </div>
             <MacroAccounts world={w} nation={n.id} />
+            {n.development && (
+              <section aria-label="Economic development program">
+                <h3>Five-year {n.development.focus} program</h3>
+                <p className="panel-note">
+                  Review in {Math.max(0, n.development.review - w.month)} months. Target: 10% more real output
+                  per person.
+                </p>
+                <div className="data-row">
+                  <span>Output per person since adoption</span>
+                  <b>
+                    {n.development.baselineOutput > 0
+                      ? `${((n.development.currentOutput / n.development.baselineOutput - 1) * 100).toFixed(1)}%`
+                      : 'Establishing baseline'}
+                  </b>
+                </div>
+                <div className="data-row">
+                  <span>Borrowed during this program</span>
+                  <b>{n.development.borrowed.toLocaleString(undefined, { maximumFractionDigits: 2 })}k</b>
+                </div>
+                <p className="panel-note">
+                  Projects pay local workers and buy materials. Unsold material surplus can also be used
+                  against compensation owed to its owners, repaid from future revenue. Strategic producers
+                  target at least six months of raw-material stocks and can earn up to 25% relief on profit
+                  tax. Growth remains an objective, not a guarantee.
+                </p>
+              </section>
+            )}
             <SectionTitle aside={<span className="subtle">tonnes / month</span>}>Goods ledger</SectionTitle>
             <table className="goods-table">
               <thead>
@@ -833,6 +866,15 @@ export function Inspector({
                     <span>War exhaustion</span>
                     <b>{Math.round(targetRel.warExhaustion)}</b>
                   </div>
+                )}
+                {targetRel.treaty === 'war' && (
+                  <PeaceNegotiation
+                    key={`${n.id}:${target.id}`}
+                    world={w}
+                    nation={n.id}
+                    target={target.id}
+                    command={command}
+                  />
                 )}
                 <button
                   className="button full"
@@ -1183,8 +1225,10 @@ function Province({
       <div className="development-list">
         {(
           [
-            { id: 'farm', label: 'Improve farmland', cost: '450k', icon: Wheat },
-            { id: 'industry', label: 'Expand industry', cost: '900k', icon: Factory },
+            { id: 'farm', label: 'Improve farmland', cost: 'Local cost', icon: Wheat },
+            { id: 'industry', label: 'Fund tool workshops', cost: 'Local cost', icon: Factory },
+            { id: 'textile-works', label: 'Fund textile workshops', cost: 'Local cost', icon: Factory },
+            { id: 'food-works', label: 'Fund farm equipment', cost: 'Local cost', icon: Wheat },
             { id: 'road', label: 'Improve gravel roads', cost: '600k', icon: Route },
             { id: 'paved-road', label: 'Pave roads · logistics 2', cost: '1,600k', icon: Route },
             { id: 'railway', label: 'Build railway · logistics 3', cost: '3,200k', icon: TrainFront },
@@ -1205,9 +1249,13 @@ function Province({
         ))}
       </div>
       <p className="panel-note">
-        Farms, industry, gravel roads and schools use 50 t timber and 70 t stone. Paved roads use 40 t timber,
-        160 t stone and 10 t tools; railways use 100 t timber, 100 t stone, 80 t iron and 30 t tools; docks
-        use 100 t timber, 120 t stone, 20 t iron and 10 t tools. Materials come from the provincial depot.
+        Farmland works buy local timber, stone and available construction labor, scale to available funds, and
+        finish in six months. Productive enterprises buy timber, stone, tools and construction labor; the
+        state receives an equity share and future dividends. Surplus materials may be supplied on credit;
+        taxes and wages remain payable in crowns. Gravel roads and schools use 50 t timber and 70 t stone.
+        Paved roads use 40 t timber, 160 t stone and 10 t tools; railways use 100 t timber, 100 t stone, 80 t
+        iron and 30 t tools; docks use 100 t timber, 120 t stone, 20 t iron and 10 t tools. Materials come
+        from the provincial depot.
       </p>
       <details className="sandbox-tools">
         <summary>

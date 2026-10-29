@@ -4,7 +4,7 @@ import type { LlmPolicySnapshot } from '../src/sim/llm-policy'
 /** One dispatch barrier for every role and retry in this application server. */
 export class LlmPolicy {
   private readonly instance = randomUUID()
-  private enabled = false
+  private enabled = true
   private generation = 0
   private dispatched = 0
   private cancelled = 0

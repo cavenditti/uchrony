@@ -1,3 +1,4 @@
+import { supplierDebt, supplierCreditRoom } from './supplier-credit'
 import { recordWorldEvent } from './event-memory'
 import { linkDistrictPeople, aggregateDistricts } from './districts'
 import { publicTransfer, transferDebt } from './ledger'
@@ -104,7 +105,6 @@ function log(world: World, title: string, detail: string, nation: number, visibi
     detail,
     nation,
   })
-
 }
 function sanction(world: World, nation: number, message: string, severity = 1) {
   const state = ensureStatecraft(world),
@@ -237,6 +237,10 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
     )
       throw new Error('Embarkation requires an army and fleet under your command.')
     command = { type: 'embark', army: order.target, fleet: order.value }
+  } else if (order.kind === 'annex') {
+    if (world.regions[order.target]?.control?.nation !== nation)
+      throw new Error('Annexation requires your own military control.')
+    command = { type: 'annex', nation, region: order.target }
   } else if (order.kind === 'army') {
     if (!world.armies.some((a) => a.id === order.target && a.nation === nation))
       throw new Error('Standing orders require an owned army.')
@@ -244,7 +248,7 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
       type: 'army-orders',
       army: order.target,
       stance: order.key as 'march' | 'hold' | 'entrench',
-      conduct: order.text as 'restrained' | 'requisition',
+      conduct: order.text as 'restrained' | 'requisition' | 'pillage',
     }
   } else if (order.kind === 'identity') {
     if (!['culture', 'language', 'belief'].includes(order.key))
@@ -291,7 +295,19 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
       throw new Error('An agent may only recruit or invest in its own provinces.')
     if (order.kind === 'recruit') command = { type: 'recruit', nation, region: order.target }
     else {
-      if (!['farm', 'industry', 'road', 'school', 'paved-road', 'railway', 'port'].includes(order.text))
+      if (
+        ![
+          'farm',
+          'food-works',
+          'textile-works',
+          'industry',
+          'road',
+          'school',
+          'paved-road',
+          'railway',
+          'port',
+        ].includes(order.text)
+      )
         throw new Error('Unknown improvement.')
       command = {
         type: 'build',
@@ -582,14 +598,18 @@ export function settleConventionalOffers(world: World) {
     'devolution',
     'institution',
   ])
+  const conventional = (offer: DiplomaticOffer) =>
+    offer.terms.length > 0 &&
+    offer.terms.every(
+      (term) =>
+        routine.has(term.kind) || (term.kind === 'cede' && offer.terms.some((t) => t.kind === 'peace')),
+    )
   for (const offer of readyOffers(world)) {
-    if (!offer.terms.length || offer.terms.some((term) => !routine.has(term.kind)))
+    if (!conventional(offer))
       offer.nativeReview =
         'Pending interpretation: these terms are outside native agreement rules. LLM assistance is optional; no agreement is assumed.'
   }
-  const offers = readyOffers(world)
-    .filter((offer) => offer.terms.length && offer.terms.every((term) => routine.has(term.kind)))
-    .slice(0, 6)
+  const offers = readyOffers(world).filter(conventional).slice(0, 6)
   if (!offers.length) return
   acceptRefereeDecision(
     world,
@@ -626,6 +646,7 @@ function transferProvince(world: World, id: number, from: number, to: number) {
   if (!province || province.nation !== from)
     throw new Error('The territorial situation changed during negotiations.')
   province.nation = to
+  delete province.control
   delete province.occupation
   province.unrest = clamp(province.unrest + 8, 0, 100)
 }
@@ -749,6 +770,9 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
         rel.treaty = 'truce'
         rel.warExhaustion = 0
         for (const army of world.armies) if ([from, to].includes(army.nation)) army.target = null
+        for (const r of world.regions)
+          if (r.control && [from, to].includes(r.nation) && [from, to].includes(r.control.nation))
+            delete r.control
       } else if (offer.visibility === 'public') rel.treaty = term.kind as 'trade' | 'alliance'
       rel.since = world.month
     }
@@ -756,7 +780,11 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
     term.from = from
     term.to = to
   }
-  if (terms.some((term) => ['cede', 'create', 'merge', 'institution', 'devolution'].includes(term.kind)))
+  if (
+    terms.some((term) =>
+      ['peace', 'cede', 'create', 'merge', 'institution', 'devolution'].includes(term.kind),
+    )
+  )
     normalizeStates(world)
 }
 
@@ -813,7 +841,7 @@ export function acceptRefereeDecision(
             'The negotiated source terms cannot support this replacement. Seek updated terms from the participating governments.',
           )
         const territorial = resolved.some((term) =>
-          ['cede', 'create', 'merge', 'institution', 'devolution'].includes(term.kind),
+          ['peace', 'cede', 'create', 'merge', 'institution', 'devolution'].includes(term.kind),
         )
         const trial: World = {
           ...world,
@@ -836,6 +864,9 @@ export function acceptRefereeDecision(
             ? {
                 ...world.economy,
                 credit: structuredClone(world.economy.credit),
+                ...(world.economy.supplierCredit
+                  ? { supplierCredit: structuredClone(world.economy.supplierCredit) }
+                  : {}),
                 ledger: structuredClone(world.economy.ledger),
                 banking: structuredClone(world.economy.banking),
                 ...(world.economy.accounts
@@ -1099,6 +1130,10 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
     institutions: visibleInstitutions(world, nation),
     strategicLandscape: strategicPressures(world, n),
     government,
+    supplierCompensation: {
+      owed: supplierDebt(world, nation),
+      availableCredit: supplierCreditRoom(world, nation),
+    },
     character: characterContext(n),
     agent: {
       strategy: agent.strategy,
@@ -1125,10 +1160,20 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
         unrest: region.unrest,
         infrastructure: region.infrastructure,
         publicWorks: region.publicWorks,
+        militaryControl: region.control,
         delegation: region.delegation,
         industry: region.industry,
         stocks: region.stocks,
         port: !!portAt(world, region.id),
+      })),
+    occupiedEnemyProvinces: world.regions
+      .filter((r) => r.control?.nation === nation)
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        legalOwner: r.nation,
+        controlledSince: r.control!.since,
+        spoils: r.control!.spoils,
       })),
     // Leaders receive operational forces and the summarized census, not every troop community.
     armies: world.armies

@@ -3,7 +3,7 @@ import 'katex/dist/katex.min.css'
 import guide from '../../docs/MATHEMATICS.md?raw'
 import { modelSections, renderFormula } from './model-formulas'
 import reference from '../../docs/MODEL.md?raw'
-import { MODEL_PARAMETERS } from '../sim/model-parameters'
+import { DEFAULT_MODEL_PARAMETERS, type ModelParameters } from '../sim/model-parameters'
 
 const sections = modelSections(guide)
 const fullReference = modelSections(reference)
@@ -110,7 +110,11 @@ function ModelText({ text }: { text: string }) {
     )
   })
 }
-export default function ModelMathematics() {
+export default function ModelMathematics({
+  parameters = DEFAULT_MODEL_PARAMETERS,
+}: {
+  parameters?: ModelParameters
+}) {
   const [query, setQuery] = useState('')
   const [full, setFull] = useState(false)
   const search = query.trim().toLowerCase(),
@@ -120,7 +124,7 @@ export default function ModelMathematics() {
   return (
     <section className="model-mathematics" aria-label="Simulation mathematics">
       <p className="model-notation">
-        Model {MODEL_PARAMETERS.version} · Monthly steps. People, tonnes and thousands of crowns unless stated
+        Model {parameters.version} · Monthly steps. People, tonnes and thousands of crowns unless stated
         otherwise. Rates are fractions; logs are natural. Symbols are defined locally.
       </p>
       <label className="model-reference-select">
@@ -155,7 +159,7 @@ export default function ModelMathematics() {
       <details className="model-core-parameters">
         <summary>Current core parameters</summary>
         <dl className="model-parameters">
-          {Object.entries(MODEL_PARAMETERS).map(([key, value]) => (
+          {Object.entries(parameters).map(([key, value]) => (
             <div key={key}>
               <dt>{key.replace(/([A-Z])/g, ' $1').toLowerCase()}</dt>
               <dd>{Array.isArray(value) ? value.join(', ') : value}</dd>

@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-29",
+  "scope": "Parameter explanations and opening-treasury clarification",
+  "registry": {
+    "fieldsWithRequiredExplanations": 338,
+    "coverage": "Advanced creation and live tuning, every biome-matrix cell, plus basic world setup and simulation conditions",
+    "interactions": ["Pointer hover", "Keyboard focus", "Click or tap", "Escape dismisses help without closing the dialog"]
+  },
+  "treasuryInvestigation": {
+    "savedWorld": "049b491c-f8df-4f18-9700-fb288dabcc39",
+    "preservedEvidence": [
+      ".uchrony/validation/treasury/reported-current.json",
+      ".uchrony/validation/treasury/reported-previous.json"
+    ],
+    "observed": "The previous month-50 save set founding.cash to 120000 while starting.treasury remained 500; state balances were approximately 423–459. The current month-0 save set founding.cash to 999906 while starting.treasury still remained 500.",
+    "cause": "The old Cash label under Founding expeditions described an expense, but was easily mistaken for an opening endowment.",
+    "correction": "Starting conditions appear first; frontier and established initial treasuries have explicit labels and thousand-crown units. Setup previews the active opening balance in crowns. Founding cash is labeled Expedition cash cost, with explanatory help.",
+    "reproduction": {
+      "script": ".uchrony/validation/treasury/reproduce.ts",
+      "log": ".uchrony/validation/treasury/reproduce.log",
+      "scenario": "Regional, four frontier states, seed treasury-investigation, starting.treasury 1000000",
+      "openingBalances": [1000000, 1000000, 1000000, 1000000],
+      "balancesAfter12Months": [963342.3072363533, 973566.3075678314, 984374.4392542891, 978291.5665889705],
+      "unit": "thousand crowns"
+    },
+    "savedWorldModified": false
+  },
+  "checks": [
+    { "command": "node --import tsx --test tests/configuration.test.ts", "result": "12 passed; covers exhaustive help metadata, expedition cost versus opening cash, large treasuries through simulation steps and save restoration" },
+    { "command": "npm run build", "result": "passed; existing bundle-size advisory remains" },
+    { "command": "git diff --check", "result": "passed" }
+  ],
+  "browser": {
+    "fixture": "Isolated static preview on port 5181; Regional world, four frontier states, starting.treasury 1000000",
+    "verified": [
+      "All three help interactions display explanations",
+      "Escape closes help and leaves the setup dialog open",
+      "Treasury summary shows 1000000000 crowns and the generated state economy panel shows Treasury 1B",
+      "Mobile matrix tooltip stays within the 390px viewport and the document has no horizontal overflow",
+      "Live expedition-cost help opens on hover and click, with the batch Apply changes together action retained"
+    ],
+    "viewports": [[1440, 1000], [390, 844]],
+    "captures": [
+      ".impeccable/review/parameter-help/desktop.png",
+      ".impeccable/review/parameter-help/mobile.png",
+      ".impeccable/review/parameter-help/desktop-treasury.png",
+      ".impeccable/review/parameter-help/mobile-treasury.png",
+      ".impeccable/review/parameter-help/desktop-matrix.png",
+      ".impeccable/review/parameter-help/mobile-matrix.png",
+      ".impeccable/review/parameter-help/desktop-live.png",
+      ".impeccable/review/parameter-help/mobile-live.png"
+    ],
+    "accessibility": "Dialog-scoped axe audit: zero violations, one incomplete contrast check for scrolled or obscured content. Captured controls inspected visually.",
+    "limitations": "Static preview has no disk-save API; background Save issue is expected. Treasury and matrix screenshots intentionally show scrolled sections."
+  },
+  "independentReview": {
+    "disposition": "ship",
+    "materialFixes": [],
+    "scope": "Six setup, treasury and matrix captures plus sampled source; live screenshots were captured afterward. No separate quality-bar certification. Not every explanation was independently audited against simulation internals."
+  },
+  "boundaries": [
+    "No treasury cap or economic spending rule changed in this correction",
+    "Shared checkout contains concurrent unrelated edits; evidence describes the tested working tree, not a committed revision",
+    "The twelve-month reproduction is not long-run economic calibration"
+  ]
+}

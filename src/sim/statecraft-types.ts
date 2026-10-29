@@ -79,6 +79,7 @@ export interface DomesticOrder {
     | 'naval'
     | 'embark'
     | 'army'
+    | 'annex'
   target: number
   key: string
   value: number

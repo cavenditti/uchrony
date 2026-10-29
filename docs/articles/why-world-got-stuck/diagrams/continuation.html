@@ -1,0 +1,30 @@
+<figure class="figure" id="fig-continuation" aria-labelledby="continuation-title">
+  <p class="figure-kicker">Figure 11 · checking the same future</p>
+  <h3 id="continuation-title">Does saving change what happens next?</h3>
+  <div class="save-fork">
+    <div class="node">One world state</div>
+    <div class="cols">
+      <div class="lane">
+        <div class="arrow" aria-hidden="true">↙</div>
+        <h4>Original path</h4>
+        <div class="node">Keep the world<br />in memory</div>
+        <div class="arrow" aria-hidden="true">↓</div>
+        <div class="node">Advance the<br />simulation</div>
+      </div>
+      <div class="lane">
+        <div class="arrow" aria-hidden="true">↘</div>
+        <h4>Restored path</h4>
+        <div class="node">Compress, save<br />and restore</div>
+        <div class="arrow" aria-hidden="true">↓</div>
+        <div class="node">Advance by the<br />same amount</div>
+      </div>
+    </div>
+    <div class="equal" aria-hidden="true">= ?</div>
+    <p class="result">The resulting world states must match exactly.</p>
+  </div>
+  <figcaption>
+    Completed experiments also check population accounting every interval, and money, goods, banks and world
+    validity annually. This checks internal consistency;
+    <strong>it does not prove historical realism.</strong>
+  </figcaption>
+</figure>

@@ -2,7 +2,7 @@ import type { BirthCohort } from './population-types'
 import type { World } from './types'
 
 const PREFIX = 'cohorts-v1:'
-const MAX_BINS = 2641
+import { MAX_CENSUS_BINS as MAX_BINS } from './simulation-invariants'
 
 /** Lossless delta/varint wire representation. The simulation still uses exact dated tuples. */
 export function encodeCohorts(bins: BirthCohort[]): string {

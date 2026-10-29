@@ -1,22 +1,11 @@
+import { parameterGroup } from './configuration-context'
 import { governance } from './governance'
 import type { World, Good } from './types'
 import { publicExpense } from './ledger'
 import { marketStore, recordUse } from './national-accounts'
 import { transportNetwork } from './transport'
 
-export const TRANSPORT_PROJECTS = {
-  'paved-road': {
-    label: 'Paved roads',
-    cost: 1600,
-    timber: 40,
-    stone: 160,
-    iron: 0,
-    tools: 10,
-    technology: 2,
-  },
-  railway: { label: 'Railway', cost: 3200, timber: 100, stone: 100, iron: 80, tools: 30, technology: 3 },
-  port: { label: 'Harbor docks', cost: 1200, timber: 100, stone: 120, iron: 20, tools: 10, technology: 1 },
-} as const
+export const TRANSPORT_PROJECTS = parameterGroup('transportProjects')
 export type TransportProject = keyof typeof TRANSPORT_PROJECTS
 export function buildTransport(w: World, region: number, kind: TransportProject) {
   const r = w.regions[region],

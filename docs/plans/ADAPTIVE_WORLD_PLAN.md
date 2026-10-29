@@ -2,6 +2,8 @@
 
 Status: phases 0–7 are implemented in the working tree. Qualification is complete; the save-timing and inherited behavioral failures remain explicitly reported. Prepared 25 October 2026 against commit `07fe925`; implementation reviewed on 26 October 2026. The US historical-model diagnosis is deferred in [the backlog](../BACKLOG.md#historical-macroeconomic-mechanics).
 
+Update — 28 October 2026: LLM assistance now starts on by default at the user's request, superseding the original default-off requirement below. The World menu can disable it, and `UCHRONY_LLM_OFF=1` continues to force it off for native-only runs.
+
 ## Implementation record — 26 October 2026
 
 The implementation uses exact retained market/household/firm records as its initial closure. Numerical refinement does not repartition financial accounts. Administrative proposals operate over the original terrain polygons, independently of much finer meter-coordinate leaves. Legal and historical region references remain permanent geographical handles. Representative residents are read-only reconstructions; persistent causal individuals remain phase 8.

@@ -1,10 +1,12 @@
+import { configurationValues } from './configuration-context'
 import { MOUNTAIN_ELEVATION } from './terrain-access'
 import { fractal, hashSeed, random, noise } from './random'
 import { clamp, type Cell, type Terrain } from './types'
 import { CELL_SIZE, neighbors } from './grid'
 import { erodeDrainage } from './hydrology'
 
-export const SEA_LEVEL = 0.095
+import { SEA_LEVEL } from './simulation-invariants'
+export { SEA_LEVEL } from './simulation-invariants'
 const layouts: Record<number, number[][]> = {
   1: [[0.5, 0.5, 0.38, 0.4]],
   2: [
@@ -33,6 +35,7 @@ const layouts: Record<number, number[][]> = {
 
 /** Climate and relief are synthetic geographic models, not a plate-tectonic solver. */
 export function generateGeography(seed: string, continents: number, width: number, height: number): Cell[] {
+  const geography = configurationValues().geography
   const rng = { rng: hashSeed(`${seed}:geography:2`) },
     noiseSeed = rng.rng
   const rand = () => random(rng)
@@ -85,15 +88,16 @@ export function generateGeography(seed: string, continents: number, width: numbe
       const ridge =
         Math.exp((-ridgeDistance * ridgeDistance) / 0.025) * Math.max(0, 1 - Math.abs(nearest.v) * 0.7)
       const ruggedness = fractal(x * 18, y * 18, noiseSeed + 20)
-      let elevation = SEA_LEVEL + coastHeight
+      let elevation = SEA_LEVEL + coastHeight - geography.seaLevelOffset
       if (coastHeight > 0) {
         // Broken ranges, upland blocks and low passes rather than one uniform spine.
         const rangeStrength = 0.35 + noise(x * 8, y * 8, noiseSeed + 211) * 1.3
         const pass = Math.exp(-(((nearest.v - Math.sin(nearest.m.phase) * 0.45) / 0.13) ** 2))
         const plateau = Math.max(0, noise(x * 9, y * 9, noiseSeed + 307) - 0.62) * 0.7
         elevation +=
-          (ridge * 0.42 * rangeStrength * (1 - pass * 0.8) + plateau) * clamp(coastHeight / 0.07) +
-          ruggedness * 0.06
+          ((ridge * 0.42 * rangeStrength * (1 - pass * 0.8) + plateau) * clamp(coastHeight / 0.07) +
+            ruggedness * 0.06) *
+          geography.relief
       }
       // Ocean frame: even a warped peninsula cannot be clipped by the world rectangle.
       const edge = Math.min(x, y, 1 - x, 1 - y)
@@ -103,11 +107,13 @@ export function generateGeography(seed: string, continents: number, width: numbe
       const subtropicalDryness = Math.exp(-(((latitude - 0.42) / 0.18) ** 2))
       const moisture = clamp(
         0.6 +
+          geography.moistureOffset +
           (fractal(x * 7, y * 7, noiseSeed + 98) - 0.5) * 0.7 -
           subtropicalDryness * 0.24 -
           Math.max(0, nearest.u - 0.2) * ridge * 0.2,
       )
-      const temperature = 1 - latitude * 0.85 - Math.max(0, elevation - SEA_LEVEL) * 0.8
+      const temperature =
+        1 + geography.temperatureOffset - latitude * 0.85 - Math.max(0, elevation - SEA_LEVEL) * 0.8
       const terrain: Terrain =
         elevation < SEA_LEVEL
           ? 'water'
@@ -149,7 +155,8 @@ export function generateGeography(seed: string, continents: number, width: numbe
   for (const c of cells) {
     if (c.terrain === 'water') continue
     const latitude = Math.abs(c.r / (height - 1) - 0.5) * 2
-    const temperature = 1 - latitude * 0.85 - Math.max(0, c.elevation - SEA_LEVEL) * 0.8
+    const temperature =
+      1 + geography.temperatureOffset - latitude * 0.85 - Math.max(0, c.elevation - SEA_LEVEL) * 0.8
     c.terrain =
       c.elevation > MOUNTAIN_ELEVATION
         ? 'mountains'

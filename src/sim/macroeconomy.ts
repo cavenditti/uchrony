@@ -1,11 +1,14 @@
+import { parameterGroup } from './configuration-context'
+import { repaySuppliers } from './supplier-credit'
 import { decisionPolicy } from './decision-policy'
+import { activeDevelopment } from './development'
 import { competitivePressure } from './competitive-pressure'
 import { expansionParameters } from './expansion-parameters'
 import { withBorrowerLoanIndex } from './banking'
 import { simulationMonths, periodFlow, periodRate } from './simulation-period'
 import { governance } from './governance'
 import { archiveRetiredDistricts } from './districts'
-import { economicRegions, economicRegion } from './local-units'
+import { economicRegions, economicRegion, provinceId } from './local-units'
 import {
   GOODS,
   inventory,
@@ -47,35 +50,12 @@ import {
 } from './ledger'
 import { BASE_PRICE, householdNeed, foodEquivalentPeople } from './economy'
 import { beginGoodsMonth, auditGoods } from './goods-accounting'
-const skill: Record<EconomicStratum, number> = {
-  smallholder: 0.9,
-  laborer: 1,
-  artisan: 1.25,
-  professional: 1.7,
-  owner: 0.8,
-}
-const budgetShares: Inventory = {
-  food: 0.5,
-  timber: 0.08,
-  stone: 0.02,
-  iron: 0.01,
-  coal: 0.08,
-  tools: 0.1,
-  textiles: 0.2,
-  arms: 0.01,
-}
-const materialWeights: Inventory = {
-  food: 0,
-  timber: 0.15,
-  stone: 0.1,
-  iron: 0.05,
-  coal: 0.1,
-  tools: 0.35,
-  textiles: 0.25,
-  arms: 0,
-}
+const skill: Record<EconomicStratum, number> = parameterGroup('wageSkills')
+const budgetShares: Inventory = parameterGroup('consumptionBudget')
+const materialWeights: Inventory = parameterGroup('materialCoverage')
 /** Collection capacity changes actual withholding, never creates revenue without a payer. */
 export function collectedTaxRate(w: World, r: Region) {
+  if (w.regions[provinceId(r)].control) return 0
   const n = governance(w, r.nation)
   const collection = clamp(
     (0.6 + n.technologies.governance * 0.045) *
@@ -109,6 +89,8 @@ export function beginEconomyMonth(w: World) {
   for (const n of w.nations) {
     n.income = 0
     n.spending = 0
+    n.capitalSpending = 0
+    n.enterpriseIncome = 0
   }
   for (const r of economicRegions(w)) {
     const f = e.producers[r.id]
@@ -168,8 +150,14 @@ export function householdDemand(prices: Inventory, subsistence: Inventory, budge
     minimum = GOODS.reduce((sum, g) => sum + (prices[g] / 1000) * subsistence[g], 0)
   if (budget >= minimum) {
     const extra = budget - minimum
+    // Editable weights are relative preferences, not independent budget claims.
+    // A food-only preference leaves satiation savings unspent rather than
+    // dividing by an empty non-food basket.
+    const totalWeight = GOODS.reduce((sum, g) => sum + budgetShares[g], 0)
+    const nonFoodWeight = GOODS.reduce((sum, g) => sum + (g === 'food' ? 0 : budgetShares[g]), 0)
     for (const g of GOODS)
-      result[g] = subsistence[g] + (budgetShares[g] * extra) / Math.max(1e-9, prices[g] / 1000)
+      result[g] =
+        subsistence[g] + ((budgetShares[g] / totalWeight) * extra) / Math.max(1e-9, prices[g] / 1000)
     const satiation = decisionPolicy().foodSatiation
     if (satiation !== undefined) {
       const limit = subsistence.food * satiation
@@ -178,9 +166,8 @@ export function householdDemand(prices: Inventory, subsistence: Inventory, budge
       // Diet quantity saturates. Additional purchasing power bids for other
       // goods, or remains saved when those goods cannot be supplied.
       for (const g of GOODS)
-        if (g !== 'food')
-          result[g] +=
-            (released * budgetShares[g]) / (1 - budgetShares.food) / Math.max(1e-9, prices[g] / 1000)
+        if (g !== 'food' && nonFoodWeight > 0)
+          result[g] += (released * budgetShares[g]) / nonFoodWeight / Math.max(1e-9, prices[g] / 1000)
     }
   } else {
     let left = Math.max(0, budget)
@@ -196,6 +183,7 @@ export function householdDemand(prices: Inventory, subsistence: Inventory, budge
 export function consumeHouseholds(w: World) {
   const e = ensureEconomy(w),
     payments = preparePayments(w)
+  const totalMaterialWeight = GOODS.reduce((sum, g) => sum + materialWeights[g], 0)
   for (const r of economicRegions(w)) {
     const f = e.producers[r.id],
       total = Math.max(1, population(r))
@@ -330,7 +318,7 @@ export function consumeHouseholds(w: World) {
           (sum, g) =>
             sum + (o.needs[g] > 0 ? Math.min(1, h.consumption[g] / o.needs[g]) : 1) * materialWeights[g],
           0,
-        ),
+        ) / totalMaterialWeight,
       )
       food += h.foodCoverage * o.people
       material += h.materialCoverage * o.people
@@ -351,16 +339,18 @@ export function consumeHouseholds(w: World) {
 export function fundGovernment(w: World) {
   const e = ensureEconomy(w)
   for (const n of w.nations) {
-    const own = economicRegions(w).filter((r) => r.nation === n.id),
+    const own = economicRegions(w).filter((r) => r.nation === n.id && !w.regions[provinceId(r)].control),
       people = own.reduce((sum, r) => sum + population(r), 0)
     if (!own.length) {
       for (const k of Object.keys(n.budget) as (keyof typeof n.budget)[]) n.budget[k] = 0
       continue
     }
-    const intended =
-      Math.max(n.income * 0.95, periodFlow(people * 0.00002)) +
-      Math.max(0, n.treasury - (n.income * 12) / simulationMonths()) * periodRate(0.02)
-    if (n.treasury < intended)
+    const plan = activeDevelopment(w, n)
+    const intended = plan
+      ? plan.appropriation
+      : Math.max(n.income * 0.95, periodFlow(people * 0.00002)) +
+        Math.max(0, n.treasury - (n.income * 12) / simulationMonths()) * periodRate(0.02)
+    if (!plan && n.treasury < intended)
       borrow(w, governmentAccount(n.id), intended - n.treasury, Math.max(1000, n.gdp * 24))
     const expansion = expansionParameters()
     const compete =
@@ -380,9 +370,9 @@ export function fundGovernment(w: World) {
         welfare: n.policies.welfare,
         education: n.policies.education + development * 12,
         military: n.policies.military,
-        research: n.policies.research + development * 16,
+        research: n.policies.research + development * 16 + (plan ? 12 : 0),
         administration: 12,
-        infrastructure: 18 + development * 24,
+        infrastructure: 18 + development * 24 + (plan ? 18 : 0),
       }
     const sum = Object.values(weights).reduce((a, b) => a + b, 0)
     for (const key of Object.keys(weights) as (keyof typeof weights)[])
@@ -567,6 +557,7 @@ export function recordTrade(
   if (economicRegion(w, to).nation >= 0) w.nations[economicRegion(w, to).nation].income += value * tariff
 }
 export function settleCredit(w: World) {
+  repaySuppliers(w)
   settleBanks(w)
 }
 export function finishEconomyMonth(w: World) {
@@ -623,6 +614,8 @@ export function finishEconomyMonth(w: World) {
     for (const n of w.nations) {
       n.income /= months
       n.spending /= months
+      if (n.capitalSpending !== undefined) n.capitalSpending /= months
+      if (n.enterpriseIncome !== undefined) n.enterpriseIncome /= months
       for (const key of Object.keys(n.budget) as (keyof typeof n.budget)[]) n.budget[key] /= months
     }
   }

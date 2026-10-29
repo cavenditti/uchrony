@@ -1,3 +1,4 @@
+import { parameterGroup } from './configuration-context'
 import { settlementElevation } from './settlement-terrain'
 export { settlementElevation } from './settlement-terrain'
 import { habitableLand } from './terrain-access'
@@ -22,7 +23,7 @@ export interface BuildingPlot {
   lanes: SettlementLane[]
 }
 /** Clear bank between a surveyed house and the rendered river, in meters. */
-const RIVER_SETBACK = 6
+const riverParameters = parameterGroup('riverRoads')
 const distance = (a: PointMeters, b: PointMeters) => Math.hypot(a.x - b.x, a.y - b.y)
 const random = (key: string) => hashSeed(key) / 4294967296
 const along = (p: PointMeters, angle: number, length: number) => ({
@@ -265,7 +266,7 @@ export function surveyBuildingPlots(
       inRiverChannel(
         w,
         building.map((p) => ({ x: p.x / scale, y: p.y / scale })),
-        RIVER_SETBACK / scale,
+        riverParameters.buildingSetback / scale,
       )
     )
       return

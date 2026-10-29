@@ -127,6 +127,7 @@ function geometry(w: World, parent: Region, d: SpatialDistrict, id: number): Dis
   }
   delete r.delegation
   delete r.occupation
+  delete r.control
   delete r.census
   // Cohorts have one serialized home: the province census with a district tag.
   Object.defineProperty(r, 'communities', {
@@ -187,6 +188,7 @@ function partitionAccount(w: World, from: string, recipients: string[], weights:
   }
   for (const owners of [
     ...e.banking!.banks.map((b) => b.owners),
+    ...Object.values(e.supplierCredit ?? {}),
     ...(e.firms ?? []).map((f) => f.owners).filter((x): x is Record<string, number> => !!x),
   ]) {
     const shares = owners[from]
@@ -700,6 +702,7 @@ function redistributeAccounts(
   const loanOpening = structuredClone(e.credit.loans)
   const owners = [
     ...e.banking!.banks.map((b) => b.owners),
+    ...Object.values(e.supplierCredit ?? {}),
     ...(e.firms ?? []).flatMap((f) => (f.owners ? [f.owners] : [])),
   ]
   const ownerOpening = owners.map((o) => ({ ...o }))
@@ -829,6 +832,7 @@ export function archiveRetiredDistricts(w: World) {
   const claimed = new Set(e.credit.loans.map((l) => l.borrower))
   for (const owners of [
     ...e.banking!.banks.map((b) => b.owners),
+    ...Object.values(e.supplierCredit ?? {}),
     ...(e.firms ?? []).flatMap((f) => (f.owners ? [f.owners] : [])),
   ])
     for (const [key, value] of Object.entries(owners)) if (value) claimed.add(key)

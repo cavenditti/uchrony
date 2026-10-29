@@ -396,7 +396,7 @@ export type CommuteCandidates = Map<
   Map<number, { route: NonNullable<ReturnType<typeof commuteRoute>>; id: string }>
 >
 
-/** Coarse months reconsider paid jobs along known journeys, without another spatial search. */
+/** Prior journeys preserve route identifiers only; vacancies and access must be searched afresh. */
 export function knownCommuteCandidates(w: World): CommuteCandidates | undefined {
   if (!w.adaptive?.commutingRows) return undefined
   const candidates: CommuteCandidates = new Map()
@@ -433,7 +433,7 @@ function matchCommuterOffers(w: World, known?: CommuteCandidates) {
   }
   const offers: Offer[] = []
   const bySite = new Map(firms.map((firm) => [`firm:${firm.id}`, firm]))
-  const search = known ? undefined : snapshotSiteSearch(w, (site) => bySite.has(site.id))
+  const search = snapshotSiteSearch(w, (site) => bySite.has(site.id))
   const size = w.economy.firms.length
   const incoming = new Float64Array(size),
     proposed = new Uint8Array(size)
@@ -453,11 +453,9 @@ function matchCommuterOffers(w: World, known?: CommuteCandidates) {
     const origin = cellPosition(w, r.center)
     const routes = new Map<number, Offer['routes'][number] | null>()
     const retained = known?.get(r.id)
-    const candidates = (
-      known
-        ? [...(retained?.keys() ?? [])].map((id) => bySite.get(`firm:${id}`)).filter((f) => f !== undefined)
-        : search!(origin, 6000).map((site) => bySite.get(site.id)!)
-    ).sort((a, b) => a.id - b.id)
+    const candidates = search(origin, 6000)
+      .map((site) => bySite.get(site.id)!)
+      .sort((a, b) => a.id - b.id)
     const available: typeof firms = [],
       weights: number[] = [],
       journeys: Offer['routes'] = []
@@ -474,10 +472,9 @@ function matchCommuterOffers(w: World, known?: CommuteCandidates) {
         continue
       if (!routes.has(cell)) {
         const previous = retained?.get(firm.id)
-        const route = known ? previous?.route : commuteRoute(w, r.center, cell)
-        // Changed residence/workplace geometry invalidates a retained journey.
-        const valid = route && (!known || (route.cells[0] === r.center && route.cells.at(-1) === cell))
-        routes.set(cell, valid ? { route, id: previous?.id ?? `${r.center}:${cell}` } : null)
+        const route = commuteRoute(w, r.center, cell)
+        const sameEndpoints = previous?.route.cells[0] === r.center && previous.route.cells.at(-1) === cell
+        routes.set(cell, route ? { route, id: sameEndpoints ? previous.id : `${r.center}:${cell}` } : null)
       }
       const journey = routes.get(cell)!
       if (!journey) continue

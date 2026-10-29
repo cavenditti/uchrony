@@ -1,4 +1,7 @@
 import { decisionPolicy, recruitmentCost } from './decision-policy'
+import { advancePeaceNegotiations } from './peace'
+import { annexProvince, annexationObstacle } from './military-control'
+import { nativeDomesticControl } from './domestic-policy'
 import { crossedPeriodMonth } from './simulation-period'
 import { competitivePressure } from './competitive-pressure'
 import { expansionParameters } from './expansion-parameters'
@@ -340,6 +343,7 @@ export function advanceGeopolitics(world: World) {
             drives.ambition * 0.35 +
             drives.dominance * 0.45 +
             drives.opportunism * 0.2 +
+            drives.opportunism * interests.economic * Math.min(0.2, Math.max(0, superiority - 1) * 0.1) +
             Math.max(0, -rel.opinion) / 160 +
             rel.grievance / 150 +
             (interests.economic * 0.35 + interests.cultural * 0.4) * (0.35 + drives.ambition * 0.65) +
@@ -651,7 +655,26 @@ export function advanceGeopolitics(world: World) {
 /** A diplomacy record is bookkeeping, not a switch that disables native peace
  * and commerce. Each autonomous signatory consents through the ordinary rules. */
 export function advanceNativeAccords(world: World) {
-  if (!world.statecraft) return
+  if (!world.statecraft && !world.relations.some((r) => r.treaty === 'war')) return
+  const statecraft = ensureStatecraft(world)
+  advancePeaceNegotiations(world)
+  for (const r of world.regions) {
+    const id = r.control?.nation
+    if (id === undefined || !nativeDomesticControl(world, world.nations[id])) continue
+    const n = world.nations[id]
+    for (const army of world.armies.filter((a) => a.nation === id && a.region === r.id)) {
+      if (!army.operations) continue
+      army.operations.stance = 'hold'
+      if ((n.character?.leader.politics?.drives.opportunism ?? 0) > 0.65) army.operations.conduct = 'pillage'
+    }
+    if (
+      (n.character?.leader.politics?.drives.ambition ?? 0) > 0.6 &&
+      n.stability > 40 &&
+      n.foodCoverage > 0.85 &&
+      !annexationObstacle(world, id, r.id)
+    )
+      annexProvince(world, id, r.id)
+  }
   const state = ensureGeopolitics(world)
   for (const rel of world.relations) {
     const a = world.nations[rel.a],
@@ -665,10 +688,9 @@ export function advanceNativeAccords(world: World) {
       !world.regions.some((r) => r.nation === b.id)
     )
       continue
-    const resolve = (a.character!.effective.assertiveness + b.character!.effective.assertiveness) / 2
-    let kind: 'peace' | 'trade' | 'alliance' | undefined
-    if (rel.treaty === 'war' && rel.warExhaustion > 30 + resolve * 20) kind = 'peace'
-    else if (crossedPeriodMonth(world.month, 0, 3)) {
+    let kind: 'trade' | 'alliance' | undefined
+    if (rel.treaty === 'war') continue
+    if (crossedPeriodMonth(world.month, 0, 3)) {
       const commerce = (a.character!.effective.commercialism + b.character!.effective.commercialism) / 2
       const patience = (a.character!.effective.patience + b.character!.effective.patience) / 2
       if (rel.treaty === 'neutral' && rel.opinion > 35 && random(state) < 0.05 + commerce * 0.2)
@@ -677,7 +699,7 @@ export function advanceNativeAccords(world: World) {
         kind = 'alliance'
     }
     if (!kind) continue
-    const pending = world.statecraft.offers.find(
+    const pending = statecraft.offers.find(
       (o) =>
         o.status === 'proposed' &&
         o.parties.includes(a.id) &&
@@ -687,11 +709,10 @@ export function advanceNativeAccords(world: World) {
     const offer =
       pending ??
       submitStandingOffer(world, a.id, {
-        title:
-          `${a.shortName}–${b.shortName} ${kind === 'peace' ? 'armistice' : kind === 'trade' ? 'trade accord' : 'alliance'}`.slice(
-            0,
-            140,
-          ),
+        title: `${a.shortName}–${b.shortName} ${kind === 'trade' ? 'trade accord' : 'alliance'}`.slice(
+          0,
+          140,
+        ),
         parties: [a.id, b.id],
         visibility: 'public',
         duration: 12,
@@ -705,11 +726,8 @@ export function advanceNativeAccords(world: World) {
             good: '',
             field: '',
             regions: [],
-            duration: kind === 'peace' ? 60 : 0,
-            text:
-              kind === 'peace'
-                ? 'Both cabinets accept a ceasefire at the current borders after sustained war exhaustion.'
-                : 'Both cabinets accept closer relations on the strength of their established relationship.',
+            duration: 0,
+            text: 'Both cabinets accept closer relations on the strength of their established relationship.',
           },
         ],
       })

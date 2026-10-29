@@ -23,11 +23,15 @@ export interface InfluenceSource {
   jobs: number
   services: number
 }
-export const SOURCE_STRIDE = 6
-export const TARGET_STRIDE = 4
-const WALK = 15 / 1000
-export const INFLUENCE_RADIUS = 6000
-export const INFLUENCE_MINUTES = 60
+import { SOURCE_STRIDE } from './simulation-invariants'
+export { SOURCE_STRIDE } from './simulation-invariants'
+import { TARGET_STRIDE } from './simulation-invariants'
+export { TARGET_STRIDE } from './simulation-invariants'
+import { WALK_MINUTES_PER_METER as WALK } from './simulation-invariants'
+import { INFLUENCE_RADIUS } from './simulation-invariants'
+export { INFLUENCE_RADIUS } from './simulation-invariants'
+import { INFLUENCE_MINUTES } from './simulation-invariants'
+export { INFLUENCE_MINUTES } from './simulation-invariants'
 
 /** Exact coincident-source aggregation; bounded-error tree reduction for separated sources.
  * The tree is independent of numerical mesh depth and never aggregates across terrain cells. */

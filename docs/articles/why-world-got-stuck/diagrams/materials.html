@@ -1,0 +1,35 @@
+<figure class="figure" id="fig-materials" aria-labelledby="materials-title">
+  <p class="figure-kicker">Figure 3 · illustrative stock of 10 units</p>
+  <h3 id="materials-title">Leave something for the workshop</h3>
+  <div class="cols">
+    <div>
+      <h4 class="ink-rust">Before: everything can be sold</h4>
+      <div class="stock" role="img" aria-label="Ten units sold; zero left for production">
+        <i class="sold"></i><i class="sold"></i><i class="sold"></i><i class="sold"></i><i class="sold"></i
+        ><i class="sold"></i><i class="sold"></i><i class="sold"></i><i class="sold"></i><i class="sold"></i>
+      </div>
+      <p>0 units left for the workshop</p>
+      <div class="arrow" aria-hidden="true">↓</div>
+      <div class="node">No inputs<br />→ no industrial hiring<br />→ no tool output</div>
+    </div>
+    <div>
+      <h4 class="ink-blue">After: a bounded reserve</h4>
+      <div
+        class="stock"
+        role="img"
+        aria-label="At most five of ten units reserved for forecast business orders; five remain available for retail"
+      >
+        <i class="reserved"></i><i class="reserved"></i><i class="reserved"></i><i class="reserved"></i
+        ><i class="reserved"></i><i class="retail"></i><i class="retail"></i><i class="retail"></i
+        ><i class="retail"></i><i class="retail"></i>
+      </div>
+      <p>Up to 5 units kept for business orders</p>
+      <div class="arrow" aria-hidden="true">↓</div>
+      <div class="node soft">Inputs available<br />→ hiring can resume<br />→ production is possible</div>
+    </div>
+  </div>
+  <figcaption>
+    Each square is one illustrative unit. The actual reserve depends on expected business orders and can be
+    less than half. <strong>Food is never held in this reserve.</strong>
+  </figcaption>
+</figure>

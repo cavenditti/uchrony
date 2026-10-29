@@ -12,7 +12,13 @@ import {
 } from './national-accounts'
 import { BASE_PRICE } from './economy'
 import { MAX_ARMIES } from './military-limits'
-import { markOccupation } from './geopolitics'
+import {
+  controller,
+  establishControl,
+  maintainControl,
+  occupationStrengthRequired,
+  pillageProvince,
+} from './military-control'
 import { knownMap } from './intelligence'
 import { clamp, population, relation, type Army, type World } from './types'
 import { transportGraph, shortestPaths, pathTo } from './economy'
@@ -46,13 +52,14 @@ export function landGraph(w: World, nation: number, profile = corridorProfile(w)
   return transportGraph(w, nation, profile).map((edges) => edges.filter((e) => !e.sea))
 }
 export function advanceArmies(w: World) {
+  maintainControl(w)
   // Movement can change owners, but diplomatic commitments stay fixed in this phase.
   const passage = seaPassageView(w),
     access = diplomaticAccessView(w),
     accessible = (world: World, nation: number, region: number) =>
-      world.regions[region].nation === nation ||
-      relation(world, nation, world.regions[region].nation)?.treaty === 'alliance' ||
-      access(nation, world.regions[region].nation)
+      controller(world, region) === nation ||
+      relation(world, nation, controller(world,region))?.treaty === 'alliance' ||
+      access(nation, controller(world,region))
   const state = ensureWarfare(w),
     profile = corridorProfile(w),
     remaining = profile.capacity.slice()
@@ -96,7 +103,7 @@ export function advanceArmies(w: World) {
   const supplyGraphs = new Map<number, ReturnType<typeof transportGraph>>(),
     landGraphs = new Map<number, ReturnType<typeof landGraph>>()
   function graphFor(nation: number, land: boolean) {
-    const currentOwners = w.regions.map((region) => region.nation).join(',')
+    const currentOwners = w.regions.map((region) => controller(w, region.id)).join(',')
     if (owners !== currentOwners) {
       owners = currentOwners
       supplyGraphs.clear()
@@ -196,7 +203,7 @@ export function advanceArmies(w: World) {
       delivered += food + arms
     }
     const need = army.soldiers * 0.034
-    if (ops.food < need && ops.conduct === 'requisition' && accessible(w, army.nation, r.id)) {
+    if (ops.food < need && ops.conduct !== 'restrained' && accessible(w, army.nation, r.id)) {
       const taken = Math.min(r.stocks.food, need - ops.food, population(r) * 0.025 * 0.25)
       recordGift(w, marketStore(r.id), armyStore(army.id), 'food', taken)
       r.stocks.food -= taken
@@ -280,15 +287,15 @@ export function advanceArmies(w: World) {
   function battle(army: Army, destination: number, amphibious = false) {
     const next = w.regions[destination],
       n = w.nations[army.nation],
-      former = w.nations[next.nation]
+      former = w.nations[controller(w, destination)]
     let defenders = w.armies.filter(
       (a) =>
-        a.nation === next.nation &&
+        a.nation === former.id &&
         a.region === destination &&
         a.soldiers > 0 &&
         a.operations!.embarkedOn === null,
     )
-    if (defenders.reduce((sum, force) => sum + force.soldiers, 0) < Math.min(1800, army.soldiers * 0.8)) {
+    if (former.id === next.nation && defenders.reduce((sum, force) => sum + force.soldiers, 0) < Math.min(1800, army.soldiers * 0.8)) {
       const willingAdults = next
           .communities!.filter((g) => g.allegiance !== army.nation)
           .reduce((sum, g) => sum + g.population.adults, 0),
@@ -391,7 +398,11 @@ export function advanceArmies(w: World) {
     next.devastation = clamp(next.devastation + 0.025 + civilianLoss / Math.max(1, population(next)))
     army.operations!.fatigue = clamp(army.operations!.fatigue + 0.2)
     army.experience = clamp(army.experience + 0.02)
-    if (attack > defense * 1.2 && army.soldiers > 200 && army.morale > 0.2) {
+    if (
+      attack > defense * 1.2 &&
+      army.soldiers * army.supply * army.morale >= occupationStrengthRequired(w, next.id) &&
+      army.morale > 0.2
+    ) {
       recordMilitaryInfluence(
         w,
         army.nation,
@@ -400,10 +411,10 @@ export function advanceArmies(w: World) {
         'victory',
         attack / Math.max(1, attack + defense),
       )
-      next.nation = army.nation
-      markOccupation(w, next.id, former.id)
+      establishControl(w, next.id, army.nation)
       next.unrest = clamp(next.unrest + 15, 0, 100)
       army.region = next.id
+      army.operations!.stance = 'hold'
       army.operations!.entrenchment = 0
       for (const group of next.communities ?? [])
         group.grievance = clamp(group.grievance + (army.operations!.conduct === 'requisition' ? 0.15 : 0.05))
@@ -418,19 +429,11 @@ export function advanceArmies(w: World) {
           d.operations!.fatigue = clamp(d.operations!.fatigue + 0.25)
         } else returnArmyPeople(w, d, next)
       }
-      if (former.capital === next.id) {
-        const remaining = w.regions
-          .filter((r) => r.nation === former.id)
-          .sort((a, b) => population(b) - population(a))
-        if (remaining.length) {
-          former.capital = remaining[0].id
-          former.stability = Math.max(5, former.stability - 15)
-        }
-      }
+      if (former.capital === next.id) former.stability = Math.max(5, former.stability - 15)
       warEvent(
         w,
         `${n.shortName} occupies ${next.name}`,
-        `Terrain, supply and troop cohesion shape the battle. ${attackerLoss + defenseLoss} troops and ${civilianLoss} civilians die; surviving defenders retreat or surrender. Occupation requires sustained forces and administration; local allegiance does not change with the battlefield result.`,
+        `Terrain, supply and troop cohesion shape the battle. ${attackerLoss + defenseLoss} troops and ${civilianLoss} civilians die; surviving defenders retreat or surrender. Military control requires a garrison. Sovereignty remains unchanged until explicit annexation or a signed territorial settlement.`,
         n.id,
         next.id,
       )
@@ -486,6 +489,7 @@ export function advanceArmies(w: World) {
       continue
     }
     supply(a)
+    pillageProvince(w, a)
     if (engaged.has(a.id) || ops.disorder || a.soldiers < 50 || ops.stance !== 'march') continue
     if (a.target === null && !wars.has(a.nation)) continue
     const graph = graphFor(a.nation, true),
@@ -494,7 +498,7 @@ export function advanceArmies(w: World) {
       const chart = knownMap(w, n.id)
       const targets = chart
         .filter(
-          (r) => relation(w, a.nation, r.nation)?.treaty === 'war' && Number.isFinite(paths.distance[r.id]),
+          (r) => controller(w, r.id) !== a.nation && relation(w, a.nation, r.nation)?.treaty === 'war' && Number.isFinite(paths.distance[r.id]),
         )
         .sort((a, b) => paths.distance[a.id] - paths.distance[b.id])
       a.target = targets[0]?.id ?? null
@@ -538,7 +542,7 @@ export function advanceArmies(w: World) {
     ops.progress = 0
     ops.entrenchment = 0
     ops.fatigue = clamp(ops.fatigue + 0.1)
-    if (relation(w, a.nation, w.regions[next].nation)?.treaty === 'war') battle(a, next)
+    if (controller(w, next) !== a.nation && relation(w, a.nation, controller(w, next))?.treaty === 'war') battle(a, next)
     else if (accessible(w, a.nation, next)) a.region = next
     if (a.target === a.region) a.target = null
   }
@@ -551,4 +555,5 @@ export function advanceArmies(w: World) {
     for (const f of state.fleets) f.embarked = f.embarked.filter((id) => id !== a.id)
   }
   w.armies = w.armies.filter((a) => a.soldiers > 0)
+  maintainControl(w)
 }

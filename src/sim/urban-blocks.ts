@@ -9,7 +9,8 @@ import { URBAN_USES, type FloorUses } from './urban-types'
 import { urbanEmploymentIndex, urbanEmploymentLocations } from './urban-location'
 import { activeUrbanProject } from './urban-projects'
 
-export const URBAN_BLOCK_SPAN = 128
+import { URBAN_BLOCK_SPAN } from './simulation-invariants'
+export { URBAN_BLOCK_SPAN } from './simulation-invariants'
 export interface UrbanBlock {
   character?: string
   floorUses?: FloorUses

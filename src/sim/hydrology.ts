@@ -1,10 +1,8 @@
+import { configurationValues } from './configuration-context'
 import { adjacentCells } from './grid'
 import { MinHeap } from './heap'
 import { fractal, hashSeed } from './random'
 import { clamp, type Cell } from './types'
-
-const PASSES = 24
-const CHANNEL_RUNOFF = 24
 
 /** Generation-time landscape evolution. Ocean cells stay fixed, while runoff repeatedly
  * finds the least-cost descending route through spatially varying rock resistance.
@@ -12,6 +10,7 @@ const CHANNEL_RUNOFF = 24
  * This is a bounded synthetic erosion model, not a hydraulic/sediment simulation.
  */
 export function erodeDrainage(cells: Cell[], width: number, height: number, seed: string, sea: number) {
+  const { erosionPasses, channelRunoff } = configurationValues().geography
   const count = cells.length,
     adjacent = new Int32Array(count * 8),
     distances = new Float64Array(count * 8),
@@ -66,7 +65,7 @@ export function erodeDrainage(cells: Cell[], width: number, height: number, seed
         clamp((c.elevation - sea) / 0.025)
   }
 
-  for (let pass = 0; pass <= PASSES; pass++) {
+  for (let pass = 0; pass <= erosionPasses; pass++) {
     // Priority flood supplies a depression-free hydraulic surface only. Its visitation
     // parent is deliberately NOT the river route: that was the source of grid canals.
     filled.set(surface)
@@ -124,7 +123,7 @@ export function erodeDrainage(cells: Cell[], width: number, height: number, seed
       const id = order[i]
       flow[downstream[id]] += flow[id]
     }
-    if (pass === PASSES) {
+    if (pass === erosionPasses) {
       // Resolve residual flats only AFTER routing, along the chosen channels.
       for (const id of order) filled[id] = Math.max(filled[id], filled[downstream[id]] + 1e-7)
       break
@@ -147,6 +146,6 @@ export function erodeDrainage(cells: Cell[], width: number, height: number, seed
     if (c.terrain === 'water') continue
     c.elevation = filled[c.id]
     c.downstream = downstream[c.id]
-    c.river = flow[c.id] >= CHANNEL_RUNOFF
+    c.river = flow[c.id] >= channelRunoff
   }
 }

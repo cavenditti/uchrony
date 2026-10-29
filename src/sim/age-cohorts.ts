@@ -32,17 +32,33 @@ export function ensureAges(group: PopulationCommunity, month: number) {
   }
   const bins: BirthCohort[] = []
   for (const age of ageNames) {
-    const first = age === 'children' ? 0 : age === 'adults' ? 18 : 65
-    const last = age === 'children' ? 17 : age === 'adults' ? 64 : 95
+    // Opening bins follow the configured age boundaries. The final month within
+    // each bin is clamped so partial-year boundaries cannot misclassify people.
+    const minimumMonths = age === 'children' ? 0 : age === 'adults' ? P.adultAgeMonths : P.retirementAgeMonths
+    const maximumMonths =
+      (age === 'children'
+        ? P.adultAgeMonths
+        : age === 'adults'
+          ? P.retirementAgeMonths
+          : P.openingMaximumAgeMonths) - 1
+    const first = Math.floor(minimumMonths / 12)
+    const last = Math.floor(maximumMonths / 12)
     const weights = Array.from({ length: last - first + 1 }, (_, i) =>
-      age === 'elders' ? Math.exp(-i / 10) : 1,
+      age === 'elders' ? Math.exp(-i / P.elderOpeningDecayYears) : 1,
     )
     const counts = apportion(group.population[age], weights)
     counts.forEach((count, i) => {
       if (!count) return
       const female = Math.round(count * P.femaleBirthShare)
       bins.push([
-        month - (first + i) * 12 - ((first + i * 7 + group.culture * 5 + group.language) % 12),
+        month -
+          Math.max(
+            minimumMonths,
+            Math.min(
+              maximumMonths,
+              (first + i) * 12 + ((first + i * 7 + group.culture * 5 + group.language) % 12),
+            ),
+          ),
         female,
         count - female,
       ])

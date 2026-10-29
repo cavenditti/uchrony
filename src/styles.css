@@ -5685,3 +5685,276 @@ select option {
 .urban-character li + li {
   margin-top: 0.8rem;
 }
+
+/* Parameter editing extends the ruled atlas dossiers. Long sections scroll
+   inside the dialog; matrix overflow is contained independently on phones. */
+.app-dialog.configuration-dialog {
+  width: 940px;
+}
+.configuration-view-toggle {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 24px;
+}
+.configuration-view-toggle [aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.configuration-editor {
+  margin-top: 24px;
+}
+.configuration-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.configuration-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 180px;
+  color: var(--muted);
+}
+.configuration-search input {
+  min-width: 0;
+  width: 100%;
+}
+.configuration-summary,
+.configuration-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 12px 0 20px;
+}
+.configuration-group {
+  border-top: 1px solid var(--line);
+}
+.configuration-group:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.configuration-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  padding: 17px 2px;
+  color: var(--ink);
+  font-size: 15px;
+}
+.configuration-group > summary > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.configuration-group[open] > summary > svg {
+  transform: rotate(90deg);
+}
+.configuration-group > summary small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+.configuration-group > summary:hover {
+  color: var(--accent);
+}
+.configuration-group-body {
+  padding: 0 0 26px;
+}
+.configuration-group-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.configuration-group-heading p {
+  max-width: 65ch;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.configuration-group-heading button {
+  flex-shrink: 0;
+}
+.configuration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 28px;
+}
+.configuration-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.configuration-field label {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.configuration-field input,
+.configuration-field select {
+  width: 100%;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.configuration-field small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.configuration-lock {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.configuration-field.creation-only input {
+  opacity: 0.7;
+}
+.configuration-subheading {
+  font:
+    400 23px/1.2 'Alegreya',
+    Georgia,
+    serif;
+  margin: 30px 0 8px;
+}
+.configuration-matrix-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.configuration-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+.configuration-matrix th,
+.configuration-matrix td {
+  padding: 7px;
+  border-bottom: 1px solid var(--line);
+}
+.configuration-matrix th {
+  font-weight: 500;
+  color: var(--muted);
+}
+.configuration-matrix th:first-child {
+  min-width: 110px;
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+  z-index: 1;
+}
+.configuration-matrix-hint {
+  display: none;
+}
+.configuration-matrix select {
+  width: 100%;
+  min-width: 130px;
+}
+.configuration-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px 0 0;
+}
+.configuration-error {
+  color: var(--red);
+  line-height: 1.6;
+  padding: 12px 0;
+}
+.configuration-submit {
+  margin-top: 12px;
+}
+@media (max-width: 600px) {
+  .configuration-matrix-hint {
+    display: block;
+  }
+  .app-dialog.configuration-dialog {
+    padding: 28px 20px 22px;
+  }
+  .configuration-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-dialog.configuration-dialog .form-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .configuration-group-heading {
+    align-items: flex-start;
+  }
+  .configuration-group > summary {
+    gap: 8px;
+    font-size: 14px;
+  }
+  .configuration-group > summary small {
+    font-size: 11px;
+  }
+  .configuration-actions {
+    flex-direction: column-reverse;
+  }
+  .configuration-actions button {
+    width: 100%;
+    min-height: 44px;
+  }
+  .configuration-search {
+    flex-basis: 100%;
+  }
+}
+
+.configuration-field-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.configuration-field-heading label {
+  margin: 0;
+}
+.parameter-help {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.parameter-help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: help;
+}
+.parameter-help-button:hover,
+.parameter-help-button[aria-expanded='true'] {
+  color: var(--accent);
+}
+.parameter-help-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.parameter-help-tooltip {
+  position: fixed;
+  z-index: 80;
+  width: min(290px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 6px 24px #0004;
+  font: 400 13px/1.55 var(--font-body, sans-serif);
+  text-align: left;
+  white-space: normal;
+}
+.configuration-matrix-control {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.configuration-matrix-control select {
+  min-width: 120px;
+}

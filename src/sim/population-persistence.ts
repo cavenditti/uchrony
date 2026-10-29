@@ -1,3 +1,4 @@
+import { MAX_CENSUS_BINS } from './simulation-invariants'
 import { ageTotals } from './age-cohorts'
 import { STRATA } from './economic-types'
 import type { World } from './types'
@@ -97,7 +98,7 @@ export function validatePopulation(world: World, allowDuplicateCommunities = fal
       if (group.ageCohorts !== undefined) {
         if (
           !Array.isArray(group.ageCohorts) ||
-          group.ageCohorts.length > 2641 ||
+          group.ageCohorts.length > MAX_CENSUS_BINS ||
           !Number.isInteger(group.ageMonth) ||
           group.ageMonth! < 0 ||
           group.ageMonth! > world.month

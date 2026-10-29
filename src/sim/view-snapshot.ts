@@ -1,3 +1,4 @@
+import { withWorldConfiguration } from './configuration'
 import { placeLabels } from './almanac'
 import { economicLandscape } from './economic-landscape'
 import { mapHomesSnapshot, mapMeshSnapshot } from './map-snapshot'
@@ -106,6 +107,9 @@ export function censusUnitLoyalty(world: World, force: Army) {
 
 /** UI-only data must never be used as a save or as simulation input. */
 export function viewSnapshot(world: World, detailNation?: number | null): Omit<World, 'cells'> {
+  return withWorldConfiguration(world, () => configuredSnapshot(world, detailNation))
+}
+function configuredSnapshot(world: World, detailNation?: number | null): Omit<World, 'cells'> {
   const includes = (nation: number) => detailNation === undefined || detailNation === nation
   const places = new Set(
     (world.localEconomy ? Object.values(world.localEconomy.units) : world.regions)

@@ -7,8 +7,8 @@ export const WORLD_SCALES = {
 export type WorldScale = keyof typeof WORLD_SCALES
 export const DEFAULT_WORLD_SCALE: WorldScale = 'world'
 // Includes disconnected islands added after the main province flood fill.
-export const MAX_PROVINCES = 4096
-export const MAX_MAP_CELLS = 448 * 288
+export { MAX_PROVINCES } from './simulation-invariants'
+export { MAX_MAP_CELLS } from './simulation-invariants'
 
 export function worldScale(value: unknown): WorldScale {
   if (typeof value !== 'string' || !Object.hasOwn(WORLD_SCALES, value)) throw new Error('Unknown world scale')

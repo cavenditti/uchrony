@@ -88,7 +88,7 @@ test('fatal local simulation errors stop playback and report the actual error', 
   clock.stop()
 })
 
-test('Max has no pacing cap, publishes completed intervals and yields to pause', (t) => {
+test('legacy Max requests fall back to regular monthly playback at 1×', (t) => {
   let now = 0,
     months = 0,
     paints = 0
@@ -96,29 +96,32 @@ test('Max has no pacing cap, publishes completed intervals and yields to pause',
   t.mock.timers.enable({ apis: ['setTimeout'] })
   const clock = new Playback(
     (speed) => {
-      assert.equal(speed, 'max')
-      months += 6
-      now += 200
+      assert.equal(speed, 1)
+      months++
       return true
     },
     () => {
       paints++
-      assert.equal(months % 6, 0)
     },
     (error) => {
       throw error
     },
   )
-  clock.start('max')
+  // Worker messages from an old client do not have runtime type guarantees.
+  clock.start('max' as unknown as number)
+  now = 999
+  t.mock.timers.tick(999)
+  assert.equal(months, 0)
+  now = 1000
   t.mock.timers.tick(1)
-  assert.equal(months, 6)
+  assert.equal(months, 1)
   assert.equal(paints, 1)
   clock.stop()
   t.mock.timers.tick(1000)
-  assert.equal(months, 6)
+  assert.equal(months, 1)
 })
 
-test('changing from Max to normal cancels the old clock and restores normal pacing', (t) => {
+test('changing from 2× to 1× cancels the old clock and restores normal pacing', (t) => {
   let now = 0
   const speeds: unknown[] = []
   t.mock.method(performance, 'now', () => now)
@@ -132,7 +135,7 @@ test('changing from Max to normal cancels the old clock and restores normal paci
       throw e
     },
   )
-  clock.start('max')
+  clock.start(2)
   clock.start(1)
   now = 999
   t.mock.timers.tick(999)

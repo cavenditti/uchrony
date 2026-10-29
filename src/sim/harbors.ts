@@ -1,10 +1,11 @@
+import { parameterGroup } from './configuration-context'
 import { traversableLegs } from './transport'
 import { simulationMonths } from './simulation-period'
 import type { World } from './types'
 
 /** Trade terminals have a durable history; this is activity memory, not new
  * construction, cargo, transport capacity or a naval facility. */
-export const HARBOR_INERTIA = { idleMonths: 60, halfLifeMonths: 24, adjustment: 0.2 } as const
+export const HARBOR_INERTIA = parameterGroup('harbors')
 
 export function advanceHarbors(w: World) {
   const activity = new Map<number, number>()

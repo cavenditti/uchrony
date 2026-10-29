@@ -64,6 +64,7 @@ export function relocateHouseholdClaims(w: World, moves: { from: string; to: str
   }
   for (const owners of [
     ...(e.banking?.banks ?? []).map((b) => b.owners),
+    ...Object.values(e.supplierCredit ?? {}),
     ...(e.firms ?? []).flatMap((f) => (f.owners ? [f.owners] : [])),
   ]) {
     const old = { ...owners }

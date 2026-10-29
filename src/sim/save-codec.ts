@@ -4,7 +4,7 @@ import type { AdaptiveWorld } from './adaptive-types'
 import { packWorldCensus, unpackWorldCensus } from './census-codec'
 
 const FORMAT = 'district-blocks-v2'
-const LIMIT = 512 * 1024 * 1024 - 1024
+import { MAX_ENCODED_SAVE_BYTES as LIMIT } from './simulation-invariants'
 interface Block {
   bytes: number
   data: string

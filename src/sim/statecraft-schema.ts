@@ -122,6 +122,7 @@ export function stateAgentSchema(strategic: boolean): Schema {
           'naval',
           'embark',
           'army',
+          'annex',
         ]),
         target: num(-1, 1e9, true),
         key: text(24),

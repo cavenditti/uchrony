@@ -41,7 +41,8 @@ export function sovereigntyAssessment(world: World, nation: number, offer: Diplo
       .map((r) => (r.a === nation ? r.b : r.a)),
     force = effectiveForce(world, nation),
     strongest = Math.max(0, ...enemies.map((id) => perceivedPower(world, nation, id))),
-    occupied = world.regions.filter((r) => r.occupation?.former === nation && r.nation !== nation).length,
+    occupied = world.regions.filter((r) => (r.occupation?.former === nation && r.nation !== nation) ||
+      (r.nation === nation && r.control && r.control.nation !== nation)).length,
     defeated =
       enemies.length > 0 &&
       (strongest > Math.max(200, force) * 1.8 ||

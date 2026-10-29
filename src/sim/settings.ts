@@ -1,3 +1,5 @@
+import { DEFAULT_CONFIGURATION_VALUES } from './configuration-defaults'
+import { configurationFor, validateConfigurationValues } from './configuration'
 import type { World } from './types'
 
 export interface SimulationSettings {
@@ -5,23 +7,10 @@ export interface SimulationSettings {
   abundance: number
   extremity: number
 }
-export const DEFAULT_SETTINGS: SimulationSettings = { instability: 1, abundance: 0.85, extremity: 1.2 }
-export const simulationSettings = (world: World): SimulationSettings => world.simulation ?? DEFAULT_SETTINGS
+export const DEFAULT_SETTINGS: SimulationSettings = DEFAULT_CONFIGURATION_VALUES.conditions
+/** Compatibility API for old scenarios; all bounds now come from the registry. */
+export const simulationSettings = (world: World): SimulationSettings => configurationFor(world).conditions
 export function validateSettings(value: unknown): SimulationSettings {
-  const settings = value as SimulationSettings
-  if (
-    !settings ||
-    typeof settings !== 'object' ||
-    !Number.isFinite(settings.instability) ||
-    settings.instability < 0 ||
-    settings.instability > 3 ||
-    !Number.isFinite(settings.abundance) ||
-    settings.abundance < 0.35 ||
-    settings.abundance > 1.6 ||
-    !Number.isFinite(settings.extremity) ||
-    settings.extremity < 0 ||
-    settings.extremity > 2
-  )
-    throw new Error('Invalid simulation conditions.')
-  return { instability: settings.instability, abundance: settings.abundance, extremity: settings.extremity }
+  if (!value || typeof value !== 'object') throw new Error('Invalid simulation conditions.')
+  return { ...validateConfigurationValues({ conditions: value }).conditions }
 }

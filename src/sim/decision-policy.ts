@@ -1,3 +1,4 @@
+import { configurationValues } from './configuration-context'
 import { simulationMonths } from './simulation-period'
 import { economicRegions } from './local-units'
 import { population, type World } from './types'
@@ -14,56 +15,17 @@ export interface DecisionPolicy {
   readiness: number
   warThreshold: number
   foodSatiation?: number
+  agriculture?: boolean
+  development?: boolean
 }
-export const DECISION_POLICIES: Record<string, Readonly<DecisionPolicy>> = {
-  legacy: {
-    renewal: false,
-    realCosts: false,
-    merchantRelease: 0,
-    workDisutility: 0.65,
-    investmentShare: 0.25,
-    investmentAdjustment: 0.025,
-    readiness: 0,
-    warThreshold: 0.7,
-  },
-  circulation: {
-    renewal: false,
-    realCosts: true,
-    merchantRelease: 0.02,
-    workDisutility: 0.5,
-    investmentShare: 0.25,
-    investmentAdjustment: 0.025,
-    readiness: 0.008,
-    warThreshold: 0.8,
-  },
-  renewal: {
-    renewal: true,
-    realCosts: true,
-    merchantRelease: 0.025,
-    workDisutility: 0.5,
-    investmentShare: 0.35,
-    investmentAdjustment: 0.04,
-    readiness: 0.01,
-    warThreshold: 0.8,
-    foodSatiation: 1.5,
-  },
-}
-// Candidate 5 from the reproducible seven-candidate offline search. Military
-// thresholds and physical constraints were not optimization targets.
-DECISION_POLICIES.dynamic = {
-  renewal: true,
-  realCosts: true,
-  merchantRelease: 0.02564,
-  workDisutility: 0.40758,
-  investmentShare: 0.23396,
-  investmentAdjustment: 0.03502,
-  readiness: 0.01,
-  warThreshold: 0.8,
-  foodSatiation: 1.5,
-}
-let current = DECISION_POLICIES.dynamic
-export const decisionPolicy = () => current
+export { DECISION_POLICIES } from './configuration-defaults'
+let current: Readonly<DecisionPolicy> | undefined
+export const decisionPolicy = () => current ?? configurationValues().decisions
 export function withDecisionPolicy<T>(policy: Readonly<DecisionPolicy>, run: () => T): T {
+  if (policy.development !== undefined && typeof policy.development !== 'boolean')
+    throw new Error('Invalid development policy switch')
+  if (policy.agriculture !== undefined && typeof policy.agriculture !== 'boolean')
+    throw new Error('Invalid agricultural policy switch')
   if (typeof policy.renewal !== 'boolean' || typeof policy.realCosts !== 'boolean')
     throw new Error('Invalid decision policy switches')
   if (

@@ -81,6 +81,8 @@ $$
 
 $d^*$ is the largest of the firm's forecast and its share of wholesaler demand or local subsistence/input orders. Manufacturing has fixed input coefficients $a_{ig}$: output cannot exceed labor/capital capacity, available inputs divided by $a_{ig}$, or input-purchase funding. Farm labor has diminishing returns through $A(1-e^{-L_f/A})$, with effective land $A$; technology and local conditions scale output. Extraction also requires remaining natural reserves.
 
+In model 7, paid productive equipment also multiplies farm output by $1+0.5\log(1+K_{\mathrm{eff}})$, using the same population-normalized productive capital as manufacturing. Its marginal effect diminishes; zero farm employment still produces zero food. Public soil works purchase actual timber, stone and available labor, enter fixed investment at cost, and add at most 0.12 fertility after six months, with a total fertility ceiling of 1.2.
+
 Local farm seasonality multiplies food capacity by
 
 $$
@@ -290,3 +292,12 @@ $$
 Time is in minutes. Cross-market search covers a six-kilometer neighborhood and requires a network journey of at most 90 minutes; within-market travel is currently approximated as ten minutes. Workplace vacancies and cash scale simultaneous offers before payroll settles. Domestic residence receives wages and pays income tax; production belongs to the workplace. No cross-border work permit is inferred. Paths respect terrain, damage, corridors and congestion. Rail and motor modes require both technology and infrastructure. Freight taking longer than a monthly interval remains owned inventory in transit until its arrival date. [UrbanSim buildings, jobs and households](https://www.urbansim.com/parcel-level), [MATSim activity and travel models](https://matsim.org/the-book/).
 
 A viewed day is a deterministic conditional sample of a saved month. Routine weights summarize paid jobs and other residents; a displayed person is not a persistent individual. Inspection never advances wages, births, consumption or the economic random stream. Persistent causal individuals remain phase 8.
+
+
+## Public productive investment and supplier compensation
+
+A public project buys a fraction `a` of a real construction recipe. Its value is `V(a) = a * (sum(q_g * local_price_g) + labor_months * local_monthly_wage)`. Feasible scale is limited by materials, available labor, project capacity, and funding. Wages always require cash. The state may defer payment only for materials above the local consumption/input buffer. A bounded search finds the largest `a` such that `V(a) - eligible_supplier_credit(a) <= allocated_cash`. The credit limit is twelve months of the current domestic revenue estimate, less outstanding supplier claims.
+
+For a deferred material purchase of value `d`: the supplier loses the actual quantity, gains a receivable of `d`, and the state gains the capital contribution and a liability of `d`. Aggregate crowns do not change. A later repayment `p` reduces treasury cash and that liability by `p`, raises supplier cash by `p`, and reduces its receivable by `p`. It is not a new sale or a second capital expense in the national accounts. Cash-basis tax/dividend capacity rises only on actual compensation. Supplier claims move with district financial ownership and survive legal succession.
+
+Public enterprise equity uses `new_shares = contribution_value / opening_book_value * old_total_shares`. This dilutes old ownership proportionally while preserving its book claim; the government gains no cash or production merely by subscribing. Dividends are transfers from realized operating cash under the ordinary firm buffer rule. Strategic reserve profit-tax relief is at most 25%, weighted by the value share of new, sufficiently productive strategic output retained within an unfilled target. Eligible quantity is bounded by `max(0, production - sold)`; sold output cannot also earn a reserve incentive. It neither taxes inventory as revenue nor pays a subsidy for holding old stocks. Food insecurity suspends the reserve incentive.

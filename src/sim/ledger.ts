@@ -1,3 +1,4 @@
+import { supplierDebt } from './supplier-credit'
 import { economicRegion } from './local-units'
 import { recordService, recordGoodsSale, marketStore, economicNation } from './national-accounts'
 import type { Good } from './types'
@@ -200,11 +201,14 @@ export function ensureEconomy(w: World) {
   // Existing sovereign debt is an opening asset of the intermediary, not newly borrowed money.
   if (!Object.keys(e.ledger.opening).length) {
     for (const n of w.nations)
-      if (n.debt > 0 && !e.credit.loans.some((l) => l.borrower === governmentAccount(n.id)))
+      if (
+        n.debt > supplierDebt(w, n.id) &&
+        !e.credit.loans.some((l) => l.borrower === governmentAccount(n.id))
+      )
         e.credit.loans.push({
           id: e.credit.nextId++,
           borrower: governmentAccount(n.id),
-          principal: n.debt,
+          principal: n.debt - supplierDebt(w, n.id),
           arrears: 0,
           originated: w.month,
         })
@@ -359,7 +363,9 @@ export function auditLedger(w: World) {
   if (e.ledger.discrepancy > 1e-8 * scale)
     throw new Error(`Unreconciled financial transaction: ${e.ledger.discrepancy}`)
   e.totals.money = Object.values(current).reduce((sum, x) => sum + x, 0)
-  e.totals.debt = e.credit.loans.reduce((sum, l) => sum + l.principal, 0)
+  e.totals.debt =
+    e.credit.loans.reduce((sum, l) => sum + l.principal, 0) +
+    w.nations.reduce((sum, n) => sum + supplierDebt(w, n.id), 0)
   auditBanks(w)
   return e.ledger.discrepancy
 }
@@ -387,6 +393,12 @@ export function transferDebt(w: World, from: number, to: number) {
   if (w.economy)
     for (const loan of w.economy.credit.loans)
       if (loan.borrower === governmentAccount(from)) loan.borrower = governmentAccount(to)
+  const claims = w.economy?.supplierCredit?.[from]
+  if (claims) {
+    const target = (w.economy!.supplierCredit![to] ??= {})
+    for (const [creditor, value] of Object.entries(claims)) target[creditor] = (target[creditor] ?? 0) + value
+    delete w.economy!.supplierCredit![from]
+  }
   w.nations[to].debt += w.nations[from].debt
   w.nations[from].debt = 0
 }

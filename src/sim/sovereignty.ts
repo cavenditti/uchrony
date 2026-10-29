@@ -404,7 +404,9 @@ export function advanceSovereignty(world: World) {
       )
       alertGovernment(world, n.id, `Security emergency: ${detail}`)
     }
-    if (report.contested >= 3 && world.month - report.since >= 12) pending.push(report)
+    // A military occupation cannot silently become annexation through a parallel
+    // authority-collapse path. Its border awaits a decision or peace settlement.
+    if (!r.control && report.contested >= 3 && world.month - report.since >= 12) pending.push(report)
   }
   // Sequential transitions re-check ownership and force balances after each territorial loss.
   for (const report of pending)

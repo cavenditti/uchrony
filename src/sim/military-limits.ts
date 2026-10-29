@@ -1,2 +1,2 @@
 /** Shared structural safety bound for army creation, saves and passenger manifests. */
-export const MAX_ARMIES = 16_384
+export { MAX_ARMIES } from './simulation-invariants'

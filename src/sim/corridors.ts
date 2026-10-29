@@ -1,3 +1,4 @@
+import { parameterGroup } from './configuration-context'
 import { habitableLand } from './terrain-access'
 import { governance } from './governance'
 import { provinceWorks, roadInvestment } from './transport-development'
@@ -6,15 +7,7 @@ import { effectMultiplier } from './effects'
 import { movementNeighbors, stepDistance } from './grid'
 import type { Cell, CorridorTrace, RouteLeg, Terrain, World } from './types'
 
-export const CORRIDOR_LEARNING = {
-  gain: 0.1,
-  evaporation: 0.025,
-  discount: 0.7,
-  trafficAdjustment: 0.2,
-  replanMonths: 3,
-  minimumPathMonths: 12,
-  improvement: 0.05,
-} as const
+export const CORRIDOR_LEARNING = parameterGroup('corridors')
 
 const difficulty: Record<Terrain, number> = {
   water: Infinity,

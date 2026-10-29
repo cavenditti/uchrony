@@ -1,0 +1,27 @@
+<figure class="figure" id="fig-wages" aria-labelledby="wages-title">
+  <p class="figure-kicker">Figure 5 · try an illustrative example</p>
+  <h3 id="wages-title">The same 600 coins can become a much bigger bill</h3>
+  <div class="range-header">
+    <label for="monthly-wage">Current monthly wage</label
+    ><output id="wage-value" for="monthly-wage">20 coins</output>
+  </div>
+  <input id="monthly-wage" type="range" min="10" max="100" step="5" value="20" />
+  <div class="range-ends"><span>10 coins</span><span>100 coins</span></div>
+  <div class="bar-row">
+    <div class="bar-label"><span>Fixed fee: 600 coins</span><strong id="fixed-months">30 months</strong></div>
+    <div class="bar-track" aria-hidden="true">
+      <div id="fixed-bar" class="bar old" style="--value: 50%"></div>
+    </div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label"><span>Fee linked to current wages</span><strong>6 months</strong></div>
+    <div class="bar-track" aria-hidden="true"><div class="bar" style="--value: 10%"></div></div>
+    <div class="wage-amount" id="linked-fee">120 coins = six current monthly wages</div>
+  </div>
+  <div class="scale"><span>0 months of wages</span><span>60 months</span></div>
+  <figcaption>
+    Move the wage slider. The fixed fee was originally six months of wages at 100 coins per month. Only the
+    wage-linked fee stays at six when wages fall.
+    <strong>The coin amounts are illustrative; the six-month rule is real.</strong>
+  </figcaption>
+</figure>

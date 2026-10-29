@@ -104,7 +104,7 @@ export function validateWarfare(
       !integer(o.isolated) ||
       !integer(o.disorder) ||
       !['march', 'hold', 'entrench'].includes(o.stance) ||
-      !['restrained', 'requisition'].includes(o.conduct) ||
+      !['restrained', 'requisition', 'pillage'].includes(o.conduct) ||
       !(o.source === null || region(o.source)) ||
       !Array.isArray(o.line) ||
       o.line.length > w.regions.length ||

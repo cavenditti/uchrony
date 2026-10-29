@@ -3,6 +3,7 @@ import { Anchor } from 'lucide-react'
 import type { Army, Command, World } from '../sim/types'
 import { portAt, transportSeats } from '../sim/navy'
 import { censusUnitLoyalty as unitLoyalty } from '../sim/view-snapshot'
+import { annexationObstacle } from '../sim/military-control'
 
 const count = (v: number) => Math.round(v).toLocaleString()
 const pct = (v: number) => `${Math.round(v * 100)}%`
@@ -18,6 +19,8 @@ export function ArmyLogistics({
   const o = a.operations
   if (!o) return null
   const fleet = world.warfare?.fleets.find((f) => f.id === o.embarkedOn)
+  const held = world.regions[a.region].control?.nation === a.nation
+  const annexation = held ? annexationObstacle(world, a.nation, a.region) : ''
   const available =
     world.warfare?.fleets.filter(
       (f) =>
@@ -89,7 +92,7 @@ export function ArmyLogistics({
         </select>
       </label>
       <label className="select-label">
-        Civilian food
+        Occupation conduct
         <select
           value={o.conduct}
           onChange={(e) =>
@@ -97,16 +100,40 @@ export function ArmyLogistics({
               type: 'army-orders',
               army: a.id,
               stance: o.stance,
-              conduct: e.target.value as 'restrained' | 'requisition',
+              conduct: e.target.value as 'restrained' | 'requisition' | 'pillage',
             })
           }
         >
           <option value="restrained">Protect civilian reserves</option>
           <option value="requisition">Requisition when provision fails</option>
+          <option value="pillage">Pillage occupied enemy territory</option>
         </select>
       </label>
       {o.conduct === 'requisition' && (
         <p className="panel-note">Taking household food increases local grievance and weakens cooperation.</p>
+      )}
+      {o.conduct === 'pillage' && (
+        <p className="panel-note">
+          Seize local wealth for your treasury. Pillage damages production and increases fear and opposition;
+          it requires a secure enemy occupation.
+        </p>
+      )}
+      {held && (
+        <>
+          <p className="panel-note">
+            Military control of {world.regions[a.region].name}; sovereignty still belongs to{' '}
+            {world.nations[world.regions[a.region].nation].shortName}.
+          </p>
+          <button
+            className="button full"
+            disabled={!!annexation}
+            title={annexation || 'Declare annexation and pay administration costs'}
+            onClick={() => command({ type: 'annex', nation: a.nation, region: a.region })}
+          >
+            Annex this province
+          </button>
+          {annexation && <p className="panel-note">{annexation}</p>}
+        </>
       )}
       {!fleet &&
         available.map((f) => (

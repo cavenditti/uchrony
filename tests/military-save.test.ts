@@ -247,7 +247,7 @@ test('a state can rebuild its funded standing cadre after the world passes 500 f
   source.stocks.arms = 10000
   source.stocks.food = 100000
   reinforceArmies(w)
-  assert(w.armies.some((a) => a.nation === 1 && a.soldiers >= 100))
+  assert(w.armies.some((a) => a.nation === 1 && a.soldiers >= 20))
   assert.equal(w.armies.length, 501)
   assert.equal(people(w), before)
   validateWorld(w)

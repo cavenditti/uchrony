@@ -1,4 +1,8 @@
+import { parameterGroup } from './configuration-context'
 import { decisionPolicy } from './decision-policy'
+import { targetInventoryMonths, reserveTaxRelief } from './strategic-reserves'
+import { quoteMaterialFinancing, issueSupplierCredit } from './supplier-credit'
+import { activeDevelopment } from './development'
 import { expansionParameters } from './expansion-parameters'
 import { loansForBorrower } from './banking'
 import { simulationMonths, periodRate, periodInterest, crossedPeriodMonth } from './simulation-period'
@@ -49,19 +53,9 @@ import {
   recordWages,
 } from './national-accounts'
 
-const SLOTS = 4
-export const WAGE_SKILL: Record<EconomicStratum, number> = {
-  smallholder: 0.9,
-  laborer: 1,
-  artisan: 1.25,
-  professional: 1.7,
-  owner: 0.8,
-}
-const recipes: Partial<Record<Good, Partial<Inventory>>> = {
-  tools: { iron: 0.65, coal: 0.3, timber: 0.25 },
-  textiles: { timber: 0.3, food: 0.12 },
-  arms: { iron: 0.9, coal: 0.5, tools: 0.3 },
-}
+import { FIRM_SLOTS_PER_REGION as SLOTS } from './simulation-invariants'
+export const WAGE_SKILL: Record<EconomicStratum, number> = parameterGroup('wageSkills')
+const recipes: Partial<Record<Good, Partial<Inventory>>> = parameterGroup('recipes')
 function workingCapitalLimit(w: World, f: CompetitiveFirm) {
   const sales = GOODS.reduce((sum, g) => sum + (f.forecast[g] * f.prices[g]) / 1000, 0)
   const rate = (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
@@ -222,10 +216,16 @@ export function hireFirms(w: World, r: Region) {
   const averageWage = firms.length ? firms.reduce((sum, f) => sum + f.wage, 0) / firms.length : p.wage
   // Anticipated public hiring has a funded wage budget and competes for people.
   // Unused reservations remain unemployment; they never count as a paid service.
-  const publicFunds = Math.min(
-    (n.treasury * population(r)) / Math.max(1, n.population),
-    labor * averageWage * collectedTaxRate(w, r) * serviceShare,
-  )
+  const development = activeDevelopment(w, n)
+  const publicFunds = development
+    ? Math.min(
+        ((development.appropriation * population(r)) / Math.max(1, n.population)) * serviceShare,
+        labor * averageWage * 0.15,
+      )
+    : Math.min(
+        (n.treasury * population(r)) / Math.max(1, n.population),
+        labor * averageWage * collectedTaxRate(w, r) * serviceShare,
+      )
   const privateLabor = Math.max(0, labor - publicFunds / Math.max(1e-9, averageWage))
   for (const f of firms) {
     const share = 1 / Math.max(1, firms.length)
@@ -243,7 +243,7 @@ export function hireFirms(w: World, r: Region) {
         p.forecast[g] * share,
         (reserveTarget(r, g) / (g === 'food' ? 2.4 : 3)) * share,
       )
-      const plan = Math.max(0, demand + 0.25 * (demand * P.inventoryMonths - f.stocks[g]))
+      const plan = Math.max(0, demand + 0.25 * (demand * targetInventoryMonths(w, r, g) - f.stocks[g]))
       f.planned[g] = plan
       // Idle raw-material-dependent jobs cannot produce anything this month.
       // Keep the unconstrained order for procurement, but share available inputs
@@ -395,6 +395,11 @@ function baseLaborMix(w: World, r: Region, f?: CompetitiveFirm): Inventory {
     const sum = GOODS.reduce((n, g) => n + mix[g], 0)
     for (const g of GOODS) mix[g] /= Math.max(1e-12, sum)
   }
+  if (f?.activity) {
+    mix[f.activity] *= 4
+    const total = GOODS.reduce((sum, g) => sum + mix[g], 0)
+    for (const g of GOODS) mix[g] /= total
+  }
   return mix
 }
 export function firmCapacity(
@@ -414,12 +419,19 @@ export function firmCapacity(
     f.productivity
   const land = Math.max(1, r.cells.length * 1800 * (0.35 + r.fertility * 0.65)) / Math.max(1, active)
   const season = localClimate(w, w.cells[f.cell ?? r.center]).season
+  const capital =
+    (w.economy!.producers[r.id].capital + f.capital * active) *
+    (r.capitalReference === undefined ? 1 : r.capitalReference / Math.max(500, population(r)))
+  // Productive equipment also serves farms. Diminishing returns preserve the
+  // need for land and labor; an empty balance sheet receives no equipment bonus.
+  const equipment = decisionPolicy().agriculture ? 1 + 0.5 * Math.log1p(capital) : 1
   const q = inventory()
   q.food =
     land *
     (1 - Math.exp((-f.employment * mix.food) / land)) *
     (0.105 + r.fertility * 0.125) *
     abundance *
+    equipment *
     (1 + t.agriculture * 0.19) *
     season *
     w.climate *
@@ -439,9 +451,6 @@ export function firmCapacity(
       eff *
       abundance *
       effectMultiplier(w, 'extraction', n.id, r.id)
-  const capital =
-    (w.economy!.producers[r.id].capital + f.capital * active) *
-    (r.capitalReference === undefined ? 1 : r.capitalReference / Math.max(500, population(r)))
   const agglomeration =
     r.province === undefined
       ? 1
@@ -601,7 +610,12 @@ export function retailMarkup(w: World, r: Region, good: Good) {
       : (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
   return 0.04 + (Math.max(0, target - sales) * retailDecay(good) + target * periodInterest(rate)) / sales
 }
-function invest(w: World, r: Region, f: CompetitiveFirm) {
+export function invest(
+  w: World,
+  r: Region,
+  f: CompetitiveFirm,
+  sponsor?: { budget: number; activity: 'food' | 'tools' | 'textiles' },
+) {
   const hh = w.economy!.households[r.id].artisan,
     merchant = w.economy!.producers[r.id]
   const wage = f.wage * WAGE_SKILL.artisan,
@@ -627,37 +641,77 @@ function invest(w: World, r: Region, f: CompetitiveFirm) {
     : 0
   const operatingYield =
     (f.sales + remainingSales - f.payroll - f.purchases) / Math.max(unitCost, f.capital * unitCost)
-  const target =
-    operatingYield > userCost
+  const target = sponsor
+    ? 0.18
+    : operatingYield > userCost
       ? Math.max(0, f.employment / Math.max(1, f.desiredEmployment) - 0.75) *
           periodRate(decisionPolicy().investmentAdjustment) +
         f.capital * periodRate(P.depreciationMonthly)
       : 0
-  const amount = Math.max(
-    0,
-    Math.min(
-      target,
-      (f.cash * decisionPolicy().investmentShare) / Math.max(1e-9, unitCost),
-      Math.max(0, hh.laborForce - hh.employed) / labor,
-      r.stocks.timber / 300,
-      r.stocks.stone / 400,
-      r.stocks.tools / 40,
-    ),
-  )
-  if (amount <= 1e-7) return
+  const financed = sponsor
+    ? quoteMaterialFinancing(
+        w,
+        r,
+        recipe,
+        labor * wage,
+        Math.min(target, Math.max(0, hh.laborForce - hh.employed) / labor),
+        sponsor.budget,
+      )
+    : undefined
+  const amount =
+    financed?.amount ??
+    Math.max(
+      0,
+      Math.min(
+        target,
+        (sponsor
+          ? Math.min(sponsor.budget, w.nations[r.nation].treasury)
+          : f.cash * decisionPolicy().investmentShare) / Math.max(1e-9, unitCost),
+        Math.max(0, hh.laborForce - hh.employed) / labor,
+        r.stocks.timber / 300,
+        r.stocks.stone / 400,
+        r.stocks.tools / 40,
+      ),
+    )
+  if (amount <= 1e-7 || f.projects.length >= 120) return 0
+  const cost = amount * unitCost
+  if (sponsor) {
+    const payer = `government:${r.nation}`
+    const owners = f.owners ?? { [householdAccount(r.id, 'owner')]: 1 }
+    const shares = Object.values(owners).reduce((sum, share) => sum + share, 0)
+    // Subscribe new equity at current book value, without taking private shares.
+    const value = Math.max(
+      unitCost * 0.05,
+      f.cash +
+        f.capital * unitCost +
+        f.projects.reduce((sum, p) => sum + p.cost, 0) +
+        GOODS.reduce((sum, g) => sum + (f.stocks[g] * f.prices[g]) / 1000, 0) -
+        loansForBorrower(w, firmAccount(f.id)).reduce((sum, l) => sum + l.principal, 0),
+    )
+    const cashCost = financed?.cash ?? cost
+    const paid = transfer(w, payer, firmAccount(f.id), cashCost, 'public enterprise equity')
+    if (paid < cashCost - 1e-9) throw new Error('Public investment funding changed during settlement')
+    owners[payer] = (owners[payer] ?? 0) + (cost / value) * Math.max(1e-9, shares)
+    f.owners = owners
+    f.activity = sponsor.activity
+    w.nations[r.nation].spending += cost
+    w.nations[r.nation].capitalSpending = (w.nations[r.nation].capitalSpending ?? 0) + cost
+  }
   for (const [input, quantity] of Object.entries(recipe)) {
     const g = input as Good,
       // Division followed by multiplication can exceed the limiting stock by one ULP.
       // Bound the actual withdrawal too, so empty stores cannot become negative dust.
       used = Math.min(r.stocks[g], amount * quantity)
+    const deferred = (Math.min(used, financed?.deferred[g] ?? 0) * r.prices[g]) / 1000
+    issueSupplierCredit(w, r, deferred)
     const paid = transfer(
       w,
       firmAccount(f.id),
       producerAccount(r.id),
-      (used * r.prices[g]) / 1000,
+      (used * r.prices[g]) / 1000 - deferred,
       'capital materials',
     )
-    recordGoodsSale(w, marketStore(r.id), g, used, paid, {
+    recordGoodsSale(w, marketStore(r.id), g, used, paid + deferred, {
       kind: 'business',
       nation: economicNation(w, r.id),
       account: firmAccount(f.id),
@@ -686,10 +740,10 @@ function invest(w: World, r: Region, f: CompetitiveFirm) {
   hh.employed += amount * labor
   if (r.nation >= 0) w.nations[r.nation].income += tax
   recordWages(w, r.id, firmAccount(f.id), paid)
-  const cost = amount * unitCost
   recordOwnCapital(w, r.id, firmAccount(f.id), cost)
   f.projects.push({ remaining: P.constructionMonths, capital: amount, cost })
   merchant.investment += cost
+  return cost
 }
 /** Fund capital before public hiring and residential construction consume all
  * remaining workers and materials. Every project still pays wages and inputs. */
@@ -711,7 +765,7 @@ export function finishFirms(w: World) {
         w,
         firmAccount(f.id),
         `government:${r.nation}`,
-        Math.max(0, f.profit) * collectedTaxRate(w, r),
+        Math.max(0, f.profit) * collectedTaxRate(w, r) * (1 - reserveTaxRelief(w, r, f)),
         'enterprise profit tax',
       )
       if (r.nation >= 0) w.nations[r.nation].income += f.taxes
@@ -735,6 +789,10 @@ export function finishFirms(w: World) {
         )
         const [, unit, stratum] = owner.split(':')
         if (owner.startsWith('household:')) e.households[+unit][stratum as EconomicStratum].income += dividend
+        if (owner.startsWith('government:')) {
+          w.nations[+unit].income += dividend
+          w.nations[+unit].enterpriseIncome = (w.nations[+unit].enterpriseIncome ?? 0) + dividend
+        }
       }
       f.distress =
         (f.desiredEmployment > 1 && f.employment < f.desiredEmployment * 0.05) ||
@@ -790,7 +848,8 @@ export function finishFirms(w: World) {
       }
       if (slot && active.length < target && balance(w, owner) >= seed * 2) {
         slot.active = true
-        if (w.localEconomy) slot.owners = { [owner]: 1 }
+        slot.owners = { [owner]: 1 }
+        delete slot.activity
         slot.generation++
         // Delete absent optional state: an own undefined property disappears in
         // JSON and would change insertion order on the next paid labor record.

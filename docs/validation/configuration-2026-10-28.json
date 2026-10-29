@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-28",
+  "scope": "Advanced world creation, central world configuration, staged live tuning and exhaustive climate matrix",
+  "registry": {
+    "fields": 338,
+    "liveFields": 265,
+    "groups": 27,
+    "biomeMatrix": { "temperatureRows": 5, "moistureColumns": 4 },
+    "terrainOverrideRows": ["tundra", "desert"]
+  },
+  "checks": [
+    { "command": "npm run build", "result": "passed; existing bundle-size advisory remains" },
+    { "command": "node --import tsx --test tests/configuration.test.ts tests/labor-monetary.test.ts tests/frontier-settlements.test.ts", "result": "25 passed at regression checkpoint" },
+    { "command": "node --import tsx --test tests/configuration.test.ts", "result": "10 passed after consumption-weight normalization and coverage test" },
+    { "command": "node --import tsx --test --test-name-pattern='validated parameters|climate keeps' tests/configuration.test.ts", "result": "2 passed after explicit legacy-world climate isolation" },
+    { "command": "node --import tsx --test --test-name-pattern='complete registry|biome matrix' tests/configuration.test.ts", "result": "2 passed after compile-time exhaustive climate-default typing" },
+    { "command": "node --import tsx --test --test-name-pattern='geographic growing seasons' tests/living-world.test.ts", "result": "1 passed" },
+    { "command": "git diff --check", "result": "passed" }
+  ],
+  "browser": {
+    "fixture": "Configuration browser verification: Regional, five states, 4000 capital residents and opening year 1850",
+    "verified": [
+      "Advanced creation produces the configured starting year and state count",
+      "Temperature, hot/wet biome and policy rate apply together and read back from reopened controls",
+      "Discard leaves the saved policy rate unchanged",
+      "Out-of-range temperature is rejected without closing the editor",
+      "Clearing search restores all live parameter groups",
+      "Live update while running succeeds, simulation advances to March 1850 and reopened controls show 36 degrees Celsius with no pending changes",
+      "Browser reload preserves the configured world",
+      "Phone document remains 390px wide; 686px matrix scrolls within a 316px container"
+    ],
+    "viewports": [[1440, 1000], [390, 844]],
+    "captures": [
+      ".impeccable/review/configuration/desktop-setup.png",
+      ".impeccable/review/configuration/mobile-setup.png",
+      ".impeccable/review/configuration/desktop-live.png",
+      ".impeccable/review/configuration/mobile-live.png",
+      ".impeccable/review/configuration/desktop-matrix.png",
+      ".impeccable/review/configuration/mobile-matrix.png"
+    ],
+    "accessibility": "Dialog-scoped axe audit: zero violations, one incomplete contrast check; rendered controls inspected visually",
+    "limitations": "Frozen static preview has no disk-save API. Background Save issue is expected in this preview; disk autosave was not qualified here. Matrix captures intentionally show a scrolled section."
+  },
+  "independentReview": {
+    "initialDisposition": "fix",
+    "fixes": ["Stack mobile world-setup fields to show complete selected values", "Show temperature units and bounds"],
+    "finalDisposition": "ship",
+    "scope": "Both requested fixes resolved; no directly introduced regressions observed in six recaptures. No separate quality-bar certification."
+  },
+  "boundaries": [
+    "Structural units and serialization limits are centralized separately and cannot be edited live",
+    "Inline algorithmic literals remain in simulation modules; this is not an exhaustive claim that every numeric expression is configurable",
+    "Shared checkout contains concurrent unrelated changes; validation describes the tested working tree, not a committed revision",
+    "No performance or long-run calibration qualification is claimed"
+  ]
+}

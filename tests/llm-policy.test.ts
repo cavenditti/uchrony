@@ -38,10 +38,33 @@ const endpoints = [
   ),
 ]
 
-test('production endpoints default off with credentials; manual roles cannot enable calls', async () => {
+test('production endpoints default on with credentials without toggling the policy', async () => {
   process.env.OPENROUTER_API_KEY = 'dummy-test-key'
   let calls = 0
   const policy = new LlmPolicy(() => false)
+  const middleware = storytellerMiddleware('test', policy, async () => {
+    calls++
+    return Response.json({ choices: [{ message: { content: '{}' }, finish_reason: 'stop' }] })
+  })
+  const status = await request(middleware, '/api/history/status')
+  assert.equal(status.body.policy.enabled, true)
+  const { generation, instance } = status.body.policy
+  for (const endpoint of endpoints) {
+    const result = await request(middleware, `/api/${endpoint}`, {
+      context: {},
+      policyGeneration: generation,
+      policyInstance: instance,
+    })
+    assert.equal(result.code, 200, endpoint)
+  }
+  assert.equal(calls, endpoints.length)
+})
+
+test('disabled production endpoints reject calls with credentials; manual roles cannot enable calls', async () => {
+  process.env.OPENROUTER_API_KEY = 'dummy-test-key'
+  let calls = 0
+  const policy = new LlmPolicy(() => false)
+  policy.set(false)
   const middleware = storytellerMiddleware('test', policy, async () => {
     calls++
     throw new Error('No network permitted')
@@ -70,11 +93,22 @@ test('off barrier aborts requests and rejects old generations after re-enabling'
 
 test('server override cannot be enabled by a tab or imported content', async () => {
   const policy = new LlmPolicy(() => true)
-  const result = await request(storytellerMiddleware('test', policy), '/api/history/policy', {
+  let calls = 0
+  const middleware = storytellerMiddleware('test', policy, async () => {
+    calls++
+    throw new Error('No network permitted')
+  })
+  assert.equal(policy.snapshot().enabled, false)
+  assert.equal(policy.snapshot().forcedOff, true)
+  const result = await request(middleware, '/api/history/policy', {
     enabled: true,
   })
   assert.equal(result.code, 400)
   assert.equal(policy.snapshot().enabled, false)
+  for (const endpoint of endpoints) {
+    assert.equal((await request(middleware, `/api/${endpoint}`, { context: {} })).code, 403)
+  }
+  assert.equal(calls, 0)
 })
 
 test('disable during provider response prevents schema repair and stale result publication', async () => {

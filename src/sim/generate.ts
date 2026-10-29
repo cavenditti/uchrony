@@ -1,3 +1,7 @@
+import { configurationValues, withConfigurationValues } from './configuration-context'
+import { validateConfigurationValues } from './configuration'
+import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './configuration-defaults'
+import { applyStartingEndowments } from './starting-conditions'
 import { advanceAlmanac } from './almanac'
 import { habitableLand } from './terrain-access'
 import { seedLandscape, settlementWeight } from './landscape'
@@ -26,8 +30,8 @@ import { generateGeography } from './geography'
 import { MinHeap } from './heap'
 export { CELL_SIZE, neighbors } from './grid'
 
-export const GRID_W = 112
-export const GRID_H = 72
+export { GRID_W } from './simulation-invariants'
+export { GRID_H } from './simulation-invariants'
 export const NAMES = [
   ['Aurelian Republic', 'Aurelia', '#d9b86c', 'Republic', 'mercantile'],
   ['Kingdom of Veyr', 'Veyr', '#759faf', 'Monarchy', 'expansionist'],
@@ -165,7 +169,36 @@ export function generateWorld(
   settings: SimulationSettings = DEFAULT_SETTINGS,
   scale: WorldScale = 'regional',
   start: 'settled' | 'frontier' = 'settled',
+  configuration?: ConfigurationValues,
 ): World {
+  const values =
+    configuration === undefined ? DEFAULT_CONFIGURATION_VALUES : validateConfigurationValues(configuration)
+  if (!['settled', 'frontier'].includes(start)) throw new Error('Unknown settlement pattern.')
+  return withConfigurationValues(values, () =>
+    generateConfiguredWorld(
+      seed,
+      continents,
+      nationCount,
+      configuration ? values.conditions : settings,
+      scale,
+      start,
+      configuration === undefined ? undefined : values,
+    ),
+  )
+}
+
+/** Geography and endowments are seeded once. Downstream initialization consumes
+ * these actual people and goods; it must not recreate the default balances. */
+function generateConfiguredWorld(
+  seed: string,
+  continents: number,
+  nationCount: number,
+  settings: SimulationSettings,
+  scale: WorldScale,
+  start: 'settled' | 'frontier',
+  configuration?: ConfigurationValues,
+): World {
+  const opening = configurationValues().starting
   const extent = WORLD_SCALES[worldScale(scale)]
   settings = validateSettings(settings)
   continents = Math.round(clamp(continents, 1, 5))
@@ -177,9 +210,15 @@ export function generateWorld(
   seedLandscape(cells, width, height, seed)
   const land = cells.filter((c) => c.terrain !== 'water')
   const habitable = land.filter(habitableLand)
+  if (habitable.length < nationCount)
+    throw new Error('Geography leaves too little habitable land for the requested states.')
   const seeds: Cell[] = [habitable[Math.floor(rand() * habitable.length)]]
   const minDistances = new Float64Array(cells.length).fill(Infinity)
-  const targetRegions = Math.min(extent.provinces, Math.floor(land.length / 13))
+  const targetRegions = Math.min(
+    configurationValues().geography.provinceCount || extent.provinces,
+    Math.floor(land.length / 13),
+    habitable.length,
+  )
   for (let i = 1; i < targetRegions; i++) {
     const last = seeds[seeds.length - 1]
     let best = habitable[0],
@@ -308,7 +347,7 @@ export function generateWorld(
       stocks,
       production: inventory(),
       consumption: inventory(),
-      prices: inventory(),
+      prices: { ...configurationValues().basePrices },
       foodCoverage: 1,
       migration: 0,
       births: 0,
@@ -373,6 +412,10 @@ export function generateWorld(
     )
     if (!candidates.length)
       candidates.push(...regions.filter((r) => habitableLand(cells[r.center]) && !capitals.includes(r)))
+    if (!candidates.length)
+      throw new Error(
+        'Geography cannot support this many starting states. Reduce the count or change the seed.',
+      )
     let best = candidates[0],
       max = -1
     for (const r of candidates) {
@@ -462,7 +505,7 @@ export function generateWorld(
             neighbors(r.center, width, height).every((id) => habitableLand(cells[id])),
         )
         .sort((a, b) => hashSeed(`${seed}:market:${a.id}`) - hashSeed(`${seed}:market:${b.id}`))
-        .slice(0, Math.max(1, Math.floor(regions.length / 60)))
+        .slice(0, Math.max(1, Math.floor(regions.length / opening.marketOneIn)))
         .map((r) => r.id),
     )
     for (const r of regions) {
@@ -471,11 +514,11 @@ export function generateWorld(
       const roll = hashSeed(`${seed}:independent:${r.id}`)
       const market = markets.has(r.id)
       const people = capital
-        ? 2500
+        ? opening.capitalPopulation
         : market
-          ? 1800 + (roll % 801)
-          : habitableLand(cells[r.center]) && roll % 7 === 0
-            ? 40 + (roll % 121)
+          ? opening.marketPopulation + (roll % (opening.marketVariation + 1))
+          : habitableLand(cells[r.center]) && roll % opening.hamletOneIn === 0
+            ? opening.hamletPopulation + (roll % (opening.hamletVariation + 1))
             : 0
       r.population = { children: Math.floor(people * 0.29), adults: Math.floor(people * 0.62), elders: 0 }
       r.population.elders = people - r.population.children - r.population.adults
@@ -483,25 +526,18 @@ export function generateWorld(
       r.infrastructure = capital ? 0.2 : market ? 0.12 : 0.02
       r.industry = capital ? 0.18 : market ? 0.12 : people ? 0.02 : 0
       r.stocks = inventory()
-      if (capital)
-        Object.assign(r.stocks, {
-          food: 780,
-          timber: 300,
-          stone: 200,
-          iron: 60,
-          coal: 30,
-          tools: 80,
-          textiles: 80,
-        })
+      if (capital) Object.assign(r.stocks, opening.capitalStocks)
       else if (people)
         Object.assign(r.stocks, { food: people * 0.026 * 6, timber: people * 0.02, tools: people * 0.003 })
     }
     for (const n of nations) {
-      n.treasury = 500
-      n.population = 2500
+      n.treasury = opening.treasury
+      n.population = opening.capitalPopulation
     }
   }
+  if (configuration) applyStartingEndowments(regions, nations, start, opening)
   const world: World = {
+    ...(configuration ? { configuration: { version: 1 as const, revision: 0, values: configuration } } : {}),
     version: 1,
     generatorVersion: 5,
     ...(start === 'frontier' ? { settlementStart: 'frontier' as const } : {}),
@@ -511,7 +547,7 @@ export function generateWorld(
     seed,
     rng: rng.rng,
     month: 0,
-    startYear: 1720,
+    startYear: opening.year,
     width,
     height,
     cells,
@@ -540,18 +576,24 @@ export function generateWorld(
       })
     }
   for (const n of nations) {
-    if (start === 'frontier') continue
+    if (start === 'frontier' || opening.armyScale === 0) continue
     const r = regions[n.capital]
-    let soldiers = Math.min(3000, Math.floor(r.population.adults * 0.08))
+    let soldiers = Math.min(
+      Math.round(3000 * opening.armyScale),
+      Math.floor(r.population.adults * Math.min(1, 0.08 * opening.armyScale)),
+    )
     if (scale === 'regional') r.population.adults -= soldiers
     else {
       // A larger country begins with a standing establishment proportional to
       // its people. All initial personnel come from its civilian population.
-      let needed = Math.max(
-        3000,
-        Math.floor(
-          regions.filter((p) => p.nation === n.id).reduce((sum, p) => sum + population(p), 0) * 0.002,
-        ),
+      let needed = Math.round(
+        opening.armyScale *
+          Math.max(
+            3000,
+            Math.floor(
+              regions.filter((p) => p.nation === n.id).reduce((sum, p) => sum + population(p), 0) * 0.002,
+            ),
+          ),
       )
       soldiers = 0
       for (const province of [r, ...regions.filter((p) => p.nation === n.id && p.id !== r.id)]) {
@@ -591,15 +633,15 @@ export function generateWorld(
   ensurePopulation(world)
   ensureCharacters(world)
   for (const nation of world.nations) {
-    nation.policies = characterPolicyTargets(nation)
-    nation.researchFocus = characterResearch(nation)
+    nation.policies = opening.policyFromLeaders ? characterPolicyTargets(nation) : { ...opening.policies }
+    nation.researchFocus = opening.researchFromLeaders ? characterResearch(nation) : opening.researchFocus
   }
   ensureWarfare(world)
   for (const n of world.nations) {
     const port = world.regions
       .filter((r) => r.nation === n.id && portAt(world, r.id))
       .sort((a, b) => b.stocks.timber - a.stocks.timber)[0]
-    if (port && start === 'settled') {
+    if (port && start === 'settled' && opening.fleets) {
       try {
         commissionFleet(world, n.id, port.id, 1, 4)
       } catch {

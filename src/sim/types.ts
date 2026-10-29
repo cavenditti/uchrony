@@ -19,7 +19,7 @@ import type {
   NationalIdentity,
 } from './population-types'
 
-export const MAX_STATE_IDENTITIES = 256
+export { MAX_STATE_IDENTITIES } from './simulation-invariants'
 export const GOODS = ['food', 'timber', 'stone', 'iron', 'coal', 'tools', 'textiles', 'arms'] as const
 export type Good = (typeof GOODS)[number]
 export type Inventory = Record<Good, number>
@@ -67,6 +67,7 @@ export interface Region {
   capitalReference?: number
   delegation?: ProvincialDelegation
   occupation?: Occupation
+  control?: import('./military-control').MilitaryControl
   id: number
   name: string
   /** -1 means land outside any state's sovereignty. */
@@ -122,6 +123,7 @@ export interface Policies {
 }
 export interface Nation {
   id: number
+  development?: import('./development').DevelopmentPlan
   /** Historical identity remains addressable after the last resident dies. */
   extinct?: number
   name: string
@@ -142,6 +144,8 @@ export interface Nation {
   researchFocus: Research
   income: number
   spending: number
+  capitalSpending?: number
+  enterpriseIncome?: number
   gdp: number
   population: number
   foodCoverage: number
@@ -281,6 +285,7 @@ export interface World {
   }[]
   economy?: EconomicSystem
   version: 1
+  configuration?: import('./configuration').WorldConfiguration
   simulation?: SimulationSettings
   institutions?: InstitutionalState
   intelligence?: IntelligenceState
@@ -305,6 +310,7 @@ export interface World {
   routes: Route[]
   tradeLanes?: TradeLane[]
   harbors?: { cell: number; since: number; updated: number; lastActive: number; throughput: number }[]
+  farmProjects?: import('./agriculture').FarmProject[]
   corridors?: CorridorTrace[]
   corridorPlan?: CorridorPlan
   historical?: HistoricalState
@@ -327,6 +333,9 @@ export interface World {
   }
 }
 export type Command =
+  | { type: 'annex'; nation: number; region: number }
+  | { type: 'peace-proposal'; nation: number; target: number; payer: number; payment: number; cede: number[] }
+  | { type: 'peace-answer'; nation: number; offer: number; accept: boolean }
   | { type: 'found-settlement'; nation: number; cell: number }
   | {
       type: 'intelligence'
@@ -344,6 +353,7 @@ export type Command =
       powers: ProvincialDelegation['powers']
     }
   | { type: 'conditions'; settings: SimulationSettings }
+  | { type: 'configuration'; values: import('./configuration-defaults').ConfigurationValues; revision: number }
   | { type: 'policy'; nation: number; key: keyof Policies; value: Policies[keyof Policies] }
   | { type: 'identity-policy'; nation: number; key: 'culture' | 'language' | 'belief'; identity: number }
   | { type: 'research'; nation: number; field: Research }
@@ -359,7 +369,7 @@ export type Command =
       type: 'army-orders'
       army: number
       stance: 'march' | 'hold' | 'entrench'
-      conduct: 'restrained' | 'requisition'
+      conduct: 'restrained' | 'requisition' | 'pillage'
     }
   | { type: 'commission'; nation: number; region: number; warships: number; transports: number }
   | {
@@ -372,7 +382,7 @@ export type Command =
   | {
       type: 'build'
       region: number
-      building: 'farm' | 'industry' | 'road' | 'school' | import('./public-works').TransportProject
+      building: 'farm' | 'food-works' | 'textile-works' | 'industry' | 'road' | 'school' | import('./public-works').TransportProject
     }
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }
@@ -389,6 +399,8 @@ export type WorkerRequest =
       continents?: number
       nations?: number
       settings?: SimulationSettings
+      configuration?: import('./configuration-defaults').ConfigurationValues
+      start?: 'settled' | 'frontier'
       scale?: WorldScale
     }
   | { type: 'step'; count: number }

@@ -104,6 +104,7 @@ test('writing uses chosen model and provider speed, counts retries and respects 
   settings.sessionCallLimit = 1
   await service.update(settings)
   const policy = new LlmPolicy(() => false)
+  policy.set(false)
   let dispatched: any[] = []
   const middleware = storytellerMiddleware(
     'test',
@@ -132,6 +133,7 @@ test('cross-origin callers cannot mutate assignments; imports do not enable mode
   const service = new ModelService()
   await service.initialize({})
   const policy = new LlmPolicy(() => false)
+  policy.set(false)
   const middleware = storytellerMiddleware(
     'test',
     policy,

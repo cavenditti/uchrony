@@ -9,7 +9,7 @@ import { SpatialBuckets } from './spatial-buckets'
 import { habitableLand } from './terrain-access'
 
 type Access = ReturnType<typeof settlementAccess>
-const MOVING_HAZARD = 1 - Math.exp(-SETTLEMENT.annualMovingHazard / 12)
+const movingHazard = () => 1 - Math.exp(-SETTLEMENT.annualMovingHazard / 12)
 
 /** Aggregate infill demand between detailed location reviews. Pending funded
  * capacity offsets the shortage once; this never creates an unpaid building. */
@@ -133,7 +133,7 @@ export function multiCentreHousingDemand(w: World, access: Access) {
       const weight = options.reduce((sum, o) => sum + o.weight, 0)
       const budget =
         access.occupied(home) *
-        MOVING_HAZARD *
+        movingHazard() *
         12 *
         1.15 *
         options.reduce((max, o) => Math.max(max, o.weight), 0)

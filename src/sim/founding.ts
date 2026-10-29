@@ -1,3 +1,5 @@
+import { withWorldConfiguration } from './configuration'
+import { parameterGroup } from './configuration-context'
 import { decisionPolicy, domesticMonthlyWage } from './decision-policy'
 import { recordWorldEvent } from './event-memory'
 import { simulationMonths } from './simulation-period'
@@ -27,17 +29,7 @@ import { refreshCityLabels } from './cities'
 import { rebuildAdaptiveMesh } from './adaptive-world'
 import { settlementComponents, type SettlementComponent } from './settlement-morphology'
 
-export const FOUNDING = {
-  people: 600,
-  reserve: 1200,
-  cash: 120,
-  food: 94,
-  timber: 40,
-  stone: 20,
-  tools: 5,
-  range: 24,
-  reserveMonths: 3,
-} as const
+export const FOUNDING = parameterGroup('founding')
 
 /** A settlement pays the same per-resident costs at every expedition size. */
 export function pioneerExpedition(w?: World, nation?: number): Expedition {
@@ -82,6 +74,9 @@ function reachable(w: World, nation: number, cell: number, range: number) {
 
 /** Validate the entire expedition before any person, goods, cash or border moves. */
 export function foundingPlan(w: World, nation: number, cell: number, expedition: Expedition = FOUNDING) {
+  return withWorldConfiguration(w, () => configuredFoundingPlan(w, nation, cell, expedition))
+}
+function configuredFoundingPlan(w: World, nation: number, cell: number, expedition: Expedition) {
   const state = w.nations[nation],
     terrain = w.cells[cell],
     region = w.regions[terrain?.region]

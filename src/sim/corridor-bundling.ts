@@ -1,15 +1,9 @@
+import { parameterGroup } from './configuration-context'
 import type { CorridorProfile } from './corridors'
 import { MinHeap } from './heap'
 import type { RouteLeg, World } from './types'
 
-export const CORRIDOR_BUNDLING = {
-  radius: 8,
-  minimumSharedEdges: 3,
-  travelWeight: 0.15,
-  maximumExtraEffort: 0.25,
-  maximumExtraCost: 0.4,
-  passes: 4,
-} as const
+export const CORRIDOR_BUNDLING = parameterGroup('corridorBundling')
 
 /** Minimize occupied corridor effort plus travel effort across the surveyed network.
  * Each leg temporarily releases its edges before looking for a shared alternative.

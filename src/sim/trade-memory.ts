@@ -1,11 +1,8 @@
+import { parameterGroup } from './configuration-context'
 import { GOODS, inventory, relation, type TradeLane, type World } from './types'
 import type { Graph } from './economy'
 
-export const TRADE_INERTIA = {
-  improvement: 0.25,
-  adjustment: 0.12,
-  idleMonths: 18,
-}
+export const TRADE_INERTIA = parameterGroup('tradeMemory')
 export const laneKey = (from: number, to: number) => `${from}-${to}`
 
 /** Previous monthly shipments seed memory when opening an older save. */

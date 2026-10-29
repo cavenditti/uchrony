@@ -1,9 +1,12 @@
 import type { AdvisorNote, StateAgent } from './statecraft-types'
 import type { World } from './types'
 
-export const ADVICE_LENGTH = 1200
-export const ADVICE_HISTORY = 12
-export const ADVICE_PENDING = 4
+import { ADVICE_LENGTH } from './simulation-invariants'
+export { ADVICE_LENGTH } from './simulation-invariants'
+import { ADVICE_HISTORY } from './simulation-invariants'
+export { ADVICE_HISTORY } from './simulation-invariants'
+import { ADVICE_PENDING } from './simulation-invariants'
+export { ADVICE_PENDING } from './simulation-invariants'
 
 const fingerprint = (text: string) => text.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase()
 

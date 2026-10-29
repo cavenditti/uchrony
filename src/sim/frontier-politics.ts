@@ -1,3 +1,5 @@
+import { parameterGroup } from './configuration-context'
+const frontierParameters = parameterGroup('frontierPolitics')
 import { expansionParameters } from './expansion-parameters'
 import { localImpression } from './influence'
 import { makeNation } from './generate'
@@ -27,15 +29,21 @@ export const FRONTIER_POLITICS = {
   get mandateMonths() {
     return expansionParameters().mandateMonths
   },
-  influence: 0.55,
+  get influence() {
+    return frontierParameters.influence
+  },
   get prosperityMonths() {
     return expansionParameters().prosperityMonths
   },
-  cityPopulation: 500,
+  get cityPopulation() {
+    return frontierParameters.cityPopulation
+  },
   get wealthPerPerson() {
     return expansionParameters().charterWealthPerPerson
   },
-  contribution: 0.1,
+  get contribution() {
+    return frontierParameters.contribution
+  },
 } as const
 
 export interface FrontierProgress {
@@ -52,7 +60,11 @@ export interface FrontierProgress {
 const atWar = (w: World, id: number) =>
   w.relations.some((r) => r.treaty === 'war' && (r.a === id || r.b === id))
 const solventGovernment = (w: World, n: Nation) =>
-  n.stability >= 45 && n.legitimacy >= 45 && n.foodCoverage >= 0.7 && n.treasury >= 0 && !atWar(w, n.id)
+  n.stability >= frontierParameters.solventStability &&
+  n.legitimacy >= frontierParameters.solventLegitimacy &&
+  n.foodCoverage >= frontierParameters.solventFood &&
+  n.treasury >= 0 &&
+  !atWar(w, n.id)
 
 function householdFunds(w: World, units: Region[]) {
   return units.reduce(

@@ -102,6 +102,7 @@ export interface BankingSystem {
   discrepancy: number
 }
 export interface CompetitiveFirm {
+  activity?: 'food' | 'tools' | 'textiles'
   locality?: number
   cell?: number
   owners?: Record<string, number>
@@ -203,6 +204,7 @@ export interface EconomicSystem {
   households: Record<number, Record<EconomicStratum, HouseholdAccount>>
   producers: Record<number, ProducerAccount>
   credit: { cash: number; loans: Loan[]; nextId: number; losses: number }
+  supplierCredit?: Record<number, Record<string, number>>
   banking?: BankingSystem
   firms?: CompetitiveFirm[]
   firmExits?: number

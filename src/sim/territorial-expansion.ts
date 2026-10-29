@@ -1,10 +1,14 @@
+import { configurationValues } from './configuration-context'
+import { DEFAULT_CONFIGURATION_VALUES } from './configuration-defaults'
 import { expansionParameters } from './expansion-parameters'
 import { recordWorldEvent } from './event-memory'
 import { CELL_METERS, edgeNeighbors } from './grid'
 import { communitySize } from './population'
 import { clamp, population, type Nation, type Region, type World } from './types'
 
-export const UNCLAIMED_ENCLAVE_MAX_AREA_KM2 = 16
+// Retained public default for callers that display the convention; calculation
+// reads the active world configuration at use time.
+export const UNCLAIMED_ENCLAVE_MAX_AREA_KM2 = DEFAULT_CONFIGURATION_VALUES.frontierPolitics.enclaveAreaKm2
 
 /** Absorb whole unclaimed pockets, including empty or mountainous land. Only
  * shared land edges count: water and the map boundary leave a pocket open.
@@ -44,7 +48,7 @@ export function absorbUnclaimedEnclaves(world: World) {
       const area = (cells.length * CELL_METERS ** 2) / 1e6
       if (
         !enclosed ||
-        area >= UNCLAIMED_ENCLAVE_MAX_AREA_KM2 ||
+        area >= configurationValues().frontierPolitics.enclaveAreaKm2 ||
         nation < 0 ||
         !world.nations[nation] ||
         world.nations[nation].extinct !== undefined

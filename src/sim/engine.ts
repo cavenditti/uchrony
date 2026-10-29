@@ -1,4 +1,11 @@
+import { applyConfiguration, withWorldConfiguration } from './configuration'
 import { decisionPolicy } from './decision-policy'
+import { advanceDevelopment, recordDevelopment } from './development'
+import { annexProvince } from './military-control'
+import { proposePeace, acceptablePeace } from './peace'
+import { advanceProductiveInvestment, buildProductiveActivity } from './productive-investment'
+import { advanceDomesticPolicy, nativeDomesticControl } from './domestic-policy'
+import { advanceAgriculturalInvestment, buildFarm, completeFarmProjects } from './agriculture'
 import { investProductiveCapital } from './firms'
 import { competitivePressure } from './competitive-pressure'
 import { urbanOpportunityByDistrict } from './urban-demography'
@@ -290,7 +297,9 @@ function science(w: World) {
       continue
     }
     n.researchProgress[focus] +=
-      periodFlow(nationalRealService(w, n.id, 'research') / 7) *
+      periodFlow(
+        nationalRealService(w, n.id, 'research') * (decisionPolicy().development ? 0.01 / 0.0015 : 1 / 7),
+      ) *
       (0.35 + literacy) *
       (1 + n.technologies.governance * 0.07) *
       effectMultiplier(w, 'research', n.id)
@@ -339,20 +348,6 @@ function diplomacy(w: World) {
     rel.grievance = Math.max(0, rel.grievance - 0.08)
     if (rel.treaty === 'war') {
       rel.warExhaustion += periodFlow(0.7 + (2 - a.foodCoverage - b.foodCoverage) * 1.5)
-      const resolve = (a.character!.effective.assertiveness + b.character!.effective.assertiveness) / 2
-      if (!w.statecraft && rel.warExhaustion > 30 + resolve * 20 && a.ai && b.ai) {
-        rel.treaty = 'truce'
-        rel.since = w.month
-        rel.warExhaustion = 0
-        rel.opinion = -15
-        event(
-          w,
-          'peace',
-          `${a.shortName} and ${b.shortName} sign an armistice`,
-          'War exhaustion forces a settlement. Current territorial control becomes the new border.',
-          a.id,
-        )
-      }
       continue
     }
     if (rel.treaty === 'truce') {
@@ -431,7 +426,7 @@ function diplomacy(w: World) {
     }
   }
   for (const n of w.nations)
-    if (!w.statecraft && n.ai && isAlive(w, n.id)) {
+    if (!decisionPolicy().agriculture && !w.statecraft && n.ai && isAlive(w, n.id)) {
       if (w.month % 6 === 0) {
         const targets = characterPolicyTargets(n)
         for (const key of [
@@ -525,6 +520,9 @@ function worldEvents(w: World) {
 }
 
 export function summarize(w: World, record = true) {
+  return withWorldConfiguration(w, () => summarizeConfigured(w, record))
+}
+function summarizeConfigured(w: World, record = true) {
   for (const n of w.nations) {
     const regions = nationRegions(w, n.id)
     n.population = regions.reduce((s, r) => s + population(r), 0) + militaryPeople(w, n.id)
@@ -570,6 +568,9 @@ export function summarize(w: World, record = true) {
 /** Establish physical land and the adaptive map before the first displayed month.
  * The same initialization is used by playback; observing a new world does not tick it. */
 export function prepareSpatialWorld(w: World) {
+  return withWorldConfiguration(w, () => prepareSpatialWorldConfigured(w))
+}
+function prepareSpatialWorldConfigured(w: World) {
   return withBatchedLedgerEntries(w, () => initializeSpatialWorld(w))
 }
 function initializeSpatialWorld(w: World) {
@@ -593,6 +594,9 @@ function initializeSpatialWorld(w: World) {
 
 /** One aggregate clearing and demographic integration, followed by physical reconciliation. */
 export function advanceCoarsePeriod(w: World, months = 6): World {
+  return withWorldConfiguration(w, () => advanceCoarsePeriodConfigured(w, months))
+}
+function advanceCoarsePeriodConfigured(w: World, months = 6): World {
   // Opening assets, inventories and cohorts are always initialized in monthly units.
   prepareSpatialWorld(w)
   ensureFirms(w)
@@ -604,6 +608,9 @@ export function advanceCoarsePeriod(w: World, months = 6): World {
 
 export type TickDetail = 'monthly' | 'coarse' | 'reconcile'
 export function tick(w: World, detail: TickDetail = 'monthly'): World {
+  return withWorldConfiguration(w, () => tickConfigured(w, detail))
+}
+function tickConfigured(w: World, detail: TickDetail = 'monthly'): World {
   const resumeMonthly = detail === 'monthly' && !!w.fastForward?.phase
   const result = withBatchedLedgerEntries(w, () => advanceMonth(w, resumeMonthly ? 'reconcile' : detail))
   if (resumeMonthly) w.fastForward!.phase = 0
@@ -621,6 +628,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   ensureWarfare(w)
   beginPopulationMonth(w)
   beginEconomyMonth(w)
+  completeFarmProjects(w)
   retireEmptyStates(w)
   arriveFreight(w)
   aggregateDistricts(w)
@@ -629,6 +637,8 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   advancePressures(w)
   advanceCharacters(w)
   if (w.statecraft) advanceStatecraft(w)
+  if (decisionPolicy().agriculture) advanceDomesticPolicy(w)
+  advanceDevelopment(w)
   linkDistrictPeople(w)
   for (const id of w.localEconomy!.active) refreshEndowment(w, w.localEconomy!.units[id], false)
   if (coarse) withLoanOriginationBatch(w, () => produce(w, true))
@@ -639,6 +649,8 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   else trade(w)
   advanceHarbors(w)
   advanceTradeInfluence(w)
+  if (decisionPolicy().agriculture) advanceAgriculturalInvestment(w)
+  advanceProductiveInvestment(w)
   investProductiveCapital(w)
   fiscalPolicy(w)
   if (decisionPolicy().realCosts) {
@@ -678,6 +690,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   if (absorbUnclaimedEnclaves(w)) reconcileJurisdictionSovereignty(w)
   refreshAdaptiveTotals(w)
   finishEconomyMonth(w)
+  recordDevelopment(w)
   if (w.adaptive?.transit)
     w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
   advanceSettlements(
@@ -732,6 +745,9 @@ function proposeTreaty(w: World, from: number, to: number, kind: 'trade' | 'alli
   return 'The proposal is dispatched. Consent, diplomatic preparation and review are required before it takes effect.'
 }
 export function applyCommand(w: World, command: Command): string {
+  return withWorldConfiguration(w, () => applyCommandConfigured(w, command))
+}
+function applyCommandConfigured(w: World, command: Command): string {
   if (w.localEconomy) {
     linkDistrictPeople(w)
     aggregateDistricts(w)
@@ -755,6 +771,41 @@ export function applyCommand(w: World, command: Command): string {
   return result
 }
 function executeCommand(w: World, command: Command): string {
+  if (command.type === 'annex') return annexProvince(w, command.nation, command.region)
+  if (command.type === 'peace-proposal') {
+    const offer = proposePeace(
+      w,
+      command.nation,
+      command.target,
+      command.payer,
+      command.payment,
+      command.cede,
+      true,
+    )
+    if (!offer) return foreignOfficeContext(w, command.nation).notice
+    if (nativeDomesticControl(w, w.nations[command.target]) && acceptablePeace(w, command.target, offer))
+      admitDiplomaticConsent(w, command.target, offer)
+    return 'Peace terms dispatched. Each government must sign, and funds and territory are checked again before settlement.'
+  }
+  if (command.type === 'peace-answer') {
+    const offer = w.statecraft?.offers.find(
+      (p) =>
+        p.id === command.offer &&
+        p.status === 'proposed' &&
+        p.parties.includes(command.nation) &&
+        p.terms.some((t) => t.kind === 'peace'),
+    )
+    if (!offer) throw new Error('Choose a pending peace proposal addressed to this government.')
+    if (command.accept) {
+      if (!admitDiplomaticConsent(w, command.nation, offer))
+        return foreignOfficeContext(w, command.nation).notice
+      settleConventionalOffers(w)
+      return 'Peace terms signed. Settlement follows diplomatic preparation and final resource checks.'
+    }
+    offer.status = 'rejected'
+    offer.ruling = 'The government rejected the proposed peace terms.'
+    return offer.ruling
+  }
   if ('nation' in command && command.nation !== null && w.nations[command.nation]?.extinct !== undefined)
     throw new Error('That state has ceased to exist.')
   if (command.type === 'found-settlement') return foundSettlement(w, command.nation, command.cell)
@@ -823,8 +874,16 @@ function executeCommand(w: World, command: Command): string {
     settleConventionalOffers(w)
     return 'Provincial responsibilities have been delegated under the recorded charter.'
   }
+  if (command.type === 'configuration') return applyConfiguration(w, command.values, command.revision)
   if (command.type === 'conditions') {
     w.simulation = validateSettings(command.settings)
+    if (w.configuration) {
+      w.configuration = {
+        ...w.configuration,
+        revision: w.configuration.revision + 1,
+        values: { ...w.configuration.values, conditions: w.simulation },
+      }
+    }
     return 'Simulation conditions updated. Existing people, stocks and commitments are preserved.'
   }
   if (command.type === 'commission')
@@ -837,7 +896,7 @@ function executeCommand(w: World, command: Command): string {
     if (
       !army ||
       !['march', 'hold', 'entrench'].includes(command.stance) ||
-      !['restrained', 'requisition'].includes(command.conduct)
+      !['restrained', 'requisition', 'pillage'].includes(command.conduct)
     )
       throw new Error('Choose a valid army stance and civilian conduct.')
     army.operations!.stance = command.stance
@@ -865,21 +924,25 @@ function executeCommand(w: World, command: Command): string {
     const r = w.regions[command.region]
     if (!r) throw new Error('That province does not exist.')
     const n = governance(w, r.nation)
+    if (
+      command.building === 'industry' ||
+      command.building === 'food-works' ||
+      command.building === 'textile-works'
+    )
+      return buildProductiveActivity(
+        w,
+        r.id,
+        command.building === 'industry' ? 'tools' : command.building === 'food-works' ? 'food' : 'textiles',
+      )
+    if (command.building === 'farm') return buildFarm(w, r.id)
     if (command.building === 'paved-road' || command.building === 'railway' || command.building === 'port')
       return buildTransport(w, r.id, command.building)
-    const cost = { farm: 450, industry: 900, road: 600, school: 500 }[command.building]
+    const cost = { road: 600, school: 500 }[command.building]
     if (!cost) throw new Error('Unknown building.')
     if (n.treasury < cost) return `Construction requires ${cost}k crowns in the treasury.`
     if (r.stocks.timber < 50 || r.stocks.stone < 70)
       return 'Construction requires 50 t of timber and 70 t of stone in this province.'
-    const maxed =
-      command.building === 'farm'
-        ? r.fertility >= 1.2
-        : command.building === 'industry'
-          ? r.industry >= 1.7
-          : command.building === 'road'
-            ? r.infrastructure >= 1.5
-            : r.literacy >= 0.99
+    const maxed = command.building === 'road' ? r.infrastructure >= 1.5 : r.literacy >= 0.99
     if (maxed) return 'This province has reached the development limit for this investment.'
     publicExpense(w, n.id, cost, 'public construction', r.id)
     recordUse(w, marketStore(r.id), 'timber', 50)
@@ -888,9 +951,6 @@ function executeCommand(w: World, command: Command): string {
     r.stocks.stone -= 70
     r.consumption.timber += 50
     r.consumption.stone += 70
-    if (command.building === 'farm') r.fertility = Math.min(1.2, r.fertility + 0.12)
-    if (command.building === 'industry')
-      w.economy!.producers[r.id].projects.push({ remaining: 6, capital: 0.18, cost })
     if (command.building === 'road') {
       r.infrastructure = Math.min(1.5, r.infrastructure + 0.2)
       r.publicWorks = { ...r.publicWorks, road: r.publicWorks?.road ?? 'gravel' }
@@ -902,7 +962,7 @@ function executeCommand(w: World, command: Command): string {
     event(
       w,
       'economy',
-      `${r.name} invests in ${command.building === 'farm' ? 'agriculture' : command.building === 'road' ? 'transport' : command.building === 'school' ? 'education' : 'industry'}`,
+      `${r.name} invests in ${command.building === 'road' ? 'transport' : command.building === 'school' ? 'education' : 'industry'}`,
       `The project uses ${cost}k crowns, 50 t timber, and 70 t stone.`,
       n.id,
       r.id,
@@ -1038,7 +1098,12 @@ function executeCommand(w: World, command: Command): string {
       if (rel.treaty !== 'war') return 'These states are not at war.'
       if (rel.warExhaustion < 5 && rel.opinion < -50)
         return `${other.shortName} rejects an early armistice. War exhaustion must reach 5.`
-      return proposeTreaty(w, n.id, other.id, 'peace')
+      const offer = proposePeace(w, n.id, other.id, n.id, 0, [], true)
+      if (offer && nativeDomesticControl(w, other) && acceptablePeace(w, other.id, offer))
+        admitDiplomaticConsent(w, other.id, offer)
+      return offer
+        ? 'Armistice proposed. A government holding enemy land may require concessions.'
+        : foreignOfficeContext(w, n.id).notice
     } else if (command.action === 'embargo') {
       if (rel.treaty === 'war') return 'Wartime borders are already closed.'
       rel.treaty = 'neutral'

@@ -1,3 +1,5 @@
+import { configurationFor } from './configuration'
+import { supplierDebt } from './supplier-credit'
 import { economicRegion } from './local-units'
 import { auditBanks } from './banking'
 import { GOODS, type World } from './types'
@@ -5,6 +7,10 @@ import { STRATA } from './economic-types'
 import { auditNationalAccounts, emptyGDP } from './national-accounts'
 import { balances } from './ledger'
 export function validateEconomy(w: World) {
+  const bankAccount = (account: unknown) => {
+    if (typeof account !== 'string' || !/^bank:(0|[1-9]\d*)$/.test(account)) return false
+    return Number(account.slice(5)) < configurationFor(w).model.bankCount
+  }
   const e = w.economy
   if (!e) return
   const fail = (message: string): never => {
@@ -129,6 +135,22 @@ export function validateEconomy(w: World) {
         f.generation < 0
       )
         fail('firm identity')
+      if (f.activity !== undefined && !['food', 'tools', 'textiles'].includes(f.activity))
+        fail('firm activity')
+      if (
+        f.owners !== undefined &&
+        (!obj(f.owners) ||
+          Object.entries(f.owners).some(
+            ([a, v]) =>
+              !num(v) ||
+              !(
+                (/^government:\d+$/.test(a) && w.nations[+a.split(':')[1]]) ||
+                (/^household:\d+:(smallholder|laborer|artisan|professional|owner)$/.test(a) &&
+                  e.households[+a.split(':')[1]])
+              ),
+          ))
+      )
+        fail('firm ownership')
       for (const key of [
         'cash',
         'capital',
@@ -235,10 +257,22 @@ export function validateEconomy(w: World) {
       fail('floating loan reset')
     ids.add(l.id)
   }
+  if (e.supplierCredit !== undefined) {
+    if (!obj(e.supplierCredit)) fail('supplier claims')
+    for (const [id, claims] of Object.entries(e.supplierCredit)) {
+      if (
+        !/^\d+$/.test(id) ||
+        !w.nations[+id] ||
+        !obj(claims) ||
+        Object.entries(claims).some(([a, v]) => !keys.has(a) || !a.startsWith('producer:') || !num(v))
+      )
+        fail('supplier claims')
+    }
+  }
   for (const n of w.nations) {
     const debt = e.credit.loans
       .filter((l) => l.borrower === `government:${n.id}`)
-      .reduce((sum, l) => sum + l.principal, 0)
+      .reduce((sum, l) => sum + l.principal, supplierDebt(w, n.id))
     if (Math.abs(debt - n.debt) > Math.max(1, debt) * 1e-8) fail('sovereign liability has no matching asset')
   }
   const l = e.ledger
@@ -262,8 +296,8 @@ export function validateEconomy(w: World) {
   for (const item of l.entries)
     if (
       !obj(item) ||
-      !(keys.has(item.from) || /^bank:[0-2]$/.test(item.from)) ||
-      !(keys.has(item.to) || /^bank:[0-2]$/.test(item.to)) ||
+      !(keys.has(item.from) || bankAccount(item.from)) ||
+      !(keys.has(item.to) || bankAccount(item.to)) ||
       !num(item.amount) ||
       typeof item.category !== 'string' ||
       item.category.length > 160
@@ -286,7 +320,7 @@ export function validateEconomy(w: World) {
       !obj(b) ||
       b.version !== 1 ||
       !Array.isArray(b.banks) ||
-      b.banks.length !== 3 ||
+      b.banks.length !== configurationFor(w).model.bankCount ||
       !obj(b.accounts) ||
       !obj(b.centralBank) ||
       !num(b.created) ||

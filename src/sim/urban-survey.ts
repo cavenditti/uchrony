@@ -40,7 +40,8 @@ function surveyPart(w: World, source: PhysicalSite, neighbors: PhysicalSite[]) {
     site.investedValue = invested[i]
     site.residents = people[i]
     site.founded = source.founded
-    site.capitalOwner = source.capitalOwner
+    if (source.capitalOwner !== undefined) site.capitalOwner = source.capitalOwner
+    else delete site.capitalOwner
     if (i) site.building = plots[i - 1].building
     site.fabric = {
       ...structuredClone(fabric),

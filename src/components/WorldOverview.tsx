@@ -1,3 +1,4 @@
+import { supplierDebt } from '../sim/supplier-credit'
 import { useMemo, useState } from 'react'
 import { population, relation, type Command, type World } from '../sim/types'
 import { INSTITUTION_POWERS, PROVINCIAL_POWERS, type Charter } from '../sim/institutions'
@@ -16,6 +17,8 @@ const labels: Record<View, string> = {
 }
 const number = (value: number) => Math.round(value).toLocaleString(),
   percent = (value: number) => `${Math.round(value * 100)}%`
+const financial = (value: number) =>
+  (Math.abs(value) < 0.0005 ? 0 : value).toLocaleString(undefined, { maximumFractionDigits: 3 })
 const templates: Record<Charter['form'], { name: string; powers: Charter['powers']; rule: Charter['rule'] }> =
   {
     'defense-league': { name: 'Mutual Defense League', powers: ['defense'], rule: 'unanimity' },
@@ -100,7 +103,12 @@ export function WorldOverview({
         realOutput: world.economy?.national[n.id]?.realOutput ?? 0,
         unemployment: world.economy?.national[n.id]?.unemployment ?? 0,
         inequality: world.economy?.national[n.id]?.inequality ?? 0,
-        perHead: (n.gdp * 1000) / Math.max(1, n.population),
+        perHead: ((world.economy?.national[n.id]?.realOutput ?? 0) * 1000) / Math.max(1, n.population),
+        supplierDebt: supplierDebt(world, n.id),
+        balance: n.income - n.spending,
+        operating: n.income - n.spending + (n.capitalSpending ?? 0),
+        capitalSpending: n.capitalSpending ?? 0,
+        enterpriseIncome: n.enterpriseIncome ?? 0,
         treasury: n.treasury,
         debt: n.debt,
         food: avg('foodCoverage'),
@@ -124,7 +132,9 @@ export function WorldOverview({
         territory: regions.length,
         vulnerable: security.fragile,
         contested: security.contested,
-        occupied: regions.filter((r) => r.occupation).length,
+        occupied: world.regions.filter(
+          (r) => r.control?.nation === n.id || (r.nation === n.id && r.occupation),
+        ).length,
         autonomy:
           regions.reduce((s, r) => s + (r.delegation?.autonomy ?? 0) * population(r), 0) /
           Math.max(1, people),
@@ -135,13 +145,34 @@ export function WorldOverview({
   type Column = { key: keyof Row; label: string; format?: (value: number) => string }
   const columns: Record<string, Column[]> = {
     economy: [
-      { key: 'output', label: 'Value added, k' },
-      { key: 'realOutput', label: 'Real output, k' },
+      {
+        key: 'output',
+        label: 'Value added / mo, k',
+        format: financial,
+      },
+      {
+        key: 'realOutput',
+        label: 'Real output / mo, k',
+        format: financial,
+      },
       { key: 'unemployment', label: 'Unemployment', format: percent },
       { key: 'inequality', label: 'Income Gini', format: (value) => value.toFixed(3) },
-      { key: 'perHead', label: 'Output / person' },
-      { key: 'treasury', label: 'Treasury, k' },
-      { key: 'debt', label: 'Debt, k' },
+      {
+        key: 'perHead',
+        label: 'Real output / person',
+        format: (v) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      },
+      {
+        key: 'balance',
+        label: 'Revenue − spending, k',
+        format: financial,
+      },
+      { key: 'treasury', label: 'Treasury, k', format: financial },
+      { key: 'debt', label: 'Debt, k', format: financial },
+      { key: 'supplierDebt', label: 'Supplier debt, k', format: financial },
+      { key: 'capitalSpending', label: 'Enterprise investment, k', format: financial },
+      { key: 'enterpriseIncome', label: 'Enterprise income, k', format: financial },
+      { key: 'operating', label: 'Before enterprise investment, k', format: financial },
       { key: 'tax', label: 'Tax %' },
       { key: 'food', label: 'Food met', format: percent },
       { key: 'materials', label: 'Other needs', format: percent },
@@ -324,6 +355,13 @@ export function WorldOverview({
             </aside>
           )}
         </>
+      )}
+      {view === 'economy' && (
+        <p className="panel-note">
+          Revenue and spending are monthly flows; treasury and debt are accumulated balances. Supplier debt is
+          included in total debt. Unsold reserves are goods, not cash. Before enterprise investment adds back
+          only that investment category.
+        </p>
       )}
       {columns[view] && (
         <div className="overview-table-scroll">

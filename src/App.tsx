@@ -1,3 +1,6 @@
+import { ParameterLabel } from './components/ParameterHelp'
+import { ConfigurationEditor } from './components/ConfigurationEditor'
+import { configurationDraft, configurationFor, validateConfigurationValues } from './sim/configuration'
 import { ModelAssignments } from './components/ModelAssignments'
 import { PlaceAtlas } from './components/PlaceAtlas'
 import type { PlaceQuery, PlaceResult } from './sim/almanac-types'
@@ -8,7 +11,6 @@ import { OFF_POLICY } from './sim/llm-policy'
 import { DEFAULT_WORLD_SCALE, WORLD_SCALES, type WorldScale } from './sim/scale'
 import { WorldOverview } from './components/WorldOverview'
 import { inWorldText, narrativeProjection, presentWorld } from './sim/narrative'
-import { DEFAULT_SETTINGS, simulationSettings, type SimulationSettings } from './sim/settings'
 import { SimulationConditions } from './components/SimulationConditions'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -117,8 +119,13 @@ export default function App() {
     [nationCount, setNationCount] = useState(32)
   const [scale, setScale] = useState<WorldScale>(DEFAULT_WORLD_SCALE)
   const [mapKey, setMapKey] = useState('')
-  const [conditions, setConditions] = useState<SimulationSettings>({ ...DEFAULT_SETTINGS }),
-    [newConditions, setNewConditions] = useState<SimulationSettings>({ ...DEFAULT_SETTINGS })
+  const [configuration, setConfiguration] = useState(configurationDraft)
+  const [newConfiguration, setNewConfiguration] = useState(configurationDraft)
+  const [configurationBaseline, setConfigurationBaseline] = useState(configurationDraft)
+  const [configurationRevision, setConfigurationRevision] = useState(0)
+  const [advancedSetup, setAdvancedSetup] = useState(false)
+  const [settlementStart, setSettlementStart] = useState<'frontier' | 'settled'>('frontier')
+  const [configurationError, setConfigurationError] = useState('')
   const [focus, setFocus] = useState<{ region: number; key: number; nation?: number; cell?: number } | null>(
       null,
     ),
@@ -408,7 +415,7 @@ export default function App() {
       }
       if (e.target instanceof HTMLElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName))
         return
-      if (['1', '2', '3'].includes(e.key)) {
+      if (['1', '2'].includes(e.key)) {
         e.preventDefault()
         setSpeed(PLAYBACK_SPEEDS[Number(e.key) - 1])
         return
@@ -733,6 +740,7 @@ export default function App() {
                 onClick={() => {
                   closeMenus()
                   setRunning(false)
+                  setConfigurationError('')
                   setModal('new')
                 }}
               >
@@ -743,13 +751,15 @@ export default function App() {
               <button
                 onClick={() => {
                   closeMenus()
-                  setRunning(false)
-                  setConditions({ ...simulationSettings(world) })
+                  setConfiguration(configurationDraft(world))
+                  setConfigurationBaseline(configurationDraft(world))
+                  setConfigurationRevision(world.configuration?.revision ?? 0)
+                  setConfigurationError('')
                   setModal('conditions')
                 }}
               >
                 <Settings2 size={16} />
-                Simulation conditions
+                Simulation parameters
               </button>
               <button
                 onClick={() => {
@@ -1046,30 +1056,21 @@ export default function App() {
           <div className="clock-date">
             <strong>{dateLabel(world)}</strong>
             <span>
-              {busy
-                ? 'Advancing…'
-                : running
-                  ? speed === 'max'
-                    ? 'Max · Approx. 6 months'
-                    : `In motion · ${speed}×`
-                  : 'Paused'}
-              {world.fastForward && !(running && speed === 'max') && ' · Approx. history'}
+              {busy ? 'Advancing…' : running ? `In motion · ${speed}×` : 'Paused'}
+              {world.fastForward && ' · Approx. history'}
             </span>
           </div>
           <div className="clock-controls">
             <div className="clock-speeds" role="group" aria-label="Simulation speed">
               {PLAYBACK_SPEEDS.map((value, index) => {
                 const playing = running && speed === value
-                const label =
-                  value === 'max'
-                    ? 'Maximum speed, approximate six-month simulation'
-                    : `Play at ${value}× speed`
+                const label = `Play at ${value}× speed`
                 return (
                   <button
                     key={value}
                     aria-pressed={speed === value}
                     aria-label={playing ? 'Pause simulation' : label}
-                    title={`${playing ? 'Pause' : value === 'max' ? 'Max · approximate six-month steps' : value === 1 ? 'Play' : '2× speed'} (${index + 1}) · Space to pause or resume`}
+                    title={`${playing ? 'Pause' : value === 1 ? 'Play' : '2× speed'} (${index + 1}) · Space to pause or resume`}
                     onClick={() => {
                       setSpeed(value)
                       setRunning(!playing)
@@ -1079,21 +1080,8 @@ export default function App() {
                       <Pause size={18} fill="currentColor" aria-hidden="true" />
                     ) : value === 1 ? (
                       <Play size={18} fill="currentColor" aria-hidden="true" />
-                    ) : value === 2 ? (
-                      <FastForward size={20} aria-hidden="true" />
                     ) : (
-                      <svg
-                        width="26"
-                        height="20"
-                        viewBox="0 0 30 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="m2 5 7 7-7 7V5Zm9 0 7 7-7 7V5Zm9 0 7 7-7 7V5Z" />
-                      </svg>
+                      <FastForward size={20} aria-hidden="true" />
                     )}
                   </button>
                 )
@@ -1125,11 +1113,8 @@ export default function App() {
                   <CalendarDays size={16} />
                   Advance one year
                 </button>
-                <p>{busy ? 'Calculating the next month…' : 'Space to play or pause · 1–3 for speed'}</p>
-                <p>
-                  Max advances six months at a time. Its history is approximate. Pause takes effect after the
-                  current step.
-                </p>
+                <p>{busy ? 'Calculating the next month…' : 'Space to play or pause · 1–2 for speed'}</p>
+                <p>Both speeds use the monthly model. Pause takes effect after the current month.</p>
               </div>
             </details>
           </div>
@@ -1187,7 +1172,7 @@ export default function App() {
       <dialog
         ref={dialogRef}
         aria-labelledby="dialog-title"
-        className={`app-dialog ${modal === 'help' ? 'help-dialog' : modal === 'model' ? 'mathematics-dialog' : modal === 'assignments' ? 'assignments-dialog' : ''}`}
+        className={`app-dialog ${modal === 'help' ? 'help-dialog' : modal === 'model' ? 'mathematics-dialog' : modal === 'assignments' ? 'assignments-dialog' : modal === 'conditions' || (modal === 'new' && advancedSetup) ? 'configuration-dialog' : ''}`}
         onCancel={() => setModal(null)}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -1220,6 +1205,12 @@ export default function App() {
           <form
             onSubmit={(e) => {
               e.preventDefault()
+              try {
+                validateConfigurationValues(newConfiguration)
+              } catch (error) {
+                setConfigurationError((error as Error).message)
+                return
+              }
               setNation(0)
               setRegion(null)
               setTab('atlas')
@@ -1231,17 +1222,43 @@ export default function App() {
                 continents,
                 scale,
                 nations: nationCount,
-                settings: newConditions,
+                configuration: newConfiguration,
+                start: settlementStart,
               })
               setModal(null)
             }}
           >
             <Globe2 className="dialog-symbol" size={34} strokeWidth={1} />
             <h2 id="dialog-title">A different beginning.</h2>
-            <p>Shape continents, islands, mountain ranges, and river basins from a seed.</p>
-            <label className="select-label">
-              World seed
+            <p>
+              Choose a beginning, then open the advanced view to shape its people, resources and simulation.
+            </p>
+            <div className="configuration-view-toggle" role="group" aria-label="World setup view">
+              <button
+                className="button secondary"
+                type="button"
+                aria-pressed={!advancedSetup}
+                onClick={() => setAdvancedSetup(false)}
+              >
+                Basic setup
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                aria-pressed={advancedSetup}
+                onClick={() => setAdvancedSetup(true)}
+              >
+                Advanced setup
+              </button>
+            </div>
+            <div className="select-label">
+              <ParameterLabel htmlFor="world-seed" label="World seed">
+                The same seed and settings produce the same generated world. Change the text to create a
+                different geography and starting history.
+              </ParameterLabel>
               <input
+                id="world-seed"
+                aria-describedby="world-seed-help"
                 autoFocus
                 maxLength={100}
                 value={seed}
@@ -1249,56 +1266,123 @@ export default function App() {
                 placeholder="A world unwritten"
                 required
               />
-            </label>
-            <label className="select-label">
-              World size
-              <select
-                value={scale}
-                onChange={(e) => {
-                  const next = e.target.value as WorldScale
-                  setScale(next)
-                  setNationCount(WORLD_SCALES[next].states)
-                }}
-              >
-                {Object.entries(WORLD_SCALES).map(([key, extent]) => (
-                  <option key={key} value={key}>
-                    {extent.label} · {(extent.width * extent.height).toLocaleString()} square cells
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="panel-note">
-              Around {WORLD_SCALES[scale].provinces.toLocaleString()} provinces. Larger worlds add real
-              distance: longer supply lines, regional markets, and more wilderness. Each state starts with one
-              settlement, 2,500 people and supplies; most land is unclaimed.
-            </p>
+            </div>
             <div className="form-columns">
-              <label className="select-label">
-                Geography
-                <select value={continents} onChange={(e) => setContinents(Number(e.target.value))}>
-                  <option value={1}>One great continent</option>
-                  <option value={2}>Twin continents</option>
-                  <option value={3}>Continental mosaic</option>
-                  <option value={5}>Scattered continents</option>
-                </select>
-              </label>
-              <label className="select-label">
-                Starting states
-                <select value={nationCount} onChange={(e) => setNationCount(Number(e.target.value))}>
-                  {[4, 6, 8, 10, 12, 16, 24, 32, 48].map((v) => (
-                    <option key={v} value={v}>
-                      {v} sovereign states
+              <div className="select-label">
+                <ParameterLabel htmlFor="world-size" label="World size">
+                  Larger worlds contain more terrain at the same physical scale, increasing travel distances
+                  and simulation work.
+                </ParameterLabel>
+                <select
+                  id="world-size"
+                  aria-describedby="world-size-help"
+                  value={scale}
+                  onChange={(e) => {
+                    const next = e.target.value as WorldScale
+                    setScale(next)
+                    setNationCount(WORLD_SCALES[next].states)
+                  }}
+                >
+                  {Object.entries(WORLD_SCALES).map(([key, extent]) => (
+                    <option key={key} value={key}>
+                      {extent.label} · {(extent.width * extent.height).toLocaleString()} square cells
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
+              <div className="select-label">
+                <ParameterLabel htmlFor="world-start" label="Starting pattern">
+                  Frontier settlements start with one settlement per state and largely unclaimed land.
+                  Established states begin with populated territories and use their own opening treasury
+                  value.
+                </ParameterLabel>
+                <select
+                  id="world-start"
+                  aria-describedby="world-start-help"
+                  value={settlementStart}
+                  onChange={(event) => setSettlementStart(event.target.value as 'frontier' | 'settled')}
+                >
+                  <option value="frontier">Frontier settlements</option>
+                  <option value="settled">Established states</option>
+                </select>
+              </div>
             </div>
-            <SimulationConditions value={newConditions} onChange={setNewConditions} />
+            <p className="panel-note">
+              Around {WORLD_SCALES[scale].provinces.toLocaleString()} provinces. Larger worlds add real
+              distance: longer supply lines, regional markets, and more wilderness. Each state starts with one
+              settlement in Frontier mode, with{' '}
+              {Math.round(
+                newConfiguration.starting.capitalPopulation * newConfiguration.starting.populationScale,
+              ).toLocaleString()}{' '}
+              people before any recruitment. Established states begin with populated territories.
+            </p>
+            <p className="panel-note" aria-live="polite">
+              Opening treasury per state:{' '}
+              <strong>
+                {(
+                  (settlementStart === 'frontier'
+                    ? newConfiguration.starting.treasury
+                    : newConfiguration.starting.settledTreasury) * 1000
+                ).toLocaleString()}{' '}
+                crowns
+              </strong>
+              . Change it under Advanced setup → Starting conditions.
+            </p>
+            <div className="form-columns">
+              <div className="select-label">
+                <ParameterLabel htmlFor="world-continents" label="Geography">
+                  Number and arrangement of generated continental masses. The seed shapes their coastline and
+                  distribution.
+                </ParameterLabel>
+                <select
+                  id="world-continents"
+                  aria-describedby="world-continents-help"
+                  value={continents}
+                  onChange={(e) => setContinents(Number(e.target.value))}
+                >
+                  <option value={1}>One great continent</option>
+                  <option value={2}>Twin continents</option>
+                  <option value={3}>Continental mosaic</option>
+                  <option value={4}>Four continents</option>
+                  <option value={5}>Scattered continents</option>
+                </select>
+              </div>
+              <div className="select-label">
+                <ParameterLabel htmlFor="world-states" label="Starting states">
+                  Number of independent states created at the beginning. Later political changes may create or
+                  remove states.
+                </ParameterLabel>
+                <input
+                  id="world-states"
+                  aria-describedby="world-states-help"
+                  type="number"
+                  required
+                  min={4}
+                  max={48}
+                  step={1}
+                  value={Number.isFinite(nationCount) ? nationCount : ''}
+                  onChange={(event) => setNationCount(event.target.valueAsNumber)}
+                />
+              </div>
+            </div>
+            {advancedSetup ? (
+              <ConfigurationEditor value={newConfiguration} onChange={setNewConfiguration} />
+            ) : (
+              <SimulationConditions
+                value={newConfiguration.conditions}
+                onChange={(conditions) => setNewConfiguration({ ...newConfiguration, conditions })}
+              />
+            )}
             <p className="panel-note">
               The same seed and settings create the same world. This replaces your current world; export it
               first to keep a copy.
             </p>
-            <button className="button primary full" type="submit">
+            {configurationError && (
+              <p className="configuration-error" role="alert">
+                {configurationError}
+              </p>
+            )}
+            <button className="button primary full configuration-submit" type="submit" disabled={busy}>
               <Plus size={16} />
               Generate world
             </button>
@@ -1307,20 +1391,48 @@ export default function App() {
           <form
             onSubmit={(e) => {
               e.preventDefault()
-              send({ type: 'command', command: { type: 'conditions', settings: conditions } })
+              try {
+                validateConfigurationValues(configuration)
+              } catch (error) {
+                setConfigurationError((error as Error).message)
+                return
+              }
+              send({
+                type: 'command',
+                command: { type: 'configuration', values: configuration, revision: configurationRevision },
+              })
               setModal(null)
             }}
           >
             <Settings2 className="dialog-symbol" size={34} strokeWidth={1} />
-            <h2 id="dialog-title">Conditions of history.</h2>
+            <h2 id="dialog-title">Simulation parameters.</h2>
             <p>
-              Shape the pressures governments and households must respond to. These conditions are saved with
-              this world.
+              Stage your changes and apply them together. Future steps use the new values; existing people,
+              goods and contracts are preserved. Settings travel with this world’s saves.
             </p>
-            <SimulationConditions value={conditions} onChange={setConditions} />
-            <button className="button primary full" type="submit">
-              Apply conditions
-            </button>
+            <ConfigurationEditor
+              value={configuration}
+              onChange={setConfiguration}
+              live
+              baseline={configurationBaseline}
+            />
+            {configurationError && (
+              <p className="configuration-error" role="alert">
+                {configurationError}
+              </p>
+            )}
+            <div className="configuration-actions">
+              <button className="button secondary" type="button" onClick={() => setModal(null)}>
+                Discard changes
+              </button>
+              <button
+                className="button primary"
+                type="submit"
+                disabled={JSON.stringify(configuration) === JSON.stringify(configurationBaseline)}
+              >
+                Apply changes together
+              </button>
+            </div>
             {!!world.pressures?.incidents.length && (
               <div className="conditions-incidents">
                 <h3>Recent pressures</h3>
@@ -1342,7 +1454,7 @@ export default function App() {
               Equations, assumptions and references. Behavioral coefficients are synthetic.
             </p>
             <Suspense fallback={<p role="status">Loading the mathematical model…</p>}>
-              <ModelMathematics />
+              <ModelMathematics parameters={configurationFor(world).model} />
             </Suspense>
           </>
         ) : modal === 'help' ? (
@@ -1360,7 +1472,7 @@ export default function App() {
               shows representative daily activity from the recorded population and paid jobs.
             </p>
             <p>
-              LLM assistance is optional and off by default. The World menu switch applies to every tab; the
+              LLM assistance is optional and on by default. The World menu switch applies to every tab; the
               native simulation continues with it off.
             </p>
             <button className="about-model-link" onClick={() => setModal('model')}>
@@ -1374,10 +1486,8 @@ export default function App() {
                 <div>
                   <Play size={18} />
                   <span>
-                    <strong>Set history in motion</strong>Play and 2× use the monthly model. Max runs as fast
-                    as possible in approximate six-month steps, then updates local details; its history can
-                    differ. Pause takes effect after the current step. Advance one year runs twelve monthly
-                    steps while paused.
+                    <strong>Set history in motion</strong>Play and 2× use the monthly model. Pause takes
+                    effect after the current month. Advance one year runs twelve monthly steps while paused.
                   </span>
                 </div>
                 <div>
@@ -1407,7 +1517,7 @@ export default function App() {
                   <kbd>Space</kbd>Play / pause
                 </span>
                 <span>
-                  <kbd>1–3</kbd>Speed
+                  <kbd>1–2</kbd>Speed
                 </span>
                 <span>
                   <kbd>L</kbd>Map layer

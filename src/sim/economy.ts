@@ -1,3 +1,4 @@
+import { parameterGroup } from './configuration-context'
 import { periodFlow } from './simulation-period'
 import { governance } from './governance'
 import { matchCommuters, knownCommuteCandidates } from './commuting'
@@ -42,26 +43,8 @@ import {
   TRADE_INERTIA,
 } from './trade-memory'
 
-export const BASE_PRICE: Inventory = {
-  food: 14,
-  timber: 24,
-  stone: 18,
-  iron: 65,
-  coal: 32,
-  tools: 155,
-  textiles: 100,
-  arms: 290,
-}
-export const MONTHLY_NEED: Inventory = {
-  food: 0.025,
-  timber: 0.0025,
-  stone: 0.0012,
-  iron: 0.0015,
-  coal: 0.0013,
-  tools: 0.00045,
-  textiles: 0.00055,
-  arms: 0.00015,
-}
+export const BASE_PRICE: Inventory = parameterGroup('basePrices')
+export const MONTHLY_NEED: Inventory = parameterGroup('householdNeeds')
 
 /** Food-equivalent consumers distinguish children's energy needs from adult rations. */
 export function foodEquivalentPeople(population: Region['population']) {

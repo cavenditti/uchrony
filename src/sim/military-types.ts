@@ -9,7 +9,7 @@ export interface ArmyOperations {
   entrenchment: number
   progress: number
   stance: 'march' | 'hold' | 'entrench'
-  conduct: 'restrained' | 'requisition'
+  conduct: 'restrained' | 'requisition' | 'pillage'
   isolated: number
   disorder: number
   embarkedOn: number | null

@@ -1,0 +1,363 @@
+<header class="masthead">
+  <a class="byline" href="#article">Carlo Venditti <span>· Uchrony</span></a>
+  <button id="theme-toggle" type="button" aria-label="Switch to dark theme">Dark theme</button>
+</header>
+<main id="article">
+  <header class="article-header">
+    <p class="eyebrow">Inside a simulated world</p>
+    <h1>
+      Why my simulated<br class="desktop-break" />
+      world got stuck
+    </h1>
+    <p class="dek">
+      A story about money that stopped moving, workshops that ran out of materials, and governments that
+      missed their meetings.
+    </p>
+    <p class="meta">Illustrated draft · experiments from 27 October 2026</p>
+  </header>
+
+  <div class="prose">
+    <p class="opening">
+      Imagine a town where shops have money, people need jobs, and there is still room to build. Yet the town
+      slowly gets poorer. Workshops stand idle. New settlements stop appearing. Governments barely act.
+    </p>
+    <p>
+      That was happening in some long runs of <strong>Uchrony</strong>, a simulation of a world with people,
+      businesses, trade and competing states. Its calendar kept advancing. Much of its economy had stopped
+      moving.
+    </p>
+    <p>
+      The investigation became a lesson in how small rules can produce very large consequences. A shop’s
+      savings rule can weaken demand. A shopping rule can empty a factory’s shelves. A calendar shortcut can
+      silence a government for centuries.
+    </p>
+    <p>You do not need to know economics or programming to follow what happened. Start with a shop till.</p>
+
+    <section id="money">
+      <p class="section-number">01 / Money</p>
+      <h2>The money was there.<br />It had stopped coming back.</h2>
+      <p>
+        People bought goods from merchants. The merchants accumulated cash, including money they did not need
+        for their day-to-day business. Meanwhile, households’ ability to keep buying weakened.
+      </p>
+      <p>
+        Think of a board game where one player keeps collecting money but rarely spends or distributes it.
+        Counting all the money on the board misses the problem: <em>who can use it next?</em>
+      </p>
+      {{diagram:circulation}}
+      <p>
+        The revised rule gives surplus cash a way back into circulation. Merchants first keep enough for
+        <strong>six months of observed operating costs</strong>, plus money already committed to construction.
+        A limited share of the excess can then go to their actual owners.
+      </p>
+      <p>
+        This is an ownership payment, so it does not go equally to everyone. It also creates no new money. It
+        changes where existing money can go.
+      </p>
+    </section>
+
+    <section id="food">
+      <p class="section-number">02 / Food</p>
+      <h2>A richer person does not need endless dinners</h2>
+      <p>
+        Getting money moving revealed a second problem. The old shopping rule let households order ever more
+        food as their spending power grew. Wealthy households could demand enormous quantities while everyone
+        competed for a limited supply.
+      </p>
+      <p>
+        In the first trial, circulation improved and measured unemployment was low. But the population fell by
+        <strong>44% in just twenty years</strong>. That trial was rejected.
+      </p>
+      {{diagram:food}}
+      <p>
+        The fix gives food demand a ceiling of <strong>1.5 subsistence baskets</strong>. A basket is the
+        model’s unit for basic food needs; the ceiling means one and a half times that amount. Beyond it,
+        extra spending shifts toward other goods.
+      </p>
+      <p>
+        A ceiling on demand does not guarantee dinner. Households still need money, and the food still has to
+        exist. But it prevents unlimited orders from swallowing the market.
+      </p>
+      <p class="pullquote">A low unemployment number is not a success if the population is starving.</p>
+    </section>
+
+    <section id="materials">
+      <p class="section-number">03 / Production</p>
+      <h2>You cannot make tools from an empty shelf</h2>
+      <p>
+        Some goods are used twice: people buy them for everyday life, and businesses use them to make
+        something else. Economists call those business supplies <em>intermediate inputs</em>. Think of timber
+        going into a workshop and tools coming out.
+      </p>
+      <p>
+        Household purchases could clear out all those supplies. At the next hiring decision, workshops found
+        nothing to work with. They hired no industrial workers, and production stayed stuck.
+      </p>
+      {{diagram:materials}}
+      <p>
+        Wholesalers can now reserve <strong>up to half of their stock</strong> against expected business
+        orders. It is a limited reserve tied to expected need, not an automatic fifty-fifty split.
+        <strong>Food is excluded.</strong>
+      </p>
+      <p>
+        The point is to keep a production chain alive. A pile of timber can satisfy a purchase today, or help
+        a workshop produce tomorrow. The simulation needs to account for both uses.
+      </p>
+    </section>
+
+    <section id="investment">
+      <p class="section-number">04 / Building</p>
+      <h2>A promising project still needs a turn in the queue</h2>
+      <p>
+        A business might have a worthwhile expansion in mind and enough cash to pay for it. But productive
+        investment used to be considered after public hiring, household shopping and housing construction. By
+        then, the workers or materials could be gone.
+      </p>
+      {{diagram:investment}}
+      <p>
+        Funded productive projects now get an earlier opportunity. They must still offer a return above their
+        financing costs and find real workers and materials. Giving a project an earlier turn does not give it
+        a free factory.
+      </p>
+      <p>
+        There was also a subtler timing mistake. Imagine judging a shop’s prospects before today’s customers
+        have arrived. Looking only at cash already received makes the shop seem weaker than it is.
+      </p>
+      <p>
+        The latest correction also considers expected retail sales, bounded by stock the firm already holds.
+        That estimate can help answer “is this project worthwhile?” It cannot answer “do we have the cash to
+        pay?” <strong>Expected revenue is never spendable funding.</strong>
+      </p>
+    </section>
+
+    <section id="wages">
+      <p class="section-number">05 / Prices</p>
+      <h2>A price tag can outlive the economy it was written for</h2>
+      <p>
+        Over decades, wages and prices could fall. Some costs for recruiting soldiers and founding settlements
+        stayed fixed in the original currency amounts. That made them much harder to afford in terms of work.
+      </p>
+      <p>
+        Suppose a fee is 600 coins when a monthly wage is 100. It represents six months of wages. If the wage
+        later falls to 20, the same fee represents thirty months. The number on the price tag has not changed;
+        the burden has.
+      </p>
+      {{diagram:wages}}
+      <p>
+        The revised obligations follow domestic wages: <strong>six months per pioneer</strong> for an
+        automatic settlement, and <strong>six months per recruit</strong> for training. Food, weapons,
+        materials and people remain separate physical requirements.
+      </p>
+      <p>
+        Settlement searches were repaired too. Governments now exclude occupied sites before taking a limited
+        shortlist, so they can discover available places beyond the same blocked candidates.
+      </p>
+    </section>
+
+    <section id="government">
+      <p class="section-number">06 / Government</p>
+      <h2>Fast-forward was skipping the meetings</h2>
+      <p>
+        Different governments were scheduled to review decisions in different months. At high speed, the
+        simulation advanced six months at a time. The old check asked whether a meeting was due
+        <em>on the month it landed on</em>.
+      </p>
+      <p>
+        Imagine checking your calendar only on Sunday and concluding that you had no appointments all week. In
+        the simulation, that shortcut permanently skipped two thirds of cabinets.
+      </p>
+      {{diagram:calendar}}
+      <p>
+        The new check asks whether the time interval crossed a scheduled review date. Governments get their
+        opportunity to act. Their ambitions, domestic support, supplies, stability, funds and military
+        readiness still determine what they do.
+      </p>
+      <p>
+        Other repairs made that opportunity usable. Half of military funding is now retained for operations,
+        and armies buy supplies and replacements before household consumption. Readiness follows current
+        wages, and a country can form a small initial force.
+      </p>
+      <p>
+        Native diplomacy also had an accidental dependency on records normally created by optional AI agents.
+        Removing that dependency required restoring the whole diplomatic path: proposals, consent, trade,
+        alliances and peace. An early offensive-only trial was stopped when its missing peace path became
+        clear.
+      </p>
+      <p>
+        Autonomous governments can now negotiate through the normal rules. Human-controlled governments still
+        require the human’s agreement. And a functioning government is allowed to remain peaceful.
+      </p>
+    </section>
+
+    <section id="search">
+      <p class="section-number">07 / Experiments</p>
+      <h2>Repair the machinery. Then adjust the dials.</h2>
+      <p>
+        A broken rule and a badly chosen number are different problems. Once the initial economic repairs were
+        in place, a small search tried different settings for four decisions: how quickly merchants distribute
+        excess cash, how unattractive work is in the household’s trade-off, how much firm cash is available
+        for investment, and how quickly capital adjusts.
+      </p>
+      <p>
+        Think of testing seven versions of a recipe. Each candidate starts from the same saved world, changes
+        a few bounded quantities, and runs for twenty simulated years. The simulator’s rules stay fixed within
+        that search.
+      </p>
+      {{diagram:search}}
+      <p>
+        The score favored population and total real output growth, gave a smaller reward to territory growth,
+        and penalized unemployment and food shortfalls. Here, <em>real output</em> measures production with
+        price changes accounted for. Wars earned no reward.
+      </p>
+      <p>
+        All seven candidates passed the stated safeguards. The selected one ended its short test with 107,217
+        people, up 16.37%, and 4.80% average unemployment.
+      </p>
+      <p>
+        This was an offline parameter search. No language model was being fine-tuned, and no AI was learning
+        to govern during play. The score expressed design preferences; it was not a scientific definition of
+        human welfare.
+      </p>
+      <p>
+        The short search also preceded the final inventory and diplomacy repairs. Its result was a promising
+        setting to test further, not proof that the complete model was solved.
+      </p>
+    </section>
+
+    <section id="results">
+      <p class="section-number">08 / Results</p>
+      <h2>Let the same world run for another two hundred years</h2>
+      <p>
+        The main recovery comparison began from a saved world called <strong>Gino</strong>, at year 200, with
+        <strong>92,136 people</strong>. One branch used the previous policy. Another used the revised rules
+        and selected economic settings.
+      </p>
+      {{diagram:recovery}}
+      <p>
+        The revised branch grew to 233,872 people; the old branch shrank to 61,755. Average unemployment fell
+        from 14.38% to 4.56%, about a <strong>68% reduction</strong>. Claimed provinces rose to 72 rather than
+        26. The revised branch recorded two wars and two peace agreements; the control recorded neither.
+      </p>
+      <p>
+        These are results for the tested versions of this world. This comparison predates the final
+        retail-return correction described below.
+      </p>
+      <p>
+        One useful diagnostic isolated the earlier economic changes. Circulation and food satiation alone
+        produced a recovery to 219,547 people, without wars or new expansion in that interval. That helped
+        identify an economic problem, but did not validate the later military and inventory changes.
+      </p>
+
+      <h3>A good average can hide a bad ending</h3>
+      <p>
+        <em>Food coverage</em> describes how much of the model’s food requirement is met. It is not the
+        percentage of people who are completely well-fed. The reported average combines population-weighted
+        regional coverage over time.
+      </p>
+      {{diagram:averages}}
+      <p>
+        The revised recovery branch averaged 90.91% food coverage, but ended at 78.51%. Another long Gino run
+        ended with 9.42% unemployment and 77.29% food coverage. Late shortages and employment cycles remain
+        unresolved.
+      </p>
+
+      <h3>More activity has costs</h3>
+      <p>
+        Restoring conflict did not automatically improve life. In a matched year-70-to-300 comparison, the
+        branch with repaired diplomacy had nine wars and nine armistices, and ended with 190,769 people. The
+        branch without that repair remained warless and ended with 224,789.
+      </p>
+      <p>
+        A separate world, Maritime, had no wars during fifty additional years. That is a valid result.
+        Requiring a certain number of wars would hide the differences between worlds.
+      </p>
+    </section>
+
+    <section id="tradeoffs">
+      <p class="section-number">09 / The latest change</p>
+      <h2>The honest result has arrows in both directions</h2>
+      <p>
+        The final investment correction received its own comparison. Both branches started from the same
+        year-400 save and ran to year 450, using the same selected economic settings. The only simulation
+        difference was the bounded retail-return estimate.
+      </p>
+      {{diagram:tradeoffs}}
+      <p>
+        The latest model ended with more people and better average food coverage. It also had worse average
+        unemployment, much worse unemployment at the endpoint, and lower output per person at that endpoint.
+        It reached 98 claimed provinces rather than 96; both branches had one war and one peace agreement.
+      </p>
+      <p>
+        The correction removes an unfair timing penalty from investment decisions. This particular
+        continuation does <strong>not</strong> show an across-the-board welfare improvement. One pair of runs
+        cannot establish its general effect.
+      </p>
+    </section>
+
+    <section id="validation">
+      <p class="section-number">10 / Trust</p>
+      <h2>A world should survive being saved</h2>
+      <p>
+        A convincing-looking history is only part of the job. The simulation also needs to account for its
+        people, money, goods and banks. And saving a world must preserve what happens next.
+      </p>
+      {{diagram:continuation}}
+      <p>
+        Stress tests found real failures. One run crashed when territory became unclaimed. Another hit a
+        census-record limit that was too low for a large, mixed population. Those were repaired, and the
+        failed runs remain recorded as failures.
+      </p>
+      <p>
+        The dense Borderlands world eventually reached year 100 with <strong>22.4 million people</strong>,
+        eight surviving states, 31 war starts and 30 peace agreements. Its saved world survived, but the final
+        comparison exhausted the test process’s 4 GiB memory allowance.
+      </p>
+      <p>
+        After reducing unnecessary copies, a separate recovery test used a 6 GiB allowance, restored that
+        save, and continued through year 101. Accounting and exact save continuation passed. That validates
+        the recovered world; it does not establish how much memory a browser needs. The reported 73 province
+        ownership changes also include peaceful transfers, so they are not 73 military conquests.
+      </p>
+    </section>
+
+    <section class="closing" id="lesson">
+      <h2>A living world depends on the connections</h2>
+      <p>
+        The strongest lesson from these experiments is how much depends on the links between systems. Money
+        needs a way back to buyers. Producers need inputs before they can hire. Investment needs a fair
+        opportunity to use resources. Governments need to notice that their meeting date has passed.
+      </p>
+      <p>
+        Repairing those connections brought growth, settlement and political activity back to worlds that had
+        stalled. It also exposed problems the next experiments need to tackle: recurring shortages, uneven
+        employment, and trade-offs that a single headline number cannot describe.
+      </p>
+      <p>
+        The next useful search should span several mature worlds and judge sustained employment alongside
+        households’ access to food and materials. New seeds should test whether those settings travel well.
+        Physical resources and diplomatic consent should remain constraints.
+      </p>
+      <p>
+        A simulation becomes more credible when its successes can be explained, its failures remain visible,
+        and its next hundred years are still worth investigating.
+      </p>
+    </section>
+
+    <footer class="source-note">
+      <p>
+        <strong>About this draft.</strong> Adapted from
+        <a href="../../validation/late-dynamics-2026-10-27.md">Late-game dynamics — 27 October 2026</a>, with
+        <a href="../../validation/late-dynamics-2026-10-27.json">the companion experiment data</a>. Numerical
+        results come from that report; diagrams marked “illustration” explain a mechanism rather than
+        replaying a measured trajectory.
+      </p>
+      <p>
+        The experiments used deterministic seeds and the full simulation, usually in six-month steps. No
+        external model calls, resource grants or forced wars were used, and the user’s saved world was not
+        changed. Real-output figures use the report’s corrected measurement version 2. The small search and
+        later checks do not establish an optimal policy or historical realism.
+      </p>
+    </footer>
+  </div>
+</main>
+<footer class="endnote">Uchrony · notes on building a world <span aria-hidden="true">✳</span></footer>

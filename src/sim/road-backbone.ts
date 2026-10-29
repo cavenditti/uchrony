@@ -1,14 +1,9 @@
+import { parameterGroup } from './configuration-context'
 import { corridorGeography } from './corridors'
 import { MinHeap } from './heap'
 import type { Region, RouteLeg, World } from './types'
 
-export const ROAD_BACKBONE = {
-  maximumDetour: 3,
-  infrastructure: 0.7,
-  logistics: 3,
-  familiarity: 0.65,
-  shortcutRatio: 1.6,
-} as const
+export const ROAD_BACKBONE = parameterGroup('roads')
 
 interface Road {
   from: number

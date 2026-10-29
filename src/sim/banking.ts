@@ -1,4 +1,6 @@
+import { supplierDebt } from './supplier-credit'
 import { simulationMonths, periodInterest, periodRate } from './simulation-period'
+import { decisionPolicy } from './decision-policy'
 import { recordWorldEvent } from './event-memory'
 import { balance, balances, changeDeposit, ensureEconomy, governmentAccount } from './ledger'
 import { clamp, type World } from './types'
@@ -166,6 +168,7 @@ export function issueBankLoan(w: World, borrower: string, requested: number, lim
       if (!existing && loan.bank === bank.id) existing = loan
     }
   }
+  if (borrower.startsWith('government:')) outstanding += supplierDebt(w, Number(borrower.split(':')[1]))
   const capacity = Math.max(0, bank.equity / P.bankCapitalRatio - assets)
   const amount = Math.max(0, Math.min(requested, limit - outstanding, capacity))
   if (!Number.isFinite(amount) || amount <= 1e-9) return 0
@@ -307,7 +310,12 @@ export function settleBanks(w: World) {
       w,
       loan.borrower,
       loan.bank!,
-      loan.principal * periodRate(P.creditRepaymentMonthly),
+      loan.principal *
+        periodRate(
+          loan.borrower.startsWith('government:') && decisionPolicy().development
+            ? 1 / 240
+            : P.creditRepaymentMonthly,
+        ),
       'bank loan principal',
     )
     loan.principal -= principal
@@ -339,7 +347,7 @@ export function settleBanks(w: World) {
   for (const n of w.nations)
     n.debt = e.credit.loans
       .filter((l) => l.borrower === governmentAccount(n.id))
-      .reduce((sum, l) => sum + l.principal, 0)
+      .reduce((sum, l) => sum + l.principal, supplierDebt(w, n.id))
   for (const bank of b.banks) {
     resolveBank(w, bank)
     const charge = Math.min(bank.reserves, bank.centralBankDebt * periodInterest(b.centralBank.rate))

@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "spectral",
+        "files": [
+          "docs/articles/why-world-got-stuck/*"
+        ],
+        "createdAt": "2026-10-28T10:01:38.627Z",
+        "reason": "Agent decision: this standalone editorial draft follows the carlo-blog-diagrams skill and the verified Spectral typography of /Users/carlo/Devel/blog/src/styles/global.css; Uchrony application typography is not being changed."
+      }
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import { validateWorldConfiguration, withWorldConfiguration } from './configuration'
 import { validateInfluence } from './influence-persistence'
 import { validateAlmanac } from './almanac-persistence'
 import { validateAdaptiveWorld } from './adaptive-persistence'
@@ -28,6 +29,16 @@ import { MAX_SAVE_BYTES } from '../storage/save-types'
 
 /** Validates untrusted save files before they enter the simulation worker. */
 export function validateWorld(value: unknown, allowDuplicateCommunities = false): World {
+  const source = value as World | null
+  if (source?.configuration !== undefined) {
+    const configuration = validateWorldConfiguration(source.configuration)
+    return withWorldConfiguration({ configuration }, () =>
+      validateConfiguredWorld({ ...source, configuration }, allowDuplicateCommunities),
+    )
+  }
+  return validateConfiguredWorld(value, allowDuplicateCommunities)
+}
+function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = false): World {
   const fail = (message: string): never => {
     throw new Error(`Invalid world save: ${message}`)
   }
@@ -262,6 +273,8 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       )
     )
       fail('invalid treasury budget')
+    for (const key of ['capitalSpending', 'enterpriseIncome'] as const)
+      if (n[key] !== undefined && !number(n[key])) fail(`invalid state ${key}`)
     for (const key of [
       'treasury',
       'debt',
@@ -418,6 +431,31 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
       const key = `${lane.from}-${lane.to}`
       if (seen.has(key)) fail('duplicate remembered trade lane')
       seen.add(key)
+    }
+  }
+  if (w.farmProjects !== undefined) {
+    if (!Array.isArray(w.farmProjects) || w.farmProjects.length > w.cells.length)
+      fail('invalid farm projects')
+    let references = 0
+    for (const p of w.farmProjects) {
+      if (
+        !object(p) ||
+        !Number.isInteger(p.nation) ||
+        !w.nations[p.nation] ||
+        !Number.isInteger(p.funded) ||
+        !number(p.funded, 0, w.month) ||
+        p.completes !== p.funded + 6 ||
+        !number(p.fertility, 0.0012, 0.12) ||
+        !number(p.cost) ||
+        !Array.isArray(p.cells) ||
+        !p.cells.length ||
+        p.cells.length > w.cells.length ||
+        new Set(p.cells).size !== p.cells.length ||
+        p.cells.some((id) => !Number.isInteger(id) || !w.cells[id] || w.cells[id].terrain === 'water')
+      )
+        fail('invalid farm project')
+      references += p.cells.length
+      if (references > w.cells.length * 12) fail('too many farm project cells')
     }
   }
   if (w.harbors !== undefined) {
@@ -625,6 +663,9 @@ export function restoreWorld(value: unknown): World {
       adjusted = { ...source, armies, warfare: { ...source.warfare, fleets } }
   }
   const world = validateWorld(adjusted ?? value, true)
+  return withWorldConfiguration(world, () => recoverDuplicateCensus(world))
+}
+function recoverDuplicateCensus(world: World): World {
   let changed = false
   const census = (groups: PopulationCommunity[] | undefined) => {
     if (!groups) return groups
