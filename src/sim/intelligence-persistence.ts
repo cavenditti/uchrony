@@ -1,20 +1,25 @@
-import type { World } from './types'
 import { INTELLIGENCE_PRIORITIES, type IntelligenceReport } from './intelligence'
+import {
+  integerValidator,
+  numberValidator,
+  recordValue,
+  textValidator,
+  validationFailure,
+  worldValidators,
+} from './persistence-primitives'
 import { validateStatecraft } from './statecraft-persistence'
+import type { World } from './types'
 
 export function validateIntelligence(w: World) {
   const state = w.intelligence
   if (state === undefined) return
-  const fail = (): never => {
-      throw new Error('Invalid intelligence service or report in this save.')
-    },
-    object = (v: unknown) => !!v && typeof v === 'object' && !Array.isArray(v),
-    number = (v: unknown, low = 0, high = 1e16) =>
-      typeof v === 'number' && Number.isFinite(v) && v >= low && v <= high,
-    integer = (v: unknown, low = 0, high = 1e12) => number(v, low, high) && Number.isInteger(v),
-    nation = (v: unknown) => integer(v, 0, w.nations.length - 1),
+  const fail = validationFailure('Invalid intelligence service or report in this save.'),
+    object = recordValue,
+    number = numberValidator(0, 1e16),
+    integer = integerValidator(0, 1e12, false),
+    nation = worldValidators(w).nationId,
     month = (v: unknown) => integer(v, 0, w.month),
-    text = (v: unknown, max = 180) => typeof v === 'string' && v.length <= max
+    text = textValidator(180, 0)
   const report = (r: IntelligenceReport | undefined) => {
     if (r === undefined) return
     if (

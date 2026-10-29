@@ -1,25 +1,24 @@
-import { recordMilitaryInfluence } from './influence'
+import { diplomaticAccess } from './agreements'
+import { effectMultiplier } from './effects'
 import { recordWorldEvent } from './event-memory'
-import { marketStore, armyStore, fleetStore, recordGift, recordUse } from './national-accounts'
-import { publicExpense, publicGoods } from './ledger'
-import { clamp, population, relation, type Army, type World } from './types'
-import type { Fleet } from './military-types'
+import { unitLoyalty } from './forces'
 import { movementNeighbors, stepDistance } from './grid'
 import { MinHeap } from './heap'
-import { transportNetwork } from './transport'
-import { diplomaticAccess } from './agreements'
+import { recordMilitaryInfluence } from './influence'
+import { publicExpense, publicGoods } from './ledger'
+import type { ArmyOperations, Fleet } from './military-types'
+import { armyStore, fleetStore, marketStore, recordGift, recordUse } from './national-accounts'
 import {
+  addCommunity,
   ensurePopulation,
-  takeCivilianAdults,
+  releaseSoldiers,
   removeSoldiers,
   returnArmyPeople,
-  releaseSoldiers,
-  addCommunity,
+  takeCivilianAdults,
 } from './population'
-import { unitLoyalty } from './forces'
 import { random } from './random'
-import { effectMultiplier } from './effects'
-import type { ArmyOperations } from './military-types'
+import { transportNetwork } from './transport'
+import { clamp, population, relation, type Army, type World } from './types'
 
 export const crewNeeded = (f: Pick<Fleet, 'warships' | 'transports'>) => f.warships * 90 + f.transports * 30
 export const transportSeats = (f: Fleet) => Math.floor((f.transports * 800 + f.warships * 40) * f.hull)
@@ -74,6 +73,13 @@ export const friendlyPort = (w: World, nation: number, region: number) =>
 const paths = new WeakMap<World['cells'], Map<string, number[]>>()
 function sailingDistance(w: World, path: number[]) {
   return path.slice(1).reduce((sum, id, i) => sum + stepDistance(w.cells[path[i]], w.cells[id]), 0)
+}
+/** Reject distant pairs in constant time; a traversable path can never be shorter
+ * than its Euclidean displacement. Nearby fleets still respect coast obstructions. */
+export function navalEncounterPath(w: World, from: number, to: number): number[] {
+  if (stepDistance(w.cells[from], w.cells[to]) > 2) return []
+  const path = waterPath(w, from, to)
+  return path.length && sailingDistance(w, path) <= 2 ? path : []
 }
 export function waterPath(w: World, from: number, to: number) {
   if (w.cells[from]?.terrain !== 'water' || w.cells[to]?.terrain !== 'water') return []
@@ -429,8 +435,7 @@ export function advanceNavy(w: World) {
         relation(w, a.nation, b.nation)?.treaty !== 'war'
       )
         continue
-      const proximity = waterPath(w, a.cell, b.cell)
-      if (!proximity.length || sailingDistance(w, proximity) > 2) continue
+      if (!navalEncounterPath(w, a.cell, b.cell).length) continue
       const power = (f: Fleet) =>
         (f.warships + f.transports * 0.12) *
         f.hull *

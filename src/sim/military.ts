@@ -1,52 +1,40 @@
+import { diplomaticAccessView } from './agreements'
+import { corridorProfile, corridorUsage } from './corridors'
 import { decisionPolicy, domesticMonthlyWage } from './decision-policy'
-import { simulationMonths } from './simulation-period'
+import { BASE_PRICE, pathTo, shortestPaths, transportGraph } from './economy'
+import { effectMultiplier } from './effects'
+import { allForces, unitLoyalty } from './forces'
 import { recordMilitaryInfluence } from './influence'
+import { knownMap } from './intelligence'
 import { publicGoods } from './ledger'
 import {
-  marketStore,
-  armyStore,
-  fleetStore,
-  recordGift,
-  recordUse,
-  recordRequisition,
-} from './national-accounts'
-import { BASE_PRICE } from './economy'
-import { MAX_ARMIES } from './military-limits'
-import {
   controller,
+  controlRevision,
   establishControl,
   maintainControl,
   occupationStrengthRequired,
   pillageProvince,
 } from './military-control'
-import { knownMap } from './intelligence'
-import { clamp, population, relation, type Army, type World } from './types'
-import { transportGraph, shortestPaths, pathTo } from './economy'
-import { corridorProfile, corridorUsage } from './corridors'
-import { allForces, unitLoyalty } from './forces'
-import { diplomaticAccessView } from './agreements'
+import { MAX_ARMIES } from './military-limits'
+import { armyStore, fleetStore, marketStore, recordGift, recordUse } from './national-accounts'
+import { seaPassageView } from './naval-control'
 import {
-  takeCivilianAdults,
-  removeCivilianAdults,
-  releaseSoldiers,
-  returnArmyPeople,
-  apportion,
-} from './population'
-import {
-  ensureWarfare,
-  militaryDeaths,
-  warEvent,
+  canEmbarkArmy,
   cargoCapacity,
-  portAt,
   disembark,
   embarkArmy,
-  canEmbarkArmy,
+  ensureWarfare,
+  militaryDeaths,
   orderFleet,
+  portAt,
+  warEvent,
   waterPath,
 } from './navy'
-import { effectMultiplier } from './effects'
+import { apportion, releaseSoldiers, removeCivilianAdults, returnArmyPeople } from './population'
 import { random } from './random'
-import { seaPassageView } from './naval-control'
+import { musterArmy } from './recruitment'
+import { simulationMonths } from './simulation-period'
+import { clamp, population, relation, type Army, type World } from './types'
 
 export function landGraph(w: World, nation: number, profile = corridorProfile(w)) {
   return transportGraph(w, nation, profile).map((edges) => edges.filter((e) => !e.sea))
@@ -58,8 +46,8 @@ export function advanceArmies(w: World) {
     access = diplomaticAccessView(w),
     accessible = (world: World, nation: number, region: number) =>
       controller(world, region) === nation ||
-      relation(world, nation, controller(world,region))?.treaty === 'alliance' ||
-      access(nation, controller(world,region))
+      relation(world, nation, controller(world, region))?.treaty === 'alliance' ||
+      access(nation, controller(world, region))
   const state = ensureWarfare(w),
     profile = corridorProfile(w),
     remaining = profile.capacity.slice()
@@ -81,7 +69,7 @@ export function advanceArmies(w: World) {
       ),
     ]),
   )
-  let owners = ''
+  let owners = -1
   const wars = new Set(w.relations.filter((r) => r.treaty === 'war').flatMap((r) => [r.a, r.b]))
   const pathCache = new WeakMap<
     ReturnType<typeof transportGraph>,
@@ -103,7 +91,7 @@ export function advanceArmies(w: World) {
   const supplyGraphs = new Map<number, ReturnType<typeof transportGraph>>(),
     landGraphs = new Map<number, ReturnType<typeof landGraph>>()
   function graphFor(nation: number, land: boolean) {
-    const currentOwners = w.regions.map((region) => controller(w, region.id)).join(',')
+    const currentOwners = controlRevision(w)
     if (owners !== currentOwners) {
       owners = currentOwners
       supplyGraphs.clear()
@@ -295,7 +283,10 @@ export function advanceArmies(w: World) {
         a.soldiers > 0 &&
         a.operations!.embarkedOn === null,
     )
-    if (former.id === next.nation && defenders.reduce((sum, force) => sum + force.soldiers, 0) < Math.min(1800, army.soldiers * 0.8)) {
+    if (
+      former.id === next.nation &&
+      defenders.reduce((sum, force) => sum + force.soldiers, 0) < Math.min(1800, army.soldiers * 0.8)
+    ) {
       const willingAdults = next
           .communities!.filter((g) => g.allegiance !== army.nation)
           .reduce((sum, g) => sum + g.population.adults, 0),
@@ -315,27 +306,20 @@ export function advanceArmies(w: World) {
         Math.floor(next.stocks.arms / 0.002),
       )
       if (levy >= 50 && w.armies.length < MAX_ARMIES) {
-        const militia: Army = {
-          id: w.nextArmy++,
+        const militia = musterArmy(w, next, {
           nation: former.id,
           name: `${next.name} local levy`,
-          region: destination,
-          target: null,
           soldiers: levy,
           establishment: levy,
-          communities: takeCivilianAdults(w, next, levy, (g) => g.allegiance !== army.nation),
           morale: 0.45,
           supply: 0.6,
           experience: 0.05,
-          casualties: 0,
-        }
-        recordRequisition(w, next.id, 'arms', levy * 0.002)
-        next.stocks.arms -= levy * 0.002
-        next.consumption.arms += levy * 0.002
-        w.armies.push(militia)
-        ensureWarfare(w)
-        militia.operations!.stance = 'entrench'
-        militia.operations!.entrenchment = 0.15
+          armsPerSoldier: 0.002,
+          requisition: true,
+          eligible: (g) => g.allegiance !== army.nation,
+          stance: 'entrench',
+          entrenchment: 0.15,
+        })
         defenders.push(militia)
       }
     }
@@ -498,7 +482,10 @@ export function advanceArmies(w: World) {
       const chart = knownMap(w, n.id)
       const targets = chart
         .filter(
-          (r) => controller(w, r.id) !== a.nation && relation(w, a.nation, r.nation)?.treaty === 'war' && Number.isFinite(paths.distance[r.id]),
+          (r) =>
+            controller(w, r.id) !== a.nation &&
+            relation(w, a.nation, r.nation)?.treaty === 'war' &&
+            Number.isFinite(paths.distance[r.id]),
         )
         .sort((a, b) => paths.distance[a.id] - paths.distance[b.id])
       a.target = targets[0]?.id ?? null
@@ -542,7 +529,8 @@ export function advanceArmies(w: World) {
     ops.progress = 0
     ops.entrenchment = 0
     ops.fatigue = clamp(ops.fatigue + 0.1)
-    if (controller(w, next) !== a.nation && relation(w, a.nation, controller(w, next))?.treaty === 'war') battle(a, next)
+    if (controller(w, next) !== a.nation && relation(w, a.nation, controller(w, next))?.treaty === 'war')
+      battle(a, next)
     else if (accessible(w, a.nation, next)) a.region = next
     if (a.target === a.region) a.target = null
   }

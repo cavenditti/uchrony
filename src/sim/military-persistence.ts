@@ -1,18 +1,21 @@
-import { MAX_ARMIES } from './military-limits'
 import { movementNeighbors, stepDistance } from './grid'
-import type { World, RouteLeg } from './types'
+import { MAX_ARMIES } from './military-limits'
+import { integerAtMost, numberAtMost, recordValue, validationFailure } from './persistence-primitives'
+import type { RouteLeg, World } from './types'
 
 export function validateWarfare(
   w: World,
   validateLegs: (from: number, to: number, legs: RouteLeg[]) => void,
 ) {
   const s = w.warfare,
-    fail = (detail = 'unrecognized military record'): never => {
-      throw new Error(`Invalid military, fleet, or supply-line state in this save: ${detail}.`)
-    }
-  const object = (v: unknown) => !!v && typeof v === 'object' && !Array.isArray(v)
-  const number = (v: unknown, max = 1e10) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max
-  const integer = (v: unknown, max = 1e10) => number(v, max) && Number.isInteger(v)
+    fail = validationFailure(
+      'Invalid military, fleet, or supply-line state in this save: ',
+      '.',
+      'unrecognized military record',
+    )
+  const object = recordValue
+  const number = numberAtMost(1e10)
+  const integer = integerAtMost(1e10, false)
   const region = (id: number) => integer(id, w.regions.length - 1)
   const water = (id: number) => integer(id, w.cells.length - 1) && w.cells[id].terrain === 'water'
   if (!s) {

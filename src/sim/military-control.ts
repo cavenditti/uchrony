@@ -1,11 +1,11 @@
-import { clamp, population, relation, type Army, type World } from './types'
-import { economicRegions, provinceId } from './local-units'
-import { balance, governmentAccount, producerAccount, transfer, publicExpense } from './ledger'
 import { domesticMonthlyWage } from './decision-policy'
-import { periodRate } from './simulation-period'
-import { recordMilitaryInfluence } from './influence'
 import { recordWorldEvent } from './event-memory'
+import { recordMilitaryInfluence } from './influence'
 import { reconcileJurisdictionSovereignty } from './jurisdictions'
+import { balance, governmentAccount, producerAccount, publicExpense, transfer } from './ledger'
+import { economicRegions, provinceId } from './local-units'
+import { periodRate } from './simulation-period'
+import { clamp, population, relation, type Army, type World } from './types'
 
 export interface MilitaryControl {
   nation: number
@@ -35,22 +35,37 @@ export function controlsProvince(w: World, region: number, nation: number) {
   const local = holdingForce(w, region, nation)
   return local >= occupationStrengthRequired(w, region) && local > holdingForce(w, region, r.nation) * 1.5
 }
+const revisions = new WeakMap<World, number>()
+/** Ephemeral controller revisions are not serialized and never shared by trial worlds. */
+export const controlRevision = (w: World) => revisions.get(w) ?? 0
+function changedControl(w: World) {
+  revisions.set(w, controlRevision(w) + 1)
+}
 export function establishControl(w: World, region: number, nation: number) {
   const r = w.regions[region]
   if (r.nation === nation) {
+    if (r.control && r.control.nation !== nation) changedControl(w)
     delete r.control
     return
   }
   if (relation(w, nation, r.nation)?.treaty !== 'war') throw new Error('Military occupation requires war.')
-  if (r.control?.nation !== nation) r.control = { nation, since: w.month, lastPillage: -1, spoils: 0 }
+  if (r.control?.nation !== nation) {
+    r.control = { nation, since: w.month, lastPillage: -1, spoils: 0 }
+    changedControl(w)
+  }
 }
 export function maintainControl(w: World) {
-  for (const r of w.regions) if (r.control && !controlsProvince(w, r.id, r.control.nation)) delete r.control
+  for (const r of w.regions)
+    if (r.control && !controlsProvince(w, r.id, r.control.nation)) {
+      if (r.control.nation !== r.nation) changedControl(w)
+      delete r.control
+    }
 }
 
 /** Legal sovereignty changes only through a government decision or signed treaty. */
 export function transferSovereignty(w: World, region: number, nation: number) {
   const r = w.regions[region]
+  if (controller(w, region) !== nation) changedControl(w)
   r.nation = nation
   delete r.control
   for (const unit of economicRegions(w))

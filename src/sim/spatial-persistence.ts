@@ -1,10 +1,9 @@
+import { numberValidator, validationFailure } from './persistence-primitives'
 import type { World } from './types'
 
 export function validateSpatial(w: World) {
-  const fail = (): never => {
-    throw new Error('Invalid world save: invalid spatial districts or settlements')
-  }
-  const finite = (x: unknown) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1e14
+  const fail = validationFailure('Invalid world save: invalid spatial districts or settlements')
+  const finite = numberValidator(0, 1e14)
   for (const c of w.cells)
     if (c.landscape !== undefined) {
       const s = c.landscape

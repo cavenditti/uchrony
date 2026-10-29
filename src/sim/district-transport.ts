@@ -1,41 +1,42 @@
-import { periodFlow, simulationMonths } from './simulation-period'
+import { agreementTerms } from './agreements'
+import {
+  corridorCost,
+  corridorProfile,
+  corridorUsage,
+  learnCorridors,
+  type CorridorProfile,
+} from './corridors'
+import { updateDistrictNeighbors } from './districts'
+import { householdNeed, reserveTarget } from './economy'
 import { deliverFreight } from './freight-transit'
+import { MinHeap } from './heap'
+import {
+  balance,
+  borrow,
+  governmentAccount,
+  householdAccount,
+  producerAccount,
+  publicGoods,
+  transfer,
+} from './ledger'
+import { economicRegions, provinceId } from './local-units'
+import { recordTrade } from './macroeconomy'
+import { marketStore, recordTransport } from './national-accounts'
+import { seaPassageView } from './naval-control'
+import { retainRoadBackbone } from './road-backbone'
+import { periodFlow, simulationMonths } from './simulation-period'
+import { tradePolicy } from './trade-policy'
+import { refreshTransport, reverseLegs, transportNetwork } from './transport'
 import {
   GOODS,
   inventory,
   population,
   relation,
-  type World,
   type Good,
   type Route,
   type RouteLeg,
+  type World,
 } from './types'
-import { economicRegions, provinceId } from './local-units'
-import {
-  corridorProfile,
-  corridorUsage,
-  corridorCost,
-  learnCorridors,
-  type CorridorProfile,
-} from './corridors'
-import { transportNetwork, refreshTransport, reverseLegs } from './transport'
-import { retainRoadBackbone } from './road-backbone'
-import { reserveTarget, householdNeed } from './economy'
-import { recordTrade } from './macroeconomy'
-import {
-  balance,
-  borrow,
-  producerAccount,
-  publicGoods,
-  transfer,
-  governmentAccount,
-  householdAccount,
-} from './ledger'
-import { marketStore, recordTransport } from './national-accounts'
-import { agreementTerms } from './agreements'
-import { MinHeap } from './heap'
-import { seaPassageView } from './naval-control'
-import { updateDistrictNeighbors } from './districts'
 
 export interface DistrictLink {
   to: number
@@ -199,35 +200,11 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     ]),
   )
   const paths = new Map<number, ReturnType<typeof nearby>>(),
-    routes: Route[] = [],
-    preferential = new Set<string>()
-  for (const { term } of agreementTerms(w))
-    if (term.kind === 'trade' || term.kind === 'alliance') {
-      preferential.add(`${term.from}:${term.to}`)
-      preferential.add(`${term.to}:${term.from}`)
-    }
-  for (const body of w.institutions?.organizations ?? [])
-    if (body.status === 'active' && body.charter.powers.includes('trade'))
-      for (const a of body.members) for (const b of body.members) preferential.add(`${a}:${b}`)
+    routes: Route[] = []
   system.shipments = []
-  // Treaty membership cannot change during this clearing phase. Price comparisons
-  // need a matrix lookup, not repeated scans of every bilateral relationship.
-  const nationCount = w.nations.length,
-    tariffs = new Float64Array(nationCount * nationCount)
-  for (let a = 0; a < nationCount; a++)
-    for (let b = 0; b < nationCount; b++) {
-      if (a === b) continue
-      const treaty = relation(w, a, b)?.treaty
-      tariffs[a * nationCount + b] =
-        treaty === 'trade' || treaty === 'alliance' || preferential.has(`${a}:${b}`)
-          ? 0
-          : w.nations[a].policies.tariff / 100
-    }
-  const tariffFor = (buyer: number, seller: number) => {
-    const a = system.units[buyer].nation,
-      b = system.units[seller].nation
-    return a < 0 ? 0 : b < 0 ? w.nations[a].policies.tariff / 100 : tariffs[a * nationCount + b]
-  }
+  const policy = tradePolicy(w)
+  const tariffFor = (buyer: number, seller: number) =>
+    policy.tariff(system.units[buyer].nation, system.units[seller].nation)
   // Within goods clearing, loan principal can only increase and bank lending
   // capacity can only fall. A rejected limit cannot become fundable until the
   // buyer receives deposits or requests a higher limit. Cache only rejections;

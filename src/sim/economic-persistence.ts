@@ -1,11 +1,12 @@
-import { configurationFor } from './configuration'
-import { supplierDebt } from './supplier-credit'
-import { economicRegion } from './local-units'
 import { auditBanks } from './banking'
-import { GOODS, type World } from './types'
+import { configurationFor } from './configuration'
 import { STRATA } from './economic-types'
-import { auditNationalAccounts, emptyGDP } from './national-accounts'
 import { balances } from './ledger'
+import { economicRegion } from './local-units'
+import { auditNationalAccounts, emptyGDP } from './national-accounts'
+import { numberValidator, recordValue, validationFailure } from './persistence-primitives'
+import { supplierDebt } from './supplier-credit'
+import { GOODS, type World } from './types'
 export function validateEconomy(w: World) {
   const bankAccount = (account: unknown) => {
     if (typeof account !== 'string' || !/^bank:(0|[1-9]\d*)$/.test(account)) return false
@@ -13,11 +14,9 @@ export function validateEconomy(w: World) {
   }
   const e = w.economy
   if (!e) return
-  const fail = (message: string): never => {
-    throw new Error(`Invalid economic save: ${message}`)
-  }
-  const num = (x: unknown, min = 0) => typeof x === 'number' && Number.isFinite(x) && x >= min && x <= 1e16
-  const obj = (x: unknown) => !!x && typeof x === 'object' && !Array.isArray(x)
+  const fail = validationFailure('Invalid economic save: ', '', '')
+  const num = numberValidator(0, 1e16)
+  const obj = recordValue
   if (
     !obj(e) ||
     e.version !== 1 ||

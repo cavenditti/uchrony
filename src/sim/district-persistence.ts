@@ -1,19 +1,17 @@
-import { GOODS, population, type World } from './types'
 import { geographicNeighbors as movementNeighbors, neighbors } from './grid'
+import { integerValidator, numberValidator, recordValue, validationFailure } from './persistence-primitives'
 import { communitySize } from './population'
 import { habitableLand, highMountain } from './terrain-access'
+import { GOODS, population, type World } from './types'
 
 /** Import checks are read-only. Duplicate/missing ownership must never be repaired by minting or deleting assets. */
 export function validateDistrictEconomy(w: World) {
   const s = w.localEconomy
   if (s === undefined) return
-  const fail = (reason: string): never => {
-    throw new Error(`Invalid district economy: ${reason}`)
-  }
-  const num = (x: unknown, min = 0, max = 1e16): x is number =>
-    typeof x === 'number' && Number.isFinite(x) && x >= min && x <= max
-  const int = (x: unknown, min = 0, max = 1e9): x is number => num(x, min, max) && Number.isSafeInteger(x)
-  const obj = (x: unknown) => !!x && typeof x === 'object' && !Array.isArray(x)
+  const fail = validationFailure('Invalid district economy: ', '', '')
+  const num = numberValidator(0, 1e16)
+  const int = integerValidator(0, 1e9, true)
+  const obj = recordValue
   if (
     !obj(s) ||
     s.version !== 1 ||

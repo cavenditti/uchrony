@@ -1,28 +1,37 @@
-import { supplierDebt } from './supplier-credit'
-import { economicRegion } from './local-units'
-import { recordService, recordGoodsSale, marketStore, economicNation } from './national-accounts'
-import type { Good } from './types'
-import { inventory, population, type World } from './types'
+/** Conserved transfers connect household, firm and government books. Address caches
+ * survive account replacement; transaction batching retains a bounded public tail. */
 import {
-  ensureBanking,
-  settleBankTransfer,
-  settleBankAccounts,
   accountBank,
-  issueBankLoan,
   auditBanks,
+  ensureBanking,
+  issueBankLoan,
+  settleBankAccounts,
+  settleBankTransfer,
 } from './banking'
 import {
   STRATA,
+  type Bank,
   type EconomicStratum,
   type HouseholdAccount,
-  type ProducerAccount,
   type LedgerEntry,
-  type Bank,
+  type ProducerAccount,
 } from './economic-types'
+import { economicRegion } from './local-units'
+import { economicNation, marketStore, recordGoodsSale, recordService } from './national-accounts'
+import { supplierDebt } from './supplier-credit'
+import type { Good } from './types'
+import { inventory, population, type World } from './types'
 
-type AccountAddress = { kind: string; id: number; group: EconomicStratum; field: 'cash' | 'treasury' }
+/** Parsed stable identity; account holders themselves may be replaced by remeshing. */
+export type AccountAddress = Readonly<{
+  kind: string
+  id: number
+  group: EconomicStratum
+  field: 'cash' | 'treasury'
+}>
 const addresses = new WeakMap<World, Map<string, AccountAddress>>()
-function accountAddress(w: World, account: string) {
+/** Cache parsed addresses only; never retain replaceable account objects. */
+export function accountAddress(w: World, account: string) {
   let index = addresses.get(w)
   if (!index) addresses.set(w, (index = new Map()))
   let address = index.get(account)

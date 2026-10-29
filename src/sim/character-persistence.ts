@@ -1,17 +1,21 @@
 import { DRIVE_AXES } from './ambitions'
-import type { World } from './types'
-import { CHARACTER_AXES, LEADER_SKILLS, type Attitudes } from './character-types'
 import { LEADER_PERKS } from './character'
+import { CHARACTER_AXES, LEADER_SKILLS, type Attitudes } from './character-types'
+import {
+  integerAtMost,
+  numberValidator,
+  recordValue,
+  textValidator,
+  validationFailure,
+} from './persistence-primitives'
+import type { World } from './types'
 
 export function validateCharacters(world: World) {
-  const fail = (): never => {
-    throw new Error('Invalid state character or leadership profile in this save.')
-  }
-  const object = (v: unknown) => !!v && typeof v === 'object' && !Array.isArray(v)
-  const number = (v: unknown, low = 0, high = 1) =>
-    typeof v === 'number' && Number.isFinite(v) && v >= low && v <= high
-  const integer = (v: unknown, max: number) => number(v, 0, max) && Number.isInteger(v)
-  const text = (v: unknown, max: number) => typeof v === 'string' && v.length > 0 && v.length <= max
+  const fail = validationFailure('Invalid state character or leadership profile in this save.')
+  const object = recordValue
+  const number = numberValidator(0, 1)
+  const integer = integerAtMost(Infinity, false)
+  const text = textValidator(Infinity, 1)
   const attitudes = (v: Attitudes) => object(v) && CHARACTER_AXES.every((key) => number(v[key]))
   const supported = [
     'taxIncome',

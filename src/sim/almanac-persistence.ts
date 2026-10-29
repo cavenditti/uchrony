@@ -1,17 +1,14 @@
-import type { World } from './types'
 import { PLACE_KINDS, type Almanac } from './almanac-types'
 import { isWritingTask } from './model-tasks'
+import { integerAtMost, recordValue, textValidator, validationFailure } from './persistence-primitives'
+import type { World } from './types'
 /** Untrusted imports cannot install settings, executable prompts or dangling evidence. */
 export function validateAlmanac(w: World, value: unknown) {
   const a = value as Almanac
-  const fail = (): never => {
-    throw new Error('Invalid world save: invalid atlas or historical archive')
-  }
-  const object = (x: unknown): x is Record<string, unknown> =>
-    !!x && typeof x === 'object' && !Array.isArray(x)
-  const text = (x: unknown, max = 3000): x is string => typeof x === 'string' && x.length <= max
-  const integer = (x: unknown, max = w.month): x is number =>
-    Number.isSafeInteger(x) && Number(x) >= 0 && Number(x) <= max
+  const fail = validationFailure('Invalid world save: invalid atlas or historical archive')
+  const object = recordValue
+  const text = textValidator(3000, 0)
+  const integer = integerAtMost(w.month, true)
   const ids = (x: unknown, max = 200000): x is string[] =>
     Array.isArray(x) &&
     x.length <= max &&

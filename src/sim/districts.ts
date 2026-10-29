@@ -1,37 +1,34 @@
-import { habitableLand } from './terrain-access'
+/** Districts own local goods and resident cohorts; provinces expose political rollups.
+ * Boundary remapping conserves dated cohorts, stores, deposits, debt and equity. */
 import { rebuildAdaptiveMesh } from './adaptive-world'
-import { consolidateClaims } from './district-finance'
-import { MODEL_PARAMETERS } from './model-parameters'
-import { GOODS, inventory, population, clamp, type Region, type World, type Inventory } from './types'
-import type { DistrictEconomy, DistrictUnit } from './district-types'
-import type { PopulationCommunity, BirthCohort } from './population-types'
-import { STRATA, type EconomicStratum, type ProducerAccount } from './economic-types'
-import { apportion } from './allocation'
-import { landscapeAt } from './landscape'
-import { neighbors } from './grid'
-import { buildSpatial, type SpatialDistrict } from './spatial'
-import { communitySize, coalesceCommunities, emptyDynamics, rollupPopulation } from './population'
 import { refreshAges } from './age-cohorts'
-import { ensureEconomy, householdAccount, producerAccount, transfer, auditLedger } from './ledger'
-import { recordGift, marketStore, reconcileGDP, inventoryQuote } from './national-accounts'
+import { apportion } from './allocation'
+import { divideStock } from './district-allocation'
+import { clearProducerAssets, distributeProducerAssets, transferAccountPartitions } from './district-assets'
+import { consolidateClaims } from './district-finance'
+import type { DistrictEconomy, DistrictUnit } from './district-types'
+import { STRATA, type EconomicStratum, type ProducerAccount } from './economic-types'
+import { neighbors } from './grid'
+import { landscapeAt } from './landscape'
+import {
+  accountAddress,
+  auditLedger,
+  balance,
+  ensureEconomy,
+  householdAccount,
+  producerAccount,
+} from './ledger'
+import { MODEL_PARAMETERS } from './model-parameters'
+import { inventoryQuote, marketStore, reconcileGDP, recordGift } from './national-accounts'
+import { coalesceCommunities, communitySize, emptyDynamics, rollupPopulation } from './population'
+import type { BirthCohort, PopulationCommunity } from './population-types'
+import { buildSpatial, type SpatialDistrict } from './spatial'
+import { habitableLand } from './terrain-access'
+import { clamp, GOODS, inventory, population, type Inventory, type Region, type World } from './types'
 
 const minerals = ['timber', 'stone', 'iron', 'coal'] as const
 const integerSum = (values: Record<number, number>) => Object.values(values).reduce((a, b) => a + b, 0)
-const fractions = (weights: number[]) => {
-  const sum = weights.reduce((a, b) => a + Math.max(0, b), 0)
-  return weights.map((x) => (sum ? Math.max(0, x) / sum : 1 / weights.length))
-}
-/** The final recipient receives the residual, so no stock disappears through rounding. */
-export function divideStock(amount: number, weights: number[]) {
-  const shares = fractions(weights)
-  let left = amount
-  return shares.map((share, i) => {
-    const part = i === shares.length - 1 ? left : Math.min(left, amount * share)
-    left -= part
-    return part
-  })
-}
-
+export { divideStock } from './district-allocation'
 /** Allocate each dated sex cohort, with exact recipient totals and no synthetic birthdays. */
 export function partitionPeople(groups: PopulationCommunity[], ids: number[], targets: number[]) {
   const remaining = [...targets],
@@ -154,51 +151,9 @@ export function refreshEndowment(w: World, r: DistrictUnit, refreshFertility = t
       }, 0) / area
 }
 
-/** Existing legal claims keep lender, interest rate, origination date and arrears.
- * Household/merchant aggregates are novated in the same fractions as their owners. */
+/** Opening partitions inherit the original bank and keep its surviving loan identity. */
 function partitionAccount(w: World, from: string, recipients: string[], weights: number[]) {
-  const e = w.economy!,
-    sourceBank = e.banking!.accounts[from]
-  for (const to of recipients) if (to !== from) e.banking!.accounts[to] ??= sourceBank
-  const cash = from.startsWith('household:')
-    ? e.households[Number(from.split(':')[1])][from.split(':')[2] as EconomicStratum].cash
-    : e.producers[Number(from.split(':')[1])].cash
-  const amounts = divideStock(cash, weights)
-  recipients.forEach((to, i) => {
-    if (to !== from) transfer(w, from, to, amounts[i], 'district boundary asset transfer')
-  })
-  for (const loan of [...e.credit.loans].filter((l) => l.borrower === from)) {
-    const claims = divideStock(loan.principal, weights),
-      original = { ...loan }
-    loan.principal = 0
-    recipients.forEach((borrower, i) => {
-      if (!claims[i]) return
-      if (borrower === from) {
-        loan.principal = claims[i]
-        loan.contract ??= loan.id
-      } else
-        e.credit.loans.push({
-          ...original,
-          contract: original.contract ?? original.id,
-          id: e.credit.nextId++,
-          borrower,
-          principal: claims[i],
-        })
-    })
-  }
-  for (const owners of [
-    ...e.banking!.banks.map((b) => b.owners),
-    ...Object.values(e.supplierCredit ?? {}),
-    ...(e.firms ?? []).map((f) => f.owners).filter((x): x is Record<string, number> => !!x),
-  ]) {
-    const shares = owners[from]
-    if (shares === undefined) continue
-    delete owners[from]
-    const parts = divideStock(shares, weights)
-    recipients.forEach((to, i) => {
-      if (parts[i]) owners[to] = (owners[to] ?? 0) + parts[i]
-    })
-  }
+  transferAccountPartitions(w, [{ from, recipients, weights, cash: balance(w, from) }], true)
 }
 
 function zeroAccounts(w: World, id: number, template: number) {
@@ -234,32 +189,12 @@ function zeroAccounts(w: World, id: number, template: number) {
 function shareProducer(w: World, source: number, targets: DistrictUnit[], weights: number[]) {
   const e = w.economy!,
     original = structuredClone(e.producers[source])
-  for (const [key, value] of Object.entries(original)) {
-    if (key === 'cash' || key === 'projects' || key === 'wage' || key === 'previousPriceIndex') continue
-    if (typeof value === 'number') {
-      const values = divideStock(value, weights)
-      targets.forEach((r, i) => {
-        const p = e.producers[r.id] as unknown as Record<string, number>
-        p[key] = (r.id === source ? 0 : p[key]) + values[i]
-      })
-    } else if (value && !Array.isArray(value))
-      for (const g of GOODS) {
-        const values = divideStock((value as Inventory)[g], weights)
-        targets.forEach((r, i) => {
-          const field = (e.producers[r.id] as unknown as Record<string, Inventory>)[key]
-          field[g] = (r.id === source ? 0 : field[g]) + values[i]
-        })
-      }
-  }
-  e.producers[source].projects = []
-  for (const project of original.projects) {
-    const capital = divideStock(project.capital, weights),
-      cost = divideStock(project.cost, weights)
-    targets.forEach((r, i) => {
-      if (capital[i] || cost[i])
-        e.producers[r.id].projects.push({ ...project, capital: capital[i], cost: cost[i] })
-    })
-  }
+  clearProducerAssets(e.producers[source])
+  distributeProducerAssets(
+    original,
+    targets.map((r) => e.producers[r.id]),
+    weights,
+  )
   partitionAccount(
     w,
     producerAccount(source),
@@ -699,13 +634,6 @@ function redistributeAccounts(
   // A remesh can split and merge simultaneously. Every original balance, claim and share
   // is captured before any transfer, preventing receipts being redistributed a second time.
   const plans: { from: string; recipients: string[]; weights: number[]; cash: number }[] = []
-  const loanOpening = structuredClone(e.credit.loans)
-  const owners = [
-    ...e.banking!.banks.map((b) => b.owners),
-    ...Object.values(e.supplierCredit ?? {}),
-    ...(e.firms ?? []).flatMap((f) => (f.owners ? [f.owners] : [])),
-  ]
-  const ownerOpening = owners.map((o) => ({ ...o }))
   for (const source of old) {
     const recipients = targets.filter(
       (r) => r.province === source.province && r.cells.some((c) => oldCells.get(source.id)!.has(c)),
@@ -734,93 +662,19 @@ function redistributeAccounts(
       })
     }
   }
-  // Noncash productive assets and all monthly counters are extensive and additive.
-  for (const id of new Set([...old.map((r) => r.id), ...targets.map((r) => r.id)])) {
-    const p = e.producers[id]
-    for (const [key, value] of Object.entries(p)) {
-      if (typeof value === 'number' && !['cash', 'wage', 'previousPriceIndex'].includes(key))
-        (p as unknown as Record<string, number>)[key] = 0
-      else if (Array.isArray(value)) (p as unknown as Record<string, unknown>)[key] = []
-      else if (value && typeof value === 'object')
-        (p as unknown as Record<string, unknown>)[key] = inventory()
-    }
-  }
+  // Snapshot all producers before clearing any destination, including split/merge overlaps.
+  for (const id of new Set([...old.map((r) => r.id), ...targets.map((r) => r.id)]))
+    clearProducerAssets(e.producers[id])
+  const byAccount = new Map(plans.map((plan) => [plan.from, plan]))
   for (const source of old) {
-    const p = producerCopies.get(source.id)!,
-      plan = plans.find((p) => p.from === producerAccount(source.id))!
-    for (const [key, value] of Object.entries(p)) {
-      if (['cash', 'wage', 'previousPriceIndex', 'projects'].includes(key)) continue
-      if (typeof value === 'number')
-        divideStock(value, plan.weights).forEach((v, i) => {
-          ;(e.producers[Number(plan.recipients[i].split(':')[1])] as unknown as Record<string, number>)[
-            key
-          ] += v
-        })
-      else if (value && !Array.isArray(value))
-        for (const g of GOODS)
-          divideStock((value as Inventory)[g], plan.weights).forEach((v, i) => {
-            ;(e.producers[Number(plan.recipients[i].split(':')[1])] as unknown as Record<string, Inventory>)[
-              key
-            ][g] += v
-          })
-    }
-    for (const project of p.projects) {
-      const caps = divideStock(project.capital, plan.weights),
-        costs = divideStock(project.cost, plan.weights)
-      plan.recipients.forEach((to, i) => {
-        if (caps[i] || costs[i])
-          e.producers[Number(to.split(':')[1])].projects.push({
-            ...project,
-            capital: caps[i],
-            cost: costs[i],
-          })
-      })
-    }
+    const plan = byAccount.get(producerAccount(source.id))!
+    distributeProducerAssets(
+      producerCopies.get(source.id)!,
+      plan.recipients.map((to) => e.producers[accountAddress(w, to).id]),
+      plan.weights,
+    )
   }
-  // Transfer only captured opening amounts. Incoming receipts are never divided again,
-  // including when a unit both receives a merger and contributes to a split.
-  for (const plan of plans) {
-    const amounts = divideStock(plan.cash, plan.weights)
-    plan.recipients.forEach((to, i) => {
-      if (to !== plan.from) transfer(w, plan.from, to, amounts[i], 'district boundary asset transfer')
-    })
-  }
-  const byAccount = new Map(plans.map((p) => [p.from, p]))
-  e.credit.loans = []
-  for (const loan of loanOpening) {
-    const plan = byAccount.get(loan.borrower)
-    if (!plan) {
-      e.credit.loans.push(loan)
-      continue
-    }
-    const parts = divideStock(loan.principal, plan.weights)
-    let used = false
-    plan.recipients.forEach((borrower, i) => {
-      if (parts[i]) {
-        e.credit.loans.push({
-          ...loan,
-          contract: loan.contract ?? loan.id,
-          borrower,
-          principal: parts[i],
-          id: used ? e.credit.nextId++ : loan.id,
-        })
-        used = true
-      }
-    })
-  }
-  owners.forEach((o, i) => {
-    for (const key of Object.keys(o)) delete o[key]
-    for (const [from, shares] of Object.entries(ownerOpening[i])) {
-      const plan = byAccount.get(from)
-      if (!plan) {
-        o[from] = (o[from] ?? 0) + shares
-        continue
-      }
-      divideStock(shares, plan.weights).forEach((v, j) => {
-        if (v) o[plan.recipients[j]] = (o[plan.recipients[j]] ?? 0) + v
-      })
-    }
-  })
+  transferAccountPartitions(w, plans)
 }
 
 /** Called only as the next monthly books open. A retired unit can be archived

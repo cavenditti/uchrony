@@ -1,15 +1,16 @@
-import { withWorldConfiguration } from './configuration'
 import { placeLabels } from './almanac'
+import { withWorldConfiguration } from './configuration'
 import { economicLandscape } from './economic-landscape'
-import { mapHomesSnapshot, mapMeshSnapshot } from './map-snapshot'
-import { urbanBlocks } from './urban-blocks'
-import { clamp, GOODS, type Inventory, type Army, type World } from './types'
-import { unitLoyalty } from './forces'
-import type { IdentityAxis, PopulationCommunity } from './population-types'
 import { STRATA, type EconomicStratum } from './economic-types'
-import { communitySize } from './population'
+import { unitLoyalty } from './forces'
+import { firmAccount, householdAccount, producerAccount } from './ledger'
 import { localFirmRegion } from './local-units'
+import { mapHomesSnapshot, mapMeshSnapshot } from './map-snapshot'
+import { communitySize } from './population'
+import type { IdentityAxis, PopulationCommunity } from './population-types'
 import { spatialState } from './spatial'
+import { clamp, GOODS, type Army, type Inventory, type World } from './types'
+import { urbanBlocks } from './urban-blocks'
 
 const axes: IdentityAxis[] = ['culture', 'language', 'belief', 'movement']
 export interface PopulationCensus {
@@ -118,8 +119,8 @@ function configuredSnapshot(world: World, detailNation?: number | null): Omit<Wo
   )
   const firms = world.economy?.firms?.filter((firm) => places.has(localFirmRegion(firm)))
   const borrowers = new Set([
-    ...[...places].flatMap((id) => [`producer:${id}`, ...STRATA.map((s) => `household:${id}:${s}`)]),
-    ...(firms ?? []).map((firm) => `firm:${firm.id}`),
+    ...[...places].flatMap((id) => [producerAccount(id), ...STRATA.map((s) => householdAccount(id, s))]),
+    ...(firms ?? []).map((firm) => firmAccount(firm.id)),
   ])
   const bankLoans: Record<number, number> = {}
   for (const loan of world.economy?.credit.loans ?? [])
@@ -145,9 +146,65 @@ function configuredSnapshot(world: World, detailNation?: number | null): Omit<Wo
   // Work ledgers and production forecasts are not display data. One shared empty
   // inventory also remains shared across structuredClone/postMessage. None of
   // these projected work buffers may be used to save or advance a world.
+  const e = world.economy,
+    months = e?.periodMonths ?? 1
+  const rates = snapshotRates(months),
+    { monthly, regionRates } = rates
+  const project = <T extends PopulationHolder>(entity: T): T => {
+    const { communities: _communities, ...data } = entity
+    return { ...data, census: censusOf(entity, world.month) } as T
+  }
+  return {
+    ...rest,
+    viewOnly: true,
+    ...(months !== 1
+      ? {
+          totals: monthly(world.totals, ['births', 'deaths', 'migration']),
+          routes: world.routes.map((r) => monthly(r, ['volume', 'capacity'])),
+        }
+      : {}),
+    almanac: undefined,
+    viewPlaces: placeLabels(world),
+    viewLandscape: economicLandscape(world),
+    ...(world.adaptive
+      ? {
+          viewHomes: mapHomesSnapshot(world),
+          viewMesh: mapMeshSnapshot(world),
+          viewUrbanBlocks: urbanBlocks(world),
+        }
+      : {}),
+    ...(detailNation !== undefined ? { viewNation: detailNation, viewBankLoans: bankLoans } : {}),
+    spatial: spatialState(world),
+    ...(e
+      ? {
+          economy: projectEconomySnapshot(e, { detailNation, places, borrowers, firms }, rates),
+        }
+      : {}),
+    ...(world.adaptive
+      ? {
+          adaptive: projectAdaptiveSnapshot(world.adaptive),
+        }
+      : {}),
+    ...(world.localEconomy
+      ? {
+          localEconomy: projectLocalEconomySnapshot(
+            world.localEconomy,
+            includes,
+            strata,
+            shipmentTotals,
+            rates,
+          ),
+        }
+      : {}),
+    regions: world.regions.map((r) => project(regionRates(r))),
+    armies: world.armies.map(project),
+    ...(world.warfare ? { warfare: { ...world.warfare, fleets: world.warfare.fleets.map(project) } } : {}),
+  }
+}
+
+/** Rate projection keeps six-month ledgers intact and scales only flow quantities. */
+function snapshotRates(months: number) {
   const empty = Object.fromEntries(GOODS.map((good) => [good, 0])) as Inventory
-  const e = world.economy
-  const months = e?.periodMonths ?? 1
   const monthly = <T extends object>(data: T, keys: readonly string[]): T => {
     if (months === 1) return data
     const result = { ...data } as Record<string, unknown>
@@ -195,174 +252,159 @@ function configuredSnapshot(world: World, detailNation?: number | null): Omit<Wo
               }
             : {}),
         }
-  const project = <T extends PopulationHolder>(entity: T): T => {
-    const { communities: _communities, ...data } = entity
-    return { ...data, census: censusOf(entity, world.month) } as T
-  }
+
+  return { empty, monthly, inventoryRate, flowKeys, regionRates }
+}
+/** Filter private account detail once and express flows as monthly rates. */
+function projectEconomySnapshot(
+  e: NonNullable<World['economy']>,
+  selection: {
+    detailNation?: number | null
+    places: ReadonlySet<number>
+    borrowers: ReadonlySet<string>
+    firms: NonNullable<World['economy']>['firms']
+  },
+  rates: ReturnType<typeof snapshotRates>,
+) {
+  const { detailNation, places, borrowers, firms } = selection
+  const { monthly, inventoryRate, flowKeys, empty } = rates
   return {
-    ...rest,
-    viewOnly: true,
-    ...(months !== 1
+    ...e,
+    ...(detailNation !== undefined
       ? {
-          totals: monthly(world.totals, ['births', 'deaths', 'migration']),
-          routes: world.routes.map((r) => monthly(r, ['volume', 'capacity'])),
-        }
-      : {}),
-    almanac: undefined,
-    viewPlaces: placeLabels(world),
-    viewLandscape: economicLandscape(world),
-    ...(world.adaptive
-      ? {
-          viewHomes: mapHomesSnapshot(world),
-          viewMesh: mapMeshSnapshot(world),
-          viewUrbanBlocks: urbanBlocks(world),
-        }
-      : {}),
-    ...(detailNation !== undefined ? { viewNation: detailNation, viewBankLoans: bankLoans } : {}),
-    spatial: spatialState(world),
-    ...(e
-      ? {
-          economy: {
-            ...e,
-            ...(detailNation !== undefined
-              ? {
-                  households: Object.fromEntries(
-                    Object.entries(e.households).filter(([id]) => places.has(+id)),
-                  ),
-                  credit: {
-                    ...e.credit,
-                    loans: e.credit.loans.filter((loan) => borrowers.has(loan.borrower)),
-                  },
-                  ...(e.banking
-                    ? {
-                        banking: {
-                          ...e.banking,
-                          accounts: {},
-                          banks: e.banking.banks.map((bank) => ({ ...bank, owners: {} })),
-                        },
-                      }
-                    : {}),
-                }
-              : {}),
-            households: Object.fromEntries(
-              Object.entries(e.households)
-                .filter(([id]) => places.has(+id))
-                .map(([id, pools]) => [
-                  id,
-                  Object.fromEntries(
-                    Object.entries(pools).map(([stratum, h]) => [
-                      stratum,
-                      { ...monthly(h, flowKeys), consumption: inventoryRate(h.consumption) },
-                    ]),
-                  ) as typeof pools,
-                ]),
-            ),
-            ledger: { ...e.ledger, opening: {}, net: {}, entries: [] },
-            inventoryPrices: undefined,
-            ...(e.accounts
-              ? {
-                  accounts: {
-                    ...e.accounts,
-                    businesses: {},
-                    stores: {},
-                    world: monthly(e.accounts.world, Object.keys(e.accounts.world)),
-                    nations: Object.fromEntries(
-                      Object.entries(e.accounts.nations).map(([id, account]) => [
-                        id,
-                        monthly(account, Object.keys(account)),
-                      ]),
-                    ),
-                    regionalValueAdded: monthly(
-                      e.accounts.regionalValueAdded,
-                      Object.keys(e.accounts.regionalValueAdded),
-                    ),
-                  },
-                }
-              : {}),
-            producers: Object.fromEntries(
-              Object.entries(e.producers)
-                .filter(([id]) => places.has(+id))
-                .map(([id, p]) => [
-                  id,
-                  {
-                    ...monthly(p, flowKeys),
-                    projects: [],
-                    forecast: empty,
-                    planned: empty,
-                    sold: empty,
-                    inputTargets: empty,
-                    openingStocks: empty,
-                    losses: empty,
-                    intermediate: empty,
-                  },
-                ]),
-            ),
-            firms: firms?.map((f) => ({
-              ...monthly(f, flowKeys),
-              projects: [],
-              prices: empty,
-              production: empty,
-              planned: empty,
-              forecast: empty,
-              sold: empty,
-              laborMix: undefined,
-              labor: undefined,
-            })),
+          credit: {
+            ...e.credit,
+            loans: e.credit.loans.filter((loan) => borrowers.has(loan.borrower)),
           },
+          ...(e.banking
+            ? {
+                banking: {
+                  ...e.banking,
+                  accounts: {},
+                  banks: e.banking.banks.map((bank) => ({ ...bank, owners: {} })),
+                },
+              }
+            : {}),
         }
       : {}),
-    ...(world.adaptive
+    households: Object.fromEntries(
+      Object.entries(e.households)
+        .filter(([id]) => places.has(+id))
+        .map(([id, pools]) => [
+          id,
+          Object.fromEntries(
+            Object.entries(pools).map(([stratum, h]) => [
+              stratum,
+              { ...monthly(h, flowKeys), consumption: inventoryRate(h.consumption) },
+            ]),
+          ) as typeof pools,
+        ]),
+    ),
+    ledger: { ...e.ledger, opening: {}, net: {}, entries: [] },
+    inventoryPrices: undefined,
+    ...(e.accounts
       ? {
-          adaptive: {
-            ...world.adaptive,
-            urban: undefined,
-            sites: {},
-            commuting: [],
-            commutingRows: [],
-            commuteRoutes: {},
-            construction: [],
-            boundaries: [],
-            transit: [],
-            tree: { leaves: [], changed: {}, month: world.adaptive.tree.month },
-            jurisdictions: Object.fromEntries(
-              Object.entries(world.adaptive.jurisdictions).filter(([, j]) => j.retired === undefined),
+          accounts: {
+            ...e.accounts,
+            businesses: {},
+            stores: {},
+            world: monthly(e.accounts.world, Object.keys(e.accounts.world)),
+            nations: Object.fromEntries(
+              Object.entries(e.accounts.nations).map(([id, account]) => [
+                id,
+                monthly(account, Object.keys(account)),
+              ]),
+            ),
+            regionalValueAdded: monthly(
+              e.accounts.regionalValueAdded,
+              Object.keys(e.accounts.regionalValueAdded),
             ),
           },
         }
       : {}),
-    ...(world.localEconomy
-      ? {
-          localEconomy: {
-            ...world.localEconomy,
-            shipments: [],
-            shipmentTotals,
-            units: Object.fromEntries(
-              Object.entries(world.localEconomy.units).map(([id, u]) => {
-                const { communities: _communities, census: _census, ...data } = u
-                return [
-                  id,
-                  {
-                    ...regionRates(data),
-                    strataCounts: strata.get(+id) ?? {},
-                    ...(includes(u.nation)
-                      ? {}
-                      : {
-                          stocks: empty,
-                          production: empty,
-                          plannedProduction: empty,
-                          consumption: empty,
-                          prices: empty,
-                          populationDynamics: undefined,
-                        }),
-                  },
-                ]
-              }),
-            ),
+    producers: Object.fromEntries(
+      Object.entries(e.producers)
+        .filter(([id]) => places.has(+id))
+        .map(([id, p]) => [
+          id,
+          {
+            ...monthly(p, flowKeys),
+            projects: [],
+            forecast: empty,
+            planned: empty,
+            sold: empty,
+            inputTargets: empty,
+            openingStocks: empty,
+            losses: empty,
+            intermediate: empty,
           },
-        }
-      : {}),
-    regions: world.regions.map((r) => project(regionRates(r))),
-    armies: world.armies.map(project),
-    ...(world.warfare ? { warfare: { ...world.warfare, fleets: world.warfare.fleets.map(project) } } : {}),
+        ]),
+    ),
+    firms: firms?.map((f) => ({
+      ...monthly(f, flowKeys),
+      projects: [],
+      prices: empty,
+      production: empty,
+      planned: empty,
+      forecast: empty,
+      sold: empty,
+      laborMix: undefined,
+      labor: undefined,
+    })),
+  }
+}
+/** Mesh work buffers are simulation state, not display payload. */
+function projectAdaptiveSnapshot(adaptive: NonNullable<World['adaptive']>) {
+  return {
+    ...adaptive,
+    urban: undefined,
+    sites: {},
+    commuting: [],
+    commutingRows: [],
+    commuteRoutes: {},
+    construction: [],
+    boundaries: [],
+    transit: [],
+    tree: { leaves: [], changed: {}, month: adaptive.tree.month },
+    jurisdictions: Object.fromEntries(
+      Object.entries(adaptive.jurisdictions).filter(([, j]) => j.retired === undefined),
+    ),
+  }
+}
+/** Local snapshots retain censuses while hiding foreign market work buffers. */
+function projectLocalEconomySnapshot(
+  localEconomy: NonNullable<World['localEconomy']>,
+  includes: (nation: number) => boolean,
+  strata: Map<number, Partial<Record<EconomicStratum, number>>>,
+  shipmentTotals: Record<number, { arriving: number; leaving: number }>,
+  rates: ReturnType<typeof snapshotRates>,
+) {
+  const { regionRates, empty } = rates
+  return {
+    ...localEconomy,
+    shipments: [],
+    shipmentTotals,
+    units: Object.fromEntries(
+      Object.entries(localEconomy.units).map(([id, u]) => {
+        const { communities: _communities, census: _census, ...data } = u
+        return [
+          id,
+          {
+            ...regionRates(data),
+            strataCounts: strata.get(+id) ?? {},
+            ...(includes(u.nation)
+              ? {}
+              : {
+                  stocks: empty,
+                  production: empty,
+                  plannedProduction: empty,
+                  consumption: empty,
+                  prices: empty,
+                  populationDynamics: undefined,
+                }),
+          },
+        ]
+      }),
+    ),
   }
 }

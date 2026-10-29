@@ -1,55 +1,58 @@
+/** Monthly household and government clearing transfers existing deposits against
+ * real goods and services before final GDP and bank reconciliation. */
+import { settleBanks, updateMonetaryPolicy, withBorrowerLoanIndex } from './banking'
+import { competitivePressure } from './competitive-pressure'
 import { parameterGroup } from './configuration-context'
-import { repaySuppliers } from './supplier-credit'
 import { decisionPolicy } from './decision-policy'
 import { activeDevelopment } from './development'
-import { competitivePressure } from './competitive-pressure'
-import { expansionParameters } from './expansion-parameters'
-import { withBorrowerLoanIndex } from './banking'
-import { simulationMonths, periodFlow, periodRate } from './simulation-period'
-import { governance } from './governance'
 import { archiveRetiredDistricts } from './districts'
-import { economicRegions, economicRegion, provinceId } from './local-units'
-import {
-  GOODS,
-  inventory,
-  population,
-  clamp,
-  type Good,
-  type Region,
-  type World,
-  type Inventory,
-} from './types'
 import { STRATA, type EconomicStratum } from './economic-types'
+import { BASE_PRICE, foodEquivalentPeople, householdNeed } from './economy'
+import { effectMultiplier } from './effects'
+import { expansionParameters } from './expansion-parameters'
+import { beginFirmMonth, ensureFirms, finishFirms, hireFirms, regionalFirms, retailDecay } from './firms'
+import { auditGoods, beginGoodsMonth } from './goods-accounting'
+import { governance } from './governance'
+import {
+  auditLedger,
+  beginLedgerMonth,
+  borrow,
+  ensureEconomy,
+  firmAccount,
+  governmentAccount,
+  householdAccount,
+  preparePayments,
+  producerAccount,
+  stratumPeople,
+  transfer,
+} from './ledger'
+import { economicRegion, economicRegions, provinceId } from './local-units'
 import { MODEL_PARAMETERS as P } from './model-parameters'
-import { settleBanks, updateMonetaryPolicy } from './banking'
-import { ensureFirms, beginFirmMonth, finishFirms, hireFirms, regionalFirms, retailDecay } from './firms'
 import {
   beginNationalAccounts,
-  reconcileGDP,
   economicNation,
-  marketStore,
   firmStore,
+  marketStore,
+  reconcileGDP,
   recordGoodsSale,
   recordTransport,
   recordUse,
   recordWages,
 } from './national-accounts'
-import { effectMultiplier } from './effects'
+import { communitySize, peopleByStratum } from './population'
+import { periodFlow, periodRate, simulationMonths } from './simulation-period'
+import { repaySuppliers } from './supplier-credit'
+import { territorialIndex } from './territory-index'
 import {
-  ensureEconomy,
-  transfer,
-  governmentAccount,
-  producerAccount,
-  firmAccount,
-  householdAccount,
-  stratumPeople,
-  borrow,
-  beginLedgerMonth,
-  auditLedger,
-  preparePayments,
-} from './ledger'
-import { BASE_PRICE, householdNeed, foodEquivalentPeople } from './economy'
-import { beginGoodsMonth, auditGoods } from './goods-accounting'
+  clamp,
+  GOODS,
+  inventory,
+  population,
+  type Good,
+  type Inventory,
+  type Region,
+  type World,
+} from './types'
 const skill: Record<EconomicStratum, number> = parameterGroup('wageSkills')
 const budgetShares: Inventory = parameterGroup('consumptionBudget')
 const materialWeights: Inventory = parameterGroup('materialCoverage')
@@ -211,8 +214,13 @@ export function consumeHouseholds(w: World) {
     const salesQuantity = inventory(),
       salesValue = inventory()
     const foodWeights = Object.fromEntries(STRATA.map((s) => [s, 0])) as Record<EconomicStratum, number>
-    for (const group of r.communities ?? [])
-      foodWeights[group.stratum ?? 'laborer'] += foodEquivalentPeople(group.population)
+    const peopleCounts = Object.fromEntries(STRATA.map((s) => [s, 0])) as Record<EconomicStratum, number>
+    for (const group of r.communities ?? []) {
+      const stratum = group.stratum ?? 'laborer'
+      foodWeights[stratum] += foodEquivalentPeople(group.population)
+      peopleCounts[stratum] += communitySize(group)
+    }
+    const heir = STRATA.find((stratum) => peopleCounts[stratum] > 0)
     const foodTotal = Object.values(foodWeights).reduce((sum, x) => sum + x, 0)
     const orders: {
       s: EconomicStratum
@@ -224,9 +232,8 @@ export function consumeHouseholds(w: World) {
     }[] = []
     for (const s of STRATA) {
       const h = e.households[r.id][s],
-        people = stratumPeople(w, r.id, s)
+        people = peopleCounts[s]
       if (!people) {
-        const heir = STRATA.find((other) => stratumPeople(w, r.id, other) > 0)
         if (heir && h.cash > 0)
           transfer(
             w,
@@ -337,9 +344,17 @@ export function consumeHouseholds(w: World) {
   }
 }
 export function fundGovernment(w: World) {
-  const e = ensureEconomy(w)
+  const e = ensureEconomy(w),
+    territory = territorialIndex(w)
+  const unitsByNation = new Map<number, Region[]>()
+  for (const unit of economicRegions(w)) {
+    if (w.regions[provinceId(unit)].control) continue
+    let units = unitsByNation.get(unit.nation)
+    if (!units) unitsByNation.set(unit.nation, (units = []))
+    units.push(unit)
+  }
   for (const n of w.nations) {
-    const own = economicRegions(w).filter((r) => r.nation === n.id && !w.regions[provinceId(r)].control),
+    const own = unitsByNation.get(n.id) ?? [],
       people = own.reduce((sum, r) => sum + population(r), 0)
     if (!own.length) {
       for (const k of Object.keys(n.budget) as (keyof typeof n.budget)[]) n.budget[k] = 0
@@ -360,9 +375,7 @@ export function fundGovernment(w: World) {
       n.stability >= expansion.minimumStability
         ? competitivePressure(w, n)
         : undefined
-    const frontier = w.regions.some(
-      (r) => r.nation === -1 && r.neighbors.some((id) => w.regions[id].nation === n.id),
-    )
+    const frontier = territory.bordering(-1, n.id)
     const savings = frontier && compete ? expansion.savingShare * compete.urgency : 0
     const development = compete ? expansion.developmentShare * (compete.urgency + compete.peer) : 0
     const available = Math.min(n.treasury, intended) * (1 - savings),
@@ -378,16 +391,14 @@ export function fundGovernment(w: World) {
     for (const key of Object.keys(weights) as (keyof typeof weights)[])
       n.budget[key] = (available * weights[key]) / sum
     let needTotal = 0
-    const eligible = own.flatMap((r) =>
-      STRATA.map((s) => ({
+    const eligible = own.flatMap((r) => {
+      const counts = peopleByStratum(r.communities ?? [])
+      return STRATA.map((s) => ({
         r,
         s,
-        need:
-          stratumPeople(w, r.id, s) *
-          (s === 'owner' ? 0.1 : 1) *
-          (1 + 1 - e.households[r.id][s].foodCoverage),
-      })),
-    )
+        need: counts[s] * (s === 'owner' ? 0.1 : 1) * (1 + 1 - e.households[r.id][s].foodCoverage),
+      }))
+    })
     for (const item of eligible) needTotal += item.need
     let welfarePaid = 0
     for (const { r, s, need } of eligible) {

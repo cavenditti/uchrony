@@ -1,10 +1,10 @@
-import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'three/examples/jsm/libs/fflate.module.js'
-import type { World } from './types'
+import { gunzipSync, gzipSync, strFromU8, strToU8 } from 'three/examples/jsm/libs/fflate.module.js'
 import type { AdaptiveWorld } from './adaptive-types'
 import { packWorldCensus, unpackWorldCensus } from './census-codec'
+import { MAX_ENCODED_SAVE_BYTES as LIMIT } from './simulation-invariants'
+import type { World } from './types'
 
 const FORMAT = 'district-blocks-v2'
-import { MAX_ENCODED_SAVE_BYTES as LIMIT } from './simulation-invariants'
 interface Block {
   bytes: number
   data: string
@@ -45,77 +45,6 @@ export function decodeSaveBlock(value: unknown): unknown {
     throw new Error('Compressed save checksum mismatch')
   return JSON.parse(strFromU8(decoded))
 }
-/** Bounded adaptive blocks avoid a single giant commuting/site string in Chromium. */
-function blocks(values: unknown[]) {
-  const result: Block[] = []
-  for (let i = 0; i < values.length; i += 4096) result.push(encodeSaveBlock(values.slice(i, i + 4096)))
-  return result
-}
-function packAdaptive(a: AdaptiveWorld | undefined) {
-  if (!a) return undefined
-  const { sites, jurisdictions, commuting, commutingRows, commuteRoutes, boundaries, ...core } = a
-  return {
-    encoding: 'adaptive-blocks-v1',
-    keys: Object.keys(a),
-    core: encodeSaveBlock(core),
-    sites: blocks(Object.entries(sites)),
-    jurisdictions: blocks(Object.entries(jurisdictions)),
-    commuting: blocks(commuting),
-    commutingRows: blocks(commutingRows ?? []),
-    commuteRoutes: blocks(Object.entries(commuteRoutes ?? {})),
-    boundaries: blocks(boundaries),
-  }
-}
-function unpackAdaptive(value: unknown): unknown {
-  if (!value || typeof value !== 'object' || !('encoding' in value)) return value
-  const a = value as {
-    encoding: string
-    keys?: string[]
-    core: Block
-    sites: Block[]
-    jurisdictions: Block[]
-    commuting: Block[]
-    commutingRows?: Block[]
-    commuteRoutes: Block[]
-    boundaries: Block[]
-  }
-  if (a.encoding !== 'adaptive-blocks-v1') throw new Error('Unsupported adaptive save encoding')
-  let bytes = a.core.bytes
-  const decode = (items: Block[]) => {
-    if (!Array.isArray(items)) throw new Error('Invalid adaptive save blocks')
-    const result: unknown[] = []
-    for (const block of items) {
-      bytes += block.bytes
-      if (bytes > LIMIT) throw new Error('Adaptive save expansion exceeds the supported size')
-      const decoded = decodeSaveBlock(block)
-      if (!Array.isArray(decoded) || decoded.length > 4096) throw new Error('Invalid adaptive block')
-      result.push(...decoded)
-    }
-    return result
-  }
-  const records = (items: Block[]) => {
-    const pairs = decode(items) as [string, unknown][]
-    if (
-      pairs.some((pair) => !Array.isArray(pair) || pair.length !== 2 || typeof pair[0] !== 'string') ||
-      new Set(pairs.map(([key]) => key)).size !== pairs.length
-    )
-      throw new Error('Invalid adaptive record identities')
-    return Object.fromEntries(pairs)
-  }
-  const result = {
-    ...(decodeSaveBlock(a.core) as object),
-    sites: records(a.sites),
-    jurisdictions: records(a.jurisdictions),
-    commuting: decode(a.commuting),
-    commutingRows: decode(a.commutingRows ?? []),
-    commuteRoutes: records(a.commuteRoutes),
-    boundaries: decode(a.boundaries),
-  }
-  return a.keys
-    ? Object.fromEntries(a.keys.map((key) => [key, (result as Record<string, unknown>)[key]]))
-    : result
-}
-
 type Layout = { [key: string]: true | Layout }
 const ECONOMY_TABLES: Layout = {
   households: true,
@@ -127,6 +56,15 @@ const ECONOMY_TABLES: Layout = {
   ledger: { opening: true, net: true, entries: true },
   accounts: { businesses: true, stores: true },
 }
+const ADAPTIVE_TABLES: Layout = {
+  sites: true,
+  jurisdictions: true,
+  commuting: true,
+  commutingRows: true,
+  commuteRoutes: true,
+  boundaries: true,
+}
+const ADAPTIVE_RECORDS = new Set(['sites', 'jurisdictions', 'commuteRoutes'])
 const LOCAL_TABLES: Layout = { units: true, built: true, reserves: true, shipments: true }
 interface Table {
   kind: 'array' | 'record'
@@ -139,7 +77,7 @@ interface Section {
 }
 /** Bound transient JSON/UTF-8/compression buffers instead of encoding an entire
  * economic registry at once. Every record and its original key order survives. */
-function packSection(value: Record<string, unknown>, layout: Layout): Section {
+function packSection(value: Record<string, unknown>, layout: Layout, blockSize = 256): Section {
   const core: [string, unknown][] = [],
     fields: [string, Table | Section][] = []
   const keys = Object.keys(value).filter((key) => value[key] !== undefined)
@@ -151,25 +89,34 @@ function packSection(value: Record<string, unknown>, layout: Layout): Section {
       continue
     }
     if (rule !== true) {
-      fields.push([key, packSection(entry as Record<string, unknown>, rule)])
+      fields.push([key, packSection(entry as Record<string, unknown>, rule, blockSize)])
       continue
     }
     const array = Array.isArray(entry),
       records = array ? entry : Object.entries(entry)
     const encoded: Block[] = []
-    for (let i = 0; i < records.length; i += 256) encoded.push(encodeSaveBlock(records.slice(i, i + 256)))
+    for (let i = 0; i < records.length; i += blockSize)
+      encoded.push(encodeSaveBlock(records.slice(i, i + blockSize)))
     fields.push([key, { kind: array ? 'array' : 'record', blocks: encoded }])
   }
   return { keys, core: encodeSaveBlock(Object.fromEntries(core)), fields: Object.fromEntries(fields) }
 }
-function unpackSection(value: Section, layout: Layout, budget = { bytes: 0 }): Record<string, unknown> {
+function unpackSection(
+  value: Section,
+  layout: Layout,
+  budget = { bytes: 0 },
+  blockSize = 256,
+  legacyOrder = false,
+): Record<string, unknown> {
   const object = (x: unknown): x is Record<string, unknown> =>
     !!x && typeof x === 'object' && !Array.isArray(x)
   if (
     !value ||
-    !Array.isArray(value.keys) ||
-    value.keys.some((k) => typeof k !== 'string') ||
-    new Set(value.keys).size !== value.keys.length ||
+    (!legacyOrder && !Array.isArray(value.keys)) ||
+    (value.keys !== undefined &&
+      (!Array.isArray(value.keys) ||
+        value.keys.some((k) => typeof k !== 'string') ||
+        new Set(value.keys).size !== value.keys.length)) ||
     !object(value.fields)
   )
     throw new Error('Invalid economic save section')
@@ -186,7 +133,7 @@ function unpackSection(value: Section, layout: Layout, budget = { bytes: 0 }): R
     const rule = Object.hasOwn(layout, key) ? layout[key] : undefined
     if (!rule || fields.has(key)) throw new Error('Invalid economic save field')
     if (rule !== true) {
-      fields.set(key, unpackSection(entry as Section, rule, budget))
+      fields.set(key, unpackSection(entry as Section, rule, budget, blockSize))
       continue
     }
     const table = entry as Table
@@ -195,7 +142,8 @@ function unpackSection(value: Section, layout: Layout, budget = { bytes: 0 }): R
     const rows: unknown[] = []
     for (const block of table.blocks) {
       const decoded = decode(block)
-      if (!Array.isArray(decoded) || decoded.length > 256) throw new Error('Invalid economic save block')
+      if (!Array.isArray(decoded) || decoded.length > blockSize)
+        throw new Error('Invalid economic save block')
       rows.push(...decoded)
     }
     if (table.kind === 'array') fields.set(key, rows)
@@ -209,9 +157,51 @@ function unpackSection(value: Section, layout: Layout, budget = { bytes: 0 }): R
       fields.set(key, Object.fromEntries(pairs))
     }
   }
+  // Adaptive v1 stored an optional key order and always emitted empty optional
+  // tables. Retain that wire contract while using the same bounded decoder.
+  if (legacyOrder)
+    return value.keys
+      ? Object.fromEntries(value.keys.map((key) => [key, fields.get(key)]))
+      : Object.fromEntries(fields)
   if (fields.size !== value.keys.length || value.keys.some((key) => !fields.has(key)))
     throw new Error('Invalid economic save key order')
   return Object.fromEntries(value.keys.map((key) => [key, fields.get(key)]))
+}
+/** Preserve adaptive-blocks-v1 on disk; only its internal table codec is shared. */
+function packAdaptive(value: AdaptiveWorld) {
+  const section = packSection(value as unknown as Record<string, unknown>, ADAPTIVE_TABLES, 4096)
+  return {
+    encoding: 'adaptive-blocks-v1',
+    keys: Object.keys(value),
+    core: section.core,
+    ...Object.fromEntries(
+      Object.keys(ADAPTIVE_TABLES).map((key) => [
+        key,
+        (section.fields[key] as Table | undefined)?.blocks ?? [],
+      ]),
+    ),
+  }
+}
+function unpackAdaptive(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || !('encoding' in value)) return value
+  const source = value as Record<string, unknown>
+  if (source.encoding !== 'adaptive-blocks-v1') throw new Error('Unsupported adaptive save encoding')
+  const fields = Object.fromEntries(
+    Object.keys(ADAPTIVE_TABLES).map((key) => [
+      key,
+      {
+        kind: ADAPTIVE_RECORDS.has(key) ? 'record' : 'array',
+        blocks: key === 'commutingRows' ? (source[key] ?? []) : source[key],
+      },
+    ]),
+  )
+  return unpackSection(
+    { keys: source.keys, core: source.core, fields } as Section,
+    ADAPTIVE_TABLES,
+    { bytes: 0 },
+    4096,
+    true,
+  )
 }
 export function packWorldSave(world: World): unknown {
   if (!world.localEconomy) return world

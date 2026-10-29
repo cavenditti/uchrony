@@ -1,8 +1,9 @@
-import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './configuration-defaults'
 import { BIOMES, CROPS, MOISTURE_BANDS, TEMPERATURE_BANDS } from './climate-types'
+import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './configuration-defaults'
 import { configurationHelp } from './configuration-help'
 import { STRATA } from './economic-types'
-import { FIELDS, GOODS, type Policies } from './types'
+import { POLICY_RULES } from './policy-rules'
+import { FIELDS, GOODS } from './types'
 
 export interface ConfigurationGroupMeta {
   readonly label: string
@@ -269,8 +270,8 @@ const readOnly = (error: string): ReadonlyFieldSpec => ({
 const recordOf = <K extends string, S>(keys: readonly K[], spec: S): Record<K, S> =>
   Object.fromEntries(keys.map((key) => [key, spec])) as Record<K, S>
 
-const MIGRATION_OPTIONS: readonly Policies['migration'][] = ['open', 'controlled', 'closed']
-const PRIORITY_OPTIONS: readonly Policies['priority'][] = ['balanced', 'agriculture', 'industry', 'military']
+const MIGRATION_OPTIONS = POLICY_RULES.migration.options
+const PRIORITY_OPTIONS = POLICY_RULES.priority.options
 
 const TRANSPORT_PROJECT_SPEC = {
   label: readOnly('Transport project names are read-only.'),
@@ -308,13 +309,13 @@ export const CONFIGURATION_SCHEMA: SchemaNode<ConfigurationValues> = {
     researchFromLeaders: bool(),
     researchFocus: select(FIELDS),
     policies: {
-      tax: num(0, 100),
-      welfare: num(0, 100),
-      education: num(0, 100),
-      military: num(0, 100),
-      research: num(0, 100),
-      tariff: num(0, 100),
-      conscription: num(0, 100),
+      tax: num(POLICY_RULES.tax.min, POLICY_RULES.tax.max),
+      welfare: num(POLICY_RULES.welfare.min, POLICY_RULES.welfare.max),
+      education: num(POLICY_RULES.education.min, POLICY_RULES.education.max),
+      military: num(POLICY_RULES.military.min, POLICY_RULES.military.max),
+      research: num(POLICY_RULES.research.min, POLICY_RULES.research.max),
+      tariff: num(POLICY_RULES.tariff.min, POLICY_RULES.tariff.max),
+      conscription: num(POLICY_RULES.conscription.min, POLICY_RULES.conscription.max),
       migration: select(MIGRATION_OPTIONS),
       priority: select(PRIORITY_OPTIONS),
     },

@@ -1,14 +1,12 @@
-import { MAX_STATE_IDENTITIES } from './types'
+import { integerValidator, numberValidator, validationFailure } from './persistence-primitives'
 import type { World } from './types'
+import { MAX_STATE_IDENTITIES } from './types'
 export function validateSovereignty(world: World) {
   const state = world.sovereignty
   if (state === undefined) return
-  const fail = (): never => {
-      throw new Error('Invalid provincial protection or political organization in this save.')
-    },
-    integer = (x: unknown, low: number, high: number) =>
-      typeof x === 'number' && Number.isInteger(x) && x >= low && x <= high,
-    unit = (x: unknown) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1
+  const fail = validationFailure('Invalid provincial protection or political organization in this save.'),
+    integer = integerValidator(0, Infinity, false),
+    unit = numberValidator(0, 1)
   if (
     !state ||
     !Array.isArray(state.provinces) ||

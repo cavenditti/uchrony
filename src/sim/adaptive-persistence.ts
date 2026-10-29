@@ -1,20 +1,19 @@
-import { habitableLand } from './terrain-access'
-import { urbanLand } from './urban-land'
-import { validateUrbanFabric } from './urban-fabric'
-import { GOODS, population, type World } from './types'
 import { rebuildAdaptiveMesh } from './adaptive-world'
 import { STRATA } from './economic-types'
-import { cellPolygon, pointInPolygon, METERS_PER_MAP_UNIT } from './physical-space'
+import { numberValidator, recordValue, validationFailure } from './persistence-primitives'
+import { cellPolygon, METERS_PER_MAP_UNIT, pointInPolygon } from './physical-space'
+import { habitableLand } from './terrain-access'
+import { GOODS, population, type World } from './types'
+import { validateUrbanFabric } from './urban-fabric'
+import { urbanLand } from './urban-land'
 
 export function validateAdaptiveWorld(w: World) {
   const a = w.adaptive
   if (!a) return
   validateUrbanFabric(w)
-  const fail = (detail: string): never => {
-    throw new Error(`Invalid adaptive world: ${detail}`)
-  }
-  const finite = (v: unknown, min = 0) => typeof v === 'number' && Number.isFinite(v) && v >= min
-  const object = (v: unknown) => !!v && typeof v === 'object' && !Array.isArray(v)
+  const fail = validationFailure('Invalid adaptive world: ', '', '')
+  const finite = numberValidator(0, Infinity)
+  const object = recordValue
   const cell = (v: number) => Number.isSafeInteger(v) && w.cells[v]?.terrain !== 'water' && !!w.cells[v]
   const date = (v: unknown) => Number.isSafeInteger(v) && finite(v) && Number(v) <= w.month
   if (

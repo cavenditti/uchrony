@@ -1,13 +1,16 @@
+import {
+  integerValidator,
+  numberValidator,
+  validationFailure,
+  worldValidators,
+} from './persistence-primitives'
 import type { World } from './types'
 
 export function validateGeopolitics(w: World) {
-  const integer = (v: unknown, min: number, max: number) =>
-    typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max
-  const unit = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1
-  const nation = (v: unknown) => integer(v, 0, w.nations.length - 1)
-  const fail = (): never => {
-    throw new Error('Invalid strategic or occupation state in this save.')
-  }
+  const integer = integerValidator(0, Infinity, false)
+  const unit = numberValidator(0, 1)
+  const nation = worldValidators(w).nationId
+  const fail = validationFailure('Invalid strategic or occupation state in this save.')
   for (const r of w.regions) {
     const c = r.control
     if (

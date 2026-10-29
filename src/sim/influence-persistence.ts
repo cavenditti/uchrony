@@ -1,13 +1,11 @@
+import { integerAtMost, numberValidator, validationFailure } from './persistence-primitives'
 import type { World } from './types'
 export function validateInfluence(w: World) {
   const s = w.influence
   if (s === undefined) return
-  const integer = (v: unknown, max: number) =>
-    typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max
-  const unit = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1
-  const fail = (): never => {
-    throw new Error('Invalid cultural or military influence in this save.')
-  }
+  const integer = integerAtMost(Infinity, false)
+  const unit = numberValidator(0, 1)
+  const fail = validationFailure('Invalid cultural or military influence in this save.')
   if (
     !s ||
     !integer(s.updated, w.month) ||

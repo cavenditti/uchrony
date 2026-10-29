@@ -1,17 +1,15 @@
+import { integerValidator, textValidator, validationFailure } from './persistence-primitives'
+import { validateSettings } from './settings'
 import type { World } from './types'
 import { GOODS } from './types'
-import { validateSettings } from './settings'
 
 export function validatePressures(world: World) {
   if (world.simulation !== undefined) validateSettings(world.simulation)
   const p = world.pressures
   if (p === undefined) return
-  const fail = (): never => {
-      throw new Error('Invalid structural pressures in this save.')
-    },
-    integer = (x: unknown, low: number, high: number) =>
-      typeof x === 'number' && Number.isInteger(x) && x >= low && x <= high,
-    text = (x: unknown, max: number) => typeof x === 'string' && x.length > 0 && x.length <= max
+  const fail = validationFailure('Invalid structural pressures in this save.'),
+    integer = integerValidator(0, Infinity, false),
+    text = textValidator(Infinity, 1)
   if (
     !p ||
     typeof p !== 'object' ||

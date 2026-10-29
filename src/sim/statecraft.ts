@@ -1,67 +1,62 @@
-import { supplierDebt, supplierCreditRoom } from './supplier-credit'
-import { recordWorldEvent } from './event-memory'
-import { linkDistrictPeople, aggregateDistricts } from './districts'
-import { publicTransfer, transferDebt } from './ledger'
-import { previousResearchOutput } from './public-services'
-import { clonePopulationHolders } from './population-clone'
-import { advisorContext, validateAdviceReplies, deliverAdvice } from './advisors'
+/** Consent and live resource checks precede an isolated trial; only a conserved
+ * settlement is committed. Prompt projection lives in statecraft-context. */
+import { deliverAdvice, validateAdviceReplies } from './advisors'
+import { retainAgreementReferences } from './agreement-references'
+import { agreementTerms, diplomaticAccess } from './agreements'
+import { applyCommand } from './commands'
 import {
-  validateInstitutionTerm,
-  applyInstitutionTerm,
-  institutionalFunds,
-  transferInstitutionMembership,
-  foreignPolicyMandate,
-  collectiveDefense,
-} from './institutions'
-import { sovereigntyAssessment } from './strategic-assessment'
-import {
-  openDiplomaticProposal,
-  rememberProposal,
   admitDiplomaticConsent,
   admitDiplomaticMessage,
   DiplomaticFriction,
-  foreignOfficeContext,
   hasActiveReplacement,
+  openDiplomaticProposal,
+  rememberProposal,
 } from './diplomatic-friction'
-import {
-  intelligenceService,
-  intelligenceContext,
-  foreignIntelligence,
-  knownMap,
-  visibleInstitutions,
-  INTELLIGENCE_PRIORITIES,
-  type IntelligencePriority,
-} from './intelligence'
-import { MAX_STATE_IDENTITIES } from './types'
-import { inWorldText, narrativeProjection } from './narrative'
-import { strategicPressures } from './ambitions'
-import { ensurePopulation, returnArmyPeople, identityDistribution } from './population'
-import { populationIdentitySummary } from './identities'
-import { characterContext } from './character'
+import { aggregateDistricts, linkDistrictPeople } from './districts'
+import { recordWorldEvent } from './event-memory'
 import { allForces } from './forces'
-import { portAt } from './navy'
-import { hashSeed } from './random'
 import { makeNation } from './generate'
-import { applyCommand, summarize } from './engine'
-import { ensureHistory, applyRefereeEffects } from './history'
+import { applyRefereeEffects, ensureHistory } from './history'
 import { validateHistoricalEffect } from './history-schema'
-import { parseReferee, parseStatePlan } from './statecraft-schema'
-import { agreementTerms, currentAgreements, diplomaticAccess } from './agreements'
 import {
-  agreementReference,
-  agreementReferenceIndex,
-  retainAgreementReferences,
-} from './agreement-references'
-import { FIELDS, clamp, population, relation, type Command, type Policies, type World } from './types'
+  applyInstitutionTerm,
+  collectiveDefense,
+  foreignPolicyMandate,
+  institutionalFunds,
+  transferInstitutionMembership,
+  validateInstitutionTerm,
+} from './institutions'
+import { INTELLIGENCE_PRIORITIES, type IntelligencePriority } from './intelligence'
+import { publicTransfer, transferDebt } from './ledger'
+import { inWorldText } from './narrative'
+import { POLICY_RULES, policyCommandValue } from './policy-rules'
+import { ensurePopulation, returnArmyPeople } from './population'
+import { previousResearchOutput } from './public-services'
+import { hashSeed } from './random'
+import { commitSettlementTrialWorld, createSettlementTrialWorld } from './settlement-trial'
+import { parseReferee, parseStatePlan } from './statecraft-schema'
 import type {
   DiplomaticClause,
   DiplomaticOffer,
   DomesticOrder,
-  Statecraft,
-  StateAgentPlan,
   RefereeDecision,
+  StateAgentPlan,
+  Statecraft,
   Visibility,
 } from './statecraft-types'
+import {
+  clamp,
+  FIELDS,
+  MAX_STATE_IDENTITIES,
+  population,
+  relation,
+  type Command,
+  type Policies,
+  type World,
+} from './types'
+import { summarize } from './world-summary'
+export { admitDiplomaticConsent } from './diplomatic-friction'
+export { refereeContext, stateAgentContext } from './statecraft-context'
 
 export function ensureStatecraft(world: World): Statecraft {
   world.statecraft ??= {
@@ -262,23 +257,7 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
   } else if (order.kind === 'policy') {
     const key = order.key as keyof Policies
     if (!Object.hasOwn(n.policies, key)) throw new Error('Unknown domestic policy.')
-    let value: Policies[keyof Policies] = order.value
-    if (key === 'migration') {
-      if (!['open', 'controlled', 'closed'].includes(order.text)) throw new Error('Unknown migration rule.')
-      value = order.text as Policies['migration']
-    } else if (['citizenship', 'languagePolicy', 'beliefPolicy'].includes(key)) {
-      const allowed: Record<string, string[]> = {
-        citizenship: ['civic', 'pluralist', 'heritage'],
-        languagePolicy: ['local', 'common', 'multilingual'],
-        beliefPolicy: ['protected', 'favored', 'restricted'],
-      }
-      if (!allowed[key].includes(order.text)) throw new Error('Unknown identity policy.')
-      value = order.text as Policies[keyof Policies]
-    } else if (key === 'priority') {
-      if (!['balanced', 'agriculture', 'industry', 'military'].includes(order.text))
-        throw new Error('Unknown production priority.')
-      value = order.text as Policies['priority']
-    }
+    const value = policyCommandValue(key, POLICY_RULES[key].kind === 'select' ? order.text : order.value)
     command = { type: 'policy', nation, key, value }
   } else if (order.kind === 'research') {
     if (!FIELDS.includes(order.text as (typeof FIELDS)[number])) throw new Error('Unknown research field.')
@@ -581,7 +560,6 @@ export function tryStandingOffer(...args: Parameters<typeof submitStandingOffer>
     throw error
   }
 }
-export { admitDiplomaticConsent } from './diplomatic-friction'
 export function settleConventionalOffers(world: World) {
   const routine = new Set([
     'war',
@@ -843,71 +821,7 @@ export function acceptRefereeDecision(
         const territorial = resolved.some((term) =>
           ['peace', 'cede', 'create', 'merge', 'institution', 'devolution'].includes(term.kind),
         )
-        const trial: World = {
-          ...world,
-          intelligence: territorial ? structuredClone(world.intelligence) : world.intelligence,
-          institutions: territorial ? structuredClone(world.institutions) : world.institutions,
-          // Ordinary terms only change treasury scalars, relation scalars and army targets.
-          // Territorial terms still need isolated nested records for normalization.
-          nations: territorial ? structuredClone(world.nations) : world.nations.map((n) => ({ ...n })),
-          regions: territorial ? clonePopulationHolders(world.regions) : world.regions,
-          relations: territorial ? structuredClone(world.relations) : world.relations.map((r) => ({ ...r })),
-          armies: territorial
-            ? clonePopulationHolders(world.armies)
-            : world.armies.map((army) => ({ ...army })),
-          warfare: territorial ? structuredClone(world.warfare) : world.warfare,
-          historical: territorial ? structuredClone(world.historical) : world.historical,
-          events: [...world.events],
-          // Settlement can transfer deposits/debts and return military inventories.
-          // Isolate every affected ledger so a later rejected clause cannot leak writes.
-          economy: world.economy
-            ? {
-                ...world.economy,
-                credit: structuredClone(world.economy.credit),
-                ...(world.economy.supplierCredit
-                  ? { supplierCredit: structuredClone(world.economy.supplierCredit) }
-                  : {}),
-                ledger: structuredClone(world.economy.ledger),
-                banking: structuredClone(world.economy.banking),
-                ...(world.economy.accounts
-                  ? {
-                      accounts: territorial
-                        ? structuredClone(world.economy.accounts)
-                        : world.economy.accounts,
-                    }
-                  : {}),
-              }
-            : undefined,
-          localEconomy:
-            territorial && world.localEconomy
-              ? {
-                  ...world.localEconomy,
-                  provinceSignals: structuredClone(world.localEconomy.provinceSignals),
-                  units: Object.fromEntries(
-                    Object.entries(world.localEconomy.units).map(([id, unit]) => [
-                      id,
-                      {
-                        ...unit,
-                        stocks: { ...unit.stocks },
-                        consumption: { ...unit.consumption },
-                        population: { ...unit.population },
-                        residents: { ...unit.residents },
-                      },
-                    ]),
-                  ),
-                }
-              : world.localEconomy,
-        }
-        if (territorial && trial.localEconomy) {
-          linkDistrictPeople(trial)
-          // A province's depot is the principal market, including inside the trial.
-          // Independent province copies would lose subsequent withdrawals at rollup.
-          for (const region of trial.regions) {
-            const depot = trial.localEconomy.units[region.id]
-            region.stocks = depot.stocks
-            region.consumption = depot.consumption
-          }
-        }
+        const trial = createSettlementTrialWorld(world, territorial)
         applyTerms(trial, offer, resolved)
         if (territorial && trial.localEconomy) {
           linkDistrictPeople(trial)
@@ -926,16 +840,7 @@ export function acceptRefereeDecision(
             trial.nations.reduce((sum, nation) => sum + nation.treasury, 0) + institutionalFunds(trial)
         if (Math.abs(fundsAfter - fundsBefore) > 1e-6)
           throw new Error('Settlement would create or destroy treasury funds.')
-        if (trial.economy) world.economy = trial.economy
-        if (trial.localEconomy) world.localEconomy = trial.localEconomy
-        world.institutions = trial.institutions
-        world.intelligence = trial.intelligence
-        world.nations = trial.nations
-        world.regions = trial.regions
-        world.relations = trial.relations
-        world.armies = trial.armies
-        world.warfare = trial.warfare
-        world.historical = trial.historical
+        commitSettlementTrialWorld(world, trial)
         offer.status = 'ratified'
         offer.activated = world.month
         offer.resolved = resolved
@@ -1085,218 +990,5 @@ export function advanceStatecraft(world: World) {
       state,
       world.institutions?.organizations.map((o) => o.sourceOffer),
     )
-  }
-}
-
-export function stateAgentContext(world: World, nation: number, strategic: boolean) {
-  const state = ensureStatecraft(world),
-    knowledge = intelligenceService(world, nation),
-    n = world.nations[nation],
-    agent = state.agents.find((entry) => entry.nation === nation)!,
-    visible = [
-      ...state.offers.filter((offer) => offer.parties.includes(nation)),
-      ...knowledge.agreements.map((report) => report.offer),
-    ],
-    inbox = state.messages
-      .filter(
-        (message) =>
-          message.to.includes(nation) || message.from === nation || knowledge.broadcasts.includes(message.id),
-      )
-      .slice(-(strategic ? 24 : 6))
-  const { character: _profile, personality: _legacyPersonality, ...government } = n
-  const currentOffers = visible
-    .filter((offer) => offer.status === 'proposed' || offer.status === 'ratified')
-    .slice(-30)
-  const referenceTexts = [
-    agent.assessment,
-    agent.strategy,
-    agent.memory,
-    ...agent.goals,
-    ...inbox.flatMap((message) => [message.subject, message.body, agreementReference(message.offer)]),
-    ...currentOffers.flatMap((offer) => [
-      offer.title,
-      offer.ruling,
-      agreementReference(offer.supersedes),
-      ...offer.terms.map((term) => term.text),
-    ]),
-  ]
-  return narrativeProjection({
-    month: world.month,
-    nation,
-    strategic,
-    adviser: advisorContext(agent, strategic),
-    intelligence: intelligenceContext(world, nation),
-    foreignOffice: foreignOfficeContext(world, nation),
-    institutions: visibleInstitutions(world, nation),
-    strategicLandscape: strategicPressures(world, n),
-    government,
-    supplierCompensation: {
-      owed: supplierDebt(world, nation),
-      availableCredit: supplierCreditRoom(world, nation),
-    },
-    character: characterContext(n),
-    agent: {
-      strategy: agent.strategy,
-      memory: agent.memory,
-      goals: agent.goals,
-      credibility: agent.integrity,
-      escalation: agent.escalation,
-    },
-    populationIdentity: populationIdentitySummary(world, nation),
-    society: ensureHistory(world).societies.find((entry) => entry.nation === nation),
-    provinces: world.regions
-      .filter((region) => region.nation === nation)
-      .map((region) => ({
-        id: region.id,
-        name: region.name,
-        people: population(region),
-        food: region.foodCoverage,
-        materialCoverage: region.materialCoverage ?? 1,
-        security:
-          world.sovereignty?.provinces.find((report) => report.region === region.id)?.stage ?? 'unreported',
-        production: region.production,
-        consumption: region.consumption,
-        deposits: region.deposits,
-        unrest: region.unrest,
-        infrastructure: region.infrastructure,
-        publicWorks: region.publicWorks,
-        militaryControl: region.control,
-        delegation: region.delegation,
-        industry: region.industry,
-        stocks: region.stocks,
-        port: !!portAt(world, region.id),
-      })),
-    occupiedEnemyProvinces: world.regions
-      .filter((r) => r.control?.nation === nation)
-      .map((r) => ({
-        id: r.id,
-        name: r.name,
-        legalOwner: r.nation,
-        controlledSince: r.control!.since,
-        spoils: r.control!.spoils,
-      })),
-    // Leaders receive operational forces and the summarized census, not every troop community.
-    armies: world.armies
-      .filter((army) => army.nation === nation)
-      .map(({ communities: _census, ...army }) => army),
-    fleets:
-      world.warfare?.fleets
-        .filter((f) => f.nation === nation)
-        .map(({ communities: _crew, ...fleet }) => fleet) ?? [],
-    foreignStates: foreignIntelligence(world, nation),
-    map: strategic ? knownMap(world, nation) : [],
-    inbox,
-    offers: currentOffers.map(({ ruling, ...offer }) => ({
-      reported: offer.parties.includes(nation)
-        ? null
-        : {
-            month: knowledge.agreements.find((r) => r.offer.id === offer.id)?.month,
-            warning: 'Third-party report; status and fulfillment may have changed since collection.',
-          },
-      sovereigntyAssessment: sovereigntyAssessment(world, nation, { ...offer, ruling }),
-      ...offer,
-      development:
-        offer.status === 'ratified'
-          ? 'Recorded commitments entered into force.'
-          : offer.status === 'proposed'
-            ? 'Negotiation or practical implementation remains pending.'
-            : 'The undertaking did not proceed or is no longer in force.',
-      reference: agreementReference(offer.id),
-    })),
-    agreementReferences: agreementReferenceIndex(visible, referenceTexts),
-    recentPublicHistory: world.events
-      .filter((event) => event.nation === nation || knowledge.news.includes(event.id))
-      .slice(0, 8)
-      .map((event) =>
-        event.nation === nation
-          ? {
-              id: event.id,
-              month: event.month,
-              type: event.type,
-              title: event.title,
-              detail: event.detail,
-              region: event.region,
-            }
-          : {
-              id: event.id,
-              month: event.month,
-              title: event.title,
-              type: event.type,
-              source: 'Reported foreign news; details and consequences are unverified.',
-            },
-      ),
-    developments: state.rulings
-      .filter(
-        (entry) =>
-          entry.parties.includes(nation) ||
-          (entry.visibility === 'public' &&
-            knowledge.agreements.some((r) => r.offer.id === entry.offer) &&
-            entry.month <= world.month - 6),
-      )
-      .slice(0, 8)
-      .map((entry) => ({
-        month: entry.month,
-        agreement: agreementReference(entry.offer),
-        situation:
-          entry.verdict === 'approve'
-            ? 'Recorded commitments entered into force.'
-            : entry.verdict === 'reject'
-              ? 'The undertaking did not proceed.'
-              : 'Practical implementation remains unresolved.',
-        outcome:
-          entry.verdict === 'approve'
-            ? 'in force'
-            : entry.verdict === 'reject'
-              ? 'did not proceed'
-              : 'delayed',
-      })),
-    warnings: state.audit.filter((entry) => entry.nation === nation).slice(0, 4),
-  })
-}
-export function refereeContext(world: World, offers: DiplomaticOffer[]) {
-  return {
-    month: world.month,
-    submitted: offers.map((offer) => ({ ...offer, reference: agreementReference(offer.id) })),
-    agreementReferences: agreementReferenceIndex(
-      ensureStatecraft(world).offers,
-      offers.flatMap((offer) => [
-        offer.title,
-        offer.ruling,
-        agreementReference(offer.supersedes),
-        ...offer.terms.map((term) => term.text),
-      ]),
-    ),
-    groundTruth: {
-      institutions: world.institutions?.organizations,
-      nations: world.nations.map((nation) => ({ ...nation, character: characterContext(nation) })),
-      identities: world.nations
-        .filter((nation) => alive(world, nation.id))
-        .map((nation) => ({ nation: nation.id, ...populationIdentitySummary(world, nation.id) })),
-      provinces: world.regions.map((region) => ({
-        id: region.id,
-        name: region.name,
-        nation: region.nation,
-        cultures: identityDistribution(region.communities ?? [], 'culture').slice(0, 3),
-        socialCohesion: region.populationDynamics?.cohesion,
-        population: population(region),
-        coastal: region.coastal,
-        terrain: region.terrain,
-        neighbors: region.neighbors,
-        unrest: region.unrest,
-        infrastructure: region.infrastructure,
-        delegation: region.delegation,
-        stocks: region.stocks,
-      })),
-      armies: world.armies.map(({ communities: _census, ...army }) => army),
-      fleets: world.warfare?.fleets.map(({ communities: _crew, ...fleet }) => fleet) ?? [],
-      relations: world.relations,
-    },
-    agreements: currentAgreements(world).map((offer) => ({
-      ...offer,
-      reference: agreementReference(offer.id),
-    })),
-    messages: ensureStatecraft(world).messages.slice(-40),
-    institutions: world.historical?.societies,
-    recentHistory: world.events.slice(0, 12),
   }
 }

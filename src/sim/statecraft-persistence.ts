@@ -1,22 +1,27 @@
 import { validateAdvisor } from './advisors'
-import type { World } from './types'
-import { CLAUSE_SCHEMA, checkSchema } from './statecraft-schema'
 import { validateHistoricalEffect } from './history-schema'
+import {
+  integerValidator,
+  numberValidator,
+  recordValue,
+  textValidator,
+  validationFailure,
+  worldValidators,
+} from './persistence-primitives'
 import { hashSeed } from './random'
+import { CLAUSE_SCHEMA, checkSchema } from './statecraft-schema'
+import type { World } from './types'
 
 /** Model-authored text is data; consent and ownership ledgers have independent validation. */
 export function validateStatecraft(world: World) {
   const state = world.statecraft
   if (!state) return
-  const fail = (message: string): never => {
-      throw new Error(`Invalid statecraft save: ${message}`)
-    },
-    object = (value: unknown) => !!value && typeof value === 'object' && !Array.isArray(value),
-    number = (value: unknown, min = 0, max = 1e12) =>
-      typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max,
-    integer = (value: unknown, min = 0, max = 1e12) => number(value, min, max) && Number.isInteger(value),
-    text = (value: unknown, max: number) => typeof value === 'string' && value.length <= max,
-    nation = (id: number) => integer(id, 0, world.nations.length - 1),
+  const fail = validationFailure('Invalid statecraft save: ', '', ''),
+    object = recordValue,
+    number = numberValidator(0, 1e12),
+    integer = integerValidator(0, 1e12, false),
+    text = textValidator(Infinity, 0),
+    nation = worldValidators(world).nationId,
     visibility = (value: string) => ['public', 'secret'].includes(value),
     ids = new Set<number>(),
     id = (value: number) => {

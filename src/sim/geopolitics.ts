@@ -1,35 +1,35 @@
-import { decisionPolicy, recruitmentCost } from './decision-policy'
-import { advancePeaceNegotiations } from './peace'
-import { annexProvince, annexationObstacle } from './military-control'
-import { nativeDomesticControl } from './domestic-policy'
-import { crossedPeriodMonth } from './simulation-period'
+import { reportedExpansionInterests } from './ambitions'
 import { competitivePressure } from './competitive-pressure'
+import { decisionPolicy, recruitmentCost } from './decision-policy'
+import { nativeDomesticControl } from './domestic-policy'
 import { expansionParameters } from './expansion-parameters'
 import { militaryImpression, recordMilitaryInfluence } from './influence'
-import { marketStore, armyStore, recordGift, recordUse } from './national-accounts'
-import { publicExpense } from './ledger'
-import { MAX_ARMIES } from './military-limits'
+import { foreignPolicyMandate, sharedInstitution } from './institutions'
 import {
   intelligenceService,
-  perceivedPower,
-  perceivedAllies,
-  reportedWar,
-  observedThreat,
   knownMap,
+  observedThreat,
+  perceivedAllies,
+  perceivedPower,
+  reportedWar,
 } from './intelligence'
-import { foreignPolicyMandate, sharedInstitution } from './institutions'
-import { sovereigntyAssessment } from './strategic-assessment'
-import { reportedExpansionInterests } from './ambitions'
-import { clamp, population, relation, type Army, type Nation, type World } from './types'
-import { random, hashSeed } from './random'
-import { takeCivilianAdults } from './population'
-import { ensureWarfare, warEvent } from './navy'
+import { publicExpense } from './ledger'
+import { annexProvince, annexationObstacle } from './military-control'
+import { MAX_ARMIES } from './military-limits'
+import { warEvent } from './navy'
+import { advancePeaceNegotiations } from './peace'
+import { hashSeed, random } from './random'
+import { musterArmy } from './recruitment'
+import { crossedPeriodMonth } from './simulation-period'
 import {
-  tryStandingOffer as submitStandingOffer,
-  settleConventionalOffers,
-  ensureStatecraft,
   admitDiplomaticConsent,
+  ensureStatecraft,
+  settleConventionalOffers,
+  tryStandingOffer as submitStandingOffer,
 } from './statecraft'
+import { sovereigntyAssessment } from './strategic-assessment'
+import { territorialIndex } from './territory-index'
+import { clamp, population, relation, type Nation, type World } from './types'
 
 export interface Occupation {
   former: number
@@ -59,9 +59,10 @@ export function ensureGeopolitics(world: World) {
     countries: [],
     observedWars: [],
   })
+  const territory = territorialIndex(world)
   for (const n of world.nations)
     if (!state.countries.some((c) => c.nation === n.id)) {
-      const count = world.regions.filter((r) => r.nation === n.id).length
+      const count = territory.regions(n.id).length
       state.countries.push({
         nation: n.id,
         lastInitiative: world.month - 12,
@@ -103,32 +104,20 @@ function mobilize(world: World, n: Nation, province: number, limit: number) {
       ),
     )
   if (amount < minimum || world.armies.length >= MAX_ARMIES) return
-  const communities = takeCivilianAdults(world, r, amount)
-  publicExpense(world, n.id, amount * unitCost, 'mobilization', r.id)
-  recordUse(world, marketStore(r.id), 'arms', amount * 0.012)
-  r.stocks.arms -= amount * 0.012
-  r.consumption.arms += amount * 0.012
-  r.stocks.food -= amount * 0.06
-  const army: Army = {
-    id: world.nextArmy++,
+  musterArmy(world, r, {
     nation: n.id,
     name: `${r.name} mobilized corps`,
-    region: r.id,
-    target: null,
     soldiers: amount,
     establishment: decisionPolicy().realCosts ? Math.max(50, amount) : Math.max(1000, amount),
     morale: 0.55,
     supply: 0.85,
     experience: 0.02,
-    casualties: 0,
-    communities,
-  }
-  world.armies.push(army)
+    armsPerSoldier: 0.012,
+    foodPerSoldier: 0.06,
+    expense: { amount: amount * unitCost, category: 'mobilization' },
+    stance: 'entrench',
+  })
   recordMilitaryInfluence(world, n.id, -1, r.id, 'mobilization', amount / 2000)
-  ensureWarfare(world)
-  recordGift(world, marketStore(r.id), armyStore(army.id), 'food', amount * 0.06)
-  army.operations!.food = amount * 0.06
-  army.operations!.stance = 'entrench'
   warEvent(
     world,
     `${n.shortName} mobilizes in ${r.name}`,
@@ -137,16 +126,19 @@ function mobilize(world: World, n: Nation, province: number, limit: number) {
     r.id,
   )
 }
-function regionalDefenseMembers(world: World, attacker: number, victims: number[], alive: Nation[]) {
+function regionalDefenseMembers(
+  world: World,
+  attacker: number,
+  victims: number[],
+  alive: Nation[],
+  territory: ReturnType<typeof territorialIndex> = territorialIndex(world),
+) {
   return alive
     .filter(
       (member) =>
         member.ai &&
         member.id !== attacker &&
-        (victims.includes(member.id) ||
-          world.regions.some(
-            (r) => r.nation === member.id && r.neighbors.some((id) => world.regions[id].nation === attacker),
-          )) &&
+        (victims.includes(member.id) || territory.bordering(member.id, attacker)) &&
         perceivedPower(world, member.id, member.id) < perceivedPower(world, member.id, attacker) * 1.2 &&
         victims.some((id) => reportedWar(world, member.id, attacker, id)),
     )
@@ -156,7 +148,9 @@ function regionalDefenseMembers(world: World, attacker: number, victims: number[
 export function advanceGeopolitics(world: World) {
   const state = ensureGeopolitics(world)
   if (world.statecraft) settleConventionalOffers(world)
-  const alive = world.nations.filter((n) => world.regions.some((r) => r.nation === n.id)),
+  // Conventional settlements above may alter ownership; snapshot only after they finish.
+  const territory = territorialIndex(world)
+  const alive = world.nations.filter((n) => territory.alive(n.id)),
     countries = new Map(state.countries.map((c) => [c.nation, c]))
   const aliveIds = new Set(alive.map((n) => n.id))
   for (const r of world.regions) {
@@ -228,7 +222,7 @@ export function advanceGeopolitics(world: World) {
   state.observedWars = state.observedWars.slice(-512)
   for (const n of alive) {
     const c = countries.get(n.id)!,
-      own = world.regions.filter((r) => r.nation === n.id),
+      own = territory.regions(n.id),
       neighbors = new Set(
         own
           .flatMap((r) => r.neighbors.map((id) => world.regions[id].nation))
@@ -332,6 +326,8 @@ export function advanceGeopolitics(world: World) {
             (sum, id) => sum + perceivedPower(world, n.id, id),
             0,
           ),
+          // Allies contribute discounted deterrence; perceived power has a floor
+          // so missing reports never imply an infinitely weak opponent.
           superiority =
             power /
             Math.max(
@@ -350,6 +346,8 @@ export function advanceGeopolitics(world: World) {
             expansionParameters().militaryDrive *
               (interests.economic + (competition?.peer ?? 0)) *
               drives.riskTolerance,
+          // Motivation is tempered by relative strength, current threats and
+          // remembered fear. These are bounded decision scores, not probabilities.
           score =
             motive +
             Math.min(0.4, (ratio - 1) * 0.2) -
@@ -400,12 +398,9 @@ export function advanceGeopolitics(world: World) {
     )) {
       const aggressor = war.aggressor!,
         victim = war.a === aggressor ? war.b : war.a,
-        regional = regionalDefenseMembers(world, aggressor, [victim], alive)
+        regional = regionalDefenseMembers(world, aggressor, [victim], alive, territory)
       for (const partner of alive.filter((n) => n.ai && n.id !== aggressor && n.id !== victim)) {
-        const exposed = world.regions.some(
-            (r) =>
-              r.nation === partner.id && r.neighbors.some((id) => world.regions[id].nation === aggressor),
-          ),
+        const exposed = territory.bordering(partner.id, aggressor),
           rel = relation(world, partner.id, victim),
           aggression =
             intelligenceService(world, partner.id).dossiers.find((d) => d.nation === aggressor)?.expansion ??

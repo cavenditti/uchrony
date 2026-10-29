@@ -1,31 +1,32 @@
-import { validateWorldConfiguration, withWorldConfiguration } from './configuration'
-import { validateInfluence } from './influence-persistence'
-import { validateAlmanac } from './almanac-persistence'
+import { MAX_SAVE_BYTES } from '../storage/save-types'
 import { validateAdaptiveWorld } from './adaptive-persistence'
-import { unpackWorldSave } from './save-codec'
+import { validateAlmanac } from './almanac-persistence'
+import { validateCharacters } from './character-persistence'
+import { validateWorldConfiguration, withWorldConfiguration } from './configuration'
+import { validateForeignOffices } from './diplomatic-persistence'
 import { validateDistrictEconomy } from './district-persistence'
 import { validateEconomy } from './economic-persistence'
-import { validateSpatial } from './spatial-persistence'
-import { MAX_ARMIES } from './military-limits'
-import { MAX_MAP_CELLS, MAX_PROVINCES } from './scale'
+import { validateGeopolitics } from './geopolitics-persistence'
+import { adjacentCells, CELL_SIZE, GRID_TOPOLOGY, geographicNeighbors as movementNeighbors } from './grid'
+import { validateHistoricalRecord, validateHistoryState } from './history-schema'
+import { validateInfluence } from './influence-persistence'
 import { validateInstitutions } from './institutions'
 import { validateIntelligence } from './intelligence-persistence'
-import { validateForeignOffices } from './diplomatic-persistence'
-import { validateGeopolitics } from './geopolitics-persistence'
-import { coalesceCommunities, communityKey } from './population'
-import type { PopulationCommunity } from './population-types'
-import { MAX_STATE_IDENTITIES } from './types'
-import { validateSovereignty } from './sovereignty-persistence'
-import { validatePressures } from './pressure-persistence'
-import { GOODS, FIELDS, type World, type RouteLeg } from './types'
-import { geographicNeighbors as movementNeighbors, adjacentCells, CELL_SIZE, GRID_TOPOLOGY } from './grid'
-import { validateHistoryState, validateHistoricalRecord } from './history-schema'
-import { validateStatecraft } from './statecraft-persistence'
-import { validatePopulation } from './population-persistence'
-import { validateCharacters } from './character-persistence'
+import { MAX_ARMIES } from './military-limits'
 import { validateWarfare } from './military-persistence'
 import { initialArmyOperations } from './navy'
-import { MAX_SAVE_BYTES } from '../storage/save-types'
+import { numberValidator, recordValue, validationFailure } from './persistence-primitives'
+import { POLICY_RULES, validSavedPolicy } from './policy-rules'
+import { coalesceCommunities, communityKey } from './population'
+import { validatePopulation } from './population-persistence'
+import type { PopulationCommunity } from './population-types'
+import { validatePressures } from './pressure-persistence'
+import { unpackWorldSave } from './save-codec'
+import { MAX_MAP_CELLS, MAX_PROVINCES } from './scale'
+import { validateSovereignty } from './sovereignty-persistence'
+import { validateSpatial } from './spatial-persistence'
+import { validateStatecraft } from './statecraft-persistence'
+import { FIELDS, GOODS, MAX_STATE_IDENTITIES, type RouteLeg, type World } from './types'
 
 /** Validates untrusted save files before they enter the simulation worker. */
 export function validateWorld(value: unknown, allowDuplicateCommunities = false): World {
@@ -39,13 +40,9 @@ export function validateWorld(value: unknown, allowDuplicateCommunities = false)
   return validateConfiguredWorld(value, allowDuplicateCommunities)
 }
 function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = false): World {
-  const fail = (message: string): never => {
-    throw new Error(`Invalid world save: ${message}`)
-  }
-  const object = (x: unknown): x is Record<string, unknown> =>
-    typeof x === 'object' && x !== null && !Array.isArray(x)
-  const number = (x: unknown, min = 0, max = 1e14) =>
-    typeof x === 'number' && Number.isFinite(x) && x >= min && x <= max
+  const fail = validationFailure('Invalid world save: ', '', '')
+  const object = recordValue
+  const number = numberValidator(0, 1e14)
   const walk = (x: unknown, depth = 0) => {
     if (depth > 15) fail('data is nested too deeply')
     if (typeof x === 'number' && !Number.isFinite(x)) fail('non-finite number')
@@ -238,30 +235,16 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
       fail('invalid extinct state')
     if (!['mercantile', 'expansionist', 'scholarly', 'agrarian'].includes(n.personality))
       fail('invalid state personality')
-    if (
-      !object(n.policies) ||
-      !['balanced', 'agriculture', 'industry', 'military'].includes(n.policies.priority) ||
-      !['open', 'controlled', 'closed'].includes(n.policies.migration)
-    )
-      fail('invalid government policies')
-    for (const [key, options] of Object.entries({
-      citizenship: ['civic', 'pluralist', 'heritage'],
-      languagePolicy: ['local', 'common', 'multilingual'],
-      beliefPolicy: ['protected', 'favored', 'restricted'],
-    })) {
-      const value = n.policies[key as keyof typeof n.policies]
-      if (value !== undefined && !options.includes(String(value))) fail('invalid identity policy')
-    }
-    for (const key of [
-      'tax',
-      'welfare',
-      'education',
-      'military',
-      'research',
-      'tariff',
-      'conscription',
-    ] as const)
-      if (!number(n.policies[key], 0, 100)) fail('invalid budget policy')
+    if (!object(n.policies)) fail('invalid government policies')
+    for (const key of Object.keys(POLICY_RULES) as (keyof typeof POLICY_RULES)[])
+      if (!validSavedPolicy(key, n.policies[key]))
+        fail(
+          POLICY_RULES[key].kind === 'number'
+            ? 'invalid budget policy'
+            : 'optional' in POLICY_RULES[key]
+              ? 'invalid identity policy'
+              : 'invalid government policies',
+        )
     for (const key of ['technologies', 'researchProgress'] as const)
       if (!object(n[key]) || FIELDS.some((f) => !number(n[key][f], 0, key === 'technologies' ? 6 : 1e14)))
         fail('invalid research')

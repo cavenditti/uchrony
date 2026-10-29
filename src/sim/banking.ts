@@ -1,12 +1,14 @@
-import { supplierDebt } from './supplier-credit'
-import { simulationMonths, periodInterest, periodRate } from './simulation-period'
+/** Bank assets and borrower liabilities settle together; resolution converts actual
+ * creditor deposits into equity and never manufactures replacement money. */
 import { decisionPolicy } from './decision-policy'
-import { recordWorldEvent } from './event-memory'
-import { balance, balances, changeDeposit, ensureEconomy, governmentAccount } from './ledger'
-import { clamp, type World } from './types'
 import type { Bank, EconomicStratum, Loan } from './economic-types'
+import { recordWorldEvent } from './event-memory'
+import { accountAddress, balance, balances, changeDeposit, ensureEconomy } from './ledger'
 import { MODEL_PARAMETERS as P } from './model-parameters'
 import { newMonetaryPolicy, observePrices, policyRate } from './monetary-policy'
+import { periodInterest, periodRate, simulationMonths } from './simulation-period'
+import { supplierDebt } from './supplier-credit'
+import { clamp, type World } from './types'
 
 const accountHash = (key: string) => {
   let h = 0
@@ -168,7 +170,8 @@ export function issueBankLoan(w: World, borrower: string, requested: number, lim
       if (!existing && loan.bank === bank.id) existing = loan
     }
   }
-  if (borrower.startsWith('government:')) outstanding += supplierDebt(w, Number(borrower.split(':')[1]))
+  const address = accountAddress(w, borrower)
+  if (address.kind === 'government') outstanding += supplierDebt(w, address.id)
   const capacity = Math.max(0, bank.equity / P.bankCapitalRatio - assets)
   const amount = Math.max(0, Math.min(requested, limit - outstanding, capacity))
   if (!Number.isFinite(amount) || amount <= 1e-9) return 0
@@ -300,6 +303,7 @@ export function settleBanks(w: World) {
   const e = ensureEconomy(w),
     b = ensureBanking(w)
   for (const loan of e.credit.loans) {
+    const address = accountAddress(w, loan.borrower)
     if (loan.rateType === 'floating' && w.month >= loan.nextReset!) {
       loan.rate = b.centralBank.rate + loan.spread!
       loan.nextReset = w.month + loan.resetMonths!
@@ -312,24 +316,20 @@ export function settleBanks(w: World) {
       loan.bank!,
       loan.principal *
         periodRate(
-          loan.borrower.startsWith('government:') && decisionPolicy().development
-            ? 1 / 240
-            : P.creditRepaymentMonthly,
+          address.kind === 'government' && decisionPolicy().development ? 1 / 240 : P.creditRepaymentMonthly,
         ),
       'bank loan principal',
     )
     loan.principal -= principal
     loan.arrears = interest + 1e-8 < due ? loan.arrears + simulationMonths() : 0
-    if (loan.borrower.startsWith('firm:')) e.firms![Number(loan.borrower.split(':')[1])].interest += interest
-    if (loan.borrower.startsWith('producer:'))
-      e.producers[Number(loan.borrower.split(':')[1])].interest += interest
-    if (loan.borrower.startsWith('government:'))
-      w.nations[Number(loan.borrower.split(':')[1])].spending += interest
+    if (address.kind === 'firm') e.firms![address.id].interest += interest
+    if (address.kind === 'producer') e.producers[address.id].interest += interest
+    if (address.kind === 'government') w.nations[address.id].spending += interest
     if (loan.arrears >= P.defaultAfterMonths) {
       writeDownLoan(w, loan, loan.principal * (1 - P.defaultRecovery))
       loan.arrears = 0
-      if (loan.borrower.startsWith('government:')) {
-        const n = w.nations[Number(loan.borrower.split(':')[1])]
+      if (address.kind === 'government') {
+        const n = w.nations[address.id]
         n.legitimacy = clamp(n.legitimacy - 4, 0, 100)
         n.stability = clamp(n.stability - 3, 5, 99)
         recordWorldEvent(w, {
@@ -344,10 +344,12 @@ export function settleBanks(w: World) {
     }
   }
   e.credit.loans = e.credit.loans.filter((l) => l.principal > 1e-8)
-  for (const n of w.nations)
-    n.debt = e.credit.loans
-      .filter((l) => l.borrower === governmentAccount(n.id))
-      .reduce((sum, l) => sum + l.principal, supplierDebt(w, n.id))
+  // Preserve each nation's original loan summation order in one linear pass.
+  for (const n of w.nations) n.debt = supplierDebt(w, n.id)
+  for (const loan of e.credit.loans) {
+    const address = accountAddress(w, loan.borrower)
+    if (address.kind === 'government') w.nations[address.id].debt += loan.principal
+  }
   for (const bank of b.banks) {
     resolveBank(w, bank)
     const charge = Math.min(bank.reserves, bank.centralBankDebt * periodInterest(b.centralBank.rate))

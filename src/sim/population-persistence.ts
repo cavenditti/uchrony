@@ -1,21 +1,25 @@
-import { MAX_CENSUS_BINS } from './simulation-invariants'
 import { ageTotals } from './age-cohorts'
 import { STRATA } from './economic-types'
-import type { World } from './types'
-import type { IdentityAxis, PopulationCommunity } from './population-types'
-import { AGES, communityKey } from './population'
 import { allForces } from './forces'
+import {
+  integerValidator,
+  numberValidator,
+  recordValue,
+  validationFailure,
+  worldValidators,
+} from './persistence-primitives'
+import { AGES, communityKey } from './population'
+import type { IdentityAxis, PopulationCommunity } from './population-types'
+import { MAX_CENSUS_BINS } from './simulation-invariants'
+import type { World } from './types'
 
 export function validatePopulation(world: World, allowDuplicateCommunities = false) {
   const state = world.demography,
-    fail = (message: string): never => {
-      throw new Error(`Invalid population save: ${message}`)
-    },
-    number = (value: unknown, min = 0, max = 1e14) =>
-      typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max,
-    integer = (value: unknown, min = 0, max = 1e14) => number(value, min, max) && Number.isInteger(value),
-    object = (value: unknown) => !!value && typeof value === 'object' && !Array.isArray(value),
-    nation = (id: number) => integer(id, 0, world.nations.length - 1)
+    fail = validationFailure('Invalid population save: ', '', ''),
+    number = numberValidator(0, 1e14),
+    integer = integerValidator(0, 1e14, false),
+    object = recordValue,
+    nation = worldValidators(world).nationId
   if (!state) {
     if (
       world.regions.some((region) => region.communities !== undefined) ||

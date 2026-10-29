@@ -1,27 +1,19 @@
-import { parameterGroup } from './configuration-context'
-import { decisionPolicy } from './decision-policy'
-import { targetInventoryMonths, reserveTaxRelief } from './strategic-reserves'
-import { quoteMaterialFinancing, issueSupplierCredit } from './supplier-credit'
-import { activeDevelopment } from './development'
-import { expansionParameters } from './expansion-parameters'
-import { loansForBorrower } from './banking'
-import { simulationMonths, periodRate, periodInterest, crossedPeriodMonth } from './simulation-period'
-import { governance } from './governance'
+/** Competitive firms hire from local labor pools and produce against real inputs.
+ * Payroll, inventories, capital projects and sales remain reconciled with the ledger. */
+import { participatingLabor } from './age-cohorts'
+import { loansForBorrower, payBank, writeDownLoan } from './banking'
 import { localClimate } from './climate'
 import { recordLocalJob } from './commuting'
+import { parameterGroup } from './configuration-context'
+import { decisionPolicy } from './decision-policy'
+import { activeDevelopment } from './development'
 import { extractDistrictResource } from './districts'
-import { economicRegions, economicRegion, localFirmRegion, provinceId } from './local-units'
-import {
-  GOODS,
-  inventory,
-  population,
-  clamp,
-  type World,
-  type Region,
-  type Good,
-  type Inventory,
-} from './types'
 import { STRATA, type CompetitiveFirm, type EconomicStratum } from './economic-types'
+import { BASE_PRICE, householdNeed, reserveTarget } from './economy'
+import { effectMultiplier } from './effects'
+import { expansionParameters } from './expansion-parameters'
+import { governance } from './governance'
+import { bargainWage, matchJobs, reservationWage, retainedJobs } from './labor-market'
 import {
   balance,
   borrow,
@@ -31,16 +23,10 @@ import {
   producerAccount,
   transfer,
 } from './ledger'
-import { BASE_PRICE, householdNeed, reserveTarget } from './economy'
-import { participatingLabor } from './age-cohorts'
+import { economicRegion, economicRegions, localFirmRegion, provinceId } from './local-units'
 import { collectedTaxRate } from './macroeconomy'
 import { MODEL_PARAMETERS as P } from './model-parameters'
-import { bargainWage, matchJobs, retainedJobs, reservationWage } from './labor-market'
 import { realFinancingRate } from './monetary-policy'
-import { effectMultiplier } from './effects'
-import { simulationSettings } from './settings'
-import { hashSeed } from './random'
-import { writeDownLoan, payBank } from './banking'
 import {
   economicNation,
   firmStore,
@@ -52,7 +38,23 @@ import {
   recordUse,
   recordWages,
 } from './national-accounts'
+import { hashSeed } from './random'
+import { simulationSettings } from './settings'
+import { crossedPeriodMonth, periodInterest, periodRate, simulationMonths } from './simulation-period'
+import { reserveTaxRelief, targetInventoryMonths } from './strategic-reserves'
+import { issueSupplierCredit, quoteMaterialFinancing } from './supplier-credit'
+import {
+  clamp,
+  GOODS,
+  inventory,
+  population,
+  type Good,
+  type Inventory,
+  type Region,
+  type World,
+} from './types'
 
+import { recordGift } from './national-accounts'
 import { FIRM_SLOTS_PER_REGION as SLOTS } from './simulation-invariants'
 export const WAGE_SKILL: Record<EconomicStratum, number> = parameterGroup('wageSkills')
 const recipes: Partial<Record<Good, Partial<Inventory>>> = parameterGroup('recipes')
@@ -376,6 +378,8 @@ function baseLaborMix(w: World, r: Region, f?: CompetitiveFirm): Inventory {
     0.3,
     0.78,
   )
+  // Nonfarm reference shares sum to 0.52; rescale them to the remaining
+  // labor after the endogenous farming share, preserving their relative mix.
   const mix = {
     food: farm,
     timber: ((1 - farm) * 0.11) / 0.52,
@@ -417,8 +421,12 @@ export function firmCapacity(
     (1 - r.devastation * 0.55) *
     (0.75 + 0.25 * (r.materialCoverage ?? 1)) *
     f.productivity
+  // Each base cell supports 1,800 reference labor units, fertility-adjusted and
+  // divided among active firms so entry cannot multiply the same land endowment.
   const land = Math.max(1, r.cells.length * 1800 * (0.35 + r.fertility * 0.65)) / Math.max(1, active)
   const season = localClimate(w, w.cells[f.cell ?? r.center]).season
+  // Capital was seeded against a reference population; normalize that baseline
+  // when districts split so refinement cannot grant an equipment productivity bonus.
   const capital =
     (w.economy!.producers[r.id].capital + f.capital * active) *
     (r.capitalReference === undefined ? 1 : r.capitalReference / Math.max(500, population(r)))
@@ -870,7 +878,6 @@ export function finishFirms(w: World) {
     r.industry = merchant.capital + firms.reduce((s, f) => s + f.capital, 0)
   }
 }
-import { recordGift } from './national-accounts'
 function liquidateFirm(w: World, f: CompetitiveFirm) {
   const r = economicRegion(w, localFirmRegion(f))
   for (const g of GOODS) {

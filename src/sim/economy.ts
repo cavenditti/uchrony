@@ -1,32 +1,33 @@
+/** Provincial production and trade clear physical goods against conserved money.
+ * District routing has finer geography but shares the same political tariff rules. */
+import { knownCommuteCandidates, matchCommuters } from './commuting'
 import { parameterGroup } from './configuration-context'
-import { periodFlow } from './simulation-period'
-import { governance } from './governance'
-import { matchCommuters, knownCommuteCandidates } from './commuting'
-import { MODEL_PARAMETERS as P } from './model-parameters'
-import { economicRegions } from './local-units'
 import { tradeDistricts } from './district-transport'
-import { marketStore } from './national-accounts'
-import { ensureEconomy, balance, producerAccount, publicGoods } from './ledger'
-import { finishProduction, consumeHouseholds, recordTrade } from './macroeconomy'
 import { ensureFirms, hireFirms, produceFirms } from './firms'
+import { governance } from './governance'
 import { MinHeap } from './heap'
+import { balance, ensureEconomy, producerAccount, publicGoods } from './ledger'
+import { economicRegions } from './local-units'
+import { consumeHouseholds, finishProduction, recordTrade } from './macroeconomy'
+import { MODEL_PARAMETERS as P } from './model-parameters'
+import { marketStore } from './national-accounts'
 import { seaPassageView } from './naval-control'
+import { periodFlow } from './simulation-period'
+import { tradePolicy } from './trade-policy'
 import {
   GOODS,
   inventory,
   population,
   relation,
-  type World,
-  type Region,
   type Good,
   type Inventory,
+  type Region,
   type Route,
   type RouteLeg,
+  type World,
 } from './types'
 
 import { agreementTerms } from './agreements'
-import { transportNetwork, reverseLegs, refreshTransport } from './transport'
-import { retainRoadBackbone } from './road-backbone'
 import {
   corridorCost,
   corridorProfile,
@@ -34,14 +35,16 @@ import {
   learnCorridors,
   type CorridorProfile,
 } from './corridors'
+import { retainRoadBackbone } from './road-backbone'
 import {
+  establishedPath,
+  laneKey,
+  pathCost,
   rememberedTrade,
   rememberShipments,
-  establishedPath,
-  pathCost,
-  laneKey,
   TRADE_INERTIA,
 } from './trade-memory'
+import { refreshTransport, reverseLegs, transportNetwork } from './transport'
 
 export const BASE_PRICE: Inventory = parameterGroup('basePrices')
 export const MONTHLY_NEED: Inventory = parameterGroup('householdNeeds')
@@ -223,20 +226,8 @@ export function trade(world: World) {
     GOODS.map((good) => [good, world.regions.map((r) => reserveTarget(r, good))]),
   ) as Record<Good, number[]>
   const target = (region: Region, good: Good) => targets[good][region.id]
-  const preferences = new Set(
-    agreementTerms(world)
-      .filter(({ term }) => ['trade', 'alliance'].includes(term.kind))
-      .flatMap(({ term }) => [`${term.from}:${term.to}`, `${term.to}:${term.from}`]),
-  )
-  for (const body of world.institutions?.organizations ?? [])
-    if (body.status === 'active' && body.charter.powers.includes('trade'))
-      for (const a of body.members) for (const b of body.members) if (a !== b) preferences.add(`${a}:${b}`)
-  const treaties = world.nations.map(() => new Map<number, string>())
-  for (const rel of world.relations) {
-    treaties[rel.a].set(rel.b, rel.treaty)
-    treaties[rel.b].set(rel.a, rel.treaty)
-  }
-  const treaty = (a: number, b: number) => treaties[a].get(b)
+  const policy = tradePolicy(world),
+    treaty = policy.treaty
   const profile = corridorProfile(world)
   refreshTransport(world, profile)
   const graph = transportGraph(world, undefined, profile),
@@ -427,17 +418,9 @@ export function trade(world: World) {
           return
         }
         const international = seller.nation !== buyer.nation
-        const nBuyer = governance(world, buyer.nation)
         const unitPrice = seller.prices[g] / 1000
         const freightRate = Math.min(0.5, plan.cost * 0.001) * unitPrice
-        const agreement = treaty(buyer.nation, seller.nation)
-        const tariff =
-          international &&
-          agreement !== 'trade' &&
-          agreement !== 'alliance' &&
-          !preferences.has(`${buyer.nation}:${seller.nation}`)
-            ? nBuyer.policies.tariff / 100
-            : 0
+        const tariff = policy.tariff(buyer.nation, seller.nation)
         const affordable =
           balance(world, producerAccount(buyer.id)) / Math.max(1e-12, unitPrice * (1 + tariff) + freightRate)
         const amount = Math.max(
