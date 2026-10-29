@@ -357,7 +357,7 @@ test('adaptive v1 table encoding stays compatible and rejects duplicate or overs
 })
 
 test('cabinet planning preserves deterministic settled/frontier monthly and coarse checkpoints', () => {
-  // Weighted-average inventory costs change the economic trajectory. Checkpoints
+  // Inventory costing and consistent merchant offers change the economic trajectory. Checkpoints
   // are captured only after two independent, validated replays agree at every phase.
   const expected = JSON.parse(
     readFileSync(new URL('./fixtures/cabinet-trajectories.json', import.meta.url), 'utf8'),

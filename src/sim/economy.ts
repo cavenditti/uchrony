@@ -12,6 +12,7 @@ import { economicRegions } from './local-units'
 import { consumeHouseholds, finishProduction, recordTrade } from './macroeconomy'
 import { MODEL_PARAMETERS as P } from './model-parameters'
 import { marketStore } from './national-accounts'
+import { refreshRetailQuote } from './retail-pricing'
 import { seaPassageView } from './naval-control'
 import { periodFlow } from './simulation-period'
 import { tradePolicy } from './trade-policy'
@@ -286,6 +287,7 @@ export function trade(world: World) {
         publicGoods(world, term.from, seller.id, good, amount, marketStore(buyer.id))
         seller.stocks[good] -= amount
         buyer.stocks[good] += amount
+        refreshRetailQuote(world, buyer, good)
         owed -= amount
         offer.delivered += amount
         for (const edge of edgeKeys) capacity.set(edge, capacity.get(edge)! - amount)
@@ -432,6 +434,7 @@ export function trade(world: World) {
         for (const [index, count] of usage) physicalCapacity[index] -= amount * count
         const value = amount * unitPrice
         recordTrade(world, seller.id, buyer.id, g, amount, unitPrice, amount * freightRate, tariff)
+        refreshRetailQuote(world, buyer, g, unitPrice * (1 + tariff) + freightRate)
         const id = `${seller.id}-${buyer.id}`,
           existing = routes.get(id)
         if (existing) {

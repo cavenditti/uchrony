@@ -40,6 +40,7 @@ import {
   recordWages,
 } from './national-accounts'
 import { communitySize, peopleByStratum } from './population'
+import { refreshRetailQuote } from './retail-pricing'
 import { periodFlow, periodRate, simulationMonths } from './simulation-period'
 import { repaySuppliers } from './supplier-credit'
 import { territorialIndex } from './territory-index'
@@ -141,6 +142,11 @@ export function beginEconomyMonth(w: World) {
   }
   beginFirmMonth(w)
   beginNationalAccounts(w)
+  // Materials can sell before a market restocks. Repair inherited offers before
+  // the first transaction, using the newly opened inventory books and forecasts.
+  withBorrowerLoanIndex(w, () => {
+    for (const r of economicRegions(w)) for (const good of GOODS) refreshRetailQuote(w, r, good)
+  })
 }
 /** Hire from actual working-age participation, subject to a paid wage bill. */
 export function hireLabor(w: World, r: Region) {
@@ -192,6 +198,8 @@ export function consumeHouseholds(w: World) {
       total = Math.max(1, population(r))
     // Households can buy from local firms when a wholesaler cannot fund its stock.
     // All sellers compete on actual available offers; no intermediary loan is required.
+    // Factory receipts must not overwrite the merchant's independent offer for
+    // its remaining, potentially dearer inventory after households have bought.
     const sellers = [
       {
         stocks: r.stocks,
@@ -211,8 +219,6 @@ export function consumeHouseholds(w: World) {
         })),
     ]
     const offers = new Map(GOODS.map((g) => [g, [...sellers].sort((a, b) => a.prices[g] - b.prices[g])]))
-    const salesQuantity = inventory(),
-      salesValue = inventory()
     const foodWeights = Object.fromEntries(STRATA.map((s) => [s, 0])) as Record<EconomicStratum, number>
     const peopleCounts = Object.fromEntries(STRATA.map((s) => [s, 0])) as Record<EconomicStratum, number>
     for (const group of r.communities ?? []) {
@@ -309,8 +315,6 @@ export function consumeHouseholds(w: World) {
           offer.seller.sold[g] += quantity
           h.expenditure += paid
           o.remainingBudget = Math.max(0, o.remainingBudget - paid)
-          salesQuantity[g] += quantity
-          salesValue[g] += paid
           r.consumption[g] += quantity
           h.consumption[g] += quantity
         })
@@ -333,7 +337,6 @@ export function consumeHouseholds(w: World) {
     r.foodCoverage = food / total
     r.materialCoverage = material / total
     for (const g of GOODS) {
-      if (salesQuantity[g] > 0) r.prices[g] = (salesValue[g] * 1000) / salesQuantity[g]
       const loss = r.stocks[g] * retailDecay(g)
       recordUse(w, marketStore(r.id), g, loss, 'loss')
       r.stocks[g] -= loss

@@ -24,6 +24,7 @@ import { recordTrade } from './macroeconomy'
 import { marketStore, recordTransport } from './national-accounts'
 import { seaPassageView } from './naval-control'
 import { retainRoadBackbone } from './road-backbone'
+import { refreshRetailQuote } from './retail-pricing'
 import { periodFlow, simulationMonths } from './simulation-period'
 import { tradePolicy } from './trade-policy'
 import { refreshTransport, reverseLegs, transportNetwork } from './transport'
@@ -307,11 +308,9 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     for (const [index, count] of path.usage) remaining[index] = Math.max(0, remaining[index] - amount * count)
     for (const edge of path.chain)
       linkRemaining.set(edge, (linkRemaining.get(edge) ?? periodFlow(edge.capacity)) - amount)
-    // Selling quotes follow delivered acquisition costs, with bounded adjustment.
-    const targetPrice = unitCost * 1000 * 1.04
-    buyer.prices[good] *= Math.exp(
-      Math.max(-0.06, Math.min(0.06, Math.log(targetPrice / Math.max(0.01, buyer.prices[good])))),
-    )
+    // The blended warehouse cost already damps a small expensive purchase.
+    // A separate price-speed cap would require reselling new imports at a loss.
+    refreshRetailQuote(w, buyer, good, donor === undefined ? unitCost : price)
     creditLimits.delete(buyerId)
     exportable.get(sellerId)![good] -= amount
     system.shipments.push({

@@ -221,6 +221,9 @@ test('funded households can buy available firm food when their wholesaler has no
   recordGift(w, marketStore(r.id), firmStore(firm.id), 'food', food)
   firm.stocks.food += food
   r.stocks.food = 0
+  // Matching the merchant's selling offer includes its markup. The gift keeps
+  // acquisition cost, so the factory must explicitly quote its own stock first.
+  inventoryQuote(w, firmStore(firm.id), 'food', firm.prices.food / 1000)
   transfer(
     w,
     producerAccount(r.id),

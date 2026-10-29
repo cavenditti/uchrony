@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-29",
+  "scenario": "A world unwritten — Verdant Commonwealth",
+  "sourceMonth": 321,
+  "populationAtStart": 4559468,
+  "units": 783,
+  "gdpUnits": "thousand crowns per month",
+  "method": "Independent continuations of a copied autosave using ordinary monthly ticks. Original save was not modified. No GDP floor or accounting residual was introduced.",
+  "cause": "Merchant offers used marginal purchases and direct factory receipts instead of the carrying cost of merchant stock; import quote caps also forced below-cost resale.",
+  "before": {
+    "negativeMonths": 5,
+    "minimumGDP": -396.8851194832295,
+    "maximumGDP": 741.5251199064833
+  },
+  "after": {
+    "negativeMonths": 0,
+    "minimumGDP": 55.7727748578867,
+    "maximumGDP": 181.98081166351236,
+    "minimumFoodCoverage": 0.9940467465540698,
+    "maximumWorldGDPDiscrepancy": 2.7853275241795927e-12
+  },
+  "months": [
+    {
+      "month": 322,
+      "beforeGDP": -24.43168872530789,
+      "afterGDP": 58.42683383191731,
+      "afterFoodCoverage": 0.9999634936503131
+    },
+    {
+      "month": 323,
+      "beforeGDP": -396.8851194832295,
+      "afterGDP": 150.8580420458023,
+      "afterFoodCoverage": 0.99872804671308
+    },
+    {
+      "month": 324,
+      "beforeGDP": 251.4988836699362,
+      "afterGDP": 91.01436516636551,
+      "afterFoodCoverage": 0.9999580748605594
+    },
+    {
+      "month": 325,
+      "beforeGDP": -61.63532460318376,
+      "afterGDP": 55.7727748578867,
+      "afterFoodCoverage": 0.9969287858275658
+    },
+    {
+      "month": 326,
+      "beforeGDP": 156.65170195959863,
+      "afterGDP": 181.98081166351236,
+      "afterFoodCoverage": 0.9999583576875847
+    },
+    {
+      "month": 327,
+      "beforeGDP": 741.5251199064833,
+      "afterGDP": 157.00046849000907,
+      "afterFoodCoverage": 0.9968001040443392
+    },
+    {
+      "month": 328,
+      "beforeGDP": 216.63899215747261,
+      "afterGDP": 111.97441348016305,
+      "afterFoodCoverage": 0.999963938489147
+    },
+    {
+      "month": 329,
+      "beforeGDP": -157.851306330852,
+      "afterGDP": 118.23035450549816,
+      "afterFoodCoverage": 0.9940467465540698
+    },
+    {
+      "month": 330,
+      "beforeGDP": 274.0249444299364,
+      "afterGDP": 129.76695515284283,
+      "afterFoodCoverage": 0.9960400385809387
+    },
+    {
+      "month": 331,
+      "beforeGDP": 575.8991338564069,
+      "afterGDP": 86.65041637695529,
+      "afterFoodCoverage": 0.9957166844291881
+    },
+    {
+      "month": 332,
+      "beforeGDP": 16.23965640998125,
+      "afterGDP": 108.02999564274069,
+      "afterFoodCoverage": 0.997220187945808
+    },
+    {
+      "month": 333,
+      "beforeGDP": -34.40567182347384,
+      "afterGDP": 82.86487260981801,
+      "afterFoodCoverage": 0.9960124198415965
+    }
+  ],
+  "limits": [
+    "This is a 12-month continuation, not a guarantee that genuine value-added losses can never occur.",
+    "The acquisition-cost national accounts remain a documented approximation rather than a full current-replacement-price valuation layer.",
+    "Runtime measurements were not isolated from concurrent validation workloads."
+  ],
+  "validation": {
+    "build": "passed",
+    "format": "npm run format completed; modified files pass the final formatting check",
+    "focusedTests": {
+      "passed": 34,
+      "failed": 0,
+      "files": ["retail-pricing.test.ts", "inventory-costing.test.ts", "banks-firms-gdp.test.ts"]
+    },
+    "determinism": "Eight settled/frontier checkpoints agree across two independent, validated replays",
+    "fullSuite": "Stopped after the housing construction test failed with Residential parcel must lie on its owner’s land. The same failure was reproduced with the pricing changes removed; the remaining full-suite tests are not certified."
+  }
+}

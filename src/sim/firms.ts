@@ -39,6 +39,7 @@ import {
   recordWages,
 } from './national-accounts'
 import { hashSeed } from './random'
+import { refreshRetailQuote, retailMarkup } from './retail-pricing'
 import { simulationSettings } from './settings'
 import { crossedPeriodMonth, periodInterest, periodRate, simulationMonths } from './simulation-period'
 import { reserveTaxRelief, targetInventoryMonths } from './strategic-reserves'
@@ -56,6 +57,7 @@ import {
 
 import { recordGift } from './national-accounts'
 import { FIRM_SLOTS_PER_REGION as SLOTS } from './simulation-invariants'
+export { retailDecay, retailMarkup } from './retail-pricing'
 export const WAGE_SKILL: Record<EconomicStratum, number> = parameterGroup('wageSkills')
 const recipes: Partial<Record<Good, Partial<Inventory>>> = parameterGroup('recipes')
 function workingCapitalLimit(w: World, f: CompetitiveFirm) {
@@ -598,25 +600,10 @@ export function restockMarket(w: World, r: Region) {
       left -= quantity
       if (left <= 1e-9) break
     }
-    if (bought > 0) r.prices[g] = Math.max(0.01, ((value * 1000) / bought) * (1 + retailMarkup(w, r, g)))
-    // An inactive market retains its quote; nonexistent output cannot bid up wages indefinitely.
+    // Requote carried stock even without a new purchase: old saves may retain
+    // a marginal-lot quote far below the warehouse's actual acquisition cost.
+    refreshRetailQuote(w, r, g, bought > 0 ? value / bought : undefined)
   }
-}
-export const retailDecay = (good: Good) =>
-  periodRate(good === 'food' ? 0.035 : good === 'timber' || good === 'textiles' ? 0.006 : 0.001)
-/** Recover expected inventory loss and finance costs per sale, plus a trading margin. */
-export function retailMarkup(w: World, r: Region, good: Good) {
-  const merchant = w.economy!.producers[r.id]
-  const sales = Math.max(1, householdNeed(r, good), merchant.forecast[good])
-  const target = reserveTarget(r, good) + householdNeed(r, good)
-  const loans = loansForBorrower(w, producerAccount(r.id))
-  const principal = loans.reduce((sum, l) => sum + l.principal, 0)
-  const rate =
-    principal > 0
-      ? loans.reduce((sum, l) => sum + l.principal * (l.rate ?? P.policyRateMonthly + P.bankLoanSpread), 0) /
-        principal
-      : (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
-  return 0.04 + (Math.max(0, target - sales) * retailDecay(good) + target * periodInterest(rate)) / sales
 }
 export function invest(
   w: World,
