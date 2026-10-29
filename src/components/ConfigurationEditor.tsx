@@ -3,8 +3,8 @@ import { ChevronRight, Download, RotateCcw, Search, Upload } from 'lucide-react'
 import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from '../sim/configuration-defaults'
 import {
   CONFIGURATION_FIELDS,
+  CONFIGURATION_FIELD_MAP,
   CONFIGURATION_FIELDS_BY_GROUP,
-  CONFIGURATION_GROUPS,
   configurationLabel,
   configurationValue,
   countChangedFields,
@@ -16,11 +16,7 @@ import { validateConfigurationValues } from '../sim/configuration'
 import { BIOMES, MOISTURE_BANDS, TEMPERATURE_BANDS } from '../sim/climate-types'
 import { configurationHelp } from '../sim/configuration-help'
 import { ParameterHelp } from './ParameterHelp'
-
-const GROUP_ENTRIES = Object.entries(CONFIGURATION_GROUPS) as [
-  keyof ConfigurationValues,
-  (typeof CONFIGURATION_GROUPS)[keyof ConfigurationValues],
-][]
+import { searchConfigurationGroups } from '../sim/configuration-search'
 
 // All 20 `climate.matrix.*` cells and 10 `climate.terrainOverrides.*` fields are
 // registered in `CONFIGURATION_FIELDS` so they participate in validation, preset
@@ -69,8 +65,29 @@ async function parsePresetFile(
   return resetConfigurationFields(validated, creationOnlyFields, current, false)
 }
 
-function matchesFieldQuery(field: ConfigurationField, query: string): boolean {
-  return `${field.label} ${field.path}`.toLowerCase().includes(query)
+/** Reuse the advanced field so both views edit the same scenario value and bounds. */
+export function InitialCashControl({
+  value,
+  start,
+  onChange,
+}: {
+  value: ConfigurationValues
+  start: 'frontier' | 'settled'
+  onChange: (value: ConfigurationValues) => void
+}) {
+  const prefix = useId()
+  const field = CONFIGURATION_FIELD_MAP.get(
+    start === 'frontier' ? 'starting.treasury' : 'starting.settledTreasury',
+  )!
+  return (
+    <ConfigurationFieldControl
+      field={{ ...field, label: 'Initial cash per state' }}
+      prefix={prefix}
+      value={value}
+      live={false}
+      onEdit={(field, next) => onChange(setConfigurationValue(value, field, next))}
+    />
+  )
 }
 
 function ConfigurationFieldControl({
@@ -253,12 +270,7 @@ export function ConfigurationEditor({
   const reset = (fields: readonly ConfigurationField[]) =>
     onChange(resetConfigurationFields(value, fields, DEFAULT_CONFIGURATION_VALUES, live))
 
-  const visibleGroups = GROUP_ENTRIES.filter(([key, group]) => {
-    if (live && (key === 'geography' || key === 'starting')) return false
-    if (!query) return true
-    if (`${group.label} ${group.description}`.toLowerCase().includes(query)) return true
-    return CONFIGURATION_FIELDS_BY_GROUP[key].some((field) => matchesFieldQuery(field, query))
-  })
+  const visibleGroups = searchConfigurationGroups(query, live)
 
   return (
     <section
@@ -271,7 +283,7 @@ export function ConfigurationEditor({
           <span className="visually-hidden">Find a parameter</span>
           <input
             type="search"
-            placeholder="Find a parameter…"
+            placeholder="Search names, descriptions or tags…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -335,6 +347,11 @@ export function ConfigurationEditor({
           ? 'Edits take effect together when applied.'
           : 'All settings are saved with the generated world.'}
       </p>
+      {live && (
+        <p className="configuration-note">
+          Initial cash per state is set in World menu → Generate world → Basic setup, before generation.
+        </p>
+      )}
       {importError && (
         <p className="configuration-error" role="alert">
           {importError}
@@ -343,16 +360,13 @@ export function ConfigurationEditor({
       {!visibleGroups.length && (
         <p className="empty-state">No parameters match “{search}”. Try climate, population or trade.</p>
       )}
-      {visibleGroups.map(([key, group]) => {
-        const fields = CONFIGURATION_FIELDS_BY_GROUP[key]
-        const showAll = !query || `${group.label} ${group.description}`.toLowerCase().includes(query)
-        const showMatrix =
-          key === 'climate' && (showAll || query.includes('matrix') || query.includes('biome'))
-        const candidateFields = showMatrix ? CLIMATE_ORDINARY_FIELDS : fields
-        const ordinary = showAll
-          ? candidateFields
-          : candidateFields.filter((field) => matchesFieldQuery(field, query))
-        const count = countChangedFields(fields, value, baseline)
+      {visibleGroups.map(({ key, group, fields }) => {
+        const allFields = CONFIGURATION_FIELDS_BY_GROUP[key]
+        // Keep the full matrix for section browsing; narrow searches show only
+        // matching cells, with their complete temperature/moisture labels.
+        const showMatrix = key === 'climate' && fields.length === allFields.length
+        const ordinary = showMatrix ? CLIMATE_ORDINARY_FIELDS : fields
+        const count = countChangedFields(allFields, value, baseline)
 
         return (
           <details

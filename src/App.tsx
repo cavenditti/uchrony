@@ -1,5 +1,5 @@
 import { ParameterLabel } from './components/ParameterHelp'
-import { ConfigurationEditor } from './components/ConfigurationEditor'
+import { ConfigurationEditor, InitialCashControl } from './components/ConfigurationEditor'
 import { configurationDraft, configurationFor, validateConfigurationValues } from './sim/configuration'
 import { ModelAssignments } from './components/ModelAssignments'
 import { PlaceAtlas } from './components/PlaceAtlas'
@@ -1316,18 +1316,6 @@ export default function App() {
               ).toLocaleString()}{' '}
               people before any recruitment. Established states begin with populated territories.
             </p>
-            <p className="panel-note" aria-live="polite">
-              Opening treasury per state:{' '}
-              <strong>
-                {(
-                  (settlementStart === 'frontier'
-                    ? newConfiguration.starting.treasury
-                    : newConfiguration.starting.settledTreasury) * 1000
-                ).toLocaleString()}{' '}
-                crowns
-              </strong>
-              . Change it under Advanced setup → Starting conditions.
-            </p>
             <div className="form-columns">
               <div className="select-label">
                 <ParameterLabel htmlFor="world-continents" label="Geography">
@@ -1365,6 +1353,11 @@ export default function App() {
                 />
               </div>
             </div>
+            <InitialCashControl
+              value={newConfiguration}
+              start={settlementStart}
+              onChange={setNewConfiguration}
+            />
             {advancedSetup ? (
               <ConfigurationEditor value={newConfiguration} onChange={setNewConfiguration} />
             ) : (
