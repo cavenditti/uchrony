@@ -3,7 +3,7 @@ import { INSTITUTION_POWERS, PROVINCIAL_POWERS } from './institutions'
 import { MAX_STATE_IDENTITIES } from './types'
 import { FIELDS, GOODS } from './types'
 import { HISTORICAL_EFFECT_SCHEMA } from './history-schema'
-import type { StateAgentPlan, RefereeDecision } from './statecraft-types'
+import { DOMESTIC_ORDER_KINDS, type StateAgentPlan, type RefereeDecision } from './statecraft-types'
 
 type Schema = {
   type?: string
@@ -110,20 +110,7 @@ export function stateAgentSchema(strategic: boolean): Schema {
     reason: text(300),
     orders: arr(
       obj({
-        kind: en([
-          'intelligence',
-          'policy',
-          'identity',
-          'research',
-          'recruit',
-          'move',
-          'build',
-          'commission',
-          'naval',
-          'embark',
-          'army',
-          'annex',
-        ]),
+        kind: en(DOMESTIC_ORDER_KINDS),
         target: num(-1, 1e9, true),
         key: text(24),
         value: num(0, 1e9),

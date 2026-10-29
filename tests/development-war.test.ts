@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
 import { applyCommand, summarize } from '../src/sim/engine'
 import { beginEconomyMonth } from '../src/sim/macroeconomy'
+import { cabinetResearchFocus } from '../src/sim/cabinet-policy'
 import { advanceDevelopment, recordDevelopment } from '../src/sim/development'
 import {
   annexProvince,
@@ -245,7 +246,14 @@ test('development programs persist for five years and borrow only within current
   rebaseEndowments(w)
   advanceDevelopment(w)
   assert(n.development)
-  assert.equal(n.development.focus, 'agriculture')
+  assert.equal(
+    n.development.focus,
+    cabinetResearchFocus(
+      w,
+      n,
+      w.regions.filter((r) => r.nation === n.id),
+    ),
+  )
   assert(n.debt > 0 && n.debt <= 72)
   const plan = n.development,
     borrowed = plan.borrowed
@@ -254,7 +262,14 @@ test('development programs persist for five years and borrow only within current
   n.foodCoverage = 1
   advanceDevelopment(w)
   assert.equal(n.development, plan, 'a short recovery must not discard the program')
-  assert.equal(n.researchFocus, 'agriculture')
+  assert.equal(
+    n.researchFocus,
+    cabinetResearchFocus(
+      w,
+      n,
+      w.regions.filter((r) => r.nation === n.id),
+    ),
+  )
   n.ai = false
   const appropriation = plan.appropriation
   advanceDevelopment(w)

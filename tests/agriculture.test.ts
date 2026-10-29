@@ -42,7 +42,7 @@ const audit = (w: ReturnType<typeof generateWorld>) => {
   auditGoods(w)
 }
 
-test('native cabinets respond to hunger with diplomacy records, but preserve human and fresh model decisions', () => {
+test('native cabinets respond to hunger with diplomacy records, but preserve human control while model-led cabinets keep working', () => {
   const w = generateWorld('hungry cabinets', 3, 4)
   const state = ensureStatecraft(w)
   w.month = 6
@@ -55,11 +55,11 @@ test('native cabinets respond to hunger with diplomacy records, but preserve hum
   state.agents[2].lastModel = 'test model'
   state.agents[2].lastDecision = 5
   withSimulationPeriod(6, () => advanceDomesticPolicy(w))
-  for (const id of [0, 3]) {
+  for (const id of [0, 2, 3]) {
     assert.equal(w.nations[id].policies.priority, 'agriculture')
     assert.equal(w.nations[id].researchFocus, 'agriculture')
   }
-  for (const id of [1, 2]) assert.equal(w.nations[id].policies.priority, 'balanced')
+  assert.equal(w.nations[1].policies.priority, 'balanced')
   w.month = 12
   withSimulationPeriod(6, () => advanceDomesticPolicy(w))
   assert.equal(w.nations[2].policies.priority, 'agriculture', 'stale model plans cannot freeze government')

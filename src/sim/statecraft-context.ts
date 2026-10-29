@@ -1,6 +1,7 @@
 /** Narrative projections expose each government's knowledge rather than world truth.
  * The referee projection separately includes evidence needed to validate settlement. */
 import { advisorContext } from './advisors'
+import { statecraftAffordances } from './statecraft-affordances'
 import { agreementReference, agreementReferenceIndex } from './agreement-references'
 import { currentAgreements } from './agreements'
 import { strategicPressures } from './ambitions'
@@ -68,6 +69,7 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
     institutions: visibleInstitutions(world, nation),
     strategicLandscape: strategicPressures(world, n),
     government,
+    affordances: statecraftAffordances(world, nation),
     supplierCompensation: {
       owed: supplierDebt(world, nation),
       availableCredit: supplierCreditRoom(world, nation),
@@ -79,6 +81,7 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
       goals: agent.goals,
       credibility: agent.integrity,
       escalation: agent.escalation,
+      orderResults: agent.orderResults ?? [],
     },
     populationIdentity: populationIdentitySummary(world, nation),
     society: ensureHistory(world).societies.find((entry) => entry.nation === nation),

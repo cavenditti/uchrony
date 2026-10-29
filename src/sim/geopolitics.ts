@@ -1,3 +1,16 @@
+import {
+  ensureCabinet,
+  nativeStrategicControl,
+  setCabinetAgenda,
+  cabinetOrderReserved,
+} from './cabinet-state'
+import {
+  advanceCampaignPreparation,
+  directTheaters,
+  hasCampaignCause,
+  rememberWars,
+  seekCampaignSupport,
+} from './campaign-ai'
 import { reportedExpansionInterests } from './ambitions'
 import { competitivePressure } from './competitive-pressure'
 import { decisionPolicy, recruitmentCost } from './decision-policy'
@@ -5,14 +18,7 @@ import { nativeDomesticControl } from './domestic-policy'
 import { expansionParameters } from './expansion-parameters'
 import { militaryImpression, recordMilitaryInfluence } from './influence'
 import { foreignPolicyMandate, sharedInstitution } from './institutions'
-import {
-  intelligenceService,
-  knownMap,
-  observedThreat,
-  perceivedAllies,
-  perceivedPower,
-  reportedWar,
-} from './intelligence'
+import { intelligenceService, perceivedAllies, perceivedPower, reportedWar } from './intelligence'
 import { publicExpense } from './ledger'
 import { annexProvince, annexationObstacle } from './military-control'
 import { MAX_ARMIES } from './military-limits'
@@ -257,58 +263,51 @@ export function advanceGeopolitics(world: World) {
     c.expansion *= 0.998
     c.lastTerritory = own.length
     if (!n.ai) continue
+    const cabinet = ensureCabinet(world, n)
+    rememberWars(world, n)
+    const preparing = cabinet.posture === 'prepare-war'
     const drives = n.character!.leader.politics!.drives
     const competition = expansionParameters().militaryDrive > 0 ? competitivePressure(world, n) : undefined
-    if (wars.length || threat > 0.55) {
-      n.policies.military = Math.max(n.policies.military, Math.round(25 + threat * 25))
-      n.policies.priority = 'military'
-      n.policies.conscription = Math.max(n.policies.conscription, 1.5 + threat * 2)
+    if (wars.length || preparing || threat > 0.55) {
+      if (!cabinetOrderReserved(world, n, 'policy:military'))
+        n.policies.military = Math.max(n.policies.military, Math.round(25 + threat * 25))
+      if (!cabinetOrderReserved(world, n, 'policy:priority')) n.policies.priority = 'military'
+      if (!cabinetOrderReserved(world, n, 'policy:conscription'))
+        n.policies.conscription = Math.max(n.policies.conscription, 1.5 + threat * 2)
     }
-    const frontier = own.filter((r) => r.neighbors.some((id) => enemies.has(world.regions[id].nation))),
+    const frontier = own.filter((r) =>
+        r.neighbors.some(
+          (id) =>
+            enemies.has(world.regions[id].nation) ||
+            (preparing && world.regions[id].nation === cabinet.target),
+        ),
+      ),
       defended = (r: (typeof own)[number]) =>
         world.armies
           .filter((a) => a.nation === n.id && a.region === r.id)
           .reduce((s, a) => s + a.soldiers, 0),
-      desired = n.population * (wars.length ? 0.008 : threat > 0.55 ? 0.004 : 0.0015),
+      desired = n.population * (wars.length || preparing ? 0.008 : threat > 0.55 ? 0.004 : 0.0015),
       current = world.armies.filter((a) => a.nation === n.id).reduce((s, a) => s + a.soldiers, 0)
-    if (current < desired && world.month - c.lastMobilized >= 3 && (wars.length || threat > 0.5)) {
+    if (
+      current < desired &&
+      world.month - c.lastMobilized >= 3 &&
+      (wars.length || preparing || threat > 0.5)
+    ) {
       const location = [...(frontier.length ? frontier : own)]
-        .filter((r) => r.foodCoverage > 0.75 && r.unrest < 80)
+        .filter((r) => !r.control && r.foodCoverage > 0.75 && r.unrest < 80)
         .sort((a, b) => defended(a) - defended(b) || b.infrastructure - a.infrastructure)[0]
       if (location) {
         mobilize(world, n, location.id, Math.min(1500, desired - current))
         c.lastMobilized = world.month
       }
     }
-    if (wars.length) {
-      const defensive = frontier.sort((a, b) => {
-        const danger = (r: typeof a) =>
-          r.neighbors.reduce((s, id) => s + observedThreat(world, n.id, id), 0) -
-          defended(r) +
-          (r.id === n.capital ? 1000 : 0)
-        return danger(b) - danger(a)
-      })
-      for (const army of world.armies.filter((a) => a.nation === n.id && a.operations?.embarkedOn === null)) {
-        const invader = knownMap(world, n.id)
-          .filter((r) => enemies.has(r.nation) && world.regions[r.id].occupation?.former === n.id)
-          .sort((a, b) => a.id - b.id)[0]
-        const nearest = defensive.find((r) => r.id === army.region || r.neighbors.includes(army.region))
-        if (
-          nearest &&
-          power < Math.max(0, ...[...enemies].map((id) => perceivedPower(world, n.id, id))) * 1.3
-        ) {
-          army.target = nearest.id === army.region ? null : nearest.id
-          army.operations!.stance = nearest.id === army.region ? 'entrench' : 'march'
-        } else if (invader) {
-          army.target = invader.id
-          army.operations!.stance = 'march'
-        } else if (
-          army.operations!.stance === 'entrench' &&
-          army.soldiers >= (decisionPolicy().realCosts ? 50 : 500)
-        )
-          army.operations!.stance = 'march'
-      }
+    if (wars.length) directTheaters(world, n, enemies)
+    if (advanceCampaignPreparation(world, n)) {
+      if (cabinet.posture === 'consolidate') c.lastInitiative = world.month
+      continue
     }
+    if (!nativeStrategicControl(world, n) || (cabinet.source === 'model' && cabinet.review > world.month))
+      continue
     if (!crossedPeriodMonth(world.month, n.id % 3, 3) || world.month - c.lastInitiative < 18) continue
     if (!foreignPolicyMandate(world, n.id, [n.id])) continue
     if (wars.length && drives.riskTolerance < 0.95) continue
@@ -316,7 +315,7 @@ export function advanceGeopolitics(world: World) {
       .map((id) => world.nations[id])
       .filter((other) => {
         const rel = relation(world, n.id, other.id)
-        return rel && rel.treaty !== 'alliance' && rel.treaty !== 'war' && rel.treaty !== 'truce'
+        return rel && hasCampaignCause(world, n, other.id)
       })
       .map((other) => {
         const rel = relation(world, n.id, other.id)!,
@@ -360,35 +359,14 @@ export function advanceGeopolitics(world: World) {
     const best = options[0]
     if (
       !best ||
-      power < (decisionPolicy().realCosts ? 30 : 500) ||
       n.foodCoverage < 0.85 ||
       n.stability < 30 ||
       n.treasury < (decisionPolicy().realCosts ? recruitmentCost(world, n.id) * 50 : 200) ||
-      best.superiority < 1.3 - drives.riskTolerance * 0.65 ||
       best.score < decisionPolicy().warThreshold
     )
       continue
-    if (random(state) > 0.08 + drives.riskTolerance * 0.16) continue
-    submitStandingOffer(world, n.id, {
-      title: `${n.shortName} pursues its frontier ambitions against ${best.other.shortName}`,
-      parties: [n.id],
-      terms: [
-        {
-          kind: 'war',
-          from: n.id,
-          to: best.other.id,
-          amount: 0,
-          good: '',
-          field: '',
-          regions: [],
-          duration: 0,
-          text: 'The government commits to coercive military action to advance its declared interests.',
-        },
-      ],
-      visibility: 'public',
-      duration: 12,
-      supersedes: 0,
-    })
+    setCabinetAgenda(world, n, 'prepare-war', best.other.id)
+    seekCampaignSupport(world, n, best.other.id)
     c.lastInitiative = world.month
   }
   if (world.statecraft) {
@@ -650,19 +628,14 @@ export function advanceGeopolitics(world: World) {
 /** A diplomacy record is bookkeeping, not a switch that disables native peace
  * and commerce. Each autonomous signatory consents through the ordinary rules. */
 export function advanceNativeAccords(world: World) {
-  if (!world.statecraft && !world.relations.some((r) => r.treaty === 'war')) return
   const statecraft = ensureStatecraft(world)
   advancePeaceNegotiations(world)
   for (const r of world.regions) {
     const id = r.control?.nation
     if (id === undefined || !nativeDomesticControl(world, world.nations[id])) continue
     const n = world.nations[id]
-    for (const army of world.armies.filter((a) => a.nation === id && a.region === r.id)) {
-      if (!army.operations) continue
-      army.operations.stance = 'hold'
-      if ((n.character?.leader.politics?.drives.opportunism ?? 0) > 0.65) army.operations.conduct = 'pillage'
-    }
     if (
+      nativeStrategicControl(world, n) &&
       (n.character?.leader.politics?.drives.ambition ?? 0) > 0.6 &&
       n.stability > 40 &&
       n.foodCoverage > 0.85 &&
@@ -677,6 +650,8 @@ export function advanceNativeAccords(world: World) {
     if (
       !a?.ai ||
       !b?.ai ||
+      !nativeStrategicControl(world, a) ||
+      !nativeStrategicControl(world, b) ||
       a.extinct !== undefined ||
       b.extinct !== undefined ||
       !world.regions.some((r) => r.nation === a.id) ||

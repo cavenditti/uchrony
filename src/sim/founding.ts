@@ -1,3 +1,4 @@
+import { knownMap } from './intelligence'
 import { withWorldConfiguration } from './configuration'
 import { parameterGroup } from './configuration-context'
 import { decisionPolicy, domesticMonthlyWage } from './decision-policy'
@@ -134,8 +135,8 @@ function configuredFoundingPlan(w: World, nation: number, cell: number, expediti
 }
 
 /** A paid, immediately inhabited founding camp. Later housing uses ordinary timed construction. */
-export function foundSettlement(w: World, nation: number, cell: number) {
-  return settleFounding(w, nation, cell, false)
+export function foundSettlement(w: World, nation: number, cell: number, pioneer = false) {
+  return settleFounding(w, nation, cell, false, undefined, pioneer ? pioneerExpedition(w, nation) : FOUNDING)
 }
 
 function settleFounding(
@@ -286,61 +287,29 @@ export function advanceFounding(w: World) {
     const expedition = pioneerExpedition(w, n.id)
     const pressure = p.peerWeight > 0 ? competitivePressure(w, n) : undefined
     const cycle =
-      pressure && pressure.peer * p.peerWeight > 0.3 ? Math.max(2, p.reviewMonths / 2) : p.reviewMonths
+      n.cabinet?.posture === 'colonize'
+        ? Math.max(2, p.reviewMonths / 2)
+        : pressure && pressure.peer * p.peerWeight > 0.3
+          ? Math.max(2, p.reviewMonths / 2)
+          : p.reviewMonths
     const offset = (1 + (n.id % 3)) % cycle
     const reviews =
       Math.floor((w.month - offset) / cycle) - Math.floor((w.month - simulationMonths() - offset) / cycle)
     if (
       reviews <= 0 ||
       !n.ai ||
+      ['prepare-war', 'wage-war', 'pacify-crisis'].includes(n.cabinet?.posture ?? '') ||
+      (n.cabinet?.source === 'model' && n.cabinet.posture === 'consolidate' && n.cabinet.review > w.month) ||
       n.foodCoverage < p.minimumFood ||
       n.stability < p.minimumStability ||
       w.relations.some((r) => r.treaty === 'war' && (r.a === n.id || r.b === n.id))
     )
       continue
     for (let review = 0; review < reviews; review++) {
-      const candidates = w.regions
-        .filter((r) => r.nation === -1 && r.neighbors.some((id) => w.regions[id].nation === n.id))
-        .sort((a, b) => frontierValue(w, n, b).score - frontierValue(w, n, a).score || a.id - b.id)
-      let settled = false
-      for (const r of candidates) {
-        const home = w.cells[w.regions[n.capital].center]
-        const cells = [
-          r.center,
-          ...r.cells
-            .filter((id) => id !== r.center && habitableLand(w.cells[id]))
-            .sort(
-              (a, b) =>
-                Math.hypot(w.cells[a].q - home.q, w.cells[a].r - home.r) -
-                  Math.hypot(w.cells[b].q - home.q, w.cells[b].r - home.r) || a - b,
-            ),
-        ]
-          .filter((id) => {
-            if (!decisionPolicy().renewal) return true
-            const point = cellPosition(w, id)
-            return !residentialSites(w).some(
-              (s) =>
-                (s.residents! > 0 ||
-                  s.capacity > 0 ||
-                  w.adaptive!.construction?.some((p) => p.site === s.id)) &&
-                Math.hypot(s.x - point.x, s.y - point.y) < 1500,
-            )
-          })
-          .slice(0, p.sitesPerProvince)
-        for (const cell of cells) {
-          try {
-            foundingPlan(w, n.id, cell, expedition)
-          } catch {
-            continue
-          }
-          settleFounding(w, n.id, cell, true, refreshLabels, expedition)
-          founded++
-          settled = true
-          break
-        }
-        if (settled) break
-      }
-      if (!settled) break
+      const option = foundingOptions(w, n.id, 1)[0]
+      if (!option) break
+      settleFounding(w, n.id, option.cell, true, refreshLabels, expedition)
+      founded++
     }
   }
   if (founded) {
@@ -349,4 +318,76 @@ export function advanceFounding(w: World) {
     w.adaptive!.revision += founded - 1
     rebuildAdaptiveMesh(w)
   }
+}
+
+/** Bounded frontier search, shared by native execution and model affordances.
+ * Only surveyed neighboring land is offered; each option is fully validated.
+ * Quotes are alternatives, never a reservation of the same settlers or supplies. */
+export function foundingOptions(w: World, nation: number, limit = 3) {
+  const options: {
+    cell: number
+    province: number
+    name: string
+    people: number
+    cost: number
+    score: number
+  }[] = []
+  if (!w.localEconomy || !w.adaptive || !w.economy || !w.nations[nation]) return options
+  const n = w.nations[nation],
+    expedition = pioneerExpedition(w, nation)
+  if (n.treasury < expedition.cash) return options
+  const charted = new Set(knownMap(w, nation).map((r) => r.id))
+  const candidates = w.regions
+    .filter(
+      (r) =>
+        r.nation === -1 && charted.has(r.id) && r.neighbors.some((id) => w.regions[id].nation === nation),
+    )
+    .map((r) => ({
+      r,
+      score:
+        frontierValue(w, n, r).score +
+        (n.cabinet?.posture === 'colonize' && n.cabinet.target === r.id ? 10 : 0),
+    }))
+    .sort((a, b) => b.score - a.score || a.r.id - b.r.id)
+    .slice(0, 8)
+  const home = w.cells[w.regions[n.capital].center]
+  const pending = new Set(w.adaptive.construction?.map((p) => p.site))
+  const occupied = residentialSites(w).filter(
+    (s) => (s.residents ?? 0) > 0 || s.capacity > 0 || pending.has(s.id),
+  )
+  for (const { r, score } of candidates) {
+    const cells = [
+      r.center,
+      ...r.cells
+        .filter((id) => id !== r.center && habitableLand(w.cells[id]))
+        .sort(
+          (a, b) =>
+            Math.hypot(w.cells[a].q - home.q, w.cells[a].r - home.r) -
+              Math.hypot(w.cells[b].q - home.q, w.cells[b].r - home.r) || a - b,
+        ),
+    ]
+      .filter((id) => {
+        const point = cellPosition(w, id)
+        return !occupied.some((s) => Math.hypot(s.x - point.x, s.y - point.y) < 1500)
+      })
+      .slice(0, expansionParameters().sitesPerProvince)
+    for (const cell of cells) {
+      try {
+        foundingPlan(w, nation, cell, expedition)
+      } catch {
+        continue
+      }
+      options.push({
+        cell,
+        province: r.id,
+        name: r.name,
+        people: expedition.people,
+        cost: expedition.cash,
+        score,
+      })
+      break
+    }
+    if (options.length >= limit) break
+  }
+  return options
 }

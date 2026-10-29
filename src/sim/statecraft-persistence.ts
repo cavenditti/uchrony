@@ -11,6 +11,7 @@ import {
 import { hashSeed } from './random'
 import { CLAUSE_SCHEMA, checkSchema } from './statecraft-schema'
 import type { World } from './types'
+import { DOMESTIC_ORDER_KINDS } from './statecraft-types'
 
 /** Model-authored text is data; consent and ownership ledgers have independent validation. */
 export function validateStatecraft(world: World) {
@@ -77,6 +78,20 @@ export function validateStatecraft(world: World) {
     )
       fail('invalid diplomatic review memory')
     validateAdvisor(world, agent)
+    if (
+      agent.orderResults !== undefined &&
+      (!Array.isArray(agent.orderResults) ||
+        agent.orderResults.length > 12 ||
+        agent.orderResults.some(
+          (r) =>
+            !object(r) ||
+            !integer(r.month, 0, world.month) ||
+            !DOMESTIC_ORDER_KINDS.includes(r.kind) ||
+            !integer(r.target, -1, 1e9) ||
+            !text(r.result, 600),
+        ))
+    )
+      fail('invalid domestic order results')
     agents.add(agent.nation)
   }
   for (const message of state.messages) {

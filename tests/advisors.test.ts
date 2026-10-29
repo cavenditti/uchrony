@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { generateWorld } from '../src/sim/generate'
+import { defaultModelSettings } from '../src/sim/model-tasks'
 import { ensureStatecraft, acceptStatePlan, stateAgentContext } from '../src/sim/statecraft'
 import { submitAdvice, withdrawAdvice, pendingAdvice } from '../src/sim/advisors'
 import { validateWorld, restoreWorld } from '../src/sim/persistence'
@@ -223,7 +224,8 @@ test('paused-world advice schedules a cheap review without bypassing rate limits
   const priorEvents = Object.getOwnPropertyDescriptor(globalThis, 'EventSource')
   Object.defineProperty(globalThis, 'EventSource', {
     configurable: true,
-    value: class {
+    // Match the event-listener API used for policy and model-setting updates.
+    value: class extends EventTarget {
       onmessage = null
       onerror = null
     },
@@ -239,7 +241,12 @@ test('paused-world advice schedules a cheap review without bypassing rate limits
   }) as typeof setInterval)
   t.mock.method(globalThis, 'fetch', (async (url: string, options?: RequestInit) => {
     if (url === '/api/history/status')
-      return Response.json({ configured, policy: { ...policy, enabled: configured } })
+      return Response.json({
+        configured,
+        policy: { ...policy, enabled: configured },
+        // Isolate decision scheduling from optional cultural-writing jobs.
+        writing: { ...defaultModelSettings(), backgroundWriting: false },
+      })
     if (url === '/api/history/policy') return Response.json(policy)
     assert.equal(url, '/api/statecraft/decision', 'ordinary suggestions use the cheap decision pass')
     const { context } = JSON.parse(options!.body as string)

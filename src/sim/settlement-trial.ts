@@ -72,6 +72,10 @@ export function createSettlementTrialWorld(world: World, territorial: boolean): 
 export function commitSettlementTrialWorld(world: World, trial: World) {
   for (const key of SETTLEMENT_ROOTS) {
     if ((key === 'economy' || key === 'localEconomy') && !trial[key]) continue
+    // The isolated trial declares all roots, including absent optional systems.
+    // Do not materialize those as undefined: JSON drops them on save, making an
+    // otherwise identical restored continuation differ from the live world.
+    if (trial[key] === undefined && !Object.hasOwn(world, key)) continue
     Object.assign(world, { [key]: trial[key] })
   }
 }

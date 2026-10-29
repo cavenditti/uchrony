@@ -123,6 +123,7 @@ export interface Policies {
 }
 export interface Nation {
   id: number
+  cabinet?: import('./cabinet-state').CabinetState
   development?: import('./development').DevelopmentPlan
   /** Historical identity remains addressable after the last resident dies. */
   extinct?: number
@@ -278,7 +279,10 @@ export interface World {
     y?: number
     parcel?: import('./adaptive-types').SpatialBounds
     building?: import('./adaptive-types').PointMeters[]
-    fabric?: Pick<import('./urban-types').UrbanBuilding, 'floorArea' | 'uses' | 'condition' | 'built' | 'altered'>
+    fabric?: Pick<
+      import('./urban-types').UrbanBuilding,
+      'floorArea' | 'uses' | 'condition' | 'built' | 'altered'
+    >
     works?: { stage: string; progress: number; disruptive: boolean }
     developed?: boolean
     construction?: number
@@ -336,7 +340,7 @@ export type Command =
   | { type: 'annex'; nation: number; region: number }
   | { type: 'peace-proposal'; nation: number; target: number; payer: number; payment: number; cede: number[] }
   | { type: 'peace-answer'; nation: number; offer: number; accept: boolean }
-  | { type: 'found-settlement'; nation: number; cell: number }
+  | { type: 'found-settlement'; nation: number; cell: number; pioneer?: boolean }
   | {
       type: 'intelligence'
       nation: number
@@ -353,7 +357,11 @@ export type Command =
       powers: ProvincialDelegation['powers']
     }
   | { type: 'conditions'; settings: SimulationSettings }
-  | { type: 'configuration'; values: import('./configuration-defaults').ConfigurationValues; revision: number }
+  | {
+      type: 'configuration'
+      values: import('./configuration-defaults').ConfigurationValues
+      revision: number
+    }
   | { type: 'policy'; nation: number; key: keyof Policies; value: Policies[keyof Policies] }
   | { type: 'identity-policy'; nation: number; key: 'culture' | 'language' | 'belief'; identity: number }
   | { type: 'research'; nation: number; field: Research }
@@ -382,7 +390,14 @@ export type Command =
   | {
       type: 'build'
       region: number
-      building: 'farm' | 'food-works' | 'textile-works' | 'industry' | 'road' | 'school' | import('./public-works').TransportProject
+      building:
+        | 'farm'
+        | 'food-works'
+        | 'textile-works'
+        | 'industry'
+        | 'road'
+        | 'school'
+        | import('./public-works').TransportProject
     }
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }

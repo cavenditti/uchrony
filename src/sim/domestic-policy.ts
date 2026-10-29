@@ -1,12 +1,12 @@
 import { characterPolicyTargets } from './character'
+import { cabinetOrderReserved } from './cabinet-state'
+import { cabinetPolicyTargets } from './cabinet-policy'
 import { crossedPeriodMonth } from './simulation-period'
 import { clamp, type Nation, type World } from './types'
 
-/** A diplomacy record is not a governing model. Only a recent accepted plan
- * temporarily defers the native cabinet; manual governments remain authoritative. */
-export function nativeDomesticControl(w: World, n: Nation) {
-  const agent = w.statecraft?.agents.find((a) => a.nation === n.id)
-  return n.ai && n.extinct === undefined && !(agent?.lastModel && w.month - agent.lastDecision <= 6)
+/** Model leadership directs the cabinet; only human governments disable it. */
+export function nativeDomesticControl(_w: World, n: Nation) {
+  return n.ai && n.extinct === undefined
 }
 
 export function advanceDomesticPolicy(w: World) {
@@ -17,7 +17,7 @@ export function advanceDomesticPolicy(w: World) {
       !w.regions.some((r) => r.nation === n.id)
     )
       continue
-    const targets = characterPolicyTargets(n)
+    const targets = cabinetPolicyTargets(w, n, characterPolicyTargets(n))
     for (const key of [
       'tax',
       'welfare',
@@ -27,22 +27,27 @@ export function advanceDomesticPolicy(w: World) {
       'tariff',
       'conscription',
     ] as const)
-      n.policies[key] += clamp(
-        targets[key] - n.policies[key],
-        key === 'conscription' ? -0.2 : -2,
-        key === 'conscription' ? 0.2 : 2,
-      )
+      if (!cabinetOrderReserved(w, n, `policy:${key}`))
+        n.policies[key] += clamp(
+          targets[key] - n.policies[key],
+          key === 'conscription' ? -0.2 : -2,
+          key === 'conscription' ? 0.2 : 2,
+        )
     const hungry = n.foodCoverage < 0.97
-    n.policies.priority = hungry
-      ? 'agriculture'
-      : w.relations.some((r) => (r.a === n.id || r.b === n.id) && r.treaty === 'war')
-        ? 'military'
-        : n.character!.effective.commercialism > 0.6
-          ? 'industry'
-          : 'balanced'
+    if (!cabinetOrderReserved(w, n, 'policy:priority'))
+      n.policies.priority = hungry
+        ? 'agriculture'
+        : n.cabinet?.posture === 'prepare-war' ||
+            w.relations.some((r) => (r.a === n.id || r.b === n.id) && r.treaty === 'war')
+          ? 'military'
+          : n.character!.effective.commercialism > 0.6
+            ? 'industry'
+            : 'balanced'
     // A stalled unrelated discovery must not lock a hungry state out of farming.
     // Progress in the previous field is retained when the cabinet changes focus.
-    if (hungry && n.technologies.agriculture < 6) n.researchFocus = 'agriculture'
-    if (n.stability < 45 || n.foodCoverage < 0.8) n.policies.welfare = clamp(n.policies.welfare + 3, 0, 80)
+    if (hungry && n.technologies.agriculture < 6 && !cabinetOrderReserved(w, n, 'research'))
+      n.researchFocus = 'agriculture'
+    if ((n.stability < 45 || n.foodCoverage < 0.8) && !cabinetOrderReserved(w, n, 'policy:welfare'))
+      n.policies.welfare = clamp(n.policies.welfare + 3, 0, 80)
   }
 }

@@ -1,5 +1,6 @@
 /** Recruitment transfers existing people, money and equipment; each institution retains its own eligibility rules. */
 import { publicExpense } from './ledger'
+import { decisionPolicy, recruitmentCost } from './decision-policy'
 import { MAX_ARMIES } from './military-limits'
 import { armyStore, marketStore, recordGift, recordRequisition, recordUse } from './national-accounts'
 import { ensureWarfare } from './navy'
@@ -10,14 +11,26 @@ import type { Army } from './types'
 import { type Nation, type Region, type World } from './types'
 
 /** Check cabinet recruitment eligibility before moving real adults and equipment. */
-export function recruit(w: World, n: Nation, r: Region): string {
-  if (r.nation !== n.id) return 'Recruitment requires a province controlled by this state.'
-  if (w.armies.length >= MAX_ARMIES) return 'This world has reached its supported number of army formations.'
+export function recruitmentQuote(w: World, n: Nation, r: Region) {
   const soldiers = Math.min(3000, Math.floor(r.population.adults * (0.025 + n.policies.conscription * 0.012)))
-  const cost = soldiers * 0.2
-  if (soldiers < 500) return 'Not enough adult recruits in this province.'
-  if (n.treasury < cost || r.stocks.arms < soldiers * 0.012)
-    return 'Recruitment needs treasury funds and locally available arms.'
+  const cost = soldiers * recruitmentCost(w, n.id)
+  const obstacle =
+    r.nation !== n.id || r.control || n.extinct !== undefined
+      ? 'Recruitment requires a province controlled by this state.'
+      : w.armies.length >= MAX_ARMIES
+        ? 'This world has reached its supported number of army formations.'
+        : soldiers < (decisionPolicy().realCosts ? 50 : 500)
+          ? 'Not enough adult recruits in this province.'
+          : n.treasury < cost || r.stocks.arms < soldiers * 0.012
+            ? 'Recruitment needs treasury funds and locally available arms.'
+            : ''
+  return { soldiers, cost, obstacle }
+}
+
+/** The preview and execution use the same frontier-scale minimum and real wages. */
+export function recruit(w: World, n: Nation, r: Region): string {
+  const { soldiers, cost, obstacle } = recruitmentQuote(w, n, r)
+  if (obstacle) return obstacle
   musterArmy(w, r, {
     nation: n.id,
     name: `${n.shortName} ${w.nextArmy} Corps`,

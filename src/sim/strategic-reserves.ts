@@ -9,6 +9,8 @@ export const STRATEGIC_MATERIALS: Good[] = ['timber', 'stone', 'iron', 'coal', '
  * face storage losses and stop accumulating once their target is filled. */
 export function targetInventoryMonths(w: World, r: Region, g: Good) {
   const n = w.nations[r.nation]
+  if (n?.cabinet?.posture === 'prepare-war' && (g === 'food' || g === 'arms'))
+    return Math.max(MODEL_PARAMETERS.inventoryMonths, 6 / simulationMonths())
   if (!n || n.foodCoverage < 0.97 || !activeDevelopment(w, n)) return MODEL_PARAMETERS.inventoryMonths
   return STRATEGIC_MATERIALS.includes(g)
     ? Math.max(MODEL_PARAMETERS.inventoryMonths, 6 / simulationMonths())

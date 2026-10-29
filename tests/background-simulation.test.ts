@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
+import { defaultModelSettings } from '../src/sim/model-tasks'
 import type { WorkerRequest, WorkerResponse } from '../src/sim/types'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -41,7 +42,8 @@ test('pending external requests never gate months, local events or worker playba
   const priorEvents = Object.getOwnPropertyDescriptor(globalThis, 'EventSource')
   Object.defineProperty(globalThis, 'EventSource', {
     configurable: true,
-    value: class {
+    // Match the event-listener API used for policy and model-setting updates.
+    value: class extends EventTarget {
       onmessage = null
       onerror = null
     },
@@ -53,7 +55,11 @@ test('pending external requests never gate months, local events or worker playba
   t.mock.method(globalThis, 'setInterval', (() => 0) as typeof setInterval)
   t.mock.method(globalThis, 'fetch', (async (url: string, options?: RequestInit) => {
     if (url === '/api/history/status')
-      return Response.json({ configured, policy: { ...policy, enabled: configured } })
+      return Response.json({
+        configured,
+        policy: { ...policy, enabled: configured },
+        writing: { ...defaultModelSettings(), backgroundWriting: false },
+      })
     if (url === '/api/history/policy') return Response.json(policy)
     requests.push(url)
     return new Promise((_resolve, reject) => {
@@ -65,10 +71,11 @@ test('pending external requests never gate months, local events or worker playba
     await import('../src/sim/worker')
     send({ type: 'load', world: generateWorld('pending-models') })
     await wait(0)
-    send({ type: 'step', count: 3 })
+    // Step messages await spatial-worker readiness, independently of model jobs.
+    await send({ type: 'step', count: 3 })
     assert(requests.length > 0, 'at least one real scheduler request is outstanding')
-    send({ type: 'step', count: 12 })
-    send({ type: 'step', count: 12 })
+    await send({ type: 'step', count: 12 })
+    await send({ type: 'step', count: 12 })
     assert.equal(snapshots.at(-1)?.month, 27)
     assert(snapshots[0].terrain, 'initial world includes its terrain')
     assert(
@@ -78,7 +85,7 @@ test('pending external requests never gate months, local events or worker playba
     assert(snapshots.every((snapshot) => snapshot.mapKey === snapshots[0].mapKey))
     assert(snapshots.at(-1)!.local > 0)
     assert.equal(requests.length, 1, 'fast months cannot bypass the wall-time request budget')
-    send({ type: 'playback', running: true, speed: 60 })
+    await send({ type: 'playback', running: true, speed: 60 })
     await wait(350)
     send({ type: 'playback', running: false, speed: 60 })
     const paused = snapshots.at(-1)!.month

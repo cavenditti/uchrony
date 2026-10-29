@@ -66,20 +66,25 @@ export interface DiplomaticMessage {
   body: string
   offer: number
 }
+/** One action vocabulary is shared by provider schemas, saved receipts and execution. */
+export const DOMESTIC_ORDER_KINDS = [
+  'intelligence',
+  'policy',
+  'identity',
+  'research',
+  'recruit',
+  'move',
+  'build',
+  'commission',
+  'naval',
+  'embark',
+  'army',
+  'annex',
+  'found',
+  'strategy',
+] as const
 export interface DomesticOrder {
-  kind:
-    | 'intelligence'
-    | 'policy'
-    | 'identity'
-    | 'research'
-    | 'recruit'
-    | 'move'
-    | 'build'
-    | 'commission'
-    | 'naval'
-    | 'embark'
-    | 'army'
-    | 'annex'
+  kind: (typeof DOMESTIC_ORDER_KINDS)[number]
   target: number
   key: string
   value: number
@@ -114,6 +119,7 @@ export interface StateAgentPlan {
   answers: { offer: number; digest: string; answer: 'accept' | 'reject' | 'withdraw'; reason: string }[]
 }
 export interface StateAgent {
+  orderResults?: { month: number; kind: DomesticOrder['kind']; target: number; result: string }[]
   advisor?: { nextId: number; notes: AdvisorNote[] }
   nation: number
   assessment: string

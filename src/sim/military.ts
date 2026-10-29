@@ -1,3 +1,4 @@
+import { cabinetOrderReserved } from './cabinet-state'
 import { diplomaticAccessView } from './agreements'
 import { corridorProfile, corridorUsage } from './corridors'
 import { decisionPolicy, domesticMonthlyWage } from './decision-policy'
@@ -478,7 +479,7 @@ export function advanceArmies(w: World) {
     if (a.target === null && !wars.has(a.nation)) continue
     const graph = graphFor(a.nation, true),
       paths = pathsFrom(graph, a.region)
-    if (n.ai && a.target === null) {
+    if (n.ai && a.target === null && !cabinetOrderReserved(w, n, `army:${a.id}`)) {
       const chart = knownMap(w, n.id)
       const targets = chart
         .filter(

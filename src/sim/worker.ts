@@ -534,6 +534,7 @@ function schedule() {
           owners: Object.fromEntries([
             ...context.provinces.map((province) => [province.id, agent.nation]),
             ...context.map.map((province) => [province.id, province.nation]),
+            ...context.affordances.canFoundTargets.map((site) => [site.province, -1]),
           ]),
           armies: context.armies.map((army) => army.id),
           fleets: context.fleets.map((fleet) => fleet.id),

@@ -86,6 +86,7 @@ test('a capable ambitious cabinet initiates a military war locally; a cautious p
   rel.opinion = -50
   rel.grievance = 40
   for (const a of strong.armies.filter((a) => a.nation === victim)) a.morale = 0.1
+  for (const army of strong.armies.filter((a) => a.nation === 0)) army.region = border.id
   const cautious = structuredClone(strong),
     d = cautious.nations[0].character!.leader.politics!.drives
   d.ambition = d.dominance = d.opportunism = d.riskTolerance = 0
@@ -245,6 +246,8 @@ test('Max speed reviews cabinets in every quarterly offset instead of permanentl
     rel.opinion = -75
     rel.grievance = 60
     for (const a of w.armies) if (a.nation === victim) a.morale = 0.1
+    // This fixture tests quarterly review scheduling, so supply the assembled frontier force.
+    for (const army of w.armies.filter((a) => a.nation === actor)) army.region = border.id
     // Native-only worlds have never enabled optional model deliberation.
     delete w.statecraft
     for (let i = 0; i < 40 && relation(w, actor, victim)!.treaty !== 'war'; i++) {

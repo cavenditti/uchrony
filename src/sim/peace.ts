@@ -1,6 +1,8 @@
 import { relation, population, type World } from './types'
 import type { DiplomaticClause, DiplomaticOffer, StateAgentPlan } from './statecraft-types'
 import { nativeDomesticControl } from './domestic-policy'
+import { nativeStrategicControl } from './cabinet-state'
+import { intelligenceService } from './intelligence'
 import { sovereigntyAssessment } from './strategic-assessment'
 import { tryStandingOffer, admitDiplomaticConsent, settleConventionalOffers } from './statecraft'
 
@@ -116,36 +118,58 @@ export function advancePeaceNegotiations(w: World) {
         pair.every((id) => p.parties.includes(id)) &&
         p.terms.some((t) => t.kind === 'peace'),
     )
-    if (!offer && rel.warExhaustion > 30) {
+    const occupied = w.regions.filter(
+      (r) => pair.includes(r.nation) && r.control && pair.includes(r.control.nation),
+    )
+    const decisive =
+      occupied.some((r) => w.nations[r.nation].capital === r.id) ||
+      pair.some(
+        (id) =>
+          occupied.filter((r) => r.nation === id).length >=
+          Math.max(1, w.regions.filter((r) => r.nation === id).length * 0.3),
+      )
+    const canNegotiate = (id: number) =>
+      nativeDomesticControl(w, w.nations[id]) &&
+      (nativeStrategicControl(w, w.nations[id]) || rel.warExhaustion >= 65 || decisive)
+    if (!offer && (rel.warExhaustion > 30 || (occupied.length > 0 && (rel.warExhaustion > 15 || decisive)))) {
       const author = pair
-        .filter((id) => nativeDomesticControl(w, w.nations[id]))
+        .filter(canNegotiate)
         .sort(
           (a, b) =>
             w.regions.filter((r) => r.nation === b && r.control).length -
               w.regions.filter((r) => r.nation === a && r.control).length || a - b,
         )[0]
       if (author !== undefined) {
-        const other = pair.find((id) => id !== author)!,
-          n = w.nations[author]
-        const lost = w.regions
-          .filter((r) => r.nation === author && r.control?.nation === other && r.id !== n.capital)
-          .sort((a, b) => population(a) - population(b))
-        const payment = lost.length ? Math.min(n.treasury * 0.1, Math.max(0, n.income) * 3) : 0
+        const other = pair.find((id) => id !== author)!
+        const held = occupied.filter((r) => r.control?.nation === author)
+        const lost = occupied.filter((r) => r.nation === author)
+        const loser = held.length > lost.length ? other : author
+        const losses = occupied
+          .filter((r) => r.nation === loser && r.id !== w.nations[loser].capital)
+          .sort((a, b) => population(a) - population(b) || a.id - b.id)
+        const limit = decisive
+          ? Math.min(3, Math.max(1, Math.floor(w.regions.filter((r) => r.nation === loser).length * 0.35)))
+          : 1
+        const treasury =
+          loser === author
+            ? w.nations[loser].treasury
+            : (intelligenceService(w, author).dossiers.find((d) => d.nation === loser)?.economy?.values
+                .treasury?.estimate ?? 0)
+        const payment = losses.length ? Math.max(0, treasury) * (decisive ? 0.15 : 0.05) : 0
         offer =
           proposePeace(
             w,
             author,
             other,
-            author,
+            loser,
             payment,
-            lost.slice(0, 1).map((r) => r.id),
+            losses.slice(0, limit).map((r) => r.id),
           ) ?? undefined
       }
     }
     if (!offer) continue
     for (const id of pair)
-      if (nativeDomesticControl(w, w.nations[id]) && acceptablePeace(w, id, offer))
-        admitDiplomaticConsent(w, id, offer)
+      if (canNegotiate(id) && acceptablePeace(w, id, offer)) admitDiplomaticConsent(w, id, offer)
   }
   settleConventionalOffers(w)
 }

@@ -5,6 +5,7 @@ import {
   worldValidators,
 } from './persistence-primitives'
 import type { World } from './types'
+import { validateCabinet } from './cabinet-persistence'
 
 export function validateGeopolitics(w: World) {
   const integer = integerValidator(0, Infinity, false)
@@ -38,6 +39,7 @@ export function validateGeopolitics(w: World) {
       fail()
   }
   for (const n of w.nations) {
+    validateCabinet(w, n)
     const p = n.development
     if (
       p !== undefined &&

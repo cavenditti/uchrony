@@ -356,9 +356,11 @@ test('adaptive v1 table encoding stays compatible and rejects duplicate or overs
   assert.throws(() => unpackWorldSave(oversized), /save block/)
 })
 
-test('phase refactoring preserves pre-change deterministic settled/frontier monthly and coarse trajectories', () => {
+test('cabinet planning preserves deterministic settled/frontier monthly and coarse checkpoints', () => {
+  // The former refactor baseline remains as historical evidence; policy changes
+  // intentionally alter its trajectories. New checkpoints match two independent replays.
   const expected = JSON.parse(
-    readFileSync(new URL('./fixtures/simulation-refactor-baseline.json', import.meta.url), 'utf8'),
+    readFileSync(new URL('./fixtures/cabinet-trajectories.json', import.meta.url), 'utf8'),
   )
   const actual = []
   for (const start of ['settled', 'frontier'] as const) {

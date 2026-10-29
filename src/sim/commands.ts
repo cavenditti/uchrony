@@ -9,20 +9,19 @@ import { aggregateDistricts, linkDistrictPeople } from './districts'
 import { nativeDomesticControl } from './domestic-policy'
 import { shortestPaths } from './economy'
 import { foundSettlement } from './founding'
-import { governance } from './governance'
 import { collectiveDefense, foreignPolicyMandate } from './institutions'
 import { configureIntelligence } from './intelligence'
 import { reconcileJurisdictionSovereignty } from './jurisdictions'
 import { publicExpense } from './ledger'
 import { landGraph } from './military'
 import { annexProvince } from './military-control'
-import { inventoryFlow, marketStore, reconcileGDP, recordUse } from './national-accounts'
+import { inventoryFlow, marketStore, reconcileGDP } from './national-accounts'
 import { commissionFleet, embarkArmy, ensureWarfare, orderFleet } from './navy'
 import { acceptablePeace, proposePeace } from './peace'
 import { policyCommandValue } from './policy-rules'
 import { ensurePopulation } from './population'
 import { buildProductiveActivity } from './productive-investment'
-import { buildTransport } from './public-works'
+import { buildPublicWork } from './public-works'
 import { recruit } from './recruitment'
 import { TECH_NAMES } from './research'
 import { syncResidentialPopulation } from './residential-sites'
@@ -143,7 +142,7 @@ const COMMAND_HANDLERS = {
     return offer.ruling
   },
   'found-settlement': (w, command) => {
-    return foundSettlement(w, command.nation, command.cell)
+    return foundSettlement(w, command.nation, command.cell, command.pioneer)
   },
   intelligence: (w, command) => {
     configureIntelligence(w, command.nation, command.budgetShare, command.priority, command.focus)
@@ -266,7 +265,6 @@ const COMMAND_HANDLERS = {
   build: (w, command) => {
     const r = w.regions[command.region]
     if (!r) throw new Error('That province does not exist.')
-    const n = governance(w, r.nation)
     if (
       command.building === 'industry' ||
       command.building === 'food-works' ||
@@ -278,39 +276,7 @@ const COMMAND_HANDLERS = {
         command.building === 'industry' ? 'tools' : command.building === 'food-works' ? 'food' : 'textiles',
       )
     if (command.building === 'farm') return buildFarm(w, r.id)
-    if (command.building === 'paved-road' || command.building === 'railway' || command.building === 'port')
-      return buildTransport(w, r.id, command.building)
-    const cost = { road: 600, school: 500 }[command.building]
-    if (!cost) throw new Error('Unknown building.')
-    if (n.treasury < cost) return `Construction requires ${cost}k crowns in the treasury.`
-    if (r.stocks.timber < 50 || r.stocks.stone < 70)
-      return 'Construction requires 50 t of timber and 70 t of stone in this province.'
-    const maxed = command.building === 'road' ? r.infrastructure >= 1.5 : r.literacy >= 0.99
-    if (maxed) return 'This province has reached the development limit for this investment.'
-    publicExpense(w, n.id, cost, 'public construction', r.id)
-    recordUse(w, marketStore(r.id), 'timber', 50)
-    recordUse(w, marketStore(r.id), 'stone', 70)
-    r.stocks.timber -= 50
-    r.stocks.stone -= 70
-    r.consumption.timber += 50
-    r.consumption.stone += 70
-    if (command.building === 'road') {
-      r.infrastructure = Math.min(1.5, r.infrastructure + 0.2)
-      r.publicWorks = { ...r.publicWorks, road: r.publicWorks?.road ?? 'gravel' }
-    }
-    if (command.building === 'school') {
-      r.literacy = Math.min(0.99, r.literacy + 0.08)
-      for (const group of r.communities ?? []) group.literacy = Math.min(0.99, group.literacy + 0.08)
-    }
-    event(
-      w,
-      'economy',
-      `${r.name} invests in ${command.building === 'road' ? 'transport' : command.building === 'school' ? 'education' : 'industry'}`,
-      `The project uses ${cost}k crowns, 50 t timber, and 70 t stone.`,
-      n.id,
-      r.id,
-    )
-    return `Investment completed in ${r.name}.`
+    return buildPublicWork(w, r.id, command.building)
   },
   disaster: (w, command) => {
     const r = w.regions[command.region]

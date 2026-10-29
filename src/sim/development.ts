@@ -1,9 +1,11 @@
+import { cabinetResearchFocus } from './cabinet-policy'
+import { cabinetOrderReserved } from './cabinet-state'
 import { nativeDomesticControl } from './domestic-policy'
 import { decisionPolicy } from './decision-policy'
 import { economicRegions, provinceId } from './local-units'
 import { governmentAccount, borrow } from './ledger'
 import { recordWorldEvent } from './event-memory'
-import { simulationMonths, periodRate } from './simulation-period'
+import { simulationMonths, periodRate, crossedPeriodMonth } from './simulation-period'
 import { clamp, population, type Nation, type Research, type World } from './types'
 
 export interface DevelopmentPlan {
@@ -28,21 +30,10 @@ export function advanceDevelopment(w: World) {
     const own = units.filter((r) => r.nation === n.id && !w.regions[provinceId(r)].control)
     const people = own.reduce((sum, r) => sum + population(r), 0)
     if (!people) continue
-    const avg = (key: 'literacy' | 'materialCoverage' | 'infrastructure') =>
-      own.reduce((sum, r) => sum + (r[key] ?? 1) * population(r), 0) / people
     const output = (w.economy?.national[n.id]?.realOutput ?? 0) / Math.max(1, n.population)
     const emergency = n.foodCoverage < 0.75 && n.development?.focus !== 'agriculture'
     if (!n.development || w.month >= n.development.review || emergency) {
-      const focus: Research =
-        n.foodCoverage < 0.95
-          ? 'agriculture'
-          : avg('materialCoverage') < 0.9
-            ? 'industry'
-            : avg('literacy') < 0.6
-              ? 'governance'
-              : avg('infrastructure') < 0.7
-                ? 'logistics'
-                : 'industry'
+      const focus = cabinetResearchFocus(w, n, own)
       const old = n.development
       n.development = {
         focus,
@@ -66,12 +57,24 @@ export function advanceDevelopment(w: World) {
       })
     }
     const p = n.development
-    if (n.technologies[p.focus] < 6) n.researchFocus = p.focus
+    if (
+      !cabinetOrderReserved(w, n, 'research') &&
+      (p.started === w.month ||
+        crossedPeriodMonth(w.month, n.id % 6, 6) ||
+        n.technologies[n.researchFocus] >= 6)
+    )
+      n.researchFocus = cabinetResearchFocus(w, n, own)
     // The long-term mandate persists, but short-term food security can redirect labor.
-    if (n.foodCoverage < 0.97 || p.focus === 'agriculture') n.policies.priority = 'agriculture'
-    else if (p.focus === 'industry') n.policies.priority = 'industry'
-    n.policies.research = Math.max(n.policies.research, 18)
-    n.policies.education = Math.max(n.policies.education, 20)
+    if (!cabinetOrderReserved(w, n, 'policy:priority')) {
+      if (n.foodCoverage < 0.97) n.policies.priority = 'agriculture'
+      else if (['prepare-war', 'wage-war'].includes(n.cabinet?.posture ?? ''))
+        n.policies.priority = 'military'
+      else if (p.focus === 'industry') n.policies.priority = 'industry'
+    }
+    if (!cabinetOrderReserved(w, n, 'policy:research'))
+      n.policies.research = Math.max(n.policies.research, 18)
+    if (!cabinetOrderReserved(w, n, 'policy:education'))
+      n.policies.education = Math.max(n.policies.education, 20)
     const months = simulationMonths()
     // The initial tax base is domestic payroll, not assumed future growth.
     const payroll =

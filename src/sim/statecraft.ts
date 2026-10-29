@@ -1,3 +1,10 @@
+import {
+  reserveCabinetOrder,
+  setCabinetAgenda,
+  STRATEGIC_POSTURES,
+  type StrategicPosture,
+} from './cabinet-state'
+import { knownMap } from './intelligence'
 /** Consent and live resource checks precede an isolated trial; only a conserved
  * settlement is committed. Prompt projection lives in statecraft-context. */
 import { deliverAdvice, validateAdviceReplies } from './advisors'
@@ -193,7 +200,39 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
   const n = world.nations[nation]
   if (!n.ai) return // Human policy interventions remain authoritative.
   let command: Command
-  if (order.kind === 'intelligence') {
+  if (order.kind === 'strategy') {
+    if (!STRATEGIC_POSTURES.includes(order.key as StrategicPosture))
+      throw new Error('Unknown strategic posture.')
+    const military = order.key === 'prepare-war' || order.key === 'wage-war'
+    if (
+      military &&
+      (order.target === nation ||
+        !alive(world, order.target) ||
+        !knownMap(world, nation).some((r) => r.nation === order.target))
+    )
+      throw new Error('Choose a known living rival for the campaign.')
+    if (!military && order.target !== -1 && !world.regions[order.target])
+      throw new Error('Choose a real province or -1.')
+    setCabinetAgenda(
+      world,
+      n,
+      order.key as StrategicPosture,
+      order.target === -1 ? null : order.target,
+      'model',
+    )
+    return `Cabinet directed to ${order.key}. Routine economic and security work continues.`
+  } else if (order.kind === 'found') {
+    const province = world.cells[order.target]?.region
+    if (
+      !Number.isInteger(order.target) ||
+      province === undefined ||
+      !knownMap(world, nation).some((r) => r.id === province)
+    )
+      throw new Error('Founding requires surveyed land.')
+    if (![nation, -1].includes(world.regions[province].nation))
+      throw new Error('That land belongs to another state.')
+    command = { type: 'found-settlement', nation, cell: order.target, pioneer: true }
+  } else if (order.kind === 'intelligence') {
     if (!INTELLIGENCE_PRIORITIES.includes(order.key as IntelligencePriority))
       throw new Error('Unknown intelligence collection priority.')
     command = {
@@ -296,7 +335,15 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
     }
   }
   try {
-    applyCommand(world, command)
+    const result = applyCommand(world, command)
+    if (order.kind === 'policy') reserveCabinetOrder(world, n, `policy:${order.key}`)
+    if (order.kind === 'research' && n.researchFocus === order.text) reserveCabinetOrder(world, n, 'research')
+    if (
+      order.kind === 'army' ||
+      (order.kind === 'move' && world.armies.find((a) => a.id === order.target)?.target === order.value)
+    )
+      reserveCabinetOrder(world, n, `army:${order.target}`)
+    return result
   } finally {
     n.ai = true
   }
@@ -351,13 +398,25 @@ export function acceptStatePlan(
     agent.escalation = `Decision model requests strategic review: ${plan.reason || 'A strategic assessment is needed.'}`
   for (const order of plan.orders) {
     try {
-      executeOrder(world, nation, order)
+      const result = executeOrder(world, nation, order)
+      agent.orderResults = [
+        ...(agent.orderResults ?? []),
+        {
+          month: world.month,
+          kind: order.kind,
+          target: order.target,
+          result: (result ?? 'Manual government retains control.').slice(0, 600),
+        },
+      ].slice(-12)
     } catch (error) {
       const stale =
         knowledge &&
-        ((['build', 'recruit', 'commission'].includes(order.kind) &&
-          knowledge.owners[order.target] === nation &&
-          world.regions[order.target]?.nation !== nation) ||
+        ((order.kind === 'found' &&
+          [nation, -1].includes(knowledge.owners[world.cells[order.target]?.region]) &&
+          ![nation, -1].includes(world.regions[world.cells[order.target]?.region]?.nation)) ||
+          (['build', 'recruit', 'commission'].includes(order.kind) &&
+            knowledge.owners[order.target] === nation &&
+            world.regions[order.target]?.nation !== nation) ||
           (order.kind === 'move' &&
             knowledge.armies.includes(order.target) &&
             !world.armies.some((army) => army.id === order.target && army.nation === nation)))
@@ -370,7 +429,20 @@ export function acceptStatePlan(
         order.kind === 'naval' &&
         knowledge?.fleets?.includes(order.target) &&
         !world.warfare?.fleets.some((f) => f.id === order.target && f.nation === nation)
-      if (stale || changedReadiness || lostFleet)
+      agent.orderResults = [
+        ...(agent.orderResults ?? []),
+        {
+          month: world.month,
+          kind: order.kind,
+          target: order.target,
+          result: (error instanceof Error ? error.message : 'Order failed.').slice(0, 600),
+        },
+      ].slice(-12)
+      const foundingReadiness =
+        order.kind === 'found' &&
+        error instanceof Error &&
+        !/surveyed land|belongs to another state/.test(error.message)
+      if (stale || changedReadiness || lostFleet || foundingReadiness)
         agent.escalation = 'The world changed during deliberation; update the planned domestic action.'
       else sanction(world, nation, error instanceof Error ? error.message : 'Invalid domestic authority.')
     }

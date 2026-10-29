@@ -4,21 +4,21 @@ import { ensureAdaptiveWorld, rebuildAdaptiveMesh, refreshAdaptiveTotals, syncSi
 import { agreementTerms } from './agreements'
 import { advanceAgriculturalInvestment, completeFarmProjects } from './agriculture'
 import { advanceAlmanac } from './almanac'
-import { reportedExpansionInterests } from './ambitions'
 import { withLoanOriginationBatch } from './banking'
 import { ensureBuildingLots } from './building-lots'
-import { advanceCharacters, characterPolicyTargets, characterResearch } from './character'
+import { advanceCharacters } from './character'
 import { advanceSettlements, evolveCities, refreshCityLabels } from './cities'
-import { competitivePressure } from './competitive-pressure'
 import { withWorldConfiguration } from './configuration'
 import { decisionPolicy } from './decision-policy'
+import { advanceCabinet } from './cabinet-ai'
+import { cabinetResearchFocus } from './cabinet-policy'
+import { cabinetOrderReserved } from './cabinet-state'
 import { advanceDevelopment, recordDevelopment } from './development'
 import { advanceDiplomaticOffices } from './diplomatic-friction'
 import { aggregateDistricts, ensureDistrictEconomy, linkDistrictPeople, refreshEndowment } from './districts'
 import { advanceDomesticPolicy } from './domestic-policy'
 import { consume, produce, trade } from './economy'
 import { effectMultiplier, effectValue } from './effects'
-import { expansionParameters } from './expansion-parameters'
 import { retireEmptyStates } from './extinction'
 import { ensureFirms, investProductiveCapital } from './firms'
 import { militaryPeople } from './forces'
@@ -31,8 +31,8 @@ import { advanceHarbors } from './harbors'
 import { advanceHistory } from './history'
 import { beginPopulationMonth, evolveIdentities } from './identities'
 import { advanceMilitaryInfluence, advanceTradeInfluence } from './influence'
-import { advanceInstitutions, allocateProvincialTaxes, foreignPolicyMandate } from './institutions'
-import { advanceIntelligence, perceivedPower } from './intelligence'
+import { advanceInstitutions, allocateProvincialTaxes } from './institutions'
+import { advanceIntelligence } from './intelligence'
 import { reconcileJurisdictionSovereignty, reviewAdministration } from './jurisdictions'
 import { advanceLandUse } from './land-use'
 import { withBatchedLedgerEntries } from './ledger'
@@ -54,7 +54,6 @@ import { advancePressures } from './pressures'
 import { advanceProductiveInvestment } from './productive-investment'
 import { nationalRealService, realService } from './public-services'
 import { random } from './random'
-import { recruit } from './recruitment'
 import { TECH_NAMES, researchCost } from './research'
 import { ensureResidentialSites, syncResidentialPopulation } from './residential-sites'
 import { reconcileRiverLanes } from './river-lanes'
@@ -242,7 +241,8 @@ function science(w: World) {
         n.id,
       )
       if (n.ai) {
-        n.researchFocus = characterResearch(n)
+        if (!cabinetOrderReserved(w, n, 'research') || n.technologies[focus] >= 6)
+          n.researchFocus = cabinetResearchFocus(w, n, regions)
       }
     }
   }
@@ -281,104 +281,7 @@ function diplomacy(w: World) {
         rel.treaty = 'neutral'
       continue
     }
-    if (w.statecraft || w.month % 3 !== 0) continue
-    const commerce = (a.character!.effective.commercialism + b.character!.effective.commercialism) / 2
-    const patience = (a.character!.effective.patience + b.character!.effective.patience) / 2
-    if (a.ai && b.ai && rel.opinion > 35 && rel.treaty === 'neutral' && random(w) < 0.05 + commerce * 0.2) {
-      rel.treaty = 'trade'
-      rel.since = w.month
-      event(
-        w,
-        'diplomacy',
-        `${a.shortName}–${b.shortName} trade accord`,
-        'The two states remove tariff friction from cross-border shipments.',
-        a.id,
-      )
-    }
-    if (a.ai && b.ai && rel.opinion > 68 && rel.treaty === 'trade' && random(w) < 0.025 + patience * 0.08) {
-      rel.treaty = 'alliance'
-      rel.since = w.month
-      event(
-        w,
-        'diplomacy',
-        `${a.shortName} and ${b.shortName} form an alliance`,
-        'Mutual military access is granted. Relations and commerce reinforce the pact.',
-        a.id,
-      )
-    }
-    const aggressor = [a, b]
-      .filter((n) => n.ai && n.character!.effective.assertiveness > 0.62)
-      .sort((a, b) => b.character!.effective.assertiveness - a.character!.effective.assertiveness)[0]
-    const militaryDrive = expansionParameters().militaryDrive
-    const rival = aggressor?.id === a.id ? b : a
-    const pressure = aggressor && militaryDrive > 0 ? competitivePressure(w, aggressor) : undefined
-    const interests =
-      aggressor && militaryDrive > 0 ? reportedExpansionInterests(w, aggressor, rival.id) : undefined
-    const initiative = militaryDrive * ((pressure?.peer ?? 0) + (interests?.economic ?? 0))
-    const capable =
-      !aggressor ||
-      !militaryDrive ||
-      (aggressor.foodCoverage >= 0.8 &&
-        perceivedPower(w, aggressor.id, aggressor.id) >=
-          Math.max(100, perceivedPower(w, aggressor.id, rival.id) * 0.8))
-    if (
-      aggressor?.ai &&
-      capable &&
-      foreignPolicyMandate(w, aggressor.id, [aggressor.id]) &&
-      rel.treaty === 'neutral' &&
-      territory.bordering(a.id, b.id) &&
-      random(w) <
-        ((rel.opinion < 0 ? 0.09 : 0.02) + initiative * 0.08) *
-          aggressor.character!.effective.assertiveness &&
-      aggressor.stability > 50
-    ) {
-      rel.treaty = 'war'
-      rel.aggressor = aggressor.id
-      rel.since = w.month
-      rel.opinion = -75
-      rel.warExhaustion = 0
-      event(
-        w,
-        'war',
-        `${a.shortName} and ${b.shortName} go to war`,
-        'Borders close to commerce. Armies mobilize, drawing food, equipment, and recruits from the civilian economy.',
-        aggressor.id,
-      )
-    }
   }
-  for (const n of w.nations)
-    if (!decisionPolicy().agriculture && !w.statecraft && n.ai && territory.alive(n.id)) {
-      if (w.month % 6 === 0) {
-        const targets = characterPolicyTargets(n)
-        for (const key of [
-          'tax',
-          'welfare',
-          'education',
-          'military',
-          'research',
-          'tariff',
-          'conscription',
-        ] as const)
-          n.policies[key] += clamp(
-            targets[key] - n.policies[key],
-            key === 'conscription' ? -0.2 : -2,
-            key === 'conscription' ? 0.2 : 2,
-          )
-        n.policies.priority =
-          n.foodCoverage < 0.97
-            ? 'agriculture'
-            : w.relations.some((r) => (r.a === n.id || r.b === n.id) && r.treaty === 'war')
-              ? 'military'
-              : n.character!.effective.commercialism > 0.6
-                ? 'industry'
-                : 'balanced'
-        if (n.treasury < 1000) n.policies.tax = clamp(n.policies.tax + 1, 10, 38)
-        if (n.stability < 45) n.policies.welfare = clamp(n.policies.welfare + 3, 0, 80)
-        const fighting = w.relations.some((r) => (r.a === n.id || r.b === n.id) && r.treaty === 'war')
-        if (fighting && w.armies.filter((a) => a.nation === n.id).length < 4 && n.treasury > 1200)
-          recruit(w, n, w.regions[n.capital])
-      }
-    }
 }
 
 function worldEvents(w: World) {
@@ -478,7 +381,8 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   advancePressures(w)
   advanceCharacters(w)
   if (w.statecraft) advanceStatecraft(w)
-  if (decisionPolicy().agriculture) advanceDomesticPolicy(w)
+  advanceCabinet(w)
+  advanceDomesticPolicy(w)
   advanceDevelopment(w)
   linkDistrictPeople(w)
   for (const id of w.localEconomy!.active) refreshEndowment(w, w.localEconomy!.units[id], false)
