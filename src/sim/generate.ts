@@ -1,7 +1,7 @@
 import { configurationValues, withConfigurationValues } from './configuration-context'
 import { validateConfigurationValues } from './configuration'
 import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './configuration-defaults'
-import { applyStartingEndowments } from './starting-conditions'
+import { applyStartingEndowments, apportionPopulation } from './starting-conditions'
 import { advanceAlmanac } from './almanac'
 import { habitableLand } from './terrain-access'
 import { seedLandscape, settlementWeight } from './landscape'
@@ -520,8 +520,7 @@ function generateConfiguredWorld(
           : habitableLand(cells[r.center]) && roll % opening.hamletOneIn === 0
             ? opening.hamletPopulation + (roll % (opening.hamletVariation + 1))
             : 0
-      r.population = { children: Math.floor(people * 0.29), adults: Math.floor(people * 0.62), elders: 0 }
-      r.population.elders = people - r.population.children - r.population.adults
+      r.population = apportionPopulation(people, opening)
       r.urban = capital || market ? 1 : 0
       r.infrastructure = capital ? 0.2 : market ? 0.12 : 0.02
       r.industry = capital ? 0.18 : market ? 0.12 : people ? 0.02 : 0

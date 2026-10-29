@@ -1,4 +1,6 @@
-import { configurationValues } from './configuration-context'
+import { createGroupScope } from './configuration-context'
+import { DEFAULT_CONFIGURATION_VALUES, DECISION_POLICIES } from './configuration-defaults'
+import { validateConfigurationValues } from './configuration'
 import { simulationMonths } from './simulation-period'
 import { economicRegions } from './local-units'
 import { population, type World } from './types'
@@ -18,39 +20,34 @@ export interface DecisionPolicy {
   agriculture?: boolean
   development?: boolean
 }
-export { DECISION_POLICIES } from './configuration-defaults'
-let current: Readonly<DecisionPolicy> | undefined
-export const decisionPolicy = () => current ?? configurationValues().decisions
-export function withDecisionPolicy<T>(policy: Readonly<DecisionPolicy>, run: () => T): T {
-  if (policy.development !== undefined && typeof policy.development !== 'boolean')
-    throw new Error('Invalid development policy switch')
-  if (policy.agriculture !== undefined && typeof policy.agriculture !== 'boolean')
-    throw new Error('Invalid agricultural policy switch')
-  if (typeof policy.renewal !== 'boolean' || typeof policy.realCosts !== 'boolean')
-    throw new Error('Invalid decision policy switches')
-  if (
-    policy.foodSatiation !== undefined &&
-    (!Number.isFinite(policy.foodSatiation) || policy.foodSatiation < 1 || policy.foodSatiation > 3)
-  )
-    throw new Error('Invalid food satiation')
-  for (const key of [
-    'merchantRelease',
-    'workDisutility',
-    'investmentShare',
-    'investmentAdjustment',
-    'readiness',
-    'warThreshold',
-  ] as const)
-    if (!Number.isFinite(policy[key]) || policy[key] < 0 || policy[key] > 1)
-      throw new Error('Invalid decision policy')
-  const previous = current
-  current = policy
-  try {
-    return run()
-  } finally {
-    current = previous
-  }
-}
+
+export { DECISION_POLICIES }
+
+/**
+ * Legacy named policies (`legacy`, `circulation`, `renewal`) omit optional fields
+ * (`development`, `agriculture`, `foodSatiation`) so `foodSatiation === undefined`
+ * can disable diet saturation in `householdDemand`. When validating a policy
+ * candidate against the full `ConfigurationValues['decisions']` schema, we fill
+ * omitted optional fields with valid defaults while preserving the caller's
+ * exact `policy` object inside the experiment scope.
+ */
+const scope = createGroupScope<DecisionPolicy>(
+  (values) => values.decisions,
+  (policy) => {
+    validateConfigurationValues({
+      decisions: {
+        ...DEFAULT_CONFIGURATION_VALUES.decisions,
+        ...policy,
+        development: policy.development ?? false,
+        agriculture: policy.agriculture ?? false,
+        foodSatiation: policy.foodSatiation ?? DEFAULT_CONFIGURATION_VALUES.decisions.foodSatiation,
+      },
+    })
+  },
+)
+
+export const decisionPolicy = scope.get
+export const withDecisionPolicy = scope.withScope
 
 /** Prices are nominal. Labor obligations follow current domestic wages, with
  * no lower bound in opening-world currency and no hidden foreign information. */
@@ -66,5 +63,6 @@ export function domesticMonthlyWage(w: World, nation: number) {
   }
   return people ? wages / people / simulationMonths() : 0.0015
 }
+
 export const recruitmentCost = (w: World, nation: number) =>
   decisionPolicy().realCosts ? domesticMonthlyWage(w, nation) * 6 : 0.2

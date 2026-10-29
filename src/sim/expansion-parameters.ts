@@ -1,4 +1,6 @@
-import { configurationValues } from './configuration-context'
+import { createGroupScope } from './configuration-context'
+import { EXPANSION_PROFILES } from './configuration-defaults'
+
 /** Synthetic behavioral coefficients. Scenarios are compared with identical
  * opening worlds; no profile supplies extra people, goods or money. */
 export interface ExpansionParameters {
@@ -27,21 +29,15 @@ export interface ExpansionParameters {
   urbanOpportunityPopulation: number
 }
 
-import { EXPANSION_PROFILES } from './configuration-defaults'
-export { EXPANSION_PROFILES } from './configuration-defaults'
+export { EXPANSION_PROFILES }
 export type ExpansionProfile = keyof typeof EXPANSION_PROFILES
+
 // Selected after the paired-seed evaluation; the baseline remains reproducible.
 export const DEFAULT_EXPANSION_PROFILE: ExpansionProfile = 'expansionist'
-let current: Readonly<ExpansionParameters> | undefined
-export const expansionParameters = () => current ?? configurationValues().expansion
+
+const scope = createGroupScope((values) => values.expansion)
+
+export const expansionParameters = scope.get
 /** Synchronous experiment scope, like simulation-period. It never modifies a
  * world's opening balances, persisted policies, or another experiment's defaults. */
-export function withExpansionParameters<T>(parameters: Readonly<ExpansionParameters>, run: () => T): T {
-  const previous = current
-  current = parameters
-  try {
-    return run()
-  } finally {
-    current = previous
-  }
-}
+export const withExpansionParameters = scope.withScope

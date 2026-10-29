@@ -1,6 +1,91 @@
+import type { ConfigurationValues } from './configuration-defaults'
+
 /** User-facing meanings live beside the configuration schema. A missing entry
  * fails registration instead of silently exposing another unexplained control. */
-const HELP: Record<string, Record<string, string>> = {
+const GROUP_HELP: Partial<Record<keyof ConfigurationValues, Readonly<Record<string, string>>>> = {
+  starting: {
+    treasury:
+      'Opening cash given to every state in Frontier settlements mode, in thousands of crowns. 500 means 500,000 crowns. Later spending can reduce it.',
+    settledTreasury:
+      'Opening cash given to every state in Established states mode, in thousands of crowns. Frontier worlds use the separate frontier treasury value.',
+    debt: 'Opening government debt per state, in thousands of crowns. It creates an existing loan obligation, not additional treasury cash.',
+    year: 'Calendar year shown at the beginning of the simulation. New worlds begin in January.',
+    capitalPopulation:
+      'Residents in each frontier state’s initial settlement, before the population multiplier. Established states use generated populations.',
+    populationScale:
+      'Multiplier for opening civilian populations before recruitment. It retains the generated differences between settlements.',
+    ai: 'Lets each starting state make autonomous government decisions. Disable it to begin with manually controlled governments.',
+    policyFromLeaders:
+      'Uses each generated leader’s preferences for opening policies. Disable it to use the explicit starting policy values below.',
+    researchFromLeaders:
+      'Uses each generated leader’s preferred opening research field. Disable it to use the chosen research focus below.',
+    researchFocus:
+      'Initial research field when Research from leaders is disabled. Autonomous governments may change it during play.',
+    'policies.tax':
+      'Opening tax percentage. Used when Policy from leaders is disabled; future government decisions can change it.',
+    'policies.welfare':
+      'Relative opening budget weight for welfare, not a percentage of the treasury. Used when Policy from leaders is disabled.',
+    'policies.education':
+      'Relative opening budget weight for education, not a percentage of the treasury. Used when Policy from leaders is disabled.',
+    'policies.military':
+      'Relative opening budget weight for military spending. Used when Policy from leaders is disabled.',
+    'policies.research':
+      'Relative opening budget weight for research. Used when Policy from leaders is disabled.',
+    'policies.tariff': 'Opening import-tariff percentage. Used when Policy from leaders is disabled.',
+    'policies.conscription':
+      'Opening conscription policy, expressed as a percentage. Used when Policy from leaders is disabled.',
+    'policies.migration':
+      'Opening policy on migration across the state’s borders. Used when Policy from leaders is disabled.',
+    'policies.priority': 'Opening economic production priority. Used when Policy from leaders is disabled.',
+    marketPopulation:
+      'Base residents in independent market settlements in frontier worlds, before variation and the population multiplier.',
+    marketVariation:
+      'Maximum extra residents added to a frontier market settlement by the seed, before the population multiplier.',
+    hamletPopulation:
+      'Base residents in inhabited independent hamlets in frontier worlds, before variation and the population multiplier.',
+    hamletVariation:
+      'Maximum extra residents added to a frontier hamlet by the seed, before the population multiplier.',
+    hamletOneIn:
+      'Approximately one in this many eligible frontier provinces gets an independent hamlet. Larger values make hamlets rarer.',
+    marketOneIn:
+      'Sets frontier market frequency relative to province count. Larger values produce fewer independent markets.',
+    childrenShare:
+      'Fraction of starting civilians assigned to children. Children and adults together must not exceed 1; the remainder are elders.',
+    adultShare:
+      'Fraction of starting civilians assigned to adults. Children and adults together must not exceed 1; the remainder are elders.',
+    stability: 'Opening domestic stability for every state, on a 0–100 scale.',
+    legitimacy: 'Opening acceptance of every state’s authority, on a 0–100 scale.',
+    urbanScale:
+      'Multiplier for each region’s opening urban share. Values are limited to the supported 0–1 range after scaling.',
+    literacyScale: 'Multiplier for opening literacy in each region, limited to 0–1 after scaling.',
+    healthScale: 'Multiplier for opening health in each region, limited to 0–1 after scaling.',
+    happinessScale: 'Multiplier for opening happiness in each region, limited to 0–1 after scaling.',
+    infrastructureScale:
+      'Multiplier for each region’s opening infrastructure level, limited to the model’s supported range.',
+    industryScale:
+      'Multiplier for opening productive capital in each region. It changes initial capacity, not treasury cash.',
+    stockpileScale:
+      'Multiplier for all opening physical goods, including the capital stock amounts below. It does not add money.',
+    armyScale:
+      'Multiplier for initial land forces in Established states mode. Zero starts without them; frontier worlds already start without armies.',
+    fleets: 'Allows the generator to create opening fleets where the starting scenario supports them.',
+  },
+  geography: {
+    seaLevelOffset:
+      'Raises or lowers generated sea level relative to the land. Positive values leave less dry land; existing worlds are unaffected.',
+    relief:
+      'Multiplier for generated elevation differences. Larger values produce stronger relief; 1 preserves the default landscape.',
+    moistureOffset:
+      'Offset to generated moisture on its normalized 0–1 scale. Positive values make the landscape wetter.',
+    temperatureOffset:
+      'Offset to the normalized temperature index used to generate terrain. This is not degrees Celsius or the live climate temperature.',
+    provinceCount:
+      'Target number of generated provinces. Zero uses the world-size default; disconnected islands can add provinces.',
+    erosionPasses:
+      'Number of erosion iterations during generation. More iterations reshape drainage valleys and increase generation work.',
+    channelRunoff:
+      'Accumulated modeled runoff needed for a drainage channel to be marked as a river. Higher values produce fewer rivers.',
+  },
   founding: {
     people: 'Residents transferred from the home settlement on a manual founding expedition.',
     reserve: 'Minimum residents that must remain at home after a manual founding expedition.',
@@ -26,73 +111,6 @@ const HELP: Record<string, Record<string, string>> = {
       'Minimum food coverage for a viable accession partner; 1 means all modeled food needs are met.',
     enclaveAreaKm2:
       'Unclaimed pockets smaller than this area may join the single state surrounding them. Zero disables this absorption.',
-  },
-  geography: {
-    seaLevelOffset:
-      'Raises or lowers generated sea level relative to the land. Positive values leave less dry land; existing worlds are unaffected.',
-    relief:
-      'Multiplier for generated elevation differences. Larger values produce stronger relief; 1 preserves the default landscape.',
-    moistureOffset:
-      'Offset to generated moisture on its normalized 0–1 scale. Positive values make the landscape wetter.',
-    temperatureOffset:
-      'Offset to the normalized temperature index used to generate terrain. This is not degrees Celsius or the live climate temperature.',
-    provinceCount:
-      'Target number of generated provinces. Zero uses the world-size default; disconnected islands can add provinces.',
-    erosionPasses:
-      'Number of erosion iterations during generation. More iterations reshape drainage valleys and increase generation work.',
-    channelRunoff:
-      'Accumulated modeled runoff needed for a drainage channel to be marked as a river. Higher values produce fewer rivers.',
-  },
-  starting: {
-    ai: 'Lets each starting state make autonomous government decisions. Disable it to begin with manually controlled governments.',
-    policyFromLeaders:
-      'Uses each generated leader’s preferences for opening policies. Disable it to use the explicit starting policy values below.',
-    researchFromLeaders:
-      'Uses each generated leader’s preferred opening research field. Disable it to use the chosen research focus below.',
-    researchFocus:
-      'Initial research field when Research from leaders is disabled. Autonomous governments may change it during play.',
-    year: 'Calendar year shown at the beginning of the simulation. New worlds begin in January.',
-    populationScale:
-      'Multiplier for opening civilian populations before recruitment. It retains the generated differences between settlements.',
-    capitalPopulation:
-      'Residents in each frontier state’s initial settlement, before the population multiplier. Established states use generated populations.',
-    marketPopulation:
-      'Base residents in independent market settlements in frontier worlds, before variation and the population multiplier.',
-    marketVariation:
-      'Maximum extra residents added to a frontier market settlement by the seed, before the population multiplier.',
-    hamletPopulation:
-      'Base residents in inhabited independent hamlets in frontier worlds, before variation and the population multiplier.',
-    hamletVariation:
-      'Maximum extra residents added to a frontier hamlet by the seed, before the population multiplier.',
-    hamletOneIn:
-      'Approximately one in this many eligible frontier provinces gets an independent hamlet. Larger values make hamlets rarer.',
-    marketOneIn:
-      'Sets frontier market frequency relative to province count. Larger values produce fewer independent markets.',
-    childrenShare:
-      'Fraction of starting civilians assigned to children. Children and adults together must not exceed 1; the remainder are elders.',
-    adultShare:
-      'Fraction of starting civilians assigned to adults. Children and adults together must not exceed 1; the remainder are elders.',
-    treasury:
-      'Opening cash given to every state in Frontier settlements mode, in thousands of crowns. 500 means 500,000 crowns. Later spending can reduce it.',
-    settledTreasury:
-      'Opening cash given to every state in Established states mode, in thousands of crowns. Frontier worlds use the separate frontier treasury value.',
-    debt: 'Opening government debt per state, in thousands of crowns. It creates an existing loan obligation, not additional treasury cash.',
-    stability: 'Opening domestic stability for every state, on a 0–100 scale.',
-    legitimacy: 'Opening acceptance of every state’s authority, on a 0–100 scale.',
-    urbanScale:
-      'Multiplier for each region’s opening urban share. Values are limited to the supported 0–1 range after scaling.',
-    literacyScale: 'Multiplier for opening literacy in each region, limited to 0–1 after scaling.',
-    healthScale: 'Multiplier for opening health in each region, limited to 0–1 after scaling.',
-    happinessScale: 'Multiplier for opening happiness in each region, limited to 0–1 after scaling.',
-    infrastructureScale:
-      'Multiplier for each region’s opening infrastructure level, limited to the model’s supported range.',
-    industryScale:
-      'Multiplier for opening productive capital in each region. It changes initial capacity, not treasury cash.',
-    stockpileScale:
-      'Multiplier for all opening physical goods, including the capital stock amounts below. It does not add money.',
-    armyScale:
-      'Multiplier for initial land forces in Established states mode. Zero starts without them; frontier worlds already start without armies.',
-    fleets: 'Allows the generator to create opening fleets where the starting scenario supports them.',
   },
   conditions: {
     instability:
@@ -366,60 +384,72 @@ const HELP: Record<string, Record<string, string>> = {
     search: 'Distance searched for a suitable crossing position, in metres.',
   },
 }
-const POLICY_HELP: Record<string, string> = {
-  tax: 'Opening tax percentage. Used when Policy from leaders is disabled; future government decisions can change it.',
-  welfare:
-    'Relative opening budget weight for welfare, not a percentage of the treasury. Used when Policy from leaders is disabled.',
-  education:
-    'Relative opening budget weight for education, not a percentage of the treasury. Used when Policy from leaders is disabled.',
-  military:
-    'Relative opening budget weight for military spending. Used when Policy from leaders is disabled.',
-  research: 'Relative opening budget weight for research. Used when Policy from leaders is disabled.',
-  tariff: 'Opening import-tariff percentage. Used when Policy from leaders is disabled.',
-  conscription:
-    'Opening conscription policy, expressed as a percentage. Used when Policy from leaders is disabled.',
-  migration:
-    'Opening policy on migration across the state’s borders. Used when Policy from leaders is disabled.',
-  priority: 'Opening economic production priority. Used when Policy from leaders is disabled.',
+
+const TRANSPORT_PROJECT_NAMES: Readonly<Record<string, string>> = {
+  'paved-road': 'paved-road',
+  railway: 'railway',
+  port: 'harbor-dock',
 }
-export function configurationHelp(path: string): string {
-  const [group, key, item, band] = path.split('.')
-  const explicit = HELP[group]?.[path.slice(group.length + 1)]
-  if (explicit) return explicit
-  if (group === 'consumptionBudget')
-    return `Relative weight of ${key} in household spending above subsistence. Weights are normalized together; increasing one redirects spending toward that good.`
-  if (group === 'materialCoverage')
-    return `Relative contribution of ${key} to the material-needs coverage score. Weights are normalized together; this changes the measure, not stocks or cash.`
-  if (group === 'basePrices')
-    return `Opening price of ${key}, in crowns per tonne. Later market prices respond to the simulation.`
-  if (group === 'householdNeeds')
-    return `Baseline tonnes of ${key} needed per person per month, before living-standard and age adjustments.`
-  if (group === 'wageSkills')
-    return `Relative wage multiplier for the ${key} stratum. A value of 1 uses the reference wage.`
-  if (group === 'recipes')
-    return `Tonnes of ${item} required to produce one tonne of ${key}. More input per unit makes production more resource-intensive.`
-  if (group === 'starting' && key === 'policies' && POLICY_HELP[item]) return POLICY_HELP[item]
-  if (group === 'starting' && key === 'capitalStocks')
-    return `Tonnes of ${item} placed in each frontier capital at creation, before the stockpile multiplier. Established states use generated stockpiles.`
-  if (group === 'starting' && key === 'technology')
-    return `Opening ${item} technology level for every state. Later research can raise it.`
-  if (group === 'model' && key === 'fertilityAnnual')
-    return `Annual fertility-pattern weight for women aged ${15 + Number(item) * 5}–${19 + Number(item) * 5}. The pattern is normalized to desired lifetime family size; this is not a direct birth count.`
-  if (group === 'climate' && key === 'amplitudes')
-    return `Seasonal output variation in the ${item} biome around a mean multiplier of 1. Zero removes seasonal variation; 0.23 gives a range of 0.77–1.23.`
-  if (group === 'climate' && key === 'crops')
-    return `Crop associated with the ${item} biome in the agricultural landscape and activity display.`
-  if (group === 'climate' && key === 'matrix')
-    return `Biome assigned to the ${item} temperature band and ${band} moisture band. Band thresholds define the ranges; desert and tundra use their explicit terrain overrides.`
-  if (group === 'climate' && key === 'terrainOverrides')
-    return `Biome assigned to ${item} terrain in the ${band} temperature band, regardless of moisture. This overrides the general biome matrix.`
-  if (group === 'transportProjects') {
-    const project = { 'paved-road': 'paved-road', railway: 'railway', port: 'harbor-dock' }[key]
+
+/**
+ * Parameterized help generators for groups whose fields repeat a uniform domain
+ * relationship across goods, strata, age cohorts, or climate bands (such as the
+ * 20 `climate.matrix.*` cells, 10 `climate.terrainOverrides.*` cells, and the
+ * per-good `consumptionBudget`, `materialCoverage`, `basePrices`, `householdNeeds`,
+ * and `recipes` tables). Keeping these templated avoids duplicating ~80 near-identical
+ * strings while still giving every cell/good a specific, contextual explanation.
+ */
+const GROUP_HELP_TEMPLATES: Partial<
+  Record<keyof ConfigurationValues, (parts: readonly string[]) => string | undefined>
+> = {
+  consumptionBudget: ([good]) =>
+    `Relative weight of ${good} in household spending above subsistence. Weights are normalized together; increasing one redirects spending toward that good.`,
+  materialCoverage: ([good]) =>
+    `Relative contribution of ${good} to the material-needs coverage score. Weights are normalized together; this changes the measure, not stocks or cash.`,
+  basePrices: ([good]) =>
+    `Opening price of ${good}, in crowns per tonne. Later market prices respond to the simulation.`,
+  householdNeeds: ([good]) =>
+    `Baseline tonnes of ${good} needed per person per month, before living-standard and age adjustments.`,
+  wageSkills: ([stratum]) =>
+    `Relative wage multiplier for the ${stratum} stratum. A value of 1 uses the reference wage.`,
+  recipes: ([output, input]) =>
+    `Tonnes of ${input} required to produce one tonne of ${output}. More input per unit makes production more resource-intensive.`,
+  starting: ([section, item]) => {
+    if (section === 'capitalStocks')
+      return `Tonnes of ${item} placed in each frontier capital at creation, before the stockpile multiplier. Established states use generated stockpiles.`
+    if (section === 'technology')
+      return `Opening ${item} technology level for every state. Later research can raise it.`
+    return undefined
+  },
+  model: ([section, index]) =>
+    section === 'fertilityAnnual'
+      ? `Annual fertility-pattern weight for women aged ${15 + Number(index) * 5}–${19 + Number(index) * 5}. The pattern is normalized to desired lifetime family size; this is not a direct birth count.`
+      : undefined,
+  climate: ([section, item, band]) => {
+    if (section === 'amplitudes')
+      return `Seasonal output variation in the ${item} biome around a mean multiplier of 1. Zero removes seasonal variation; 0.23 gives a range of 0.77–1.23.`
+    if (section === 'crops')
+      return `Crop associated with the ${item} biome in the agricultural landscape and activity display.`
+    if (section === 'matrix')
+      return `Biome assigned to the ${item} temperature band and ${band} moisture band. Band thresholds define the ranges; desert and tundra use their explicit terrain overrides.`
+    if (section === 'terrainOverrides')
+      return `Biome assigned to ${item} terrain in the ${band} temperature band, regardless of moisture. This overrides the general biome matrix.`
+    return undefined
+  },
+  transportProjects: ([key, item]) => {
+    const project = TRANSPORT_PROJECT_NAMES[key]
     if (item === 'cost')
       return `Funding required for a new ${project} project, in thousands of crowns. The project also requires the listed materials and technology.`
     if (item === 'technology')
       return `Minimum logistics technology level needed to begin a ${project} project.`
     return `Tonnes of ${item} required for a new ${project} project, in addition to its funding and other materials.`
-  }
+  },
+}
+
+export function configurationHelp(path: string): string {
+  const [group, ...rest] = path.split('.') as [keyof ConfigurationValues, ...string[]]
+  const subpath = rest.join('.')
+  const description = GROUP_HELP[group]?.[subpath] ?? GROUP_HELP_TEMPLATES[group]?.(rest)
+  if (description) return description
   throw new Error(`Missing parameter explanation: ${path}`)
 }

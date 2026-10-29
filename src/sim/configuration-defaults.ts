@@ -3,10 +3,17 @@ import type { ExpansionParameters } from './expansion-parameters'
 import type { Policies, Research, Inventory } from './types'
 import type { ClimateConfiguration } from './climate-types'
 
-/** Versioned synthetic defaults. Numerical identities, file formats and safety limits
- * are invariants, not live calibration controls. Rates state their period in the key.
- * Existing named profiles remain available for paired, reproducible experiments. */
-export const DECISION_POLICIES: Record<string, Readonly<DecisionPolicy>> = {
+/**
+ * Versioned synthetic defaults. Numerical identities, file formats and safety limits
+ * are structural invariants (in `simulation-invariants.ts`), not live calibration
+ * controls. Rates state their period in the key (`Monthly` vs `Annual`).
+ *
+ * Named `DECISION_POLICIES` and `EXPANSION_PROFILES` remain available for paired,
+ * reproducible offline experiments. Using `satisfies` (instead of a widened type
+ * annotation) validates every profile against its interface while preserving the
+ * exact literal keys and non-optional field types on `DECISION_POLICIES.dynamic`.
+ */
+export const DECISION_POLICIES = {
   legacy: {
     renewal: false,
     realCosts: false,
@@ -38,22 +45,22 @@ export const DECISION_POLICIES: Record<string, Readonly<DecisionPolicy>> = {
     warThreshold: 0.8,
     foodSatiation: 1.5,
   },
-}
-// Candidate 5 from the reproducible seven-candidate offline search. Military
-// thresholds and physical constraints were not optimization targets.
-DECISION_POLICIES.dynamic = {
-  development: true,
-  agriculture: true,
-  renewal: true,
-  realCosts: true,
-  merchantRelease: 0.02564,
-  workDisutility: 0.40758,
-  investmentShare: 0.23396,
-  investmentAdjustment: 0.03502,
-  readiness: 0.01,
-  warThreshold: 0.8,
-  foodSatiation: 1.5,
-}
+  // Candidate 5 from the reproducible seven-candidate offline search. Military
+  // thresholds and physical constraints were not optimization targets.
+  dynamic: {
+    development: true,
+    agriculture: true,
+    renewal: true,
+    realCosts: true,
+    merchantRelease: 0.02564,
+    workDisutility: 0.40758,
+    investmentShare: 0.23396,
+    investmentAdjustment: 0.03502,
+    readiness: 0.01,
+    warThreshold: 0.8,
+    foodSatiation: 1.5,
+  },
+} satisfies Record<string, Readonly<DecisionPolicy>>
 
 export const EXPANSION_PROFILES = {
   baseline: {
@@ -198,117 +205,83 @@ const DEFAULT_CLIMATE: ClimateConfiguration = {
   },
 }
 
+/**
+ * Master default configuration values.
+ *
+ * Design notes:
+ * - Property declaration order within each group determines the control order in
+ *   `ConfigurationEditor` (via `buildRegistry` in `configuration-schema.ts`).
+ *   In `starting`, the primary scenario endowments (`treasury`, `settledTreasury`,
+ *   `debt`, `year`, `capitalPopulation`, `populationScale`) are listed first so
+ *   they appear at the top of the Starting Conditions section without UI-side sorting.
+ * - Sub-objects like `starting.policies` and `recipes` use `satisfies` rather
+ *   than `as` type assertions so `typeof DEFAULT_CONFIGURATION_VALUES` retains
+ *   only the concrete keys present at runtime (preventing optional interface
+ *   properties like `Policies['citizenship']` from polluting the schema type).
+ */
 export const DEFAULT_CONFIGURATION_VALUES = {
-  model: {
-    version: 8,
-    bankCount: 3,
-    bankCapitalRatio: 0.1,
-    policyRateMonthly: 0.0015,
-    bankLoanSpread: 0.0015,
-    adultAgeMonths: 216,
-    retirementAgeMonths: 780,
-    maximumAgeMonths: 1320,
-    openingMaximumAgeMonths: 1152,
-    elderOpeningDecayYears: 10,
-    femaleBirthShare: 0.488,
-    childFoodEquivalent: 0.65,
-    elderFoodEquivalent: 0.85,
-    desiredChildrenBase: 2.3,
-    ruralFamilyMotive: 1.2,
-    urbanFamilyCost: 0.6,
-    jobSeparationMonthly: 0.015,
-    matchingEfficiency: 0.65,
-    matchingElasticity: 0.5,
-    wageRenegotiationMonthly: 1 / 12,
-    workerBargainingPower: 0.5,
-    consumptionRiskAversion: 2,
-    loanResetMonths: 3,
-    referenceUnemployment: 0.04,
-    infrastructureServiceProductivity: 0.005,
-    infrastructureWearMonthly: 0.0015,
-    fertilityAnnual: [0.018, 0.115, 0.145, 0.12, 0.075, 0.025, 0.003],
-    infantHazardAnnual: 0.055,
-    childHazardAnnual: 0.002,
-    adultHazardAnnual: 0.0015,
-    ageingHazardScale: 0.00018,
-    ageingHazardSlope: 0.085,
-    forecastAdjustment: 0.18,
-    inventoryMonths: 2,
-    depreciationMonthly: 0.0015,
-    constructionMonths: 6,
-    dividendShare: 0.2,
-    creditRepaymentMonthly: 0.015,
-    defaultAfterMonths: 12,
-    defaultRecovery: 0.35,
-    mobilityMonthly: 0.0005,
-    fullBuiltPopulationPerCell: 48000,
-  },
-  settlements: {
-    villagePopulation: 500,
-    townPopulation: 5000,
-    cityPopulation: 50000,
-    minimumDensity: 300, // residents / km² of the physical footprint
-    entryBuiltCover: 0.03,
-    retainedBuiltCover: 0.02,
-    movingFriction: 0.08,
-    annualMovingHazard: 0.08,
-    accessMinutes: 60,
-    searchMeters: 6000,
-  },
-  tradeMemory: {
-    improvement: 0.25,
-    adjustment: 0.12,
-    idleMonths: 18,
-  },
-  corridors: {
-    gain: 0.1,
-    evaporation: 0.025,
-    discount: 0.7,
-    trafficAdjustment: 0.2,
-    replanMonths: 3,
-    minimumPathMonths: 12,
-    improvement: 0.05,
-  },
-  corridorBundling: {
-    radius: 8,
-    minimumSharedEdges: 3,
-    travelWeight: 0.15,
-    maximumExtraEffort: 0.25,
-    maximumExtraCost: 0.4,
-    passes: 4,
-  },
-  roads: {
-    maximumDetour: 3,
-    infrastructure: 0.7,
-    logistics: 3,
-    familiarity: 0.65,
-    shortcutRatio: 1.6,
-  },
-  shipping: { maximumDetour: 2, shortcutRatio: 1.35 },
-  harbors: { idleMonths: 60, halfLifeMonths: 24, adjustment: 0.2 },
-  riverRoads: { buildingSetback: 6, setback: 4, approach: 14, maxSpan: 360, spacing: 320, search: 180 },
-  urbanIntegration: {
-    incorporationMonths: 120,
-    mergerMonths: 240,
-    prestigeRatio: 1.5,
-    wealthRatio: 1.25,
-    mergerPrestigeRatio: 2,
-    mergerWealthRatio: 1.75,
-  },
-  transportProjects: {
-    'paved-road': {
-      label: 'Paved roads',
-      cost: 1600,
-      timber: 40,
-      stone: 160,
-      iron: 0,
-      tools: 10,
-      technology: 2,
+  starting: {
+    treasury: 500,
+    settledTreasury: 24000,
+    debt: 0,
+    year: 1720,
+    capitalPopulation: 2500,
+    populationScale: 1,
+    ai: true,
+    policyFromLeaders: true,
+    researchFromLeaders: true,
+    researchFocus: 'logistics' as Research,
+    policies: {
+      tax: 22,
+      welfare: 20,
+      education: 15,
+      military: 20,
+      research: 15,
+      tariff: 8,
+      conscription: 1,
+      migration: 'open' as Policies['migration'],
+      priority: 'balanced' as Policies['priority'],
+    } satisfies Policies,
+    marketPopulation: 1800,
+    marketVariation: 800,
+    hamletPopulation: 40,
+    hamletVariation: 120,
+    hamletOneIn: 7,
+    marketOneIn: 60,
+    childrenShare: 0.29,
+    adultShare: 0.62,
+    stability: 75,
+    legitimacy: 72,
+    urbanScale: 1,
+    literacyScale: 1,
+    healthScale: 1,
+    happinessScale: 1,
+    infrastructureScale: 1,
+    industryScale: 1,
+    stockpileScale: 1,
+    armyScale: 1,
+    fleets: true,
+    capitalStocks: {
+      food: 780,
+      timber: 300,
+      stone: 200,
+      iron: 60,
+      coal: 30,
+      tools: 80,
+      textiles: 80,
+      arms: 0,
     },
-    railway: { label: 'Railway', cost: 3200, timber: 100, stone: 100, iron: 80, tools: 30, technology: 3 },
-    port: { label: 'Harbor docks', cost: 1200, timber: 100, stone: 120, iron: 20, tools: 10, technology: 1 },
+    technology: { agriculture: 0, industry: 0, military: 0, medicine: 0, logistics: 0, governance: 0 },
   },
-  farming: { timber: 5, stone: 7, laborMonths: 100, fertility: 0.12, duration: 6 },
+  geography: {
+    seaLevelOffset: 0,
+    relief: 1,
+    moistureOffset: 0,
+    temperatureOffset: 0,
+    provinceCount: 0,
+    erosionPasses: 24,
+    channelRunoff: 24,
+  },
   founding: {
     people: 600,
     reserve: 1200,
@@ -365,8 +338,53 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     tools: { iron: 0.65, coal: 0.3, timber: 0.25 },
     textiles: { timber: 0.3, food: 0.12 },
     arms: { iron: 0.9, coal: 0.5, tools: 0.3 },
-  } as Record<'tools' | 'textiles' | 'arms', Partial<Inventory>>,
+  } satisfies Record<'tools' | 'textiles' | 'arms', Partial<Inventory>>,
   conditions: { instability: 1, abundance: 0.85, extremity: 1.2 },
+  climate: DEFAULT_CLIMATE,
+  model: {
+    version: 8,
+    bankCount: 3,
+    bankCapitalRatio: 0.1,
+    policyRateMonthly: 0.0015,
+    bankLoanSpread: 0.0015,
+    adultAgeMonths: 216,
+    retirementAgeMonths: 780,
+    maximumAgeMonths: 1320,
+    openingMaximumAgeMonths: 1152,
+    elderOpeningDecayYears: 10,
+    femaleBirthShare: 0.488,
+    childFoodEquivalent: 0.65,
+    elderFoodEquivalent: 0.85,
+    desiredChildrenBase: 2.3,
+    ruralFamilyMotive: 1.2,
+    urbanFamilyCost: 0.6,
+    jobSeparationMonthly: 0.015,
+    matchingEfficiency: 0.65,
+    matchingElasticity: 0.5,
+    wageRenegotiationMonthly: 1 / 12,
+    workerBargainingPower: 0.5,
+    consumptionRiskAversion: 2,
+    loanResetMonths: 3,
+    referenceUnemployment: 0.04,
+    infrastructureServiceProductivity: 0.005,
+    infrastructureWearMonthly: 0.0015,
+    fertilityAnnual: [0.018, 0.115, 0.145, 0.12, 0.075, 0.025, 0.003],
+    infantHazardAnnual: 0.055,
+    childHazardAnnual: 0.002,
+    adultHazardAnnual: 0.0015,
+    ageingHazardScale: 0.00018,
+    ageingHazardSlope: 0.085,
+    forecastAdjustment: 0.18,
+    inventoryMonths: 2,
+    depreciationMonthly: 0.0015,
+    constructionMonths: 6,
+    dividendShare: 0.2,
+    creditRepaymentMonthly: 0.015,
+    defaultAfterMonths: 12,
+    defaultRecovery: 0.35,
+    mobilityMonthly: 0.0005,
+    fullBuiltPopulationPerCell: 48000,
+  },
   decisions: { ...DECISION_POLICIES.dynamic },
   expansion: { ...EXPANSION_PROFILES.expansionist },
   monetary: {
@@ -378,69 +396,72 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     inertia: 0.85,
     expectationAdjustment: 1 / 24,
   },
-  climate: DEFAULT_CLIMATE,
-  geography: {
-    seaLevelOffset: 0,
-    relief: 1,
-    moistureOffset: 0,
-    temperatureOffset: 0,
-    provinceCount: 0,
-    erosionPasses: 24,
-    channelRunoff: 24,
+  settlements: {
+    villagePopulation: 500,
+    townPopulation: 5000,
+    cityPopulation: 50000,
+    minimumDensity: 300, // residents / km² of the physical footprint
+    entryBuiltCover: 0.03,
+    retainedBuiltCover: 0.02,
+    movingFriction: 0.08,
+    annualMovingHazard: 0.08,
+    accessMinutes: 60,
+    searchMeters: 6000,
   },
-  starting: {
-    ai: true,
-    policyFromLeaders: true,
-    researchFromLeaders: true,
-    researchFocus: 'logistics' as Research,
-    policies: {
-      tax: 22,
-      welfare: 20,
-      education: 15,
-      military: 20,
-      research: 15,
-      tariff: 8,
-      conscription: 1,
-      migration: 'open',
-      priority: 'balanced',
-    } as Policies,
-    year: 1720,
-    populationScale: 1,
-    capitalPopulation: 2500,
-    marketPopulation: 1800,
-    marketVariation: 800,
-    hamletPopulation: 40,
-    hamletVariation: 120,
-    hamletOneIn: 7,
-    marketOneIn: 60,
-    childrenShare: 0.29,
-    adultShare: 0.62,
-    treasury: 500,
-    settledTreasury: 24000,
-    debt: 0,
-    stability: 75,
-    legitimacy: 72,
-    urbanScale: 1,
-    literacyScale: 1,
-    healthScale: 1,
-    happinessScale: 1,
-    infrastructureScale: 1,
-    industryScale: 1,
-    stockpileScale: 1,
-    armyScale: 1,
-    fleets: true,
-    capitalStocks: {
-      food: 780,
-      timber: 300,
-      stone: 200,
-      iron: 60,
-      coal: 30,
-      tools: 80,
-      textiles: 80,
-      arms: 0,
+  urbanIntegration: {
+    incorporationMonths: 120,
+    mergerMonths: 240,
+    prestigeRatio: 1.5,
+    wealthRatio: 1.25,
+    mergerPrestigeRatio: 2,
+    mergerWealthRatio: 1.75,
+  },
+  farming: { timber: 5, stone: 7, laborMonths: 100, fertility: 0.12, duration: 6 },
+  transportProjects: {
+    'paved-road': {
+      label: 'Paved roads',
+      cost: 1600,
+      timber: 40,
+      stone: 160,
+      iron: 0,
+      tools: 10,
+      technology: 2,
     },
-    technology: { agriculture: 0, industry: 0, military: 0, medicine: 0, logistics: 0, governance: 0 },
+    railway: { label: 'Railway', cost: 3200, timber: 100, stone: 100, iron: 80, tools: 30, technology: 3 },
+    port: { label: 'Harbor docks', cost: 1200, timber: 100, stone: 120, iron: 20, tools: 10, technology: 1 },
   },
+  tradeMemory: {
+    improvement: 0.25,
+    adjustment: 0.12,
+    idleMonths: 18,
+  },
+  corridors: {
+    gain: 0.1,
+    evaporation: 0.025,
+    discount: 0.7,
+    trafficAdjustment: 0.2,
+    replanMonths: 3,
+    minimumPathMonths: 12,
+    improvement: 0.05,
+  },
+  corridorBundling: {
+    radius: 8,
+    minimumSharedEdges: 3,
+    travelWeight: 0.15,
+    maximumExtraEffort: 0.25,
+    maximumExtraCost: 0.4,
+    passes: 4,
+  },
+  roads: {
+    maximumDetour: 3,
+    infrastructure: 0.7,
+    logistics: 3,
+    familiarity: 0.65,
+    shortcutRatio: 1.6,
+  },
+  shipping: { maximumDetour: 2, shortcutRatio: 1.35 },
+  harbors: { idleMonths: 60, halfLifeMonths: 24, adjustment: 0.2 },
+  riverRoads: { buildingSetback: 6, setback: 4, approach: 14, maxSpan: 360, spacing: 320, search: 180 },
 }
 
 export type ConfigurationValues = typeof DEFAULT_CONFIGURATION_VALUES
@@ -456,4 +477,6 @@ export function freezeConfiguration<T>(value: T): T {
   }
   return value
 }
+freezeConfiguration(DECISION_POLICIES)
+freezeConfiguration(EXPANSION_PROFILES)
 freezeConfiguration(DEFAULT_CONFIGURATION_VALUES)
