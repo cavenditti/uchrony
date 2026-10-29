@@ -23,6 +23,7 @@ import { consume, produce, trade } from './economy'
 import { effectMultiplier, effectValue } from './effects'
 import { retireEmptyStates } from './extinction'
 import { ensureFirms, investProductiveCapital } from './firms'
+import { nextFiscalStability } from './fiscal-stability'
 import { militaryPeople } from './forces'
 import { advanceFounding } from './founding'
 import { arriveFreight } from './freight-transit'
@@ -105,11 +106,7 @@ function fiscalPolicy(w: World) {
     n.foodCoverage = regions.reduce((s, r) => s + r.foodCoverage * population(r), 0) / Math.max(1, civilians)
     n.manpower = regions.reduce((s, r) => s + r.population.adults * 0.08, 0)
     const happy = regions.reduce((s, r) => s + r.happiness * population(r), 0) / Math.max(1, civilians)
-    n.stability = clamp(
-      n.stability + (happy * 80 + n.legitimacy * 0.2 - n.stability) * 0.05 - (n.debt > n.gdp * 24 ? 0.3 : 0),
-      5,
-      99,
-    )
+    n.stability = nextFiscalStability(n, happy)
   }
 }
 
