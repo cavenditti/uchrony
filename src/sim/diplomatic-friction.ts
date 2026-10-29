@@ -64,6 +64,8 @@ function termKey(t: DiplomaticClause) {
           t.charter.rule,
           t.charter.contribution,
           t.charter.exit,
+          t.charter.defense ?? 'either',
+          t.charter.responseMonths ?? 6,
         ]
       : null,
     t.delegation ? [...t.delegation.powers].sort() : null,
@@ -123,7 +125,7 @@ export function diplomaticCapacity(w: World, nation: number) {
 }
 export function advanceDiplomaticOffices(w: World) {
   for (const body of w.institutions?.organizations ?? [])
-    if (body.status === 'active') for (const id of body.members) office(w, id)
+    if (body.status !== 'dissolved') for (const id of body.members) office(w, id)
   for (const p of w.statecraft?.offers ?? [])
     if (p.status === 'ratified' && (!p.ends || p.ends > w.month)) for (const id of p.parties) office(w, id)
   for (const o of w.foreignOffices?.offices ?? []) {
@@ -159,7 +161,7 @@ function ongoingBurden(w: World, nation: number) {
         p.parties.includes(nation) &&
         p.resolved.some((t) => !['war', 'payment', 'devolution', 'institution'].includes(t.kind)),
     ).length ?? 0) +
-    (w.institutions?.organizations.filter((o) => o.status === 'active' && o.members.includes(nation))
+    (w.institutions?.organizations.filter((o) => o.status !== 'dissolved' && o.members.includes(nation))
       .length ?? 0) *
       1.5
   )
@@ -217,7 +219,7 @@ function covered(w: World, t: DiplomaticClause, parties: number[], nation: numbe
     return (
       w.institutions?.organizations.some(
         (o) =>
-          o.status === 'active' &&
+          o.status !== 'dissolved' &&
           parties.every((id) => o.members.includes(id)) &&
           t.charter!.powers.every((p) => o.charter.powers.includes(p)),
       ) ?? false

@@ -1,3 +1,4 @@
+import { cloneInstitutions } from './institution-lifecycle'
 /** Transactional settlement isolates the fields signed terms can mutate. Ordinary
  * payments copy scalar holders and financial books; territorial terms also isolate
  * cohorts, physical depots and institutions before any clause is applied. */
@@ -8,7 +9,7 @@ import type { World } from './types'
 export function createSettlementTrialWorld(world: World, territorial: boolean): World {
   const changes = {
     intelligence: territorial ? structuredClone(world.intelligence) : world.intelligence,
-    institutions: territorial ? structuredClone(world.institutions) : world.institutions,
+    institutions: territorial ? cloneInstitutions(world.institutions) : world.institutions,
     // Ordinary terms only change treasury scalars, relation scalars and army targets.
     // Territorial terms still need isolated nested records for normalization.
     nations: territorial ? structuredClone(world.nations) : world.nations.map((n) => ({ ...n })),

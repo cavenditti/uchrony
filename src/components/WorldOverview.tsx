@@ -41,7 +41,9 @@ export function WorldOverview({
   nation,
   onNation,
   onCommand,
+  onInstitution,
 }: {
+  onInstitution?: (id: number) => void
   world: World
   nation: number
   onNation: (id: number) => void
@@ -138,7 +140,7 @@ export function WorldOverview({
         autonomy:
           regions.reduce((s, r) => s + (r.delegation?.autonomy ?? 0) * population(r), 0) /
           Math.max(1, people),
-        bodies: institutions.filter((o) => o.status === 'active' && o.members.includes(n.id)).length,
+        bodies: institutions.filter((o) => o.status !== 'dissolved' && o.members.includes(n.id)).length,
       }
     })
   type Row = (typeof actors)[number]
@@ -216,7 +218,7 @@ export function WorldOverview({
     chooseSort = (key: string) =>
       setSort((old) => ({ key, descending: old.key === key ? !old.descending : true })),
     bodyBetween = (a: number, b: number) =>
-      institutions.filter((o) => o.status === 'active' && o.members.includes(a) && o.members.includes(b)),
+      institutions.filter((o) => o.status !== 'dissolved' && o.members.includes(a) && o.members.includes(b)),
     pairRelation = pair ? relation(world, ...pair) : undefined
   return (
     <section className="world-overview">
@@ -463,14 +465,24 @@ export function WorldOverview({
           </p>
           <div className="institution-grid">
             {institutions
-              .filter((o) => o.status === 'active')
+              .filter((o) => o.status !== 'dissolved')
               .map((o) => (
                 <article key={o.id}>
                   <small>
                     {o.visibility === 'secret' ? 'Confidential · ' : ''}
                     {o.charter.form.replaceAll('-', ' ')}
                   </small>
-                  <h3>{o.name}</h3>
+                  <h3>
+                    <button className="text-button" onClick={() => onInstitution?.(o.id)}>
+                      {o.name}
+                    </button>
+                  </h3>
+                  <p>
+                    {o.status === 'crisis' ? 'Constitutional crisis' : 'Active'} ·{' '}
+                    <button className="text-button" onClick={() => onInstitution?.(o.id)}>
+                      Open history and charter
+                    </button>
+                  </p>
                   <p>{o.members.map((id) => world.nations[id].shortName).join(' · ')}</p>
                   <dl>
                     <div>
@@ -498,11 +510,25 @@ export function WorldOverview({
                 </article>
               ))}
           </div>
-          {!institutions.some((o) => o.status === 'active') && (
+          {!institutions.some((o) => o.status !== 'dissolved') && (
             <p>
               No shared institution has been founded yet. Its charter requires the participating governments’
               consent.
             </p>
+          )}
+          {institutions.some((o) => o.status === 'dissolved') && (
+            <details>
+              <summary>Dissolved institutions</summary>
+              {institutions
+                .filter((o) => o.status === 'dissolved')
+                .map((o) => (
+                  <p key={o.id}>
+                    <button className="text-button" onClick={() => onInstitution?.(o.id)}>
+                      {o.name}
+                    </button>
+                  </p>
+                ))}
+            </details>
           )}
           <details className="institution-builder">
             <summary>Propose a shared institution</summary>
@@ -633,6 +659,20 @@ export function WorldOverview({
               </p>
             </form>
           </details>
+          {institutions.some((o) => o.status === 'dissolved') && (
+            <details>
+              <summary>Dissolved institutions</summary>
+              {institutions
+                .filter((o) => o.status === 'dissolved')
+                .map((o) => (
+                  <p key={o.id}>
+                    <button className="text-button" onClick={() => onInstitution?.(o.id)}>
+                      {o.name}
+                    </button>
+                  </p>
+                ))}
+            </details>
+          )}
           <details className="institution-builder">
             <summary>Delegate powers to provinces</summary>
             <form

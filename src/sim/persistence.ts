@@ -1,3 +1,4 @@
+import { validateWorldArchive } from './world-archive'
 import { MAX_SAVE_BYTES } from '../storage/save-types'
 import { validateAdaptiveWorld } from './adaptive-persistence'
 import { validateAlmanac } from './almanac-persistence'
@@ -287,7 +288,8 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
       !number(r.warExhaustion) ||
       !number(r.since) ||
       !number(r.grievance) ||
-      (r.aggressor !== undefined && r.aggressor !== r.a && r.aggressor !== r.b)
+      (r.aggressor !== undefined && r.aggressor !== r.a && r.aggressor !== r.b) ||
+      (r.defenseOf !== undefined && !nationId(r.defenseOf))
     )
       fail('invalid diplomatic relationship')
     const key = `${r.a}-${r.b}`
@@ -539,6 +541,7 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
     }
   }
   validateInstitutions(w)
+  validateWorldArchive(w)
   validateIntelligence(w)
   validateForeignOffices(w)
   validateGeopolitics(w)

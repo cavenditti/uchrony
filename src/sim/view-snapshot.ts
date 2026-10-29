@@ -157,6 +157,16 @@ function configuredSnapshot(world: World, detailNation?: number | null): Omit<Wo
   return {
     ...rest,
     viewOnly: true,
+    archive: undefined,
+    institutions: world.institutions
+      ? {
+          ...world.institutions,
+          organizations: world.institutions.organizations.map(({ events: _events, calls, ...o }) => ({
+            ...o,
+            ...(calls ? { calls: calls.filter((c) => c.closed === undefined) } : {}),
+          })),
+        }
+      : undefined,
     ...(months !== 1
       ? {
           totals: monthly(world.totals, ['births', 'deaths', 'migration']),

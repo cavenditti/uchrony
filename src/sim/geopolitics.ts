@@ -498,7 +498,7 @@ export function advanceGeopolitics(world: World) {
         members.length >= 3 &&
         !world.institutions?.organizations.some(
           (body) =>
-            body.status === 'active' &&
+            body.status !== 'dissolved' &&
             body.charter.powers.includes('defense') &&
             members.every((id) => body.members.includes(id)),
         ) &&

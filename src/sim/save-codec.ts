@@ -203,12 +203,61 @@ function unpackAdaptive(value: unknown): unknown {
     true,
   )
 }
+/** History uses independent bounded blocks even in older provincial worlds. */
+function packHistoricalSections(world: World) {
+  return {
+    ...(world.archive
+      ? {
+          archive: {
+            encoding: 'atlas-blocks-v1',
+            ...packSection(world.archive as unknown as Record<string, unknown>, { frames: true }, 120),
+          },
+        }
+      : {}),
+    ...(world.institutions
+      ? {
+          institutions: {
+            encoding: 'institutions-blocks-v1',
+            nextId: world.institutions.nextId,
+            organizations: world.institutions.organizations.map((o) =>
+              packSection(o as unknown as Record<string, unknown>, { events: true, calls: true }, 120),
+            ),
+          },
+        }
+      : {}),
+  }
+}
+function unpackHistoricalSections(source: Record<string, unknown>) {
+  const result: Record<string, unknown> = {},
+    budget = { bytes: 0 }
+  for (const key of ['archive', 'institutions']) {
+    const value = source[key] as Record<string, unknown> | undefined
+    if (!value || !('encoding' in value)) continue
+    if (key === 'archive' && value.encoding === 'atlas-blocks-v1')
+      result.archive = unpackSection(value as unknown as Section, { frames: true }, budget, 120)
+    else if (
+      key === 'institutions' &&
+      value.encoding === 'institutions-blocks-v1' &&
+      Array.isArray(value.organizations)
+    )
+      result.institutions = {
+        nextId: value.nextId,
+        organizations: value.organizations.map((o) =>
+          unpackSection(o as Section, { events: true, calls: true }, budget, 120),
+        ),
+      }
+    else throw new Error('Unsupported historical save encoding')
+  }
+  return result
+}
 export function packWorldSave(world: World): unknown {
-  if (!world.localEconomy) return world
+  const historical = packHistoricalSections(world)
+  if (!world.localEconomy) return Object.keys(historical).length ? { ...world, ...historical } : world
   const packed = packWorldCensus(world) as Record<string, unknown>
   return {
     ...packed,
     ...(world.adaptive ? { adaptive: packAdaptive(world.adaptive) } : {}),
+    ...historical,
     regions: (packed.regions as unknown[]).map(encodeSaveBlock),
     economy: packSection(packed.economy as Record<string, unknown>, ECONOMY_TABLES),
     localEconomy: packSection(packed.localEconomy as Record<string, unknown>, LOCAL_TABLES),
@@ -218,7 +267,8 @@ export function packWorldSave(world: World): unknown {
 export function unpackWorldSave(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value
   const source = value as Record<string, unknown>
-  if (source.worldEncoding === undefined) return unpackWorldCensus(value)
+  if (source.worldEncoding === undefined)
+    return unpackWorldCensus({ ...source, ...unpackHistoricalSections(source) })
   if (
     ![FORMAT, 'district-blocks-v1'].includes(String(source.worldEncoding)) ||
     !Array.isArray(source.regions) ||
@@ -229,6 +279,7 @@ export function unpackWorldSave(value: unknown): unknown {
   return unpackWorldCensus({
     ...packed,
     ...(source.adaptive ? { adaptive: unpackAdaptive(source.adaptive) } : {}),
+    ...unpackHistoricalSections(source),
     regions: source.regions.map(decodeSaveBlock),
     economy:
       source.worldEncoding === FORMAT

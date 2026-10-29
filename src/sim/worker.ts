@@ -1,3 +1,4 @@
+import { queryWorldArchive, recordWorldArchive } from './world-archive'
 import { withWorldConfiguration } from './configuration'
 import { advanceAlmanac, queryPlaces, writingContext, acceptWriting } from './almanac'
 import { defaultModelSettings, isWritingTask, type ModelTask } from './model-tasks'
@@ -125,6 +126,7 @@ function publish(message?: string, acknowledgement = false) {
     backgroundPublish = undefined
   }
   if (world) {
+    if (world.archive) recordWorldArchive(world)
     revision++
     mailbox.publish(message, acknowledgement)
   }
@@ -598,6 +600,20 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       if (world) mailbox.publish()
       return
     }
+    if (data.type === 'archive') {
+      try {
+        if (!world) throw new Error('No world to inspect.')
+        if (!world.archive) recordWorldArchive(world)
+        send({ type: 'archive', result: queryWorldArchive(world, data.query), mapKey })
+      } catch (error) {
+        send({
+          type: 'archive-error',
+          request: data.query.id,
+          message: error instanceof Error ? error.message : 'History unavailable.',
+        })
+      }
+      return
+    }
     if (data.type === 'inspect') {
       const request = data.request
       try {
@@ -706,6 +722,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       ensureHistory(generated)
       ensureStatecraft(generated)
       summarize(generated)
+      recordWorldArchive(generated)
       reset()
       world = generated
       mapKey = geographyKey(world.cells)
@@ -722,6 +739,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       ensureHistory(world)
       ensureStatecraft(world)
       ensureIntelligence(world)
+      if (!world.archive) recordWorldArchive(world)
       message = 'World restored. Simulation is paused.'
       void connection().then(schedule)
     } else if (action.type === 'step') {

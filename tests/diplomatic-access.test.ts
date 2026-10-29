@@ -11,6 +11,7 @@ test('phase access index preserves direction, expiration, alliances and institut
     ({ status: 'ratified', activated: 2, ends: 0, resolved, ...extra }) as DiplomaticOffer
   const world = {
     month: 5,
+    relations: [],
     statecraft: {
       offers: [
         offer([terms('access', 0, 1)]),
@@ -42,6 +43,11 @@ test('phase access index preserves direction, expiration, alliances and institut
   assert.equal(initial(2, 3), true)
   world.month = 7
   assert.equal(compare()(2, 3), false)
+  world.relations.push({ a: 1, b: 4, treaty: 'war', aggressor: 1, since: 7 } as World['relations'][number])
+  const wartime = compare()
+  assert.equal(wartime(1, 4), false)
+  assert.equal(wartime(1, 5), false)
+  assert.equal(wartime(4, 5), true)
   world.institutions!.organizations[0].status = 'dissolved'
   assert.equal(compare()(1, 5), false)
 })

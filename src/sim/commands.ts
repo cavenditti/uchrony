@@ -1,3 +1,6 @@
+import { recordWorldArchive } from './world-archive'
+import { reconcileInstitutions } from './institution-lifecycle'
+import { respondToInstitutionDefense } from './institution-defense'
 /** Commands apply one typed handler under world configuration, then reconcile derived views. */
 import { refreshAdaptiveTotals } from './adaptive-world'
 import { diplomaticAccess } from './agreements'
@@ -9,7 +12,7 @@ import { aggregateDistricts, linkDistrictPeople } from './districts'
 import { nativeDomesticControl } from './domestic-policy'
 import { shortestPaths } from './economy'
 import { foundSettlement } from './founding'
-import { collectiveDefense, foreignPolicyMandate } from './institutions'
+import { collectiveDefense, collectiveDefenseBeneficiary, foreignPolicyMandate } from './institutions'
 import { configureIntelligence } from './intelligence'
 import { reconcileJurisdictionSovereignty } from './jurisdictions'
 import { publicExpense } from './ledger'
@@ -98,7 +101,9 @@ function applyCommandConfigured(w: World, command: Command): string {
     reconcileGDP(w)
     summarize(w, false)
   }
+  reconcileInstitutions(w)
   refreshSpatial(w)
+  if (w.archive) recordWorldArchive(w)
   return result
 }
 
@@ -148,6 +153,29 @@ const COMMAND_HANDLERS = {
     configureIntelligence(w, command.nation, command.budgetShare, command.priority, command.focus)
     return 'Intelligence priorities updated. Reports improve through funded collection over time.'
   },
+  'institution-answer': (w, command) => {
+    const offer = w.statecraft?.offers.find(
+      (o) =>
+        o.id === command.offer &&
+        o.status === 'proposed' &&
+        o.parties.includes(command.nation) &&
+        o.terms.some((t) => t.kind === 'institution'),
+    )
+    if (!offer) throw new Error('Choose a pending institutional proposal addressed to this government.')
+    if (!command.accept) {
+      offer.status = 'rejected'
+      offer.ruling = 'The government rejected the institutional proposal.'
+      return offer.ruling
+    }
+    if (!admitDiplomaticConsent(w, command.nation, offer))
+      return foreignOfficeContext(w, command.nation).notice
+    settleConventionalOffers(w)
+    return 'The government signed the institutional proposal. Its preparation period and remaining consents still apply.'
+  },
+  'institution-defense': (w, command) => {
+    respondToInstitutionDefense(w, command.institution, command.call, command.nation, command.response)
+    return 'The defense response has been recorded.'
+  },
   'charter-proposal': (w, command) => {
     const offer = tryStandingOffer(
       w,
@@ -159,7 +187,7 @@ const COMMAND_HANDLERS = {
           {
             kind: 'institution',
             from: command.nation,
-            to: -1,
+            to: command.target ?? -1,
             amount: 0,
             good: '',
             field: '',
@@ -169,7 +197,11 @@ const COMMAND_HANDLERS = {
             charter: command.charter,
           },
         ],
-        visibility: 'public',
+        visibility:
+          command.charter.operation === 'found'
+            ? 'public'
+            : (w.institutions?.organizations.find((o) => o.id === command.charter.id)?.visibility ??
+              'public'),
         supersedes: 0,
         duration: 24,
       },
@@ -382,8 +414,11 @@ const COMMAND_HANDLERS = {
       if (rel.treaty === 'war') return 'These states are already at war.'
       if (rel.treaty === 'truce' && w.month - rel.since < 60)
         return 'The armistice prevents another declaration of war for five years.'
+      const beneficiary = collectiveDefenseBeneficiary(w, n.id, command.target)
       rel.treaty = 'war'
-      rel.aggressor = n.id
+      rel.aggressor = beneficiary === undefined ? n.id : command.target
+      if (beneficiary === undefined) delete rel.defenseOf
+      else rel.defenseOf = beneficiary
       rel.opinion = -85
       rel.warExhaustion = 0
       n.legitimacy = clamp(n.legitimacy - 5, 0, 100)

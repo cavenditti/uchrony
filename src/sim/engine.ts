@@ -1,3 +1,5 @@
+import { recordWorldArchive } from './world-archive'
+import { reconcileInstitutions } from './institution-lifecycle'
 /** Monthly orchestration: local books and cohorts settle before provincial political
  * decisions; synchronization at those boundaries carries changes in both directions. */
 import { ensureAdaptiveWorld, rebuildAdaptiveMesh, refreshAdaptiveTotals, syncSites } from './adaptive-world'
@@ -364,6 +366,7 @@ function tickConfigured(w: World, detail: TickDetail = 'monthly'): World {
 function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   const coarse = detail === 'coarse'
   if (!prepared) prepareSpatialWorld(w)
+  if (!w.archive) recordWorldArchive(w)
   w.month += simulationMonths()
   advanceMilitaryInfluence(w)
   w.totals.births = 0
@@ -449,9 +452,11 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   syncSites(w)
   if (!coarse && (w.month % 6 === 0 || detail === 'reconcile')) rebuildAdaptiveMesh(w)
   else refreshAdaptiveTotals(w)
+  reconcileInstitutions(w)
   summarize(w)
   // Saves may occur between coarse substeps; their physical settlement census must be current.
   refreshSpatial(w)
   advanceAlmanac(w)
+  recordWorldArchive(w)
   return w
 }

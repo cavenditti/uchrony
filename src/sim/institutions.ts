@@ -1,44 +1,25 @@
+/** Institutional consent, constitutional changes and monthly shared services. */
+import { validateInstitutionHistory, validInstitutionCharter } from './institution-validation'
 import { transfer, governmentAccount } from './ledger'
 import { purchasePublicLabor } from './macroeconomy'
 import { provincialRealService, nationalRealService } from './public-services'
 import { clamp, population, relation, type World, type Region } from './types'
-import type { DiplomaticClause, DiplomaticOffer, Visibility } from './statecraft-types'
-export const INSTITUTION_POWERS = ['defense', 'trade', 'research', 'taxation', 'foreignPolicy'] as const
-export const PROVINCIAL_POWERS = ['taxation', 'education', 'policing', 'infrastructure'] as const
-export interface Charter {
-  operation: 'found' | 'join' | 'withdraw' | 'amend'
-  id: number
-  form: 'defense-league' | 'customs-union' | 'research-community' | 'confederation' | 'federation' | 'bespoke'
-  powers: (typeof INSTITUTION_POWERS)[number][]
-  rule: 'unanimity' | 'majority' | 'weighted'
-  contribution: number
-  exit: 'free' | 'notice'
-}
-export interface Institution {
-  id: number
-  name: string
-  founded: number
-  members: number[]
-  charter: Charter
-  visibility: Visibility
-  treasury: number
-  income: number
-  grants: number
-  status: 'active' | 'dissolved'
-  sourceOffer: number
-}
-export interface InstitutionalState {
-  nextId: number
-  organizations: Institution[]
-}
-export interface ProvincialDelegation {
-  autonomy: number
-  powers: (typeof PROVINCIAL_POWERS)[number][]
-  income: number
-  budget: number
-  treasury: number
-  since: number
-}
+import type { DiplomaticClause, DiplomaticOffer } from './statecraft-types'
+import { INSTITUTION_POWERS, PROVINCIAL_POWERS, type Institution } from './institution-types'
+import {
+  ensureInstitutionRecord,
+  recordInstitution,
+  institutionMembers,
+  institutionEligible,
+  institutionQuorum,
+  reconcileInstitutions,
+  dissolveInstitution,
+  removeInstitutionMember,
+  recoverInstitution,
+} from './institution-lifecycle'
+import { advanceInstitutionDefense } from './institution-defense'
+export { INSTITUTION_POWERS, INSTITUTION_OPERATIONS, PROVINCIAL_POWERS } from './institution-types'
+export type { Charter, Institution, InstitutionalState, ProvincialDelegation } from './institution-types'
 export function ensureInstitutions(w: World) {
   return (w.institutions ??= { nextId: 1, organizations: [] })
 }
@@ -52,40 +33,34 @@ export function sharedInstitution(
     a !== b &&
     (w.institutions?.organizations.some(
       (o) =>
-        o.status === 'active' &&
-        o.members.includes(a) &&
-        o.members.includes(b) &&
+        institutionEligible(w, o, a) &&
+        institutionEligible(w, o, b) &&
+        relation(w, a, b)?.treaty !== 'war' &&
         o.charter.powers.includes(power),
     ) ??
       false)
   )
 }
 export function foreignPolicyMandate(w: World, nation: number, parties: number[] = []) {
-  const bodies =
-    w.institutions?.organizations.filter(
-      (o) =>
-        o.status === 'active' && o.members.includes(nation) && o.charter.powers.includes('foreignPolicy'),
-    ) ?? []
-  return bodies.every((o) => {
-    if (o.charter.rule === 'unanimity') return o.members.every((id) => parties.includes(id))
-    if (o.charter.rule === 'majority')
-      return o.members.filter((id) => parties.includes(id)).length > o.members.length / 2
-    const total = o.members.reduce((s, id) => s + Math.sqrt(Math.max(1, w.nations[id].population)), 0),
-      votes = o.members
-        .filter((id) => parties.includes(id))
-        .reduce((s, id) => s + Math.sqrt(Math.max(1, w.nations[id].population)), 0)
-    return votes > total / 2
-  })
+  return (w.institutions?.organizations ?? [])
+    .filter((o) => institutionEligible(w, o, nation) && o.charter.powers.includes('foreignPolicy'))
+    .every((o) => institutionQuorum(w, o, parties))
 }
 /** A standing mutual-defense commitment authorizes defense against the specific aggressor. */
 export function collectiveDefense(w: World, nation: number, attacker: number) {
-  return w.relations.some(
+  return collectiveDefenseBeneficiary(w, nation, attacker) !== undefined
+}
+/** Preserve the original aggressor when a member enters an existing defense commitment. */
+export function collectiveDefenseBeneficiary(w: World, nation: number, attacker: number) {
+  const war = w.relations.find(
     (r) =>
       r.treaty === 'war' &&
+      r.defenseOf === undefined &&
       r.aggressor === attacker &&
       (r.a === attacker || r.b === attacker) &&
       sharedInstitution(w, nation, r.a === attacker ? r.b : r.a, 'defense'),
   )
+  return war ? (war.a === attacker ? war.b : war.a) : undefined
 }
 export function validateInstitutionTerm(w: World, term: DiplomaticClause, parties: number[]) {
   if (term.kind === 'devolution') {
@@ -104,28 +79,23 @@ export function validateInstitutionTerm(w: World, term: DiplomaticClause, partie
     return
   }
   const c = term.charter
-  if (
-    !c ||
-    !Number.isFinite(c.contribution) ||
-    c.contribution < 0 ||
-    c.contribution > 0.15 ||
-    !c.powers.length ||
-    c.powers.some((p) => !INSTITUTION_POWERS.includes(p))
-  )
+  if (!c || !validInstitutionCharter(c))
     throw new Error('A charter needs explicit supported powers and bounded contributions.')
+  if (!parties.includes(term.from))
+    throw new Error('The proposing government must consent to its own institutional act.')
   if (c.operation === 'found') {
     if (
       parties.length < 2 ||
       parties.length > 32 ||
       !term.text.trim() ||
-      ensureInstitutions(w).organizations.length >= 128
+      ensureInstitutions(w).organizations.filter((o) => o.status !== 'dissolved').length >= 128
     )
       throw new Error(
         'Founding an institution needs two to thirty-two consenting states and an explicit name.',
       )
     return
   }
-  const organization = w.institutions?.organizations.find((o) => o.id === c.id && o.status === 'active')
+  const organization = w.institutions?.organizations.find((o) => o.id === c.id && o.status !== 'dissolved')
   if (!organization) throw new Error('This institution is no longer active.')
   if (c.operation === 'withdraw') {
     if (!organization.members.includes(term.from))
@@ -134,19 +104,25 @@ export function validateInstitutionTerm(w: World, term: DiplomaticClause, partie
   }
   if (c.operation === 'join' && organization.members.includes(term.from))
     throw new Error('This state already belongs to the institution.')
-  const voters = organization.members.filter((id) => parties.includes(id))
-  if (organization.charter.rule === 'unanimity' && !organization.members.every((id) => parties.includes(id)))
-    throw new Error('The charter requires every existing member to consent.')
-  if (organization.charter.rule === 'majority' && voters.length <= organization.members.length / 2)
-    throw new Error('The charter requires a majority of existing members.')
-  if (organization.charter.rule === 'weighted') {
-    const weight = (ids: number[]) =>
-      ids.reduce((s, id) => s + Math.sqrt(Math.max(1, w.nations[id].population)), 0)
-    if (weight(voters) <= weight(organization.members) / 2)
-      throw new Error('The charter requires a majority of weighted votes.')
+  if (c.operation === 'join' && (organization.members.length >= 32 || organization.suspended?.length))
+    throw new Error('Admissions require a settled institution with fewer than thirty-two members.')
+  if (c.operation !== 'join' && !institutionMembers(organization).includes(term.from))
+    throw new Error('Only an eligible member can propose this institutional decision.')
+  if (c.operation === 'expel' || c.operation === 'reinstate') {
+    if (!organization.members.includes(term.to) || term.to === term.from)
+      throw new Error('Choose another current member.')
+    if (!organization.suspended?.includes(term.to))
+      throw new Error('Expulsion or reinstatement requires a recorded suspension.')
+    if (
+      c.operation === 'reinstate' &&
+      organization.members.some((id) => relation(w, id, term.to)?.treaty === 'war')
+    )
+      throw new Error('A member at war with its partners cannot be reinstated.')
   }
-  if (c.operation === 'amend' && !organization.members.includes(term.from))
-    throw new Error('Only a member can propose a charter amendment.')
+  if (!institutionQuorum(w, organization, parties, c.operation === 'expel' ? term.to : undefined))
+    throw new Error('The charter requires the eligible council’s voting mandate.')
+  if ((c.operation === 'rename' || c.operation === 'amend') && !term.text.trim())
+    throw new Error('An institution needs a name.')
 }
 export function applyInstitutionTerm(w: World, term: DiplomaticClause, offer: DiplomaticOffer) {
   validateInstitutionTerm(w, term, offer.parties)
@@ -165,9 +141,9 @@ export function applyInstitutionTerm(w: World, term: DiplomaticClause, offer: Di
     return
   }
   const state = ensureInstitutions(w),
-    c = structuredClone(term.charter!)
-  if (c.operation === 'found')
-    state.organizations.push({
+    c = { ...term.charter!, powers: [...term.charter!.powers] }
+  if (c.operation === 'found') {
+    const organization: Institution = {
       id: state.nextId++,
       name: term.text.slice(0, 140),
       founded: w.month,
@@ -179,49 +155,124 @@ export function applyInstitutionTerm(w: World, term: DiplomaticClause, offer: Di
       grants: 0,
       status: 'active',
       sourceOffer: offer.id,
-    })
-  else {
-    const organization = state.organizations.find((o) => o.id === c.id)!
-    if (c.operation === 'join') organization.members.push(term.from)
-    else if (c.operation === 'amend') {
-      organization.charter = c
-      if (term.text.trim()) organization.name = term.text.slice(0, 140)
-    } else {
-      organization.members = organization.members.filter((id) => id !== term.from)
-      if (organization.charter.exit === 'notice') {
-        w.nations[term.from].legitimacy = Math.max(0, w.nations[term.from].legitimacy - 3)
-        for (const id of organization.members) {
-          const rel = relation(w, id, term.from)
-          if (rel) rel.opinion = Math.max(-100, rel.opinion - 8)
-        }
-      }
+      events: [],
     }
-    if (organization.members.length < 2) {
-      const beneficiary = organization.members[0] ?? term.from
-      transfer(
+    state.organizations.push(organization)
+    recordInstitution(
+      w,
+      organization,
+      'founded',
+      'The founding governments ratified the charter.',
+      offer.parties,
+      offer.id,
+    )
+    return
+  }
+  const o = state.organizations.find((o) => o.id === c.id)!
+  ensureInstitutionRecord(w, o)
+  switch (c.operation) {
+    case 'join':
+      o.members.push(term.from)
+      recordInstitution(
         w,
-        `institution:${organization.id}`,
-        governmentAccount(beneficiary),
-        organization.treasury,
-        'institution dissolution',
+        o,
+        'joined',
+        'The applicant and council approved admission.',
+        [term.from],
+        offer.id,
       )
-      organization.status = 'dissolved'
-    }
+      break
+    case 'amend':
+      o.charter = c
+      o.name = term.text.slice(0, 140)
+      recordInstitution(
+        w,
+        o,
+        'amended',
+        'The council ratified a new charter version.',
+        offer.parties,
+        offer.id,
+      )
+      break
+    case 'rename':
+      o.name = term.text.slice(0, 140)
+      recordInstitution(
+        w,
+        o,
+        'renamed',
+        'The council adopted a new institutional name.',
+        offer.parties,
+        offer.id,
+      )
+      break
+    case 'withdraw':
+      if (o.withdrawals?.some((x) => x.nation === term.from))
+        throw new Error('Withdrawal notice is already pending.')
+      if (o.charter.exit === 'notice') {
+        o.withdrawals ??= []
+        o.withdrawals.push({ nation: term.from, due: w.month + 6 })
+        recordInstitution(
+          w,
+          o,
+          'withdrawal',
+          'The member gave six months’ notice of withdrawal.',
+          [term.from],
+          offer.id,
+        )
+      } else
+        removeInstitutionMember(
+          w,
+          o,
+          term.from,
+          'left',
+          'The member exercised its right of withdrawal.',
+          offer.id,
+        )
+      break
+    case 'expel':
+      removeInstitutionMember(
+        w,
+        o,
+        term.to,
+        'expelled',
+        'The eligible council voted to expel the suspended member.',
+        offer.id,
+      )
+      break
+    case 'reinstate':
+      o.suspended = o.suspended?.filter((id) => id !== term.to)
+      recordInstitution(
+        w,
+        o,
+        'reinstated',
+        'The council restored the member’s rights following settlement.',
+        [term.to],
+        offer.id,
+      )
+      recoverInstitution(w, o)
+      break
+    case 'dissolve':
+      dissolveInstitution(w, o, 'The council voted to dissolve the institution.', offer.id)
+      break
   }
 }
+
 export function institutionalFunds(w: World) {
   return (
     (w.institutions?.organizations.reduce((s, o) => s + o.treasury, 0) ?? 0) +
     w.regions.reduce((s, r) => s + (r.delegation?.treasury ?? 0), 0)
   )
 }
+/** Succession changes present membership, never archived identities or decisions. */
 export function transferInstitutionMembership(w: World, from: number, to: number) {
   for (const o of w.institutions?.organizations ?? []) {
+    if (o.status === 'dissolved' || !o.members.includes(from)) continue
+    ensureInstitutionRecord(w, o)
     o.members = [...new Set(o.members.map((id) => (id === from ? to : id)))]
-    if (o.status === 'active' && o.members.length < 2) {
-      transfer(w, `institution:${o.id}`, governmentAccount(to), o.treasury, 'institution succession')
-      o.status = 'dissolved'
-    }
+    o.suspended = [...new Set((o.suspended ?? []).map((id) => (id === from ? to : id)))]
+    o.withdrawals = (o.withdrawals ?? []).filter((x) => x.nation !== from)
+    recordInstitution(w, o, 'succession', 'Membership passed to the successor state.', [from, to])
+    if (o.members.length < 2) dissolveInstitution(w, o, 'State succession left fewer than two members.')
   }
 }
 export function allocateProvincialTaxes(w: World, nation: number, gross: number) {
@@ -266,26 +317,13 @@ export function advanceInstitutions(w: World) {
           100,
         )
     }
+  reconcileInstitutions(w)
   for (const o of w.institutions?.organizations ?? []) {
-    if (o.status !== 'active') continue
+    if (o.status === 'dissolved') continue
+    advanceInstitutionDefense(w, o)
     o.income = 0
     o.grants = 0
-    const former = o.members,
-      active = former.filter((id) => w.regions.some((r) => r.nation === id))
-    o.members = active
-    if (active.length < 2) {
-      const beneficiary = active[0] ?? former[0]
-      if (beneficiary !== undefined)
-        transfer(
-          w,
-          `institution:${o.id}`,
-          governmentAccount(beneficiary),
-          o.treasury,
-          'institution dissolution',
-        )
-      o.status = 'dissolved'
-      continue
-    }
+    const active = o.members.filter((id) => institutionEligible(w, o, id))
     for (const id of active) {
       const n = w.nations[id],
         paid = Math.min(Math.max(0, n.treasury), n.income * o.charter.contribution)
@@ -294,7 +332,9 @@ export function advanceInstitutions(w: World) {
     }
     if (o.charter.powers.includes('defense')) {
       const recipients = active
-        .filter((id) => w.relations.some((r) => r.treaty === 'war' && (r.a === id || r.b === id)))
+        .filter((id) =>
+          w.relations.some((r) => r.treaty === 'war' && r.aggressor !== id && (r.a === id || r.b === id)),
+        )
         .sort((a, b) => w.nations[a].treasury - w.nations[b].treasury)
       const budget = Math.min(o.treasury, o.income * 0.8)
       for (const id of recipients) {
@@ -319,7 +359,12 @@ export function validateInstitutions(w: World) {
     }
   if (w.institutions) {
     const s = w.institutions
-    if (!integer(s.nextId, 1, 1e12) || !Array.isArray(s.organizations) || s.organizations.length > 128) fail()
+    if (
+      !integer(s.nextId, 1, 1e12) ||
+      !Array.isArray(s.organizations) ||
+      s.organizations.filter((o) => o.status !== 'dissolved').length > 128
+    )
+      fail()
     const ids = new Set<number>()
     for (const o of s.organizations) {
       const c = o.charter
@@ -335,32 +380,16 @@ export function validateInstitutions(w: World) {
         (o.status === 'active' && o.members.length < 2) ||
         new Set(o.members).size !== o.members.length ||
         o.members.some((id) => !integer(id, 0, w.nations.length - 1)) ||
-        !['active', 'dissolved'].includes(o.status) ||
+        !['active', 'crisis', 'dissolved'].includes(o.status) ||
         !['public', 'secret'].includes(o.visibility) ||
         !finite(o.treasury, 0, 1e14) ||
         !finite(o.income, 0, 1e14) ||
         !finite(o.grants, 0, 1e14) ||
         !integer(o.sourceOffer, 1, 1e12) ||
-        !c ||
-        !['found', 'join', 'withdraw', 'amend'].includes(c.operation) ||
-        !integer(c.id, 0, 1e12) ||
-        ![
-          'defense-league',
-          'customs-union',
-          'research-community',
-          'confederation',
-          'federation',
-          'bespoke',
-        ].includes(c.form) ||
-        !['unanimity', 'majority', 'weighted'].includes(c.rule) ||
-        !['free', 'notice'].includes(c.exit) ||
-        !finite(c.contribution, 0, 0.15) ||
-        !Array.isArray(c.powers) ||
-        !c.powers.length ||
-        new Set(c.powers).size !== c.powers.length ||
-        c.powers.some((p) => !INSTITUTION_POWERS.includes(p))
+        !validInstitutionCharter(c)
       )
         fail()
+      validateInstitutionHistory(w, o)
       ids.add(o.id)
     }
   }

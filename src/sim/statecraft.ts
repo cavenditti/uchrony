@@ -1,3 +1,4 @@
+import { reconcileInstitutions } from './institution-lifecycle'
 import {
   reserveCabinetOrder,
   setCabinetAgenda,
@@ -28,6 +29,7 @@ import { validateHistoricalEffect } from './history-schema'
 import {
   applyInstitutionTerm,
   collectiveDefense,
+  collectiveDefenseBeneficiary,
   foreignPolicyMandate,
   institutionalFunds,
   transferInstitutionMembership,
@@ -812,8 +814,11 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
       const rel = relation(world, from, to)
       if (!rel) throw new Error('A diplomatic counterpart no longer exists.')
       if (term.kind === 'war') {
+        const beneficiary = collectiveDefenseBeneficiary(world, from, to)
         rel.treaty = 'war'
-        rel.aggressor = from
+        rel.aggressor = beneficiary === undefined ? from : to
+        if (beneficiary === undefined) delete rel.defenseOf
+        else rel.defenseOf = beneficiary
         rel.opinion = Math.min(-50, rel.opinion)
         rel.warExhaustion = 0
       } else if (term.kind === 'peace') {
@@ -947,6 +952,7 @@ export function acceptRefereeDecision(
               ? 0
               : world.month + Math.max(...ongoing.map((term) => term.duration))
         reconcileTreatyRelations(world)
+        reconcileInstitutions(world)
         appliedEffects = effects
         applyRefereeEffects(
           world,
@@ -1060,7 +1066,10 @@ export function advanceStatecraft(world: World) {
   if (state.offers.length > 240) {
     state.offers = retainAgreementReferences(
       state,
-      world.institutions?.organizations.map((o) => o.sourceOffer),
+      world.institutions?.organizations.flatMap((o) => [
+        o.sourceOffer,
+        ...(o.events ?? []).flatMap((e) => (e.offer === undefined ? [] : [e.offer])),
+      ]),
     )
   }
 }

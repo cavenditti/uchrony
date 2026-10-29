@@ -163,6 +163,8 @@ export interface Nation {
   ai: boolean
 }
 export interface Relation {
+  /** An intervention supports this original victim; it must not manufacture another defense call. */
+  defenseOf?: number
   aggressor?: number
   a: number
   b: number
@@ -250,6 +252,7 @@ export interface HistoryPoint {
   nations: { id: number; population: number; gdp: number; territory: number; treasury: number }[]
 }
 export interface World {
+  archive?: import('./world-archive').WorldArchive
   influence?: import('./influence').InfluenceState
   /** Persistent provenance; coarse history remains approximate after returning to monthly play. */
   fastForward?: { months: number; lastMonth: number; phase: number }
@@ -348,7 +351,22 @@ export type Command =
       priority: IntelligencePriority
       focus: number | null
     }
-  | { type: 'charter-proposal'; nation: number; members: number[]; name: string; charter: Charter }
+  | {
+      type: 'charter-proposal'
+      nation: number
+      members: number[]
+      name: string
+      charter: Charter
+      target?: number
+    }
+  | { type: 'institution-answer'; nation: number; offer: number; accept: boolean }
+  | {
+      type: 'institution-defense'
+      nation: number
+      institution: number
+      call: string
+      response: 'aid' | 'refuse'
+    }
   | {
       type: 'devolution'
       nation: number
@@ -402,6 +420,7 @@ export type Command =
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }
 export type WorkerRequest =
+  | { type: 'archive'; query: import('./world-archive').ArchiveQuery }
   | { type: 'places'; query: import('./almanac-types').PlaceQuery }
   | { type: 'world-writing'; request: import('./almanac-types').WritingRequest }
   | { type: 'models-changed' }
@@ -435,6 +454,8 @@ export type WorkerRequest =
   | { type: 'agent-strategy'; nation: number }
   | { type: 'event-details'; event: number }
 export type WorkerResponse =
+  | { type: 'archive'; result: import('./world-archive').ArchiveResult; mapKey: string }
+  | { type: 'archive-error'; request: number; message: string }
   | { type: 'places'; result: import('./almanac-types').PlaceResult }
   | { type: 'world-writing'; id: string; state: 'loading' | 'done' | 'error'; message?: string }
   | { type: 'inspection'; snapshot: import('./inspection').InspectionSnapshot }

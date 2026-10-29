@@ -1,3 +1,4 @@
+import { ensureInstitutionRecord, recordInstitution } from './institution-lifecycle'
 import { dateLabel, type World } from './types'
 import { geographicNeighbors } from './grid'
 import { hashSeed } from './random'
@@ -425,6 +426,29 @@ export function advanceAlmanac(w: World, force = false) {
       org.name,
       { founded: org.founded },
     )
+    if (p.name !== org.name) {
+      p.names.push({
+        name: p.name,
+        month: w.month,
+        language: p.language,
+        kind: 'former',
+        reason: 'Institutional name changed',
+      })
+      p.name = org.name
+    }
+    ensureInstitutionRecord(w, org)
+    const cursor = Number(p.milestones?.institutionEvent ?? 0)
+    for (const e of org.events!.slice(cursor))
+      rememberFact(w, {
+        id: `institution:${org.id}/decision:${e.id}`,
+        month: e.month,
+        title: `${e.version?.name ?? org.name}: ${e.kind}`,
+        detail: e.detail,
+        places: [p.id, ...e.nations.map((id) => `nation:${id}`)],
+        source: 'recorded',
+      })
+    p.milestones ??= {}
+    p.milestones.institutionEvent = org.events!.length
     state(w, p, { status: org.status })
     p.related = [...new Set([...p.related, ...org.members.map((id) => `nation:${id}`)])]
   }
@@ -779,6 +803,10 @@ function renamePlace(w: World, p: AtlasEntry, name: string, reason: string) {
   }
   if (p.id.startsWith('institution:')) {
     const org = w.institutions?.organizations.find((o) => o.id === id)
-    if (org) org.name = name
+    if (org && org.status !== 'dissolved' && org.name !== name) {
+      ensureInstitutionRecord(w, org)
+      org.name = name
+      recordInstitution(w, org, 'renamed', 'An established institutional name was recorded in the atlas.')
+    }
   }
 }

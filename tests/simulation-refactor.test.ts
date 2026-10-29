@@ -362,17 +362,24 @@ test('cabinet planning preserves deterministic settled/frontier monthly and coar
   const expected = JSON.parse(
     readFileSync(new URL('./fixtures/cabinet-trajectories.json', import.meta.url), 'utf8'),
   )
+  // The inspection archive is derived evidence, covered by its own continuation tests.
+  // Keep the physical trajectory fingerprint comparable with the pre-archive baseline.
+  const trajectoryHash = (w: World) => {
+    const state = { ...w }
+    delete state.archive
+    return canonicalHash(state)
+  }
   const actual = []
   for (const start of ['settled', 'frontier'] as const) {
     const w = generateWorld('refactor-contract', 3, 4, undefined, 'regional', start)
     prepareSpatialWorld(w)
-    actual.push([start, 'prepared', canonicalHash(w)])
+    actual.push([start, 'prepared', trajectoryHash(w)])
     tick(w)
-    actual.push([start, 'monthly', canonicalHash(w)])
+    actual.push([start, 'monthly', trajectoryHash(w)])
     tick(w, 'coarse')
-    actual.push([start, 'coarse', canonicalHash(w)])
+    actual.push([start, 'coarse', trajectoryHash(w)])
     advanceCoarsePeriod(w, 6)
-    actual.push([start, 'period', canonicalHash(w)])
+    actual.push([start, 'period', trajectoryHash(w)])
   }
   assert.deepEqual(actual, expected)
 })

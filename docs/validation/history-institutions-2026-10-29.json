@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-29",
+  "scope": "Historical atlas and institution lifecycle",
+  "status": "Implemented and validated locally with documented full-suite limitations",
+  "features": [
+    "Dated provincial sovereignty, state values and war maps",
+    "Institution lifecycle, membership operations, charter versions and defense calls",
+    "Current-date institutional proposals with explicit consent",
+    "Worker queries and compressed persistent history"
+  ],
+  "validation": {
+    "build": "passed",
+    "format": "npm run format and targeted checks passed; incidental formatting outside scope reverted",
+    "focused_tests": 28,
+    "additional_tests": [
+      "diplomatic access index with wartime exclusions",
+      "disk save endpoint with local-server permission",
+      "physical cabinet trajectory fingerprint with derived archive excluded"
+    ],
+    "browser": {
+      "fixture": "tests/browser/historical-atlas.html",
+      "synthetic": true,
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "a11y": {
+        "violations": 0,
+        "incomplete": 0
+      },
+      "checks": [
+        "past name and membership",
+        "past-date read-only dossier",
+        "internal-war crisis",
+        "current-date rename remains a proposal",
+        "no horizontal mobile overflow",
+        "quantitative legend and full fitted geography"
+      ]
+    },
+    "review": {
+      "role": "independent fallback impeccable finish reviewer",
+      "disposition": "ship",
+      "scope": "Scored quantitative legend and geography obstruction fixes"
+    },
+    "full_suite": {
+      "command": "npm test",
+      "reported": 673,
+      "passed": 658,
+      "failed": 15,
+      "note": "Run began before final refinements. Two feature-related failures (incomplete access fixture and physical trajectory hashing) pass on isolated reruns; disk endpoint passes with local-server access. One long simulation file was terminated after 17 minutes; its remaining cases are unverified. All eleven remaining unrelated failures reproduce on unchanged HEAD."
+    }
+  },
+  "known_baseline_failures": [
+    "adaptive-economy: paid housing construction ownership",
+    "competitive-pressure: assertive frontier resource balance",
+    "competitive-pressure: coarse frontier resource balance",
+    "economic-model: industrial investment queue",
+    "map-memory: expected coastline/freight fingerprint",
+    "map-scale: world geometry expectations",
+    "model-mathematics: guide equation rendering",
+    "settlement-dynamics: funded housing parcel",
+    "settlement-dynamics: multiple-centre housing funding",
+    "frontier-growth: ordinary expansion does not produce a funded new state",
+    "view-storage: residential display fabric differs from legacy expectation"
+  ],
+  "baseline_proof": "Each listed failure reproduced using a git archive of baseline_revision with the same installed dependencies.",
+  "limits": [
+    "Older saves begin detailed history at their first recorded observation; earlier details remain unknown",
+    "Max playback exposes coarse observations rather than reconstructed months",
+    "Historical views cannot resume an earlier simulation",
+    "Historical buildings, roads and troop positions are not captured",
+    "Performance fixture measures 1200 static observations, not a natural century simulation"
+  ],
+  "change_management": "Verified locally before the requested commit. No push or deployment. Existing unrelated working-tree changes preserved.",
+  "refinement": {
+    "architecture": "Constitutional transitions and journal ownership centralized; worker owns archive and serves bounded projections.",
+    "functions": "Shared charter validation and terminal-state guards; existing defense duties survive prospective amendments.",
+    "performance": "Sparse provincial changes, ten-year checkpoints, journal sharing in trials, linear map-color preparation, century space contract.",
+    "documentation": "Model behavior and limits documented; exported domain helpers explain invariants; repository formatting and focused checks completed."
+  },
+  "baseline_revision": "4b7bae1cf0d3aaca204bf2139cfee8f46ef55c20"
+}

@@ -1,3 +1,5 @@
+import { HistoricalAtlas } from './components/HistoricalAtlas'
+import type { ArchiveQuery, ArchiveResult } from './sim/world-archive'
 import { ParameterLabel } from './components/ParameterHelp'
 import { ConfigurationEditor, InitialCashControl } from './components/ConfigurationEditor'
 import { configurationDraft, configurationFor, validateConfigurationValues } from './sim/configuration'
@@ -75,6 +77,29 @@ const tabLayer: Partial<Record<Tab, Layer>> = {
 }
 
 export default function App() {
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyInstitution, setHistoryInstitution] = useState<number>()
+  const [archiveResult, setArchiveResult] = useState<ArchiveResult | null>(null)
+  const [archiveError, setArchiveError] = useState('')
+  const archiveSequence = useRef(0)
+  const queryArchive = useCallback((query: Omit<ArchiveQuery, 'id'>) => {
+    setArchiveError('')
+    worker.current?.postMessage({
+      type: 'archive',
+      query: { ...query, id: ++archiveSequence.current },
+    } satisfies WorkerRequest)
+  }, [])
+  const openHistory = (institution?: number) => {
+    setRunning(false)
+    setArchiveResult(null)
+    setArchiveError('')
+    setHistoryInstitution(institution)
+    setHistoryOpen(true)
+    setOverviewOpen(false)
+    setInspectorOpen(false)
+    setShowStates(false)
+    setPlacesOpen(false)
+  }
   const [placesOpen, setPlacesOpen] = useState(false)
   const [placeResult, setPlaceResult] = useState<PlaceResult | null>(null)
   const [writingJobs, setWritingJobs] = useState<Record<string, { state: string; message?: string }>>({})
@@ -161,6 +186,9 @@ export default function App() {
   )
   const send = useCallback((data: WorkerRequest) => {
     if (data.type === 'generate' || data.type === 'load' || data.type === 'import') {
+      setHistoryOpen(false)
+      setArchiveResult(null)
+      archiveSequence.current++
       setPendingDetails([])
       setPlacesOpen(false)
       setPlaceResult(null)
@@ -204,6 +232,14 @@ export default function App() {
     ensureSaveWorker.current = connectWriter
     connectWriter()
     instance.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+      if (data.type === 'archive') {
+        if (data.result.request === archiveSequence.current) setArchiveResult(data.result)
+        return
+      }
+      if (data.type === 'archive-error') {
+        if (data.request === archiveSequence.current) setArchiveError(data.message)
+        return
+      }
       if (data.type === 'places') {
         if (data.result.request === placeSequence.current) setPlaceResult(data.result)
         return
@@ -395,6 +431,10 @@ export default function App() {
   useEffect(() => {
     const keydown = (e: KeyboardEvent) => {
       if (modal) return
+      if (historyOpen) {
+        if (e.key === 'Escape') setHistoryOpen(false)
+        return
+      }
       if (e.key === 'Escape') {
         if (closeMenus()) return
         if (placesOpen) {
@@ -451,7 +491,7 @@ export default function App() {
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [modal, orderedArmy, showStates, overviewOpen, inspectorOpen, placesOpen])
+  }, [historyOpen, modal, orderedArmy, showStates, overviewOpen, inspectorOpen, placesOpen])
   useEffect(() => {
     if (showStates) searchInput.current?.focus()
   }, [showStates])
@@ -565,6 +605,14 @@ export default function App() {
           {world.seed}
         </span>
         <div className="atlas-header-actions">
+          <button
+            className={`header-link ${historyOpen ? 'active' : ''}`}
+            aria-label="Open historical atlas"
+            onClick={() => openHistory()}
+          >
+            <Clock3 size={16} />
+            <span>History</span>
+          </button>
           <button
             className={`header-link ${overviewOpen ? 'active' : ''}`}
             aria-label="World overview"
@@ -798,7 +846,18 @@ export default function App() {
           onRefresh={() => requestInspection(inspection.bounds)}
         />
       )}
-      <main className="workspace atlas-stage">
+      {historyOpen && (
+        <HistoricalAtlas
+          world={world}
+          result={archiveResult}
+          error={archiveError}
+          initialInstitution={historyInstitution}
+          onQuery={queryArchive}
+          onClose={() => setHistoryOpen(false)}
+          onCommand={command}
+        />
+      )}
+      <main className="workspace atlas-stage" inert={historyOpen}>
         <section className="atlas-workspace" aria-label="World atlas">
           <WorldMap
             world={world}
@@ -1041,6 +1100,7 @@ export default function App() {
                 </span>
               </div>
               <WorldOverview
+                onInstitution={openHistory}
                 world={world}
                 nation={nation}
                 onNation={(id) => {

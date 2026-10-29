@@ -5958,3 +5958,419 @@ select option {
 .configuration-matrix-control select {
   min-width: 120px;
 }
+
+/* History extends the atlas: the selected date governs both geography and its dossier. */
+.historical-atlas {
+  position: absolute;
+  inset: 54px 0 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg, #19252b);
+  color: #e6e7dd;
+}
+.history-toolbar,
+.history-datebar,
+.history-map-toolbar,
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.history-toolbar {
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #354449;
+}
+.history-toolbar h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font:
+    400 25px 'Alegreya',
+    Georgia,
+    serif;
+}
+.history-datebar {
+  padding: 12px 20px 4px;
+}
+.history-datebar input[type='range'] {
+  flex: 1;
+  min-width: 100px;
+  accent-color: #d7b77a;
+}
+.history-datebar input[type='number'] {
+  width: 88px;
+  margin-left: 8px;
+}
+.history-date-label strong {
+  display: block;
+  font:
+    400 24px 'Alegreya',
+    Georgia,
+    serif;
+}
+.history-coverage {
+  padding: 8px 20px 12px;
+  color: #a8b6b7;
+  min-height: 34px;
+  font-size: 12px;
+}
+.history-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 390px);
+  min-height: 0;
+  flex: 1;
+  border-top: 1px solid #354449;
+}
+.history-geography {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.history-map-toolbar {
+  padding: 10px 16px;
+  justify-content: space-between;
+}
+.history-map-toolbar select {
+  margin-left: 8px;
+}
+.historical-map {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 220px;
+  overflow: hidden;
+  background: #304e54;
+}
+.historical-map > svg {
+  width: 100%;
+  height: 0;
+  min-height: 0;
+  flex: 1;
+  display: block;
+}
+.historical-map > svg path {
+  cursor: pointer;
+}
+.historical-map > svg path:hover,
+.historical-map > svg path:focus-visible {
+  stroke: #e6e7dd;
+  stroke-width: 2px;
+  outline: none;
+}
+.historical-map-controls {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  display: flex;
+  gap: 6px;
+  background: #202e34;
+  border: 1px solid #354449;
+  border-radius: 4px;
+}
+.historical-map-key {
+  flex-shrink: 0;
+  margin: 10px 12px;
+  background: #202e34;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+.history-dossier {
+  background: #202e34;
+  border-left: 1px solid #354449;
+  padding: 16px 20px 28px;
+  overflow: auto;
+  min-width: 0;
+}
+.history-tabs {
+  display: flex;
+  border-bottom: 1px solid #354449;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+.history-tabs button {
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #a8b6b7;
+}
+.history-tabs button[aria-pressed='true'] {
+  color: #e6e7dd;
+  border-bottom-color: #d7b77a;
+}
+.history-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.history-search input {
+  min-width: 0;
+  width: 100%;
+}
+.history-record-list,
+.history-member-list,
+.institution-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.history-record-list {
+  max-height: 230px;
+  overflow: auto;
+  margin: 12px 0 22px;
+}
+.history-record-list li {
+  border-bottom: 1px solid #354449;
+}
+.history-record-list button {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 4px;
+  border: 0;
+  background: transparent;
+  color: #e6e7dd;
+}
+.history-record-list button:hover,
+.history-record-list button[aria-pressed='true'] {
+  background: #31403f;
+}
+.history-record-list small {
+  flex-shrink: 0;
+  color: #a8b6b7;
+  font-size: 11px;
+}
+.history-member-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #354449;
+  padding: 5px 0;
+}
+.history-member-list span {
+  color: #a8b6b7;
+  font-size: 12px;
+}
+.institution-dossier h2,
+.historical-state-dossier h2 {
+  font:
+    500 27px 'Alegreya',
+    Georgia,
+    serif;
+  margin: 14px 0 4px;
+  overflow-wrap: anywhere;
+}
+.institution-dossier h3,
+.historical-state-dossier h3 {
+  font:
+    500 21px 'Alegreya',
+    Georgia,
+    serif;
+  margin: 24px 0 10px;
+}
+.institution-dossier p,
+.historical-state-dossier p {
+  max-width: 65ch;
+  line-height: 1.55;
+}
+.history-state {
+  text-transform: capitalize;
+  color: #a8b6b7;
+}
+.history-notice {
+  padding: 12px;
+  border: 1px solid #6f6251;
+  background: #2d3436;
+}
+.history-facts {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.history-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid #354449;
+}
+.history-facts dt {
+  color: #a8b6b7;
+  flex: 1;
+}
+.history-facts dd {
+  flex: 1;
+  text-align: right;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.history-call {
+  padding: 12px 0;
+  border-bottom: 1px solid #354449;
+}
+.history-call summary,
+.institution-governance summary {
+  cursor: pointer;
+  line-height: 1.5;
+}
+.history-response {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.history-response span {
+  color: #a8b6b7;
+}
+.institution-timeline li {
+  padding: 14px 0;
+  border-bottom: 1px solid #354449;
+}
+.institution-timeline li > strong {
+  display: block;
+  margin: 6px 0;
+  text-transform: capitalize;
+}
+.institution-timeline p {
+  margin: 7px 0;
+}
+.institution-timeline small {
+  color: #a8b6b7;
+}
+.institution-timeline details {
+  margin: 10px 0 0;
+}
+.history-actions {
+  margin-top: 14px;
+}
+.institution-governance {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #354449;
+}
+.institution-governance form {
+  display: grid;
+  gap: 14px;
+  padding-top: 16px;
+}
+.institution-governance form > label {
+  display: grid;
+  gap: 6px;
+}
+.institution-governance fieldset {
+  border: 1px solid #354449;
+  padding: 12px;
+}
+.historical-atlas button:focus-visible,
+.historical-atlas input:focus-visible,
+.historical-atlas select:focus-visible,
+.historical-atlas summary:focus-visible {
+  outline: 2px solid #d7b77a;
+  outline-offset: 3px;
+}
+.historical-atlas button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (max-width: 760px) {
+  .historical-atlas {
+    inset: 50px 0 0;
+    overflow: auto;
+  }
+  .history-toolbar,
+  .history-datebar {
+    padding: 10px 12px;
+  }
+  .history-toolbar h1 {
+    font-size: 22px;
+  }
+  .history-datebar input[type='range'] {
+    flex-basis: 100%;
+    order: 2;
+  }
+  .history-datebar > .subtle {
+    display: none;
+  }
+  .history-coverage {
+    padding: 6px 12px 12px;
+  }
+  .history-layout {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+  }
+  .history-geography {
+    min-height: 350px;
+  }
+  .historical-map {
+    height: 360px;
+    flex: none;
+  }
+  .history-map-toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .history-dossier {
+    border-left: 0;
+    border-top: 1px solid #354449;
+    overflow: visible;
+    padding: 16px;
+  }
+  .history-record-list button {
+    align-items: flex-start;
+  }
+  .history-record-list span {
+    overflow-wrap: anywhere;
+  }
+}
+.history-table-scroll {
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.history-table-scroll table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+}
+.history-table-scroll th,
+.history-table-scroll td {
+  padding: 7px 10px;
+  text-align: right;
+  border-bottom: 1px solid #354449;
+  white-space: nowrap;
+}
+.history-table-scroll th:first-child,
+.history-table-scroll td:first-child {
+  text-align: left;
+}
+
+/* Quantitative legends share the map's scale and remain inside the map on narrow screens. */
+.historical-map-scale {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  max-width: 300px;
+}
+.historical-map-ramp {
+  height: 10px;
+}
+.historical-map-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+.historical-map-ticks span {
+  border-top: 1px solid currentColor;
+  padding-top: 3px;
+}

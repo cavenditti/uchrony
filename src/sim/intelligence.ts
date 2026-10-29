@@ -1,3 +1,4 @@
+import { institutionEligible } from './institution-lifecycle'
 import { publicExpense } from './ledger'
 import { clamp, relation, type World, type Region, type Relation } from './types'
 import { hashSeed, random } from './random'
@@ -84,9 +85,9 @@ const hasDefense = (w: World, a: number, b: number) =>
   relation(w, a, b)?.treaty === 'alliance' ||
   (w.institutions?.organizations.some(
     (o) =>
-      o.status === 'active' &&
-      o.members.includes(a) &&
-      o.members.includes(b) &&
+      institutionEligible(w, o, a) &&
+      institutionEligible(w, o, b) &&
+      relation(w, a, b)?.treaty !== 'war' &&
       o.charter.powers.includes('defense'),
   ) ??
     false)
@@ -593,11 +594,10 @@ export function perceivedAllies(w: World, observer: number, target: number) {
   for (const body of w.institutions?.organizations ?? [])
     if (
       body.members.includes(observer) &&
-      body.status === 'active' &&
-      body.members.includes(target) &&
+      institutionEligible(w, body, target) &&
       body.charter.powers.includes('defense')
     )
-      for (const id of body.members) if (id !== target) ids.add(id)
+      for (const id of body.members) if (id !== target && institutionEligible(w, body, id)) ids.add(id)
   for (const { offer } of s.agreements)
     if (
       offer.status === 'ratified' &&
@@ -620,7 +620,16 @@ export function observedThreat(w: World, observer: number, region: number) {
 }
 export function visibleInstitutions(w: World, nation: number) {
   const s = intelligenceService(w, nation),
-    own = w.institutions?.organizations.filter((o) => o.members.includes(nation)) ?? []
+    own =
+      w.institutions?.organizations
+        .filter(
+          (o) => o.members.includes(nation) || o.events?.slice(-8).some((e) => e.nations.includes(nation)),
+        )
+        .map(({ events, calls, ...o }) => ({
+          ...o,
+          calls: calls?.filter((c) => c.closed === undefined),
+          recentDecisions: events?.slice(-8).map(({ month, kind, detail }) => ({ month, kind, detail })),
+        })) ?? []
   const reported = s.agreements.flatMap(({ offer, month }) =>
     offer.resolved
       .filter((t) => t.kind === 'institution' && t.charter)

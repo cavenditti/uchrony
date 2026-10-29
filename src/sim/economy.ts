@@ -1,3 +1,4 @@
+import { institutionEligible } from './institution-lifecycle'
 /** Provincial production and trade clear physical goods against conserved money.
  * District routing has finer geography but shares the same political tariff rules. */
 import { knownCommuteCandidates, matchCommuters } from './commuting'
@@ -135,12 +136,8 @@ export function transportGraph(
     )
   if (militaryNation !== undefined)
     for (const body of world.institutions?.organizations ?? [])
-      if (
-        body.status === 'active' &&
-        body.members.includes(militaryNation) &&
-        body.charter.powers.includes('defense')
-      )
-        for (const member of body.members) hosts.add(member)
+      if (institutionEligible(world, body, militaryNation) && body.charter.powers.includes('defense'))
+        for (const member of body.members) if (institutionEligible(world, body, member)) hosts.add(member)
   let metrics = linkMetrics.get(profile)
   if (!metrics) {
     metrics = new Map()

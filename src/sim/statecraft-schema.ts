@@ -1,5 +1,5 @@
 import { MAX_PROVINCES } from './scale'
-import { INSTITUTION_POWERS, PROVINCIAL_POWERS } from './institutions'
+import { INSTITUTION_POWERS, INSTITUTION_OPERATIONS, PROVINCIAL_POWERS } from './institutions'
 import { MAX_STATE_IDENTITIES } from './types'
 import { FIELDS, GOODS } from './types'
 import { HISTORICAL_EFFECT_SCHEMA } from './history-schema'
@@ -27,10 +27,10 @@ const num = (minimum: number, maximum: number, integer = false): Schema => ({
   maximum,
 })
 const en = (values: readonly string[]): Schema => ({ type: 'string', enum: values })
-const obj = (properties: Record<string, Schema>): Schema => ({
+const obj = (properties: Record<string, Schema>, optional: string[] = []): Schema => ({
   type: 'object',
   properties,
-  required: Object.keys(properties),
+  required: Object.keys(properties).filter((key) => !optional.includes(key)),
   additionalProperties: false,
 })
 const arr = (items: Schema, maxItems: number, minItems = 0): Schema => ({
@@ -74,22 +74,27 @@ export const CLAUSE_SCHEMA: Schema = {
     obj({
       ...clauseProperties,
       kind: en(['institution']),
-      charter: obj({
-        operation: en(['found', 'join', 'withdraw', 'amend']),
-        id,
-        powers: arr(en(INSTITUTION_POWERS), 5),
-        form: en([
-          'defense-league',
-          'customs-union',
-          'research-community',
-          'confederation',
-          'federation',
-          'bespoke',
-        ]),
-        rule: en(['unanimity', 'majority', 'weighted']),
-        contribution: num(0, 0.15),
-        exit: en(['free', 'notice']),
-      }),
+      charter: obj(
+        {
+          operation: en(INSTITUTION_OPERATIONS),
+          id,
+          powers: arr(en(INSTITUTION_POWERS), 5),
+          form: en([
+            'defense-league',
+            'customs-union',
+            'research-community',
+            'confederation',
+            'federation',
+            'bespoke',
+          ]),
+          rule: en(['unanimity', 'majority', 'weighted']),
+          contribution: num(0, 0.15),
+          exit: en(['free', 'notice']),
+          defense: en(['military', 'aid', 'either']),
+          responseMonths: num(1, 24, true),
+        },
+        ['defense', 'responseMonths'],
+      ),
     }),
     obj({
       ...clauseProperties,
