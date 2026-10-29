@@ -1,3 +1,4 @@
+/** Army logistics and movement share physical capacity, with separate directional access views. */
 import { cabinetOrderReserved } from './cabinet-state'
 import { diplomaticAccessView } from './agreements'
 import { corridorProfile, corridorUsage } from './corridors'
@@ -40,6 +41,7 @@ import { clamp, population, relation, type Army, type World } from './types'
 export function landGraph(w: World, nation: number, profile = corridorProfile(w)) {
   return transportGraph(w, nation, profile).map((edges) => edges.filter((e) => !e.sea))
 }
+/** Resupply and move armies, rebuilding cached routes when military control changes. */
 export function advanceArmies(w: World) {
   maintainControl(w)
   // Movement can change owners, but diplomatic commitments stay fixed in this phase.
@@ -101,16 +103,24 @@ export function advanceArmies(w: World) {
     const cache = land ? landGraphs : supplyGraphs
     let graph = cache.get(nation)
     if (!graph) {
-      const access = w.regions.map((region) => accessible(w, nation, region.id)),
-        chart = land && w.nations[nation].ai ? new Set(knownMap(w, nation).map((r) => r.id)) : null
-      graph = land
-        ? landGraph(w, nation, profile).map((edges, from) => {
-            if (!chart) return edges
-            return chart.has(from) ? edges.filter((e) => chart.has(e.to)) : []
-          })
-        : transportGraph(w, nation, profile).map((edges, from) =>
-            edges.filter((edge) => access[from] && access[edge.to]),
-          )
+      if (land) {
+        const chart = w.nations[nation].ai ? new Set(knownMap(w, nation).map((r) => r.id)) : null
+        graph = landGraph(w, nation, profile).map((edges, from) => {
+          if (!chart) return edges
+          return chart.has(from) ? edges.filter((e) => chart.has(e.to)) : []
+        })
+      } else {
+        // Supply searches start at the army and follow incoming connections to
+        // depots. Permission to leave a province does not imply permission to
+        // enter it. Index once per nation/control revision, retaining each edge's
+        // actual delivery legs and capacity rather than inventing a reverse trip.
+        const access = w.regions.map((region) => accessible(w, nation, region.id))
+        graph = w.regions.map(() => [])
+        for (const [from, edges] of transportGraph(w, nation, profile).entries()) {
+          if (!access[from]) continue
+          for (const edge of edges) if (access[edge.to]) graph[edge.to].push({ ...edge, to: from })
+        }
+      }
       cache.set(nation, graph)
     }
     return graph
@@ -121,8 +131,8 @@ export function advanceArmies(w: World) {
       n = w.nations[army.nation]
     ops.source = null
     ops.line = []
-    const graph = graphFor(army.nation, false)
-    const paths = pathsFrom(graph, army.region)
+    const incoming = graphFor(army.nation, false)
+    const paths = pathsFrom(incoming, army.region)
     const sources = w.regions
       .filter(
         (r) =>
@@ -137,7 +147,7 @@ export function advanceArmies(w: World) {
         needArms = Math.max(0, army.soldiers * 0.0005 * 4 - ops.arms)
       if (needFood + needArms < 0.01) break
       const path = pathTo(paths.previous, army.region, source.id).reverse(),
-        edges = path.slice(1).map((to, i) => graph[path[i]].find((e) => e.to === to)!),
+        edges = path.slice(1).map((to, i) => incoming[to].find((e) => e.to === path[i])!),
         legs = edges.flatMap((e) => e.legs),
         usage = corridorUsage(profile, legs)
       const sea = edges.some((e) => e.sea)
