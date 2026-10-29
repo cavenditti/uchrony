@@ -570,7 +570,17 @@ export function remeshDistricts(w: World, partition: SpatialDistrict[]) {
         r.stocks[g] += parts[i]
         values.get(r.id)![g] += parts[i] * carrying.get(source.id)![g]
         quotes.get(r.id)![g] += parts[i] * source.prices[g]
-        if (r.id !== source.id) recordGift(w, marketStore(source.id), marketStore(r.id), g, parts[i])
+        // A retained source may already have received another district's goods.
+        // Transfer the original parcel's value from the snapshot, not its new average.
+        if (r.id !== source.id)
+          recordGift(
+            w,
+            marketStore(source.id),
+            marketStore(r.id),
+            g,
+            parts[i],
+            parts[i] * carrying.get(source.id)![g],
+          )
       })
     }
     // Asset accounts are handled from snapshots in a second pass to avoid merge-order dependence.
@@ -581,7 +591,9 @@ export function remeshDistricts(w: World, partition: SpatialDistrict[]) {
         const price = values.get(target.id)![good] / target.stocks[good]
         inventoryQuote(w, marketStore(target.id), good, price)
         e.inventoryPrices ??= {}
-        e.inventoryPrices[marketStore(target.id)] ??= { ...target.prices }
+        e.inventoryPrices[marketStore(target.id)] ??= Object.fromEntries(
+          GOODS.map((g) => [g, target.prices[g] / 1000]),
+        ) as Inventory
         e.inventoryPrices[marketStore(target.id)][good] = price
         target.prices[good] = quotes.get(target.id)![good] / target.stocks[good]
       }

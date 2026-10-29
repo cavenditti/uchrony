@@ -1,3 +1,5 @@
+/** Goods accounts separate cash, inventory cost and explicit revaluation. Merchant
+ * receipts blend acquisition values; a marginal purchase never reprices old stock. */
 import { economicRegions, economicRegion, localFirmRegion } from './local-units'
 import { GOODS, inventory, type Good, type Inventory, type World } from './types'
 import type { GDPAccount } from './economic-types'
@@ -109,7 +111,7 @@ function addStore(w: World, key: string, opening = true) {
   if (!s) throw new Error(`Unknown inventory owner ${key}`)
   const quantity = opening ? { ...s.quantity } : inventory()
   const quoted = Object.fromEntries(GOODS.map((g) => [g, (s.prices[g] || BASE_PRICE[g]) / 1000])) as Inventory
-  // Carry the last acquisition/replacement quote across months. A retailer's selling
+  // Carry average acquisition costs across months. A retailer's selling
   // markup is output when goods sell, never a revaluation of its unsold inventory.
   const oldPrices = w.economy!.inventoryPrices?.[key] ?? quoted
   const price = { ...oldPrices }
@@ -126,6 +128,7 @@ function addStore(w: World, key: string, opening = true) {
   a.stores[key] = store
   return store
 }
+/** Open a fresh period, preserving old balances before any one-time legacy revaluation. */
 export function beginNationalAccounts(w: World) {
   w.economy!.accounts = {
     month: w.month,
@@ -144,11 +147,38 @@ export function beginNationalAccounts(w: World) {
   for (const f of w.economy!.firms ?? []) addStore(w, firmStore(f.id))
   for (const a of w.armies) addStore(w, armyStore(a.id))
   for (const f of w.warfare?.fleets ?? []) addStore(w, fleetStore(f.id))
+  adoptInventoryCosting(w)
+}
+
+/** Old saves retain only the last lot's quote, so historical average costs cannot
+ * be recovered. Rebase purchased goods once to local market quotes as an explicit
+ * approximation. Keeping openingValue unchanged recognizes the correction as a
+ * holding gain/loss, never GDP, a goods flow, or a cash payment. Produced goods
+ * already use explicit firm revaluation and keep their existing treatment. */
+function adoptInventoryCosting(w: World) {
+  const e = w.economy!
+  if (e.inventoryValuation) return
+  let legacyAdjustment = 0
+  if (e.inventoryPrices)
+    for (const [key, s] of Object.entries(e.accounts!.stores)) {
+      if (key.startsWith('firm:')) continue
+      // Stored ownership already identifies the price location. Avoid another
+      // linear shipment search for each transit inventory during migration.
+      const quotes = s.government ? w.regions[s.region].prices : economicRegion(w, s.region).prices
+      for (const good of GOODS) {
+        const price = (quotes[good] || BASE_PRICE[good]) / 1000
+        legacyAdjustment += s.quantity[good] * (price - s.price[good])
+        s.price[good] = price
+      }
+    }
+  e.inventoryValuation = { method: 'weighted-average', adoptedMonth: w.month, legacyAdjustment }
 }
 function store(w: World, key: string) {
   return w.economy!.accounts!.stores[key] ?? addStore(w, key, false)
 }
-/** Inventory entries are transaction flows, not the residual needed to make GDP agree. */
+/** Receipts blend actual values in O(1); ordinary withdrawals use average cost.
+ * An explicit negative value removes an identified lot (transit or remapping),
+ * leaving the other lots' value intact. No receipt creates a holding gain. */
 export function inventoryFlow(
   w: World,
   key: string,
@@ -159,10 +189,20 @@ export function inventoryFlow(
 ) {
   if (!w.economy?.accounts || !quantity) return 0
   const s = store(w, key),
-    amount = value ?? quantity * s.price[good]
-  s.quantity[good] += quantity
-  if (s.quantity[good] < -1e-6) throw new Error(`Inventory flow overdraw: ${key} ${good}`)
-  s.quantity[good] = Math.max(0, s.quantity[good])
+    amount = value ?? quantity * s.price[good],
+    remaining = s.quantity[good] + quantity
+  if (remaining < -1e-6) throw new Error(`Inventory flow overdraw: ${key} ${good}`)
+  // Equal-cost lots (including firm production at its current quote) need no
+  // arithmetic revaluation, avoiding drift and a division in the common case.
+  if (value !== undefined && amount !== quantity * s.price[good]) {
+    const openingValue = s.quantity[good] * s.price[good],
+      closingValue = openingValue + amount
+    if (closingValue < -1e-7 * Math.max(1, openingValue, Math.abs(amount)))
+      throw new Error(`Inventory value overdraw: ${key} ${good}`)
+    // Exact-lot withdrawals may leave a few negative ulps after cancellation.
+    if (remaining > 0) s.price[good] = Math.max(0, closingValue) / remaining
+  }
+  s.quantity[good] = Math.max(0, remaining)
   const n = national(w, s.nation)
   if (other) {
     s.other += amount
@@ -174,6 +214,7 @@ export function inventoryFlow(
   }
   return Math.abs(amount)
 }
+/** Explicit revaluation only; purchases and gifts must enter through inventoryFlow. */
 export function inventoryQuote(w: World, key: string, good: Good, price: number) {
   if (w.economy?.accounts) {
     w.economy.accounts.complete = false
@@ -221,7 +262,7 @@ function recordExternal(w: World, from: number, to: number, value: number) {
   national(w, from).exports += value
   national(w, to).imports += value
 }
-/** Retail/wholesale margin = receipt less the current replacement value withdrawn. */
+/** Merchant margin = sale receipt less weighted-average inventory cost withdrawn. */
 export function recordGoodsSale(
   w: World,
   fromStore: string,
@@ -249,7 +290,6 @@ export function recordGoodsSale(
   if (buyer.kind === 'business' && buyer.account)
     business(w, buyer.account, buyer.nation).purchases += paid + extraCost
   if (buyer.store) {
-    inventoryQuote(w, buyer.store, good, (paid + extraCost) / amount)
     inventoryFlow(w, buyer.store, good, amount, paid + extraCost)
   } else if (buyer.kind === 'business') {
     national(w, buyer.nation).intermediate += paid
@@ -295,10 +335,18 @@ export function recordOwnCapital(w: World, region: number, owner: string, value:
   national(w, nation).fixedInvestment += value
   business(w, owner, nation).ownAccount += value
 }
-export function recordGift(w: World, from: string, to: string, good: Good, amount: number) {
-  if (!w.economy?.accounts || !amount) return
-  const value = inventoryFlow(w, from, good, -amount, undefined, true)
-  inventoryQuote(w, to, good, value / amount)
+/** Transfer carrying value without production or cash. An identified lot can
+ * supply its original total value when other receipts have since blended in. */
+export function recordGift(
+  w: World,
+  from: string,
+  to: string,
+  good: Good,
+  amount: number,
+  lotValue?: number,
+) {
+  if (!w.economy?.accounts || !amount || from === to) return
+  const value = inventoryFlow(w, from, good, -amount, lotValue === undefined ? undefined : -lotValue, true)
   inventoryFlow(w, to, good, amount, value, true)
 }
 /** Read-only validation of completed accounts, including their independent supporting records. */

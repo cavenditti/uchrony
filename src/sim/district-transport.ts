@@ -295,7 +295,15 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     }
     seller.stocks[good] = Math.max(0, seller.stocks[good] - amount)
     const legs = path.chain.flatMap((edge) => reverseLegs(edge.legs))
-    deliverFreight(w, sellerId, buyerId, good, amount, legs)
+    deliverFreight(
+      w,
+      sellerId,
+      buyerId,
+      good,
+      amount,
+      legs,
+      amount * (donor === undefined ? unitCost : price),
+    )
     for (const [index, count] of path.usage) remaining[index] = Math.max(0, remaining[index] - amount * count)
     for (const edge of path.chain)
       linkRemaining.set(edge, (linkRemaining.get(edge) ?? periodFlow(edge.capacity)) - amount)

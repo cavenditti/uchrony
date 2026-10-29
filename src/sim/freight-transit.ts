@@ -27,6 +27,7 @@ export function deliverFreight(
   good: Good,
   amount: number,
   legs: RouteLeg[],
+  acquisitionValue?: number,
 ) {
   const days = w.adaptive ? freightDays(w, legs) : 0
   const buyer = w.localEconomy!.units[to]
@@ -48,7 +49,9 @@ export function deliverFreight(
     goods: { ...inventory(), [good]: amount },
     legs,
   })
-  recordGift(w, marketStore(to), `transit:${id}`, good, amount)
+  // Settlement temporarily booked this particular lot at the destination. Remove
+  // its acquisition value, not the blended cost of goods already in that market.
+  recordGift(w, marketStore(to), `transit:${id}`, good, amount, acquisitionValue)
 }
 export function arriveFreight(w: World) {
   for (const shipment of w.adaptive?.transit ?? [])

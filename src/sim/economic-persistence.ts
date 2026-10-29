@@ -35,6 +35,18 @@ export function validateEconomy(w: World) {
     (!Number.isInteger(e.periodMonths) || e.periodMonths < 1 || e.periodMonths > 6)
   )
     fail('accounting interval')
+  if (e.inventoryValuation !== undefined) {
+    const v = e.inventoryValuation
+    if (
+      !obj(v) ||
+      v.method !== 'weighted-average' ||
+      !Number.isSafeInteger(v.adoptedMonth) ||
+      v.adoptedMonth < 0 ||
+      v.adoptedMonth > w.month ||
+      !num(v.legacyAdjustment, -1e16)
+    )
+      fail('inventory valuation method')
+  }
   for (const r of w.localEconomy ? Object.values(w.localEconomy.units) : w.regions) {
     const f = e.producers[r.id],
       hs = e.households[r.id]

@@ -357,8 +357,8 @@ test('adaptive v1 table encoding stays compatible and rejects duplicate or overs
 })
 
 test('cabinet planning preserves deterministic settled/frontier monthly and coarse checkpoints', () => {
-  // The former refactor baseline remains as historical evidence; policy changes
-  // intentionally alter its trajectories. New checkpoints match two independent replays.
+  // Weighted-average inventory costs change the economic trajectory. Checkpoints
+  // are captured only after two independent, validated replays agree at every phase.
   const expected = JSON.parse(
     readFileSync(new URL('./fixtures/cabinet-trajectories.json', import.meta.url), 'utf8'),
   )
