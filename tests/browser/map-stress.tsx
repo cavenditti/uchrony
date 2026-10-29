@@ -76,6 +76,7 @@ const root = createRoot(document.getElementById('root')!)
 root.render(<p>Preparing the isolated huge-world stress fixture…</p>)
 const worker = new Worker(new URL('./map-stress-world.ts', import.meta.url), { type: 'module' })
 worker.onmessage = ({ data }: MessageEvent<World>) => {
+  Object.assign(window, { mapStressWorld: data })
   root.render(<Fixture world={data} />)
   worker.terminate()
 }

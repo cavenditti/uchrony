@@ -2,6 +2,14 @@
 
 Uchrony's map extends the existing cabinet-map visual world with a three-dimensional landscape. The browser renders raised terrain, forests, and small settlements while retaining the atlas's data layers, province selection, and dossier controls. The interface still uses slate surfaces, brass actions, and Alegreya place names. Landscape colors are cartographic data and materials, not a new interface palette.
 
+## Huge-world quadtree LoD — 29 October 2026
+
+Every flat atlas layer now stops at physical quadtree ancestors before their children become smaller than 12 CSS pixels. Previously, only Population used this cutoff; other layers visited every visible simulation leaf and discarded tiny grid lines afterward. Ancestor totals include all descendants, so panning never changes density. Zooming in reveals the exact leaves again. Population picking continues to match its displayed square; other inspection stays at physical leaf/building resolution. Simulation state and 3D scenery are unchanged.
+
+Developed and construction parcels have a separate render quadtree, using the existing subdivision primitives. Each branch caches its content bounds and largest parcel span, letting a viewport query discard offscreen or entirely subpixel branches before reading individual homes. The existing 0.4-pixel building cutoff is unchanged. Content bounds include complete footprints across quadrant edges. Mesh totals, plot lookup and urban-block inspection now initialize independently, avoiding unrelated housing/block work when querying the grid.
+
+In the prepared 129,024-cell browser fixture, display traversal fell from 79,863 leaves to 1,788 ancestors. Median quadtree drawing time fell from 29.7 ms to 1.7 ms; the 90-frame pan test improved from 31.2 ms median / 39 ms p95 to 16.7 ms / 16.8 ms. These are warm camera-movement measurements in Chromium with no roads or shipments, not cold loading, simulation or 3D benchmarks. A deterministic dense regression reduces 262,144 leaves to 4,096 display cells and verifies that 65,536 subpixel entries are pruned without reading them. Reproduction, screenshots and limitations are in [the validation record](validation/quadtree-lod-2026-10-29.json).
+
 ## Readable population squares — 28 October 2026
 
 In Quadtree's Population layer, fine simulation leaves aggregate into aligned ancestor squares at least 12 CSS pixels wide. The traversal stops before a subdivision would fall below that size; coarser existing leaves remain intact. At extreme zoom-out the root is the final limit. Population grid lines use the same display squares, and zooming in reveals the original leaves.

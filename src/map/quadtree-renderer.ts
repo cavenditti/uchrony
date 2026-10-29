@@ -1,5 +1,5 @@
 import {
-  visibleMapLeaves,
+  visibleRenderCells,
   visiblePopulationCells,
   visibleUrbanPlots,
   urbanPlotDensity,
@@ -11,8 +11,8 @@ import type { World, Layer } from '../sim/types'
 import { drawGroundRoads } from './ground-roads'
 import { hashSeed } from '../sim/random'
 
-/** Actual spatial leaves and persistent occupied lots. Building footprints are
- * simulation-owned geometry; zoom only changes how much detail is drawn. */
+/** Screen-sized ancestors of the physical mesh and persistent occupied lots.
+ * Building footprints remain simulation-owned; zoom changes only display work. */
 export function drawQuadtree(
   ctx: CanvasRenderingContext2D,
   world: World,
@@ -24,7 +24,9 @@ export function drawQuadtree(
   if (!world.adaptive) return
   const meters = world.adaptive.metersPerMapUnit ?? METERS_PER_MAP_UNIT
   const cells =
-    layer === 'population' ? visiblePopulationCells(world, window, scale) : visibleMapLeaves(world, window)
+    layer === 'population'
+      ? visiblePopulationCells(world, window, scale)
+      : visibleRenderCells(world, window, scale)
   ctx.save()
   ctx.beginPath()
   ctx.rect(0, 0, (world.width * CELL_METERS) / meters, (world.height * CELL_METERS) / meters)
@@ -67,12 +69,11 @@ export function drawQuadtree(
     },
     land,
   )
-  for (const plot of visibleUrbanPlots(world, window)) {
+  for (const plot of visibleUrbanPlots(world, window, scale)) {
     const p = plot.parcel,
       x = p.x / meters,
       y = p.y / meters,
       size = p.size / meters
-    if (size * scale < 0.4) continue
     const shape = new Path2D()
     if (plot.building) {
       plot.building.forEach((p, i) => {

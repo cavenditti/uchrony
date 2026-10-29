@@ -1,16 +1,15 @@
+/** Camera-dependent display traversal over immutable physical mesh snapshots.
+ * Totals and exact inspection are shared across zoom levels; only draw work varies. */
 import { mapHomesSnapshot, mapMeshSnapshot, type MapMesh } from '../sim/map-snapshot'
 import { nodeBounds, quadrant, rootBounds, pointInPolygon, METERS_PER_MAP_UNIT } from '../sim/physical-space'
 import { CELL_METERS } from '../sim/grid'
 import type { SpatialBounds, PointMeters } from '../sim/adaptive-types'
 import type { World } from '../sim/types'
 import { urbanBlocks, urbanBlockId, type UrbanBlock } from '../sim/urban-blocks'
+import { RenderQuadtree, type RenderBounds } from './spatial-index'
 
-export interface MapWindow {
-  x: number
-  y: number
-  width: number
-  height: number
-}
+/** Visible physical area in metres; camera LoD never alters the simulation. */
+export type MapWindow = RenderBounds
 export interface MapLeaf {
   id: string
   bounds: SpatialBounds
@@ -20,7 +19,11 @@ export interface MapLeaf {
 }
 export type UrbanPlot = NonNullable<World['viewHomes']>[number] & { parcel: SpatialBounds }
 type MapTotals = Pick<MapLeaf, 'population' | 'jobs' | 'landArea'>
-export const MIN_POPULATION_SQUARE_PIXELS = 12
+/** A display grid has a screen-space budget, independent of simulation depth. */
+export const MIN_RENDER_SQUARE_PIXELS = 12
+export const MIN_POPULATION_SQUARE_PIXELS = MIN_RENDER_SQUARE_PIXELS
+/** Below this footprint size the atlas previously skipped the individual draw. */
+export const MIN_URBAN_PLOT_PIXELS = 0.4
 const cache = new WeakMap<
   World,
   {
@@ -28,8 +31,6 @@ const cache = new WeakMap<
     mesh: MapMesh | undefined
     indices: Map<string, number>
     branches: Map<string, MapTotals>
-    plots: Map<number, UrbanPlot[]>
-    blocks: Map<string, UrbanBlock>
   }
 >()
 
@@ -58,17 +59,54 @@ function index(world: World) {
       totals.landArea += mesh.landArea[i]
     }
   })
-  const plots = new Map<number, UrbanPlot[]>()
+  const result = { revision: world.adaptive?.revision, mesh, indices, branches }
+  cache.set(world, result)
+  return result
+}
+
+// Grid shading, footprint drawing and block inspection have independent lazy
+// caches: hovering a square must not also construct every urban block.
+const plotCache = new WeakMap<
+  World,
+  {
+    revision: number | undefined
+    homes: World['viewHomes']
+    plots: Map<number, UrbanPlot[]>
+    tree: RenderQuadtree<UrbanPlot>
+  }
+>()
+const blockCache = new WeakMap<
+  World,
+  {
+    revision: number | undefined
+    source: World['viewUrbanBlocks']
+    blocks: Map<string, UrbanBlock>
+  }
+>()
+
+function plotIndex(world: World) {
+  const prior = plotCache.get(world)
+  if (prior && prior.revision === world.adaptive?.revision && prior.homes === world.viewHomes) return prior
+  const plots = new Map<number, UrbanPlot[]>(),
+    entries = []
+  // Point picking uses the known simulation cell; viewport queries use the
+  // footprint tree so they can prune unresolvable groups before visiting lots.
   for (const home of mapHomesSnapshot(world)) {
     // Naming thresholds never decide whether occupied land or a funded project exists.
     if (!home.parcel || (!home.developed && !(home.construction! > 0))) continue
     const list = plots.get(home.cell) ?? []
     list.push(home as UrbanPlot)
     plots.set(home.cell, list)
+    const { x, y, size } = home.parcel
+    entries.push({ value: home as UrbanPlot, bounds: { x, y, width: size, height: size }, span: size })
   }
-  const blocks = new Map(urbanBlocks(world).map((b) => [b.id, b]))
-  const result = { revision: world.adaptive?.revision, mesh, indices, branches, plots, blocks }
-  cache.set(world, result)
+  const result = {
+    revision: world.adaptive?.revision,
+    homes: world.viewHomes,
+    plots,
+    tree: new RenderQuadtree(entries),
+  }
+  plotCache.set(world, result)
   return result
 }
 const intersects = (b: SpatialBounds, v: MapWindow) =>
@@ -90,14 +128,33 @@ export function visiblePopulationCells(world: World, window: MapWindow, scale: n
   return visibleMapCells(world, window, populationMinimumSize(world, scale))
 }
 
+/** Stop before descending into subpixel simulation leaves on every atlas layer. */
+export function visibleRenderCells(world: World, window: MapWindow, scale: number) {
+  return visibleMapCells(world, window, minimumMapSize(world, scale, MIN_RENDER_SQUARE_PIXELS))
+}
+
 function populationMinimumSize(world: World, scale: number) {
+  return minimumMapSize(world, scale, MIN_POPULATION_SQUARE_PIXELS)
+}
+
+function minimumMapSize(world: World, scale: number, pixels: number) {
   const meters = world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT
-  return (MIN_POPULATION_SQUARE_PIXELS * meters) / scale
+  return scale > 0 ? (pixels * meters) / scale : Infinity
 }
 
 function visibleMapCells(world: World, window: MapWindow, minimumSize: number) {
-  const { mesh, indices, branches } = index(world),
-    result: MapLeaf[] = []
+  const result: MapLeaf[] = []
+  // The root is square but worlds need not be. Never draw a padded ancestor
+  // when the viewport is wholly outside the actual rectangular domain.
+  if (
+    !(window.width > 0 && window.height > 0) ||
+    window.x >= world.width * CELL_METERS ||
+    window.y >= world.height * CELL_METERS ||
+    window.x + window.width <= 0 ||
+    window.y + window.height <= 0
+  )
+    return result
+  const { mesh, indices, branches } = index(world)
   if (!mesh) return result
   const visit = (id: string, bounds: SpatialBounds) => {
     if (!intersects(bounds, window)) return
@@ -114,6 +171,7 @@ function visibleMapCells(world: World, window: MapWindow, minimumSize: number) {
   return result
 }
 
+/** Exact physical leaf for inspection, regardless of the display resolution. */
 export function mapLeafAt(world: World, point: PointMeters): MapLeaf | undefined {
   return mapCellAt(world, point, 0)
 }
@@ -148,30 +206,33 @@ function mapCellAt(world: World, point: PointMeters, minimumSize: number): MapLe
   return i === undefined ? undefined : leaf(mesh, id, bounds, i)
 }
 
-export function visibleUrbanPlots(world: World, window: MapWindow) {
-  const { plots } = index(world),
-    result: UrbanPlot[] = []
-  const x0 = Math.max(0, Math.floor(window.x / CELL_METERS)),
-    x1 = Math.min(world.width - 1, Math.floor((window.x + window.width) / CELL_METERS)),
-    y0 = Math.max(0, Math.floor(window.y / CELL_METERS)),
-    y1 = Math.min(world.height - 1, Math.floor((window.y + window.height) / CELL_METERS))
-  for (let y = y0; y <= y1; y++)
-    for (let x = x0; x <= x1; x++)
-      for (const plot of plots.get(y * world.width + x) ?? [])
-        if (intersects(plot.parcel, window)) result.push(plot)
-  return result
+/** Optional scale keeps inspection exact while drawing skips unresolvable lots. */
+export function visibleUrbanPlots(world: World, window: MapWindow, scale?: number) {
+  return plotIndex(world)
+    .tree.query(window, scale === undefined ? 0 : minimumMapSize(world, scale, MIN_URBAN_PLOT_PIXELS))
+    .filter((plot) => intersects(plot.parcel, window))
 }
 
 /** Pick the actual footprint, rather than treating the whole numerical cell as a house. */
 export function mapBuildingAt(world: World, point: PointMeters) {
   const cell = Math.floor(point.y / CELL_METERS) * world.width + Math.floor(point.x / CELL_METERS)
-  return index(world)
+  return plotIndex(world)
     .plots.get(cell)
     ?.find((plot) => plot.building && pointInPolygon(point, plot.building))
 }
 
+/** Build block lookup only when block inspection is requested. */
 export function mapUrbanBlockAt(world: World, point: PointMeters) {
-  return index(world).blocks.get(urbanBlockId(point))
+  let cached = blockCache.get(world)
+  if (!cached || cached.revision !== world.adaptive?.revision || cached.source !== world.viewUrbanBlocks) {
+    cached = {
+      revision: world.adaptive?.revision,
+      source: world.viewUrbanBlocks,
+      blocks: new Map(urbanBlocks(world).map((b) => [b.id, b])),
+    }
+    blockCache.set(world, cached)
+  }
+  return cached.blocks.get(urbanBlockId(point))
 }
 
 /** Stable physical density scale: camera movement and city names cannot recolor a home. */

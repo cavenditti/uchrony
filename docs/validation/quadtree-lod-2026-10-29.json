@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-29",
+  "scope": "Default flat Quadtree/atlas renderer; no changes to simulation or 3D scenery",
+  "fixture": {
+    "url": "http://127.0.0.1:5192/tests/browser/map-stress.html?landscape",
+    "seed": "Map memory stress fixture",
+    "worldCells": 129024,
+    "preparedSimulationLeaves": 79863,
+    "homeRecords": 58922,
+    "developedPlotsAtMeasuredScale": 1261,
+    "roads": 0,
+    "month": 0,
+    "drawScaleCssPixelsPerMapUnit": 0.18601190476190477,
+    "browser": "Isolated agent-browser Chromium session",
+    "panViewport": [
+      1280,
+      577
+    ],
+    "phoneViewport": [
+      390,
+      844
+    ]
+  },
+  "method": {
+    "draw": "tests/browser/map-lod-probe.js; median of 12 synchronous runs on the same prepared world; canvas submission timing, with queue flush reported separately",
+    "pan": "tests/browser/map-drag-probe.js; 90 pointer-move frames while mouse held, first five frames excluded from percentiles",
+    "limitations": [
+      "Warm-cache camera movement; cold world generation, atlas raster baking and snapshot transfer are not measured",
+      "No shipments or roads in this month-zero fixture",
+      "Not a claim about 3D rendering, simulation throughput or long-run memory",
+      "Timing varies by device and concurrent load; deterministic regression tests enforce traversal/draw counts"
+    ]
+  },
+  "before": {
+    "displayCells": 79863,
+    "displayQueryMedianMs": 31.1,
+    "plotQueryMedianMs": 1.8,
+    "quadtreeDrawMedianMs": 29.7,
+    "canvasFlushMs": 38.6,
+    "panMedianFrameMs": 31.2,
+    "panP95FrameMs": 39
+  },
+  "after": {
+    "displayCells": 1788,
+    "displayQueryMedianMs": 0.6,
+    "plotQueryMedianMs": 0.1,
+    "quadtreeDrawMedianMs": 1.7,
+    "canvasFlushMs": 17.5,
+    "panMedianFrameMs": 16.7,
+    "panP95FrameMs": 16.8,
+    "redundantCanvasResizes": 0,
+    "runtimeErrors": [],
+    "phoneHorizontalOverflow": false
+  },
+  "denseRegression": {
+    "simulationLeaves": 262144,
+    "displayCells": 4096,
+    "canvasRectanglesIncludingClip": 4097,
+    "warmQueryMeanMs": 3.56,
+    "subpixelEntriesPrunedWithoutReadingIndividualSpans": 65536
+  },
+  "screenshots": [
+    "docs/validation/quadtree-lod-huge-2026-10-29.png",
+    "docs/validation/quadtree-lod-phone-2026-10-29.png"
+  ],
+  "verification": {
+    "build": "Passed in shared workspace before concurrent simulation edits and in isolated HEAD plus rendering changes",
+    "format": "npm run format passed in isolated snapshot; changed files match formatted output; Prettier check and git diff --check passed in shared workspace",
+    "focusedTests": {
+      "passed": 21,
+      "failed": 0,
+      "files": [
+        "tests/render-quadtree.test.ts",
+        "tests/population-map.test.ts",
+        "tests/quadtree-map.test.ts"
+      ]
+    },
+    "fullSuite": "Not green. Initial shared-workspace run failed while concurrent simulation edits temporarily referenced missing cabinet-ai. Subsequent shared and isolated runs hit existing simulation failures; broad runs were stopped after reproduction, not completed.",
+    "reproducedBaselineFailure": {
+      "test": "tests/adaptive-economy.test.ts: housing requires paid labor and real materials, and capacity appears only on completion",
+      "error": "Residential parcel must lie on its owner\u2019s land",
+      "reproduction": "Isolated committed source with original renderer restored: node --import tsx --test --test-name-pattern=\"housing requires paid\" tests/adaptive-economy.test.ts"
+    },
+    "designDetector": "No findings on modified rendering modules"
+  }
+}
