@@ -5,18 +5,21 @@ construction use physical quantities, paid labor, inventories and the existing
 cash and goods ledgers. Coefficients are synthetic game parameters, not historical
 or nutritional calibration.
 
-| Chain | Inputs and outputs | Economic use |
-| --- | --- | --- |
-| Iron and fuel | Iron ore + charcoal → iron; timber → charcoal | Tools, arms and construction |
-| Masonry | Clay + coal → bricks | Partial stone substitution in housing and public construction |
-| Cereals | Grain → flour; flour + charcoal → bread | Household food substitution |
-| Fishing | Coastal fish → fresh fish; fish + salt → preserved food | Household food, with different spoilage rates |
-| Steel | Coal → coke; iron + coke → steel | Alternative tool and arms recipes after industry research |
-| Fibres | Wool, flax or cotton → textiles; hemp → rope | Clothing and paid shipbuilding materials |
-| Luxury | Precious ore + charcoal → precious metal → jewelry | Discretionary household spending after food needs |
+| Chain         | Inputs and outputs                                      | Economic use                                                  |
+| ------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
+| Iron and fuel | Iron ore + charcoal → iron; timber → charcoal           | Tools, arms and construction                                  |
+| Masonry       | Clay + coal → bricks                                    | Partial stone substitution in housing and public construction |
+| Cereals       | Grain → flour; flour + charcoal → bread                 | Household food substitution                                   |
+| Fishing       | Coastal fish → fresh fish; fish + salt → preserved food | Household food, with different spoilage rates                 |
+| Steel         | Coal → coke; iron + coke → steel                        | Alternative tool and arms recipes after industry research     |
+| Fibres        | Wool, flax or cotton → textiles; hemp → rope            | Clothing and paid shipbuilding materials                      |
+| Luxury        | Precious ore + charcoal → precious metal → jewelry      | Discretionary household spending after food needs             |
 
 Each new good has a productive facility, construction recipe, opening price and
-explicit labor share. Raw minerals are geographically distributed. Clay, salt
+explicit labor share. District specialization counts every commissioned facility: crops,
+grazing and fisheries are agricultural, extraction is mining, processing is
+industrial, and markets are urban. Ties remain mixed; pending projects supply no
+workplaces or specialization. Raw minerals are geographically distributed. Clay, salt
 and precious ore extraction draw down finite cell reservoirs. Precious metals
 are aggregated rather than separated into gold and silver; extraction does not
 mint money. Coastal fisheries share water-cell stocks and a monthly harvest cap.

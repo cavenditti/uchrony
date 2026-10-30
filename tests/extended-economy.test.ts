@@ -29,6 +29,7 @@ import {
   validateResourceStocks,
 } from '../src/sim/resource-extraction'
 import { parseSave, validateWorld } from '../src/sim/persistence'
+import { packWorldSave } from '../src/sim/save-codec'
 import { validateConfigurationValues } from '../src/sim/configuration'
 import { DEFAULT_CONFIGURATION_VALUES } from '../src/sim/configuration-defaults'
 import { withConfigurationValues } from '../src/sim/configuration-context'
@@ -266,6 +267,34 @@ test('shared fishing quotas survive repeated firms, partitions, renewal and rest
   validateResourceStocks(w)
   const restored = parseSave(JSON.stringify(w))
   assert.deepEqual(restored.resourceStocks, stocks)
+})
+
+test('packed restoration preserves depleted minerals and the current shared fishing quota', () => {
+  const { w, r } = fixture('fish'),
+    stocks = ensureResourceStocks(w)
+  for (const good of ['clay', 'salt', 'preciousOre'] as const) {
+    const opening = r.cells.reduce((sum, id) => sum + (stocks.minerals[id]?.[good] ?? 0), 0)
+    near(extractExtendedResource(w, r, good, opening * 2), opening)
+  }
+  const caught = extractExtendedResource(w, r, 'fish', 1e12)
+  assert(caught > 0)
+  const restored = parseSave(JSON.stringify(packWorldSave(w))),
+    restoredRegion = restored.regions[r.id]
+  assert.deepEqual(restored.resourceStocks, stocks)
+  for (const good of ['clay', 'salt', 'preciousOre'] as const) {
+    assert.equal(regionalMineralPotential(restored, restoredRegion, good), 0)
+    assert.equal(extractExtendedResource(restored, restoredRegion, good, 1), 0)
+  }
+  assert.equal(extractExtendedResource(restored, restoredRegion, 'fish', 1e12), 0)
+  w.month++
+  restored.month++
+  renewFishStocks(w)
+  renewFishStocks(restored)
+  assert.deepEqual(restored.resourceStocks, w.resourceStocks)
+  const nextCatch = extractExtendedResource(w, r, 'fish', 1e12)
+  assert(nextCatch > 0)
+  near(extractExtendedResource(restored, restoredRegion, 'fish', 1e12), nextCatch)
+  validateResourceStocks(restored)
 })
 
 test('new fishery sites require a real accessible coast', () => {

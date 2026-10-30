@@ -12,7 +12,7 @@ import {
 } from '../src/sim/districts'
 import { evolveCities } from '../src/sim/cities'
 import { buildSpatial, refreshSpatial, type SpatialDistrict } from '../src/sim/spatial'
-import { GOODS, population, type World } from '../src/sim/types'
+import { GOODS, inventory, population, type World } from '../src/sim/types'
 import { balances, borrow, householdAccount, producerAccount, auditLedger } from '../src/sim/ledger'
 import { physicalStocks } from '../src/sim/goods-accounting'
 import { validateWorld, restoreWorld } from '../src/sim/persistence'
@@ -189,13 +189,13 @@ test('local resource availability limits output and depletion survives remeshing
     poor = units.find((u) => u.deposits.iron === 0)!
   const f = regionalFirms(w, rich.id)[0]
   f.employment = 1000
-  const mix = { food: 0, timber: 0, stone: 0, iron: 1, coal: 0, tools: 0, textiles: 0, arms: 0 }
-  assert(firmCapacity(w, rich, f, 1, mix).q.iron > 0)
-  assert.equal(firmCapacity(w, poor, f, 1, mix).q.iron, 0)
+  const mix = { ...inventory(), ironOre: 1 }
+  assert(firmCapacity(w, rich, f, 1, mix).q.ironOre > 0)
+  assert.equal(firmCapacity(w, poor, f, 1, mix).q.ironOre, 0)
   const stock = rich.cells.reduce((sum, c) => sum + w.localEconomy!.reserves[c].iron, 0)
   near(extractDistrictResource(w, rich, 'iron', stock * 2), stock)
   refreshEndowment(w, rich, false)
-  assert.equal(firmCapacity(w, rich, f, 1, mix).q.iron, 0)
+  assert.equal(firmCapacity(w, rich, f, 1, mix).q.ironOre, 0)
   const remaining = JSON.stringify(w.localEconomy!.reserves)
   remeshDistricts(w, coarse(w))
   assert.equal(JSON.stringify(w.localEconomy!.reserves), remaining)

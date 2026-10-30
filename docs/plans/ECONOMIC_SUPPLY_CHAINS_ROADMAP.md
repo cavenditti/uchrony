@@ -1,7 +1,8 @@
 # Piano delle prossime filiere produttive
 
 Stato: piano di sviluppo aggiornato al 30 ottobre 2026. Il primo ampliamento
-è nel codice e in verifica. L'ordine indica la priorità di sviluppo, non una
+a ventotto beni è implementato; le sezioni seguenti distinguono il codice attuale
+dagli obiettivi successivi. L'ordine indica la priorità di sviluppo, non una
 cronologia storica obbligata per gli stati simulati.
 
 ## Punto di partenza
@@ -26,24 +27,24 @@ devono passare attraverso quantità, costi e capacità, senza bonus gratuiti al 
 
 ## Ordine proposto
 
-| Priorità | Filiera | Nuovi beni candidati | Utilizzatori e comportamento atteso |
-| --- | --- | --- | --- |
-| 1 | Edilizia | Argilla, mattoni, calcare, calce | Case, magazzini, impianti e opere pubbliche comprano materiali; combustibile e forniture locali cambiano il costo di costruire. |
-| 2 | Alimentazione e conservazione | Cereali, farina, sale, alimenti conservati | Famiglie, eserciti e spedizioni hanno prodotti commestibili con conservabilità diversa; raccolti e scorte diventano più importanti. |
-| 3 | Energia e siderurgia | Coke, acciaio | Nuovi impianti possono adottare tecniche diverse; utensili, armamenti e infrastrutture avanzate richiedono materiali appropriati. |
-| 4 | Fibre e navigazione | Lino, cotone, canapa, corde | Tessiture e cantieri navali generano domanda agricola e industriale; colture tessili e alimentari competono per terreno e lavoro. |
-| 5 | Chimica agricola e militare | Zolfo, salnitro, polvere da sparo, fosfati, concimi | Agricoltura e armamenti dipendono da materiali specializzati; gli impianti chimici hanno costi e capacità reali. |
+| Priorità | Filiera                       | Nuovi beni candidati                                | Utilizzatori e comportamento atteso                                                                                                 |
+| -------- | ----------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1        | Edilizia                      | Argilla, mattoni, calcare, calce                    | Case, magazzini, impianti e opere pubbliche comprano materiali; combustibile e forniture locali cambiano il costo di costruire.     |
+| 2        | Alimentazione e conservazione | Cereali, farina, sale, alimenti conservati          | Famiglie, eserciti e spedizioni hanno prodotti commestibili con conservabilità diversa; raccolti e scorte diventano più importanti. |
+| 3        | Energia e siderurgia          | Coke, acciaio                                       | Nuovi impianti possono adottare tecniche diverse; utensili, armamenti e infrastrutture avanzate richiedono materiali appropriati.   |
+| 4        | Fibre e navigazione           | Lino, cotone, canapa, corde                         | Tessiture e cantieri navali generano domanda agricola e industriale; colture tessili e alimentari competono per terreno e lavoro.   |
+| 5        | Chimica agricola e militare   | Zolfo, salnitro, polvere da sparo, fosfati, concimi | Agricoltura e armamenti dipendono da materiali specializzati; gli impianti chimici hanno costi e capacità reali.                    |
 
 I candidati di una fase non devono essere introdotti tutti nello stesso rilascio.
 Ogni incremento può aggiungere due o tre beni, purché la filiera risultante sia
 utilizzabile e completa. Quantità e rese vanno calibrate con esperimenti; la
 tabella non pretende di descrivere processi industriali in dettaglio.
 
-## 1. Edilizia: la prossima implementazione
+## 1. Edilizia: ampliamento implementato e passi successivi
 
-Primo incremento: **argilla → mattoni**, con consumo di combustibile, lavoro e
-capacità di fornace. Secondo incremento: **calcare → calce**, con una propria
-lavorazione e un impiego esplicito negli edifici.
+Incremento implementato: **argilla → mattoni**, con consumo di combustibile,
+lavoro e capacità di fornace. Incremento successivo: **calcare → calce**, con una
+propria lavorazione e un impiego esplicito negli edifici.
 
 L'argilla deve avere una distribuzione geografica riproducibile e distinta dal
 minerale metallico. Il calcare richiede una dotazione geologica specifica: non ogni tonnellata
@@ -52,8 +53,8 @@ della pietra generica deve diventare automaticamente calcare utilizzabile.
 Le ricette edilizie devono offrire progetti alternativi, per esempio costruzioni
 in legno, pietra o muratura. Una scelta cambia materiali, lavoro, costo e proprietà
 fisiche dell'edificio, con parametri dichiarati. I progetti già avviati mantengono
-gli impegni originali. Un vecchio salvataggio senza mattoni deve poter continuare
-a costruire con tecniche disponibili, senza ricevere materiali gratuiti.
+gli impegni originali. Un mondo senza mattoni può continuare a costruire con la ricetta in pietra,
+senza ricevere materiali gratuiti.
 
 **Verifica decisiva:** due distretti uguali, ma con disponibilità diversa di
 argilla, scelgono forniture o tecniche edilizie diverse. Una fornace non produce
@@ -61,10 +62,10 @@ senza lavoro e combustibile; una casa non compare prima del completamento.
 
 ## 2. Alimentazione: raccolti, scorte e conservazione
 
-Introdurre **cereali → farina → cibo commestibile** e una trasformazione di cibo
-con sale in **alimenti conservati**. Il bene attuale `food` resta inizialmente
-l'aggregato commestibile, evitando una migrazione simultanea di tutta la domanda
-alimentare. Cereali e farina sono intermedi in questa prima versione.
+Sono implementati **cereali → farina → pane** e **pesce + sale → alimenti
+conservati**. Il bene `food` resta l'aggregato commestibile ordinario; pane, pesce
+e alimenti conservati possono sostituirlo negli acquisti delle famiglie.
+Cereali e farina sono intermedi in questa prima versione.
 
 Il piano deve distinguere resa materiale, contenuto alimentare e perdite di
 lavorazione: trasformare un alimento non può creare nutrimento o far contare due
@@ -77,8 +78,9 @@ ma consuma sale, lavorazione e capacità. Le famiglie devono poter continuare ad
 alimentarsi anche dove manca il sale. Le merci conservate non sono esenti da
 deperimento, trasporto o pagamento.
 
-Pesce, carne, latte e allevamenti dettagliati sono estensioni successive. Prima
-di aggiungerli servono stock animali, alimentazione, riproduzione e macellazione:
+La pesca costiera usa stock condivisi e recupero biologico. Carne, latte e
+allevamenti dettagliati sono estensioni successive: richiedono stock animali,
+alimentazione, riproduzione e macellazione;
 lana e carne non devono poter sfruttare due volte lo stesso allevamento.
 
 **Verifica decisiva:** un cattivo raccolto pesa meno su un territorio che ha
@@ -87,9 +89,9 @@ gratuito e non rende obbligatorio salare tutta l'alimentazione civile.
 
 ## 3. Energia e siderurgia: tecniche produttive alternative
 
-Aggiungere **carbone fossile → coke**, poi una tecnica di produzione
-dell'**acciaio** con input e impianti espliciti. La prima tecnica del ferro a
-carbone vegetale deve restare utilizzabile.
+Sono implementati **carbone fossile → coke** e **ferro + coke → acciaio**, con
+input e impianti espliciti. La prima tecnica del ferro a carbone vegetale resta
+utilizzabile; le conversioni di impianto descritte sotto sono ancora da sviluppare.
 
 Occorre prima un contratto comune per le tecniche produttive: ricerca richiesta,
 impianto compatibile, input, resa, capacità, consumo energetico e costo della
@@ -108,10 +110,10 @@ impianto incompatibile non può usare automaticamente il sostituto.
 
 ## 4. Fibre: specializzazione agricola e cantieri
 
-Estendere la tessitura con tecniche alimentate da **lino** e **cotone**, mantenendo
-la tecnica della lana. Aggiungere **canapa → corde** quando i cantieri acquistano
-cordame per costruzione e manutenzione; i tessuti possono servire alle vele senza
-introdurre subito un ulteriore bene quasi identico.
+La tessitura può usare **lino**, **cotone** o lana. La filiera **canapa → corde**
+è implementata e i cantieri acquistano corde e tessuti per costruire navi.
+Manutenzione navale dettagliata e costi delle conversioni tessili restano futuri;
+non serve introdurre un ulteriore bene quasi identico per le vele.
 
 Le colture hanno idoneità geografiche e stagionali dichiarate. Terre e lavoro
 agricolo sono condivisi con le colture alimentari: lo stesso ettaro non può
@@ -163,10 +165,10 @@ quantità acquistate e ha rendimenti decrescenti verificabili.
 3. **Lavoro e finanza:** attività concorrenti condividono lavoratori, terreno,
    combustibile e impianti. Ordini non eseguibili restano visibili; i fornitori
    sono pagati e credito, ricavi, PIL e patrimonio restano conti distinti.
-4. **Compatibilità:** salvataggi vecchi ricevono nuove voci a quantità zero,
-   conservando beni, debiti e impegni esistenti. Nuove dotazioni sono esplicite
-   solo nella creazione degli scenari. La transizione non deve creare un blocco
-   artificiale perché manca una tecnologia appena introdotta.
+4. **Persistenza:** lo schema attuale richiede inventari completi e rifiuta
+   salvataggi precedenti o incompleti, senza migrazione. Quantità, riserve e
+   impegni devono sopravvivere al ripristino. Nuove dotazioni sono esplicite
+   solo nella creazione degli scenari; il caricamento non reintegra scorte esaurite.
 5. **Verifica:** test unitari e di regressione per input mancanti, sostituzioni,
    limiti geografici, conservazione, contabilità e ripristino. Confronti a seed
    uguale, interruzione di una fornitura e prosecuzione dopo salvataggio. Eseguire
@@ -183,8 +185,10 @@ dei problemi già presenti nella lottizzazione e nella calibrazione generale.
 
 ## Prossimo pacchetto concreto
 
-Implementare argilla e mattoni, una fornace costruibile e almeno una ricetta
-edilizia che li consumi. Includere l'alternativa edilizia per territori senza
-argilla, la migrazione dei salvataggi, gli ordini commerciali e le prove di
-carenza, costo e completamento. Valutare il risultato prima di introdurre calce
-e di iniziare la trasformazione del sistema alimentare.
+Argilla, mattoni, fornaci e sostituzione parziale della pietra sono implementati,
+insieme alle prime filiere alimentari, siderurgiche, tessili e del lusso.
+I prossimi incrementi richiedono verifiche distinte: calcare e calce con un uso
+edilizio esplicito, oppure conversioni industriali finanziate e ritardate al
+posto delle attuali sostituzioni immediate di materiali. Chimica, allevamento
+dettagliato e pesca d'altura restano obiettivi futuri, senza beni o capacità
+impliciti nell'ampliamento attuale.

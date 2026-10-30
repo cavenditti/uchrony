@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-30",
+  "baseCommit": "4118963c4844511a96c0dd8bb9e086367516a305",
+  "supplyChainsCommit": "83176111fbfffca8636107086d9c848c64f0f5c3",
+  "scope": [
+    "Complete district specialization for all 28 productive goods and markets, including crops, coastal fisheries and extended minerals.",
+    "Keep workshop workplaces tied to the same processing-sector catalogue; retain exact majority ties and physical cell ownership.",
+    "Exercise real suitable sites when funding every facility kind; complete commodity inventories in affected shipment and labor fixtures.",
+    "Verify packed saves preserve exhausted mineral reserves and the shared current-month fishing quota through deterministic renewal.",
+    "Document the implemented catalogue and distinguish remaining roadmap work from current production."
+  ],
+  "validationEnvironment": "An archive of the base commit with only the resource-industry completion patch applied, using the existing dependency installation. Separate investment, politics, mapping and demographic workspace changes were excluded.",
+  "checks": [
+    {
+      "command": "npm run build",
+      "result": "pass",
+      "scope": "Both shared workspace and isolated resource patch; isolated build includes final production code."
+    },
+    {
+      "command": "node --import tsx --test --test-concurrency=2 --test-timeout=120000 tests/extended-economy.test.ts tests/production-chains.test.ts tests/productive-facilities.test.ts tests/natural-resources.test.ts",
+      "result": "pass",
+      "tests": 75
+    },
+    {
+      "command": "node --import tsx --test --test-concurrency=1 --test-name-pattern='local resource availability|industrial employment refines|saved shipments cannot|nonfarm workplace access' tests/district-economy.test.ts tests/spatial.test.ts tests/adaptive-world.test.ts tests/settlement-dynamics.test.ts",
+      "result": "pass",
+      "tests": 4
+    },
+    {
+      "command": "node --import tsx --test --test-concurrency=2 tests/productive-facilities-display.test.ts tests/retail-pricing.test.ts tests/configuration.test.ts tests/model-mathematics.test.ts",
+      "result": "pass",
+      "tests": 22
+    },
+    {
+      "command": "npm run format",
+      "result": "pass",
+      "scope": "Repository formatter; the isolated changed TypeScript files also pass Prettier checks."
+    },
+    {
+      "command": "npm test",
+      "result": "interrupted",
+      "qualification": "The default whole-suite launch was stopped during excessive parallel worker startup. This is not a full-suite pass; targeted checks above used bounded concurrency."
+    }
+  ],
+  "regressionEvidence": {
+    "baseCommit": "4118963c4844511a96c0dd8bb9e086367516a305",
+    "command": "node --import tsx --test --test-name-pattern='every commissioned facility|new primary facilities' tests/productive-facilities.test.ts",
+    "withoutFix": "Both new specialization tests fail: grain-farm is unclassified and the new primary-sector tie is ignored.",
+    "withFix": "Both tests pass as part of the isolated 75-test run."
+  },
+  "refinement": {
+    "design": "Compile facility activity groups once from the commodity/facility catalogues; share the industrial group with public workshop capacity.",
+    "functions": "Reviewed mean-level summation, workplace apportionment, rounded tier-majority selection, suitable-site fixtures and saved extraction continuation.",
+    "performance": "Grouping is bounded by the 29 facility kinds with no per-query arrays. Existing geographic means remain cached. A deterministic 100,000-query contract verifies specialization and capacity reads never rescan district cells.",
+    "documentation": "Comments explain primary-sector grouping, cached means, integer majority ties and geography-aware construction fixtures. Catalogue counts and roadmap persistence claims match the current implementation."
+  },
+  "limitations": [
+    "No claim of a complete repository test-suite pass or world-scale simulation throughput benchmark.",
+    "Chemistry, limestone/lime, detailed livestock, offshore fisheries and paid delayed plant conversions remain future roadmap work.",
+    "Unrelated working-tree changes are excluded; no push or deployment is part of this task."
+  ]
+}

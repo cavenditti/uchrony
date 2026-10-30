@@ -66,7 +66,7 @@ test('every facility kind uses real paid construction and grants no immediate pr
       'the construction catalogue must cover every productive good exactly once',
     )
   for (const kind of FACILITY_KINDS) {
-    const { w, r, n, cell } = facilityFixture(),
+    const { w, r, n, cell } = facilityFixture(kind),
       before = cash(w),
       quote = facilityQuote(w, r, kind, cell),
       timber = r.stocks.timber,
@@ -397,6 +397,63 @@ test('equal sector tier counts remain mixed regardless of how they are spread ac
   assert.equal(facilityDistrictActivity(w, r), 'mixed')
 })
 
+test('every commissioned facility contributes to the district specialization of its productive sector', () => {
+  const { w, r, cell } = facilityFixture()
+  const groups = {
+    agricultural: [
+      'farm-estate',
+      'sheep-farm',
+      'grain-farm',
+      'flax-farm',
+      'cotton-farm',
+      'hemp-farm',
+      'fishery',
+    ],
+    mining: ['timber-yard', 'quarry', 'iron-mine', 'coal-mine', 'clay-pit', 'salt-works', 'precious-mine'],
+    industrial: [
+      'smelter',
+      'charcoal-kiln',
+      'tool-industry',
+      'textile-industry',
+      'arms-industry',
+      'brick-kiln',
+      'flour-mill',
+      'bakery',
+      'preserving-works',
+      'coking-works',
+      'steel-works',
+      'rope-works',
+      'precious-refinery',
+      'jeweler',
+    ],
+    urban: ['market'],
+  } as const
+  assert.deepEqual(Object.values(groups).flat().sort(), [...FACILITY_KINDS].sort())
+  for (const [activity, kinds] of Object.entries(groups))
+    for (const kind of kinds) {
+      w.facilities = { sites: { [cell]: { [kind]: 1 } }, projects: [] }
+      assert.equal(facilityDistrictActivity(w, r), activity, kind)
+      assert.equal(publicWorkshopJobs(w, r, 1) > 0, activity === 'industrial', kind)
+    }
+})
+
+test('new primary facilities preserve exact majority ties and follow their own physical cells', () => {
+  const { w, r } = facilityFixture(),
+    cells = r.cells.filter((id) => habitableLand(w.cells[id]))
+  assert(cells.length >= 3)
+  w.facilities = {
+    sites: {
+      [cells[0]]: { 'grain-farm': 1, 'clay-pit': 3 },
+      [cells[1]]: { 'flax-farm': 1 },
+      [cells[2]]: { fishery: 1 },
+    },
+    projects: [],
+  }
+  assert.equal(facilityDistrictActivity(w, r), 'mixed')
+  assert.equal(facilityDistrictActivity(w, { ...r, cells: [cells[0]] }), 'mining')
+  assert.equal(facilityDistrictActivity(w, { ...r, cells: cells.slice(1) }), 'agricultural')
+})
+
 test('quotes and 100,000 repeated capacity reads do not mutate the world or rescan its terrain', () => {
   const { w, r, cell } = facilityFixture(),
     before = canonicalHash(w)
@@ -414,7 +471,10 @@ test('quotes and 100,000 repeated capacity reads do not mutate the world or resc
   const district = { ...r, cells },
     first = regionalFacilityLevels(w, district),
     count = visits
-  for (let i = 0; i < 100000; i++) assert.equal(regionalFacilityLevels(w, district), first)
+  for (let i = 0; i < 100000; i++) {
+    assert.equal(regionalFacilityLevels(w, district), first)
+    assert.equal(facilityDistrictActivity(w, district), 'mining')
+  }
   assert.equal(visits, count)
 })
 

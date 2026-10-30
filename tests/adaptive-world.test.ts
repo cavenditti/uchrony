@@ -21,7 +21,7 @@ import { packWorldSave } from '../src/sim/save-codec'
 import { tick } from '../src/sim/engine'
 import { refreshSpatial } from '../src/sim/spatial'
 import { neighbors } from '../src/sim/grid'
-import type { World } from '../src/sim/types'
+import { inventory, type World } from '../src/sim/types'
 import { submitStandingOffer } from '../src/sim/statecraft'
 
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -277,7 +277,7 @@ test('saved shipments cannot change ownership or inject negative inventory', () 
       owner: `household:${to}:owner`,
       dispatched: 0,
       arrives: 2,
-      goods: { food: 1, timber: 0, stone: 0, iron: 0, coal: 0, tools: 0, textiles: 0, arms: 0 },
+      goods: { ...inventory(), food: 1 },
       legs: [{ mode: 'land', cells: [w.localEconomy!.units[from].center, w.localEconomy!.units[to].center] }],
     },
   ]

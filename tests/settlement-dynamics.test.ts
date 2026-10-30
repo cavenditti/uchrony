@@ -16,7 +16,7 @@ import { evolveCities } from '../src/sim/cities'
 import { refreshSpatial } from '../src/sim/spatial'
 import { settlementPlaces } from '../src/map/settlement-scenery'
 import { describeCity } from '../src/map/city-layout'
-import { population } from '../src/sim/types'
+import { inventory, population } from '../src/sim/types'
 import { balances, auditLedger } from '../src/sim/ledger'
 import { physicalStocks } from '../src/sim/goods-accounting'
 import { validateWorld, restoreWorld } from '../src/sim/persistence'
@@ -396,7 +396,7 @@ test('nonfarm workplace access attracts residents even with equal initial crowdi
   const workplace = w.adaptive!.sites[`firm:${firm.id}`]
   Object.assign(workplace, { pool: id, cell: to.cell, x: to.x, y: to.y })
   firm.employment = 10000
-  firm.laborMix = { food: 0, timber: 0, stone: 0, iron: 0, coal: 0, tools: 1, textiles: 0, arms: 0 }
+  firm.laborMix = { ...inventory(), tools: 1 }
   syncResidentialPopulation(w)
   refreshAdaptiveTotals(w)
   const access = settlementAccess(w),

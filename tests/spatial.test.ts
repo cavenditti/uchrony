@@ -6,7 +6,7 @@ import { neighbors } from '../src/sim/grid'
 import { tick } from '../src/sim/engine'
 import { buildSpatial, refreshSpatial, spatialState } from '../src/sim/spatial'
 import { validateWorld, restoreWorld } from '../src/sim/persistence'
-import { population, type World } from '../src/sim/types'
+import { inventory, population, type World } from '../src/sim/types'
 import { balances } from '../src/sim/ledger'
 import { viewSnapshot } from '../src/sim/view-snapshot'
 
@@ -108,7 +108,7 @@ test('industrial employment refines rural land, with split and merge hysteresis'
     region: r.id,
     active: true,
     employment: 3000,
-    laborMix: { tools: 1, textiles: 0, arms: 0, iron: 0, coal: 0 },
+    laborMix: { ...inventory(), tools: 1 },
   }
   w.economy!.firms.push(firm as CompetitiveFirm)
   refreshSpatial(w)

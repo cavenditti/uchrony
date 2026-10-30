@@ -4,11 +4,11 @@ import { parameterGroup } from './configuration-context'
 import {
   FACILITY_DEFINITIONS,
   FACILITY_KINDS,
-  GOOD_FACILITY,
   MAX_FACILITY_LEVELS,
   type FacilityKind,
 } from './facility-types'
 import type { DistrictActivity } from './district-types'
+import { COMMODITIES, type ExtendedGood } from './commodity-catalog'
 import { WORKSHOP_GOODS } from './production-chains'
 import { GOODS, type Inventory, type Nation, type Region, type World } from './types'
 
@@ -17,11 +17,40 @@ export const FACILITY_RECIPES = parameterGroup('facilityRecipes')
 const EMPTY_LEVELS: Readonly<Record<FacilityKind, number>> = Object.freeze(
   Object.fromEntries(FACILITY_KINDS.map((kind) => [kind, 0])) as Record<FacilityKind, number>,
 )
-const WORKSHOP_KINDS = WORKSHOP_GOODS.map((good) => GOOD_FACILITY[good])
-/** Shared premises and descriptive specialization count the same installed workshops. */
-function workshopTiers(levels: Readonly<Record<FacilityKind, number>>) {
+const FACILITY_ACTIVITIES = [
+  'agricultural',
+  'mining',
+  'industrial',
+  'urban',
+] as const satisfies readonly DistrictActivity[]
+type FacilityActivity = (typeof FACILITY_ACTIVITIES)[number]
+const ACTIVITY_KINDS: Record<FacilityActivity, FacilityKind[]> = {
+  agricultural: [],
+  mining: [],
+  industrial: [],
+  urban: [],
+}
+// Compile the catalogue once. Fisheries join crops and grazing in primary food
+// production; mineral sites remain mining even when their research is industrial.
+// Shared premises and specialization must count the same workshop catalogue.
+for (const kind of FACILITY_KINDS) {
+  const good = FACILITY_DEFINITIONS[kind].sector,
+    sector = good === 'market' ? undefined : COMMODITIES[good as ExtendedGood]?.sector,
+    activity: FacilityActivity =
+      good === 'market'
+        ? 'urban'
+        : good === 'food' || good === 'wool' || sector === 'crop' || sector === 'fishery'
+          ? 'agricultural'
+          : WORKSHOP_GOODS.includes(good)
+            ? 'industrial'
+            : 'mining'
+  ACTIVITY_KINDS[activity].push(kind)
+}
+
+/** Sum cached equal-area levels without allocating a fresh sector list per query. */
+function facilityTiers(levels: Readonly<Record<FacilityKind, number>>, kinds: readonly FacilityKind[]) {
   let total = 0
-  for (const kind of WORKSHOP_KINDS) total += levels[kind]
+  for (const kind of kinds) total += levels[kind]
   return total
 }
 const regional = new WeakMap<
@@ -102,32 +131,31 @@ export function weightFacilityLabor(w: World, r: Region, mix: Inventory) {
  * every entrant. Private establishment capacity remains a separate asset. */
 export function publicWorkshopJobs(w: World, r: Region, active: number) {
   const levels = regionalFacilityLevels(w, r)
-  return (workshopTiers(levels) * r.cells.length * FACILITY_POLICY.jobsPerTier) / Math.max(1, active)
+  return (
+    (facilityTiers(levels, ACTIVITY_KINDS.industrial) * r.cells.length * FACILITY_POLICY.jobsPerTier) /
+    Math.max(1, active)
+  )
 }
 
 /** Installed specialization is descriptive; it does not book jobs or output. */
 export function facilityDistrictActivity(w: World, r: Region): DistrictActivity | undefined {
   if (!w.facilities) return undefined
-  const levels = regionalFacilityLevels(w, r),
-    // Commissioned tiers are integers. Recover their counts from cached means
-    // before a majority test, so summation order cannot break an exact tie.
-    farming = Math.round((levels['farm-estate'] + levels['sheep-farm']) * r.cells.length),
-    mining = Math.round(
-      (levels['timber-yard'] + levels.quarry + levels['iron-mine'] + levels['coal-mine']) * r.cells.length,
-    ),
-    industry = Math.round(workshopTiers(levels) * r.cells.length),
-    market = Math.round(levels.market * r.cells.length),
-    total = farming + mining + industry + market,
-    largest = Math.max(farming, mining, industry, market)
+  const levels = regionalFacilityLevels(w, r)
+  let total = 0,
+    maximum = 0,
+    largest: FacilityActivity = 'urban'
+  for (const activity of FACILITY_ACTIVITIES) {
+    // Commissioned tiers are integers. Recover counts from cached means before
+    // the majority test, so summation order cannot break an exact tie.
+    const tiers = Math.round(facilityTiers(levels, ACTIVITY_KINDS[activity]) * r.cells.length)
+    total += tiers
+    if (tiers > maximum) {
+      maximum = tiers
+      largest = activity
+    }
+  }
   if (!total) return undefined
-  if (largest <= total * 0.5) return 'mixed'
-  return largest === farming
-    ? 'agricultural'
-    : largest === mining
-      ? 'mining'
-      : largest === industry
-        ? 'industrial'
-        : 'urban'
+  return maximum > total * 0.5 ? largest : 'mixed'
 }
 
 /** Completion changes durable capacity once, without granting cash, inventories,
