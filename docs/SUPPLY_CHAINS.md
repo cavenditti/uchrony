@@ -20,9 +20,13 @@ explicit labor share. District specialization counts every commissioned facility
 grazing and fisheries are agricultural, extraction is mining, processing is
 industrial, and markets are urban. Ties remain mixed; pending projects supply no
 workplaces or specialization. Raw minerals are geographically distributed. Clay, salt
-and precious ore extraction draw down finite cell reservoirs. Precious metals
-are aggregated rather than separated into gold and silver; extraction does not
-mint money. Coastal fisheries share water-cell stocks and a monthly harvest cap.
+and precious ore extraction draw down finite cell reservoirs. New worlds place
+precious-metal ore in three to five compact, separated lodes with rich centres
+and barren land between them, favouring accessible uplands. Their footprint
+scales with map extent rather than adding more scattered deposits at larger
+scales. Previously saved reservoirs retain their original geology and depletion.
+Precious metals are aggregated rather than separated into gold and silver;
+extraction does not mint money. Coastal fisheries share water-cell stocks and a monthly harvest cap.
 Stocks recover over time without creating fish in owned warehouses. Offshore
 fishing, fishing fleets and territorial fishing rights are not implemented.
 

@@ -1,0 +1,177 @@
+{
+  "date": "2026-10-30",
+  "baseCommit": "28adc64",
+  "scope": "Concentrate precious-metal ore into a few rare, rich lodes for newly initialized natural-resource reservoirs.",
+  "behavior": {
+    "lodes": "Three to five seed-selected, non-overlapping prospects, subject to available accessible land.",
+    "placement": "Broad geological prospect scores favor accessible uplands; a compact radial profile leaves barren ground between lodes.",
+    "scale": "Radius is proportional to the shorter map extent; increasing world size preserves a few coherent districts rather than multiplying deposits.",
+    "richness": "Reference core grades are 1.5\u20132.5, giving 18,000\u201330,000 opening tonnes at lode centres. There is no world-average renormalization.",
+    "accounting": "Existing extraction, finite reserves, depletion, owned inventories and payment rules remain binding. Geology never consumes simulation randomness.",
+    "persistence": "New reservoirs carry geology revision 2. Already-saved unmarked reservoirs retain their original opening geography, positions and depletion rather than being redistributed or rejected."
+  },
+  "regionalSurvey": [
+    {
+      "seed": "natural resources browser review",
+      "mineableCells": 3211,
+      "before": {
+        "oreCells": 1472,
+        "coverage": 0.4584241669261912,
+        "clusters": 12,
+        "tonnes": 1153769.538073574,
+        "richestCellTonnes": 17846.736009265172
+      },
+      "after": {
+        "oreCells": 19,
+        "coverage": 0.005917159763313609,
+        "clusters": 3,
+        "tonnes": 195000.36935301308,
+        "richestCellTonnes": 21749.43592499035
+      }
+    },
+    {
+      "seed": "district productive facilities",
+      "mineableCells": 3068,
+      "before": {
+        "oreCells": 865,
+        "coverage": 0.2819426336375489,
+        "clusters": 15,
+        "tonnes": 721988.5973520466,
+        "richestCellTonnes": 13136.6908973613
+      },
+      "after": {
+        "oreCells": 36,
+        "coverage": 0.011734028683181226,
+        "clusters": 5,
+        "tonnes": 308968.3794412333,
+        "richestCellTonnes": 26611.451973454303
+      }
+    },
+    {
+      "seed": "extended resource map reserves",
+      "mineableCells": 3121,
+      "before": {
+        "oreCells": 1144,
+        "coverage": 0.3665491829541814,
+        "clusters": 17,
+        "tonnes": 899191.5240018402,
+        "richestCellTonnes": 13716.551107142604
+      },
+      "after": {
+        "oreCells": 24,
+        "coverage": 0.00768984299903877,
+        "clusters": 3,
+        "tonnes": 207631.27855564092,
+        "richestCellTonnes": 22581.349060478533
+      }
+    },
+    {
+      "seed": "A world unwritten",
+      "mineableCells": 3136,
+      "before": {
+        "oreCells": 1088,
+        "coverage": 0.3469387755102041,
+        "clusters": 10,
+        "tonnes": 639806.523133258,
+        "richestCellTonnes": 11138.687444283098
+      },
+      "after": {
+        "oreCells": 53,
+        "coverage": 0.016900510204081634,
+        "clusters": 4,
+        "tonnes": 413981.53707619756,
+        "richestCellTonnes": 26197.762260139803
+      }
+    },
+    {
+      "seed": "precious lodes regression",
+      "mineableCells": 3197,
+      "before": {
+        "oreCells": 1614,
+        "coverage": 0.5048482952768221,
+        "clusters": 8,
+        "tonnes": 1226350.133724999,
+        "richestCellTonnes": 18226.178444011777
+      },
+      "after": {
+        "oreCells": 66,
+        "coverage": 0.02064435408195183,
+        "clusters": 5,
+        "tonnes": 554996.4044908845,
+        "richestCellTonnes": 27017.883860902988
+      }
+    }
+  ],
+  "surveyQualification": "Five declared seeds at Regional scale, three continents and four states. This measures static geography, not historical economic calibration or long-run precious-metal prices.",
+  "checks": [
+    {
+      "command": "npm run build",
+      "result": "pass",
+      "environment": "Shared workspace and an isolated archive with only this geological change and its tests."
+    },
+    {
+      "command": "node --import tsx --test --test-concurrency=2 tests/precious-deposits.test.ts tests/natural-resources.test.ts tests/extended-economy.test.ts tests/productive-facilities.test.ts",
+      "result": "pass",
+      "tests": 67,
+      "qualification": "The isolated equivalent also excludes unrelated investment, politics and population edits."
+    },
+    {
+      "command": "npm run format",
+      "result": "pass"
+    },
+    {
+      "command": "npm test",
+      "result": "incomplete",
+      "qualification": "Test concurrency was limited to two with a temporary Node launcher, runner timeouts and a three-minute process-group bound. This is not a full-suite pass."
+    },
+    {
+      "command": "node --import tsx --test --test-name-pattern='regional, continental and world geography' tests/precious-deposits.test.ts",
+      "environment": "Previous committed geology with the new regression test.",
+      "result": "expected failure",
+      "evidence": "112: ore must be spatially rare"
+    },
+    {
+      "check": "Synthetic saved world produced by the previous implementation restores with identical resource reservoirs under the new code.",
+      "result": "pass"
+    },
+    {
+      "check": "Browser preview of precious-metal ore at 1440\u00d71000 shows three compact deposits with mostly barren land; no page errors.",
+      "result": "pass"
+    }
+  ],
+  "refinement": {
+    "design": "The existing source field remains canonical for mining, map quantities and save validation. Saved opening geology is fixed, while new-world calibration is explicit.",
+    "functions": "Reviewed stable prospect ranking, seed-only grades, bounded exclusion, radial support, accessible-land filtering, initialization and revision validation.",
+    "performance": "At most five linear candidate scans and bounded local painting once per cached geography. The temporary score array is released; capacity queries remain O(1). A deterministic 100,000-query contract proves repeated quotes do not revisit terrain.",
+    "benchmark": {
+      "workload": "Three trials on synthetic 8,064- and 129,024-cell fields; median initial lookup and 100,000 cached lookups. Concurrent validation and JIT warmup make these diagnostic timings, not throughput comparisons.",
+      "measurements": [
+        {
+          "cells": 8064,
+          "geology": "saved broad field",
+          "coldMedianMs": 9.516624999999976,
+          "cached100kMedianMs": 4.55641700000001
+        },
+        {
+          "cells": 8064,
+          "geology": "sparse lodes",
+          "coldMedianMs": 39.794124999999894,
+          "cached100kMedianMs": 8.581375000000207
+        },
+        {
+          "cells": 129024,
+          "geology": "saved broad field",
+          "coldMedianMs": 658.0200419999996,
+          "cached100kMedianMs": 6.798499999999876
+        },
+        {
+          "cells": 129024,
+          "geology": "sparse lodes",
+          "coldMedianMs": 312.467208,
+          "cached100kMedianMs": 2.6268750000008367
+        }
+      ]
+    },
+    "documentation": "Domain comments explain rare rich centres, non-overlap, absence of endowment renormalization, caching and fixed saved geology. The supply-chain guide states the new-world scope."
+  }
+}

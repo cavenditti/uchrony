@@ -9,6 +9,9 @@ export const EXTENDED_MINERALS = ['clay', 'salt', 'preciousOre'] as const
 export type ExtendedMineral = (typeof EXTENDED_MINERALS)[number]
 export interface ResourceStocks {
   version: 1
+  /** Opening geology is immutable: recalibration must not relocate saved mines.
+   * Unmarked reservoirs retain their original broad-field endowment. */
+  readonly geology?: 2
   renewed: number
   minerals: Record<number, Record<ExtendedMineral, number>>
   fish: Record<number, number>
@@ -20,6 +23,55 @@ interface ResourceGeography extends Record<ExtendedMineral, Float64Array> {
   fish: Float64Array
 }
 const geographyCache = new WeakMap<World, ResourceGeography>()
+
+/** A handful of finite, separated lodes replaces ubiquitous trace ore. Rank
+ * broad geological prospects once, favor accessible uplands, and suppress nearby
+ * centres after each selection. Radius scales with the map, so larger worlds
+ * retain a few coherent mining districts rather than hundreds of random specks.
+ * Rich centres make mining locations distinct; there is no world-average
+ * normalization that would replace missing ore elsewhere on barren land.
+ * Preparation is O(cells × at most five lodes), never a per-tick search, and uses
+ * only seed-derived fields rather than consuming the simulation random stream. */
+function seedPreciousLodes(
+  w: Pick<World, 'cells' | 'width' | 'height'>,
+  output: Float64Array,
+  prospects: Float64Array,
+  salt: number,
+) {
+  const radius = Math.max(1, Math.min(w.width, w.height) * 0.03),
+    spacingSquared = (radius * 3) ** 2,
+    reach = Math.ceil(radius * 3),
+    lodes = 3 + (salt % 3)
+  for (let lode = 0; lode < lodes; lode++) {
+    let best = -1,
+      score = 0
+    for (let id = 0; id < prospects.length; id++)
+      if (prospects[id] > score) {
+        best = id
+        score = prospects[id]
+      }
+    if (best < 0) break
+    const centre = w.cells[best],
+      detail = noise((centre.q / w.width) * 17, (centre.r / w.height) * 17, salt + 181),
+      radiusSquared = (radius * (0.8 + detail * 0.4)) ** 2,
+      grade = 1.5 + detail
+    for (let row = Math.max(0, centre.r - reach); row <= Math.min(w.height - 1, centre.r + reach); row++)
+      for (
+        let column = Math.max(0, centre.q - reach);
+        column <= Math.min(w.width - 1, centre.q + reach);
+        column++
+      ) {
+        const id = row * w.width + column,
+          distanceSquared = (column - centre.q) ** 2 + (row - centre.r) ** 2
+        // Exclusion exceeds two maximum lode radii, leaving genuine barren
+        // ground between prospects. Sea and inaccessible peaks receive no ore.
+        if (distanceSquared < spacingSquared) prospects[id] = 0
+        if (distanceSquared >= radiusSquared || !habitableLand(w.cells[id])) continue
+        output[id] = grade * (1 - distanceSquared / radiusSquared) ** 2
+      }
+  }
+}
+
 /** Static geographic fields are sampled once, not on every firm's capacity
  * quote. Remaining stocks stay live and are never cached with these fields. */
 function resourceGeography(w: World): ResourceGeography {
@@ -33,6 +85,8 @@ function resourceGeography(w: World): ResourceGeography {
     fish: new Float64Array(size),
   }
   const salt = hashSeed(`${w.seed}:extended-geology`)
+  const originalGeology = w.resourceStocks !== undefined && w.resourceStocks.geology === undefined,
+    prospects = originalGeology ? undefined : new Float64Array(size)
   for (const c of w.cells) {
     const coast = neighbors(c.id, w.width, w.height)
     if (c.terrain === 'water') {
@@ -40,8 +94,7 @@ function resourceGeography(w: World): ResourceGeography {
     } else if (habitableLand(c)) {
       const x = (c.q / w.width) * 9,
         y = (c.r / w.height) * 9
-      const field = noise(x, y, salt + 23),
-        precious = noise(x, y, salt + 71)
+      const field = noise(x, y, salt + 23)
       cached.clay[c.id] = Math.max(0, c.moisture - 0.18) * (c.river ? 1.5 : Math.max(0.1, 1 - c.elevation))
       cached.salt[c.id] =
         c.terrain === 'desert'
@@ -49,10 +102,16 @@ function resourceGeography(w: World): ResourceGeography {
           : field > 0.4 && coast.some((id) => w.cells[id].terrain === 'water')
             ? 0.15 + field * 0.4
             : 0
-      cached.preciousOre[c.id] =
-        Math.max(0, precious - 0.55) ** 2 * (c.terrain === 'hills' || c.terrain === 'mountains' ? 8 : 0.4)
+      if (prospects)
+        prospects[c.id] =
+          noise(x / 3, y / 3, salt + 71) * (c.terrain === 'hills' || c.terrain === 'mountains' ? 1.5 : 0.6)
+      else
+        cached.preciousOre[c.id] =
+          Math.max(0, noise(x, y, salt + 71) - 0.55) ** 2 *
+          (c.terrain === 'hills' || c.terrain === 'mountains' ? 8 : 0.4)
     }
   }
+  if (prospects) seedPreciousLodes(w, cached.preciousOre, prospects, salt)
   geographyCache.set(w, cached)
   return cached
 }
@@ -81,7 +140,7 @@ export function ensureResourceStocks(w: World): ResourceStocks {
     const capacity = fishCapacity(w, c.id)
     if (capacity > 0) fish[c.id] = capacity
   }
-  return (w.resourceStocks = { version: 1, renewed: w.month, minerals, fish, caught: {} })
+  return (w.resourceStocks = { version: 1, geology: 2, renewed: w.month, minerals, fish, caught: {} })
 }
 const coastIndexes = new WeakMap<World, WeakMap<number[], number[]>>()
 /** Cache geographic access by the actual cell array; adjacent markets share the
@@ -172,6 +231,7 @@ export function validateResourceStocks(w: World) {
   if (
     !s ||
     s.version !== 1 ||
+    (s.geology !== undefined && s.geology !== 2) ||
     !Number.isFinite(s.renewed) ||
     s.renewed < 0 ||
     s.renewed > w.month ||
