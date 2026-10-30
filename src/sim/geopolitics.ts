@@ -18,7 +18,7 @@ import { decisionPolicy, recruitmentCost } from './decision-policy'
 import { nativeDomesticControl } from './domestic-policy'
 import { expansionParameters } from './expansion-parameters'
 import { militaryImpression, recordMilitaryInfluence } from './influence'
-import { foreignPolicyMandate, sharedInstitution } from './institutions'
+import { collectiveDefense, foreignPolicyMandate, sharedInstitution } from './institutions'
 import { intelligenceService, perceivedAllies, perceivedPower, reportedWar } from './intelligence'
 import { publicExpense } from './ledger'
 import { annexProvince, annexationObstacle } from './military-control'
@@ -457,6 +457,10 @@ export function advanceGeopolitics(world: World) {
           rel.treaty === 'truce' ||
           rel.treaty === 'alliance'
         )
+          continue
+        // A bilateral alliance does not override delegated foreign policy. Only
+        // the charter's mandate or its specific common-defense duty permits entry.
+        if (!foreignPolicyMandate(world, partner, [partner]) && !collectiveDefense(world, partner, attacker))
           continue
         const combined = perceivedPower(world, partner, partner) + perceivedPower(world, partner, victim),
           risk = world.nations[partner].character!.leader.politics!.drives.riskTolerance

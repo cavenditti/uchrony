@@ -16,6 +16,8 @@ import {
 } from '../src/sim/institutions'
 import { diplomaticAccess, preferentialTrade } from '../src/sim/agreements'
 import { transportGraph } from '../src/sim/economy'
+import { advanceGeopolitics } from '../src/sim/geopolitics'
+import { intelligenceService, perceivedPower, reportedWar } from '../src/sim/intelligence'
 import { restoreWorld, validateWorld } from '../src/sim/persistence'
 import { relation, type World } from '../src/sim/types'
 
@@ -129,6 +131,68 @@ test('delegated foreign policy needs the charter majority, with a specific commo
     /member authorization/,
   )
 })
+
+/** Isolate intervention from offensive planning: only the ally is autonomous,
+ * and its received report makes military support feasible, not authorized. */
+function intervention(w: World, victim: number, attacker: number) {
+  for (const n of w.nations) n.ai = n.id === 0
+  for (const rel of w.relations) Object.assign(rel, { treaty: 'neutral', opinion: 0, grievance: 0 })
+  relation(w, 0, victim)!.treaty = 'alliance'
+  const war = relation(w, attacker, victim)!
+  Object.assign(war, { treaty: 'war', aggressor: attacker, since: w.month })
+  const service = intelligenceService(w, 0)
+  service.relations.push({ ...war, month: w.month })
+  w.nations[0].character!.leader.politics!.drives.riskTolerance = 1
+  assert(reportedWar(w, 0, attacker, victim))
+  assert(
+    perceivedPower(w, 0, 0) + perceivedPower(w, 0, victim) >= perceivedPower(w, 0, attacker) * 0.7,
+    'the ally has enough perceived strength to attempt intervention',
+  )
+  return war
+}
+
+for (const powers of [['foreignPolicy'], ['foreignPolicy', 'defense']] satisfies Charter['powers'][]) {
+  test(`an automated ally with ${powers.join('/')} delegation skips unauthorized outside wars`, () => {
+    const w = generateWorld('charter-allied-intervention')
+    found(w, powers)
+    const war = intervention(w, 3, 4),
+      before = structuredClone(relation(w, 0, 4)),
+      spent = w.foreignOffices!.offices.find((o) => o.nation === 0)!.totalSpent
+    assert(!foreignPolicyMandate(w, 0, [0]))
+    assert.doesNotThrow(() => advanceGeopolitics(w))
+    assert.deepEqual(relation(w, 0, 4), before)
+    assert.equal(relation(w, war.a, war.b)!.treaty, 'war')
+    assert(!w.statecraft!.offers.some((o) => o.terms.some((t) => t.kind === 'war')))
+    assert.equal(w.foreignOffices!.offices.find((o) => o.nation === 0)!.totalSpent, spent)
+    // Repeated monthly decisions must remain safe without weakening the charter.
+    w.month++
+    assert.doesNotThrow(() => advanceGeopolitics(w))
+    assert.deepEqual(relation(w, 0, 4), before)
+  })
+}
+
+for (const commonDefense of [false, true]) {
+  test(`automated intervention preserves ${commonDefense ? 'delegated common defense' : 'independent bilateral support'}`, () => {
+    const w = generateWorld('charter-authorized-intervention')
+    found(w, commonDefense ? ['foreignPolicy', 'defense'] : ['trade'])
+    const victim = commonDefense ? 1 : 3,
+      attacker = 4
+    intervention(w, victim, attacker)
+    assert.equal(foreignPolicyMandate(w, 0, [0]), !commonDefense)
+    advanceGeopolitics(w)
+    const offer = w.statecraft!.offers.find((o) =>
+      o.terms.some((t) => t.kind === 'war' && t.from === 0 && t.to === attacker),
+    )!
+    assert(offer, 'an authorized cabinet still proposes intervention')
+    w.month = Math.max(w.month, offer.notBefore ?? w.month)
+    settleConventionalOffers(w)
+    assert.equal(offer.status, 'ratified', offer.ruling)
+    const rel = relation(w, 0, attacker)!
+    assert.equal(rel.treaty, 'war')
+    assert.equal(rel.aggressor, commonDefense ? attacker : 0)
+    assert.equal(rel.defenseOf, commonDefense ? victim : undefined)
+  })
+}
 
 test('common defense opens the actual army transport graph through member territory', () => {
   const w = generateWorld('charter-access')
