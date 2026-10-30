@@ -6,12 +6,10 @@ export { FAST_FORWARD_MONTHS } from './simulation-invariants'
 
 /** One six-month production/consumption and cohort integration. Local migration,
  * household assets, housing, employment and settlement census reconcile at the end.
- * Legacy partial intervals finish their remaining months before starting a new block.
  */
 export function fastForwardStep(world: World): boolean {
-  const previous = world.fastForward ?? { months: 0, lastMonth: world.month, phase: 0 }
-  const months = FAST_FORWARD_MONTHS - previous.phase
-  advanceCoarsePeriod(world, months)
-  world.fastForward = { months: previous.months + months, lastMonth: world.month, phase: 0 }
+  const previous = world.fastForward?.months ?? 0
+  advanceCoarsePeriod(world, FAST_FORWARD_MONTHS)
+  world.fastForward = { months: previous + FAST_FORWARD_MONTHS, lastMonth: world.month }
   return true
 }

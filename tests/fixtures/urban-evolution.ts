@@ -85,8 +85,6 @@ export function urbanFixture(scenario: UrbanScenario = 'market') {
         },
       ],
       jurisdictions: {},
-      commuting: [],
-      migration: { source: 'legacy', month: 0, assumptions: [] },
     },
     localEconomy: {
       active: scenario === 'boundary' ? [0, 1] : [0],

@@ -1,3 +1,22 @@
+import {
+  withSimulationPeriod,
+  simulationMonths,
+  periodRate,
+  periodInterest,
+  crossedPeriodMonth,
+} from '../src/sim/simulation-period'
+import { householdNeed } from '../src/sim/economy'
+import { firmCapacity, ensureFirms } from '../src/sim/firms'
+import { beginEconomyMonth } from '../src/sim/macroeconomy'
+import { MODEL_PARAMETERS as P } from '../src/sim/model-parameters'
+import { cohortBirths, cohortDeaths, annualMortality } from '../src/sim/age-cohorts'
+import { viewSnapshot } from '../src/sim/view-snapshot'
+import { borrow, producerAccount } from '../src/sim/ledger'
+import { withLoanOriginationBatch, loansForBorrower, bankLoans, accountBank } from '../src/sim/banking'
+
+const near = (actual: number, expected: number) =>
+  assert(Math.abs(actual - expected) < 1e-8 * Math.max(1, Math.abs(expected)), `${actual} != ${expected}`)
+
 import { ensureHistory } from '../src/sim/history'
 import { ensureStatecraft } from '../src/sim/statecraft'
 import test from 'node:test'
@@ -52,7 +71,7 @@ test('one clearing advances six months, conserves accounts/census and resumes ex
     )
     check(w)
   }
-  assert.deepEqual(w.fastForward, { months: 18, lastMonth: 18, phase: 0 })
+  assert.deepEqual(w.fastForward, { months: 18, lastMonth: 18 })
   tick(w)
   assert.equal(w.month, 19)
   assert.equal(w.economy!.periodMonths, 1)
@@ -60,42 +79,21 @@ test('one clearing advances six months, conserves accounts/census and resumes ex
   check(w)
 })
 
-test('legacy partial Max intervals finish their remaining months and retain provenance', () => {
-  const w = generateWorld('fast-forward-pause', 3, 4, undefined, 'regional', 'frontier')
-  tick(w, 'coarse')
-  tick(w, 'coarse')
-  w.fastForward = { months: 2, lastMonth: 2, phase: 2 }
+test('fast-forward provenance rejects retired partial intervals and impossible dates', () => {
+  const w = generateWorld('fast-forward-provenance', 3, 4, undefined, 'regional', 'frontier')
   fastForwardStep(w)
-  assert.equal(w.month, 6)
-  assert.equal(w.economy!.periodMonths, 4)
-  assert.deepEqual(w.fastForward, { months: 6, lastMonth: 6, phase: 0 })
+  assert.deepEqual(w.fastForward, { months: 6, lastMonth: 6 })
   check(w)
   tick(w)
   assert.equal(w.month, 7)
   check(w)
-  assert.throws(() => validateWorld({ ...w, fastForward: { ...w.fastForward, phase: 6 } }), /provenance/)
-  assert.throws(() => validateWorld({ ...w, fastForward: { ...w.fastForward, months: 100 } }), /provenance/)
   assert.throws(() => validateWorld({ ...w, fastForward: { ...w.fastForward, phase: 1 } }), /provenance/)
+  assert.throws(() => validateWorld({ ...w, fastForward: { ...w.fastForward, months: 100 } }), /provenance/)
+  assert.throws(
+    () => validateWorld({ ...w, fastForward: { ...w.fastForward, lastMonth: 100 } }),
+    /provenance/,
+  )
 })
-
-import {
-  withSimulationPeriod,
-  simulationMonths,
-  periodRate,
-  periodInterest,
-  crossedPeriodMonth,
-} from '../src/sim/simulation-period'
-import { householdNeed } from '../src/sim/economy'
-import { firmCapacity, ensureFirms } from '../src/sim/firms'
-import { beginEconomyMonth } from '../src/sim/macroeconomy'
-import { MODEL_PARAMETERS as P } from '../src/sim/model-parameters'
-import { cohortBirths, cohortDeaths, annualMortality } from '../src/sim/age-cohorts'
-import { viewSnapshot } from '../src/sim/view-snapshot'
-import { borrow, producerAccount } from '../src/sim/ledger'
-import { withLoanOriginationBatch, loansForBorrower, bankLoans, accountBank } from '../src/sim/banking'
-
-const near = (actual: number, expected: number) =>
-  assert(Math.abs(actual - expected) < 1e-8 * Math.max(1, Math.abs(expected)), `${actual} != ${expected}`)
 
 test('coarse production, needs, mortality, fertility and construction use elapsed months, not one monthly tick', () => {
   const w = generateWorld('macro-units', 3, 4, undefined, 'regional')

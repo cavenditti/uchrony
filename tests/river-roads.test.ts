@@ -4,7 +4,7 @@ import { CELL_METERS, CELL_SIZE } from '../src/sim/grid'
 import { METERS_PER_MAP_UNIT } from '../src/sim/physical-space'
 import { type World } from '../src/sim/types'
 import { type SettlementLane } from '../src/sim/adaptive-types'
-import { laneTouchesRiver, surveyRiverBridge, reconcileRiverLanes, RIVER_ROADS } from '../src/sim/river-lanes'
+import { laneTouchesRiver, surveyRiverBridge, RIVER_ROADS } from '../src/sim/river-lanes'
 import { inRiverChannel, riverCurves, riverPoint, riverSectionsNear } from '../src/map/rivers'
 import { generateWorld } from '../src/sim/generate'
 import { prepareSpatialWorld, tick } from '../src/sim/engine'
@@ -135,79 +135,6 @@ test('bends use the local river normal and confluences move the crossing away fr
   }
   assert(Math.hypot(mid.x - junction.x, mid.y - junction.y) > 40, 'do not bridge through the confluence')
   assert(crossing.points.every((p) => !laneTouchesRiver(junction.w, [p], 5.5)))
-})
-
-test('repair cannot add a bridge across sea, occupied abutments or steep banks', () => {
-  for (const obstacle of ['sea', 'building', 'slope'] as const) {
-    const { w, x, y } = channel()
-    w.adaptive!.lanes = [
-      {
-        pool: 0,
-        founded: 0,
-        width: 5.5,
-        points: [
-          { x: x - 130, y },
-          { x: x + 130, y },
-        ],
-      },
-    ]
-    if (obstacle === 'sea') w.cells[4 * w.width + 4].terrain = 'water'
-    if (obstacle === 'slope')
-      w.cells.forEach((c) => {
-        c.elevation = c.q <= 3 ? 0 : 1
-      })
-    if (obstacle === 'building')
-      w.adaptive!.sites.block = {
-        building: [
-          { x: x - 500, y: y - 500 },
-          { x: x + 500, y: y - 500 },
-          { x: x + 500, y: y + 500 },
-          { x: x - 500, y: y + 500 },
-        ],
-      } as any
-    const sites = JSON.stringify(w.adaptive!.sites)
-    reconcileRiverLanes(w)
-    assert.equal(w.adaptive!.lanes!.filter((l) => l.bridge).length, 0, obstacle)
-    assert.equal(JSON.stringify(w.adaptive!.sites), sites)
-  }
-})
-
-test('old water-crossing tangles become dry streets and a connected shared bridge, without moving homes', () => {
-  const { w, x, y } = channel()
-  w.adaptive!.lanes = [-60, 0, 60].map((dy) => ({
-    pool: 0,
-    founded: 0,
-    width: 5.5,
-    points: [
-      { x: x - 130, y: y + dy },
-      { x: x + 130, y: y + dy + 25 },
-    ],
-  }))
-  const sites = JSON.stringify(w.adaptive!.sites)
-  assert(reconcileRiverLanes(w))
-  const lanes = w.adaptive!.lanes!
-  assert(
-    lanes.every((lane) =>
-      lane.points.every((p) => Object.keys(p).every((key) => key === 'x' || key === 'y')),
-    ),
-    'street geometry must not retain mutable residential records',
-  )
-  const bridges = lanes.filter((l) => l.bridge)
-  assert.equal(bridges.length, 1)
-  assert(
-    lanes
-      .filter((l) => !l.bridge)
-      .every((l) => l.points.slice(1).every((p, i) => !laneTouchesRiver(w, [l.points[i], p], l.width))),
-  )
-  for (const end of bridges[0].points)
-    assert(
-      lanes.some((l) => !l.bridge && l.points.some((p) => Math.hypot(p.x - end.x, p.y - end.y) < 0.01)),
-      'bridge joins an actual dry street at both ends',
-    )
-  assert.equal(JSON.stringify(w.adaptive!.sites), sites)
-  const repaired = JSON.stringify(w)
-  assert(!reconcileRiverLanes(w))
-  assert.equal(JSON.stringify(w), repaired)
 })
 
 test('new riverside cities retain dry roads, shared crossings and valid save geometry as they grow', () => {

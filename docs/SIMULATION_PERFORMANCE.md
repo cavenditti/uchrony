@@ -2,7 +2,7 @@
 
 ## Regular monthly playback — 28 October 2026
 
-Max is temporarily disabled while correctness and regular monthly throughput take priority. The app offers Play and 2×, both calling the same monthly engine; the worker cannot dispatch coarse integration. Legacy `max` playback requests fall back to regular 1×. Space toggles playback and keys 1–2 select the pace. Existing saves retain their approximation provenance and display **Approx. history** when applicable; their next step uses the monthly model, including reconciliation of an inherited partial interval.
+Max is temporarily disabled while correctness and regular monthly throughput take priority. The app offers Play and 2×, both calling the same monthly engine; the worker cannot dispatch coarse integration. Unsupported playback requests are rejected. Space toggles playback and keys 1–2 select the pace. Existing saves retain their approximation provenance and display **Approx. history** when applicable; their next step uses the monthly model, with no partial-interval recovery path.
 
 The coarse engine remains available to development benchmarks and compatibility tests, but its old timings below are historical. Retained commuter history now preserves route identifiers only: every matching round discovers current vacancies and computes routes against current access, including damage and ownership. An empty history cannot freeze recruitment, and an old route cannot bypass a newly inaccessible province. These corrections intentionally change experimental coarse outcomes; regular monthly matching retains its search and settlement order.
 
@@ -150,7 +150,7 @@ Max is an explicitly approximate, multirate model, approved for this mode. It do
 - Between six-month reviews, commuter matching reuses known journeys and current workers, vacancies, wages and funding. Full job search returns at the review.
 - Migration and occupational changes run at the review with accumulated transition probabilities and actual housing capacity. Identity changes and residential location choices are reviewed then; these can differ from monthly decisions.
 - Housing demand uses aggregate local shortages, subtracting funded capacity once. Infill uses actual resources and paid labor. New plots are surveyed at the review; normal playback keeps the full multi-centre housing-demand calculation.
-- Returning to normal playback reconciles an incomplete interval on the next monthly step. Pausing alone does not advance or alter the model. Partial interval state and approximation provenance survive compressed saves, and the clock keeps an **Approx. history** label after leaving Max.
+- Explicit benchmark steps integrate complete six-month periods. Pausing alone does not advance or alter the model. Saves retain approximation provenance; retired partial intervals are rejected.
 
 The profile also found an exact optimisation: `housingCentres` rebuilt the global construction membership set for every housing pool. That immutable index is now shared across the phase, without changing ordering, choices or arithmetic. The sampled World run spent about two-thirds of monthly work in housing investment before this fix.
 

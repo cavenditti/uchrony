@@ -31,7 +31,7 @@ Each support (a parcel square, or a node for point-like buildings) is convolved 
 
 **No lattice of identical towns.** At market scale, similar coarse records one sample apart blur into one plateau with one summit. Ripples over evenly settled land are insignificant, and the place is labelled at the plateau's centre of mass. A genuine concentration on that plateau becomes its summit and draws the label. In controlled scenarios a 5,000-person satellite of a 20,000-person city grades with distance: a shoulder of the city at 2.6 km, a quarter-range bump at 3 km, independent from 3.5 km, and a separate urban area beyond about 4.5 km. Density alone barely changes a satellite's prominence; new fabric between two towns does, so sprawl, not mere growth, absorbs a neighbour.
 
-Places move no residents, buildings, accounts or legal jurisdictions. Legal municipalities and provinces (`jurisdictions.ts`) keep their own cost-driven reviews. The saved records keep the `cities` name for save compatibility. Older records' prestige/wealth `standing` and dominance timers are accepted and dropped on the next refresh; saved configurations of the retired `urbanIntegration` group and `settlements.minimumDensity` load unchanged.
+Places move no residents, buildings, accounts or legal jurisdictions. Legal municipalities and provinces (`jurisdictions.ts`) keep their own cost-driven reviews. The records use the `cities` registry. Retired prestige/wealth indicators, dominance timers, `urbanIntegration` settings and `settlements.minimumDensity` are no longer supported.
 
 ## Gravitation
 

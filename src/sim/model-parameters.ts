@@ -1,4 +1,4 @@
-/** Compatibility names; all defaults and validation now live in configuration. */
+/** Scoped model calibration; defaults and validation belong to the configuration registry. */
 import { parameterGroup } from './configuration-context'
 export { DEFAULT_MODEL_PARAMETERS } from './configuration-defaults'
 export type { ModelParameters } from './configuration-defaults'

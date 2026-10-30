@@ -1,19 +1,12 @@
+import { UnsupportedSaveError } from '../src/sim/save-version'
 import { packWorldSave } from '../src/sim/save-codec'
 import { createHash, randomUUID } from 'node:crypto'
-import { constants } from 'node:fs'
 import { copyFile, mkdir, open, readFile, rename, stat, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { restoreWorld } from '../src/sim/persistence'
 import { MAX_SAVE_BYTES, type WorldSave } from '../src/storage/save-types'
-import { LEGACY_SAVE_KEY } from '../src/storage/autosave'
-
-const recoveryPage = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Uchrony save recovery</title>
-<style>body{background:#19252b;color:#e6e7dd;font:16px/1.6 system-ui;margin:0;padding:40px 24px}main{max-width:640px;margin:10vh auto}h1{font:400 34px/1.2 Georgia,serif}button{background:#d7b77a;color:#253034;border:0;border-radius:4px;padding:12px 18px;font:inherit;cursor:pointer}button:disabled{opacity:.6}a{color:#d7b77a}p{overflow-wrap:anywhere}button:focus-visible,a:focus-visible{outline:2px solid #d7b77a;outline-offset:4px}</style>
-<main><h1>Preserve a previous browser save</h1><p>This copies the older browser autosave to local disk without opening a simulation or changing the original browser data. An existing disk autosave is never overwritten. A world that has not yet been saved must be exported from its running tab.</p><button id="backup">Back up previous save</button><p id="status" role="status" aria-live="polite"></p><a href="/">Return to the simulator</a></main>
-<script>document.getElementById('backup').onclick=async function(){const status=document.getElementById('status');this.disabled=true;try{const raw=localStorage.getItem(${JSON.stringify(LEGACY_SAVE_KEY)});if(!raw){status.textContent='No previous browser autosave was found. Your running tab may still hold an unsaved world; use Export there before reloading it.';this.disabled=false;return}const world=JSON.parse(raw),initial=await(await fetch('/api/saves/current')).json(),headers={'Content-Type':'application/json','X-Uchrony-Save-Slot':initial.slot},save={version:1,savedAt:Date.now(),world};if(initial.save){status.textContent='A verified disk autosave already exists and was kept. The original browser save is also unchanged.';this.textContent='Existing disk save kept';return}const response=await fetch('/api/saves/current',{method:'PUT',headers,body:JSON.stringify(save)});if(!response.ok)throw new Error('The disk backup could not complete. Your browser save has been kept.');const verified=await(await fetch('/api/saves/current',{headers:{'X-Uchrony-Save-Slot':initial.slot}})).json();if(JSON.stringify(verified.save.world)!==JSON.stringify(world))throw new Error('The backup could not be verified. Your browser save has been kept.');status.textContent='Backup verified on local disk: '+world.seed+', simulation month '+world.month+'. The original browser save is unchanged.';this.textContent='Backup verified'}catch(error){status.textContent=error.message;this.disabled=false}};</script></html>`
-
 const validSlot = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 const checksum = (save: { world: unknown }) =>
@@ -32,7 +25,7 @@ export function validateSaveRecord(value: unknown): WorldSave {
 }
 export class DiskAutosaves {
   private queues = new Map<string, Promise<void>>()
-  private verified = new Map<string, { fingerprint: string; adaptive: boolean }>()
+  private verified = new Map<string, { fingerprint: string }>()
   private async fingerprint(path: string) {
     const info = await stat(path)
     return `${info.size}:${info.mtimeMs}:${info.ctimeMs}`
@@ -44,7 +37,7 @@ export class DiskAutosaves {
       if (cached?.fingerprint === signature) return cached
       const saved = await this.readFile(path)
       if (!saved) return null
-      const verified = { fingerprint: signature, adaptive: !!saved.world.adaptive }
+      const verified = { fingerprint: signature }
       this.verified.set(path, verified)
       return verified
     } catch {
@@ -85,16 +78,17 @@ export class DiskAutosaves {
       savedAt: value.savedAt,
       world: encoded ? value.encoded : value.world,
     })
-    let damaged = false
+    let failure: unknown
     try {
       const save = await this.readFile(this.path(slot))
       if (save) return { save: output(save), recovered: false }
-    } catch {
-      damaged = true
+    } catch (error) {
+      failure = error
     }
     const previous = await this.readFile(this.path(slot, true))
     if (previous) return { save: output(previous), recovered: true }
-    if (damaged) throw new Error('The saved files could not be restored. They have been kept for recovery.')
+    if (failure instanceof UnsupportedSaveError) throw failure
+    if (failure) throw new Error('The saved files could not be restored. They have been kept for recovery.')
     return { save: null, recovered: false }
   }
   async write(slot: string, value: WorldSave<unknown>) {
@@ -103,7 +97,6 @@ export class DiskAutosaves {
       backup = this.path(slot, true)
     // The worker already compressed this immutable snapshot. Decode and validate
     // above, but retain its original encoding instead of compressing it twice.
-    // Narrow legacy recovery still runs when either replica is restored.
     const encoded = value.world && typeof value.world === 'object' && 'worldEncoding' in value.world
     const packed = { ...save, world: encoded ? value.world : packWorldSave(save.world) }
     const data = JSON.stringify({ ...packed, checksum: checksum(packed) })
@@ -126,23 +119,12 @@ export class DiskAutosaves {
           // Never replace a good backup with an unreadable current file.
           const prior = await this.verifiedCurrent(current)
           if (prior) {
-            if (save.world.adaptive && !prior.adaptive) {
-              // Write-once recovery copy survives later rotations of the ordinary previous save.
-              await copyFile(
-                current,
-                join(this.root, `${slot}.pre-adaptive-v1.json`),
-                constants.COPYFILE_EXCL,
-              ).catch((error: NodeJS.ErrnoException) => {
-                if (error.code !== 'EEXIST') throw error
-              })
-            }
             await copyFile(current, backupTemporary)
             await rename(backupTemporary, backup)
           }
           await rename(temporary, current)
           this.verified.set(current, {
             fingerprint: await this.fingerprint(current),
-            adaptive: !!save.world.adaptive,
           })
           const directory = await open(this.root, 'r')
           try {
@@ -167,15 +149,6 @@ export class DiskAutosaves {
 export function autosaveMiddleware(root: string, onError: (error: unknown) => void = () => {}) {
   const store = new DiskAutosaves(root)
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    if (req.url?.split('?')[0] === '/save-recovery' && req.method === 'GET') {
-      res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store',
-        'Cross-Origin-Resource-Policy': 'same-origin',
-      })
-      res.end(recoveryPage)
-      return
-    }
     if (req.url?.split('?')[0] !== '/api/saves/current') {
       next()
       return
@@ -242,11 +215,13 @@ export function autosaveMiddleware(root: string, onError: (error: unknown) => vo
     } catch (error) {
       onError(error)
       const code = (error as NodeJS.ErrnoException).code
-      reply(503, {
+      reply(error instanceof UnsupportedSaveError ? 409 : 503, {
         error:
-          code === 'ENOSPC'
-            ? 'The local disk has no free space.'
-            : 'The local disk autosave is unavailable. Existing save files have been kept.',
+          error instanceof UnsupportedSaveError
+            ? error.message
+            : code === 'ENOSPC'
+              ? 'The local disk has no free space.'
+              : 'The local disk autosave is unavailable. Existing save files have been kept.',
       })
     }
   }

@@ -63,7 +63,7 @@ test('packed district exports and disk checkpoints restore an identical continua
   assert.throws(() => restoreWorld(bad))
 })
 
-test('bounded economic tables retain all records and key order, read v1 saves and reject forged tables', () => {
+test('bounded economic tables retain all records and key order and reject retired or forged tables', () => {
   const w = generateWorld('Bounded economic serialization')
   tick(w)
   const expected = digest(w),
@@ -79,7 +79,13 @@ test('bounded economic tables retain all records and key order, read v1 saves an
     economy: encodeSaveBlock(w.economy),
     localEconomy: encodeSaveBlock(w.localEconomy),
   }
-  assert.equal(digest(restoreWorld(JSON.parse(JSON.stringify(old)))), expected)
+  assert.throws(() => restoreWorld(old), /Unsupported compressed world/)
+  const oldAdaptive = structuredClone(packed)
+  oldAdaptive.adaptive.encoding = 'adaptive-blocks-v1'
+  assert.throws(() => restoreWorld(oldAdaptive), /Unsupported adaptive/)
+  const unordered = structuredClone(packed)
+  delete unordered.adaptive.keys
+  assert.throws(() => restoreWorld(unordered), /save section/)
   const duplicate = structuredClone(packed)
   duplicate.economy.fields.households.blocks.push(duplicate.economy.fields.households.blocks[0])
   assert.throws(() => restoreWorld(duplicate), /record identities/)

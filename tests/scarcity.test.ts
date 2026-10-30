@@ -1,3 +1,4 @@
+import { configurationDraft, applyConfiguration } from '../src/sim/configuration'
 import { firmCapacity, ensureFirms } from '../src/sim/firms'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -27,7 +28,9 @@ test('abundance scales actual raw output; constrained populations can exhaust re
       instability: 0,
     }),
     rich = structuredClone(scarce)
-  rich.simulation!.abundance = 1.6
+  const values = configurationDraft(rich)
+  values.conditions.abundance = 1.6
+  applyConfiguration(rich, values, rich.configuration.revision)
   for (const w of [scarce, rich]) {
     ensureFirms(w)
     for (const f of w.economy!.firms!) f.employment = 1000

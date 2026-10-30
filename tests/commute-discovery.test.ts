@@ -47,7 +47,6 @@ function fixture() {
       w.economy!.households[residence.id].laborer.laborForce = 100
       w.adaptive!.commutingRows = []
       w.adaptive!.commuteRoutes = {}
-      w.adaptive!.commuting = []
       return { w, residence, workplace, firm, route }
     }
   }

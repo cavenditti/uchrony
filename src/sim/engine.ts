@@ -66,7 +66,6 @@ import { nationalRealService, realService } from './public-services'
 import { random } from './random'
 import { TECH_NAMES, researchCost } from './research'
 import { ensureResidentialSites, syncResidentialPopulation } from './residential-sites'
-import { reconcileRiverLanes } from './river-lanes'
 import { settlementAccess } from './settlement-access'
 import { event } from './simulation-events'
 import {
@@ -79,7 +78,6 @@ import {
 import { advanceSovereignty } from './sovereignty'
 import { refreshSpatial } from './spatial'
 import { advanceStatecraft } from './statecraft'
-import { reconcileMountainTerrain } from './terrain-migration'
 import { refreshPlaces } from './places'
 import { absorbUnclaimedEnclaves } from './territorial-expansion'
 import { territorialIndex } from './territory-index'
@@ -328,14 +326,12 @@ function initializeSpatialWorld(w: World) {
   ensureDistrictEconomy(w)
   ensureAdaptiveWorld(w)
   ensureResidentialSites(w)
-  const terrainChanged = reconcileMountainTerrain(w)
   const buildingsChanged = ensureBuildingLots(w)
-  reconcileRiverLanes(w)
   syncResidentialPopulation(w)
-  if (initializing || buildingsChanged || terrainChanged) {
+  if (initializing || buildingsChanged) {
     rebuildAdaptiveMesh(w)
     // Urban shares, district activity and places are all read from the
-    // localized physical census, so a converted world starts consistent.
+    // localized physical census, so a new world starts consistent.
     const settlements = advanceSettlements(w, true)
     refreshPlaces(w, settlements)
     // As after the monthly refresh: re-aggregate so pool shares are the canonical
@@ -370,17 +366,14 @@ function advanceCoarsePeriodConfigured(w: World, months = 6): World {
   )
 }
 
-export type TickDetail = 'monthly' | 'coarse' | 'reconcile'
+export type TickDetail = 'monthly' | 'coarse'
 
 export function tick(w: World, detail: TickDetail = 'monthly'): World {
   return withWorldConfiguration(w, () => tickConfigured(w, detail))
 }
 
 function tickConfigured(w: World, detail: TickDetail = 'monthly'): World {
-  const resumeMonthly = detail === 'monthly' && !!w.fastForward?.phase
-  const result = withBatchedLedgerEntries(w, () => advanceMonth(w, resumeMonthly ? 'reconcile' : detail))
-  if (resumeMonthly) w.fastForward!.phase = 0
-  return result
+  return withBatchedLedgerEntries(w, () => advanceMonth(w, detail))
 }
 
 function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
@@ -440,7 +433,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   advanceIntelligence(w)
   advanceGeopolitics(w)
   linkDistrictPeople(w)
-  demographics(w, coarse, detail === 'reconcile' ? (w.fastForward?.phase ?? 0) + 1 : 1)
+  demographics(w, coarse, 1)
   retireEmptyStates(w)
   science(w)
   diplomacy(w)
@@ -469,16 +462,11 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   recordDevelopment(w)
   if (w.adaptive?.transit)
     w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
-  const settlements = advanceSettlements(
-    w,
-    false,
-    access,
-    coarse ? 0 : detail === 'reconcile' ? (w.fastForward?.phase ?? 0) + 1 : 1,
-  )
+  const settlements = advanceSettlements(w, false, access, coarse ? 0 : 1)
   refreshPlaces(w, settlements)
   aggregateDistricts(w)
   syncSites(w)
-  if (!coarse && (w.month % 6 === 0 || detail === 'reconcile')) rebuildAdaptiveMesh(w)
+  if (!coarse && w.month % 6 === 0) rebuildAdaptiveMesh(w)
   else refreshAdaptiveTotals(w)
   reconcileInstitutions(w)
   summarize(w)

@@ -52,10 +52,11 @@ function* expand(w: World, rows: CommuteRow[]): Generator<CommuteFlow> {
         }
   }
 }
+/** Expand the canonical compact payroll rows only when a consumer needs flows. */
 export function* commuteFlows(w: World): Generator<CommuteFlow> {
-  yield* w.adaptive?.commuting ?? [] // legacy uncompressed records remain readable
   yield* expand(w, w.adaptive?.commutingRows ?? [])
 }
+/** Index once per monthly row array so residence queries avoid scanning every firm. */
 export function commutesAt(w: World, residence: number) {
   const rows = w.adaptive?.commutingRows ?? []
   let index = residenceIndexes.get(rows)
@@ -68,8 +69,5 @@ export function commutesAt(w: World, residence: number) {
     }
     residenceIndexes.set(rows, index)
   }
-  return [
-    ...(w.adaptive?.commuting.filter((flow) => flow.residence === residence) ?? []),
-    ...expand(w, index.get(residence) ?? []),
-  ]
+  return [...expand(w, index.get(residence) ?? [])]
 }

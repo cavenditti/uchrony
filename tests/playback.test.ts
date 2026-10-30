@@ -88,37 +88,20 @@ test('fatal local simulation errors stop playback and report the actual error', 
   clock.stop()
 })
 
-test('legacy Max requests fall back to regular monthly playback at 1×', (t) => {
-  let now = 0,
-    months = 0,
-    paints = 0
-  t.mock.method(performance, 'now', () => now)
-  t.mock.timers.enable({ apis: ['setTimeout'] })
+test('unsupported playback requests are rejected without starting the clock', () => {
+  let months = 0
   const clock = new Playback(
-    (speed) => {
-      assert.equal(speed, 1)
-      months++
-      return true
-    },
     () => {
-      paints++
+      months++
     },
-    (error) => {
-      throw error
-    },
+    () => {},
+    () => {},
   )
-  // Worker messages from an old client do not have runtime type guarantees.
-  clock.start('max' as unknown as number)
-  now = 999
-  t.mock.timers.tick(999)
+  for (const speed of ['max', NaN, Infinity, 0, 61]) {
+    assert.throws(() => clock.start(speed as number), /playback speed/)
+    assert.equal(clock.running, false)
+  }
   assert.equal(months, 0)
-  now = 1000
-  t.mock.timers.tick(1)
-  assert.equal(months, 1)
-  assert.equal(paints, 1)
-  clock.stop()
-  t.mock.timers.tick(1000)
-  assert.equal(months, 1)
 })
 
 test('changing from 2× to 1× cancels the old clock and restores normal pacing', (t) => {

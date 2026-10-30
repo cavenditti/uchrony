@@ -331,20 +331,19 @@ test('validation primitives preserve bounds, noncoercion, safe IDs, text emptine
   assert(!v.unit(1.1))
 })
 
-test('adaptive v1 table encoding stays compatible and rejects duplicate or oversized records', () => {
+test('adaptive sections require key order and reject duplicate or oversized records', () => {
   const w = fixture()
   prepareSpatialWorld(w)
   const packed = packWorldSave(w) as {
-    adaptive: { encoding: string; sites: unknown[]; commutingRows?: unknown; keys?: string[] }
+    adaptive: { encoding: string; fields: { sites: { blocks: unknown[] } }; keys: string[] }
   }
-  assert.equal(packed.adaptive.encoding, 'adaptive-blocks-v1')
+  assert.equal(packed.adaptive.encoding, 'adaptive-blocks-v2')
   assert.equal(canonicalHash(unpackWorldSave(packed) as World), canonicalHash(w))
-  const legacy = structuredClone(packed)
-  delete legacy.adaptive.keys
-  delete legacy.adaptive.commutingRows
-  assert(Array.isArray((unpackWorldSave(legacy) as World).adaptive!.commutingRows))
+  const unordered = structuredClone(packed) as any
+  delete unordered.adaptive.keys
+  assert.throws(() => unpackWorldSave(unordered), /save section/)
   const duplicate = structuredClone(packed)
-  duplicate.adaptive.sites = [
+  duplicate.adaptive.fields.sites.blocks = [
     encodeSaveBlock([
       ['duplicate', {}],
       ['duplicate', {}],
@@ -352,7 +351,9 @@ test('adaptive v1 table encoding stays compatible and rejects duplicate or overs
   ]
   assert.throws(() => unpackWorldSave(duplicate), /record identities/)
   const oversized = structuredClone(packed)
-  oversized.adaptive.sites = [encodeSaveBlock(Array.from({ length: 4097 }, (_, i) => [String(i), {}]))]
+  oversized.adaptive.fields.sites.blocks = [
+    encodeSaveBlock(Array.from({ length: 4097 }, (_, i) => [String(i), {}])),
+  ]
   assert.throws(() => unpackWorldSave(oversized), /save block/)
 })
 

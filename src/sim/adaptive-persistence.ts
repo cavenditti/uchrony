@@ -1,5 +1,4 @@
 import { rebuildAdaptiveMesh } from './adaptive-world'
-import { STRATA } from './economic-types'
 import { numberValidator, recordValue, validationFailure } from './persistence-primitives'
 import { cellPolygon, METERS_PER_MAP_UNIT, pointInPolygon } from './physical-space'
 import { habitableLand } from './terrain-access'
@@ -38,7 +37,6 @@ export function validateAdaptiveWorld(w: World) {
     a.tree.domain !== 'world' ||
     !Array.isArray(a.boundaries) ||
     !Array.isArray(a.names) ||
-    !Array.isArray(a.commuting) ||
     !Number.isSafeInteger(a.nextJurisdiction) ||
     a.nextJurisdiction < 0
   )
@@ -46,14 +44,9 @@ export function validateAdaptiveWorld(w: World) {
   if (
     !date(a.tree.month) ||
     !date(a.reviewMonth) ||
-    !a.migration ||
-    a.migration.source !== 'legacy' ||
-    !date(a.migration.month) ||
-    !Array.isArray(a.migration.assumptions) ||
-    a.migration.assumptions.some((s) => typeof s !== 'string') ||
     Object.entries(a.tree.changed).some(([id, month]) => !/^r[0-3]{0,39}$/.test(id) || !date(month))
   )
-    fail('invalid migration or mesh dates')
+    fail('invalid mesh dates')
   const addresses = new Set(a.tree.leaves)
   if (!addresses.size || addresses.size !== a.tree.leaves.length) fail('duplicate or empty leaves')
   for (const id of addresses) {
@@ -85,9 +78,7 @@ export function validateAdaptiveWorld(w: World) {
   for (const id of w.localEconomy!.active)
     for (const c of w.localEconomy!.units[id].cells)
       if (a.sites[`home:${c}`]?.pool !== id) fail('residents have no persistent home site')
-  if (a.terrainVersion !== undefined && a.terrainVersion !== 1) fail('invalid terrain version')
   if (a.buildingVersion !== undefined && a.buildingVersion !== 1) fail('invalid building version')
-  if (a.riverLaneVersion !== undefined && a.riverLaneVersion !== 1) fail('invalid river lane version')
   if (a.lanes !== undefined) {
     if (!Array.isArray(a.lanes) || a.lanes.length > 1000000) fail('invalid local lanes')
     for (const lane of a.lanes) {
@@ -158,7 +149,6 @@ export function validateAdaptiveWorld(w: World) {
       )
         fail('building must lie inside its surveyed lot')
       if (
-        a.terrainVersion === 1 &&
         !habitableLand(w.cells[site.cell]) &&
         ((site.residents ?? 0) > 0 || site.capacity > 0 || site.building)
       )
@@ -288,19 +278,6 @@ export function validateAdaptiveWorld(w: World) {
       !['walk', 'road', 'rail'].includes(route.mode)
     )
       fail('invalid physical commuting path')
-  for (const flow of a.commuting)
-    if (
-      !w.localEconomy!.units[flow.residence] ||
-      !a.sites[flow.workplace] ||
-      !STRATA.includes(flow.stratum) ||
-      !finite(flow.workers) ||
-      !finite(flow.wage) ||
-      !finite(flow.minutes) ||
-      !['walk', 'road', 'rail'].includes(flow.mode) ||
-      !Array.isArray(flow.route ? a.commuteRoutes?.[flow.route]?.cells : flow.cells) ||
-      (flow.route ? a.commuteRoutes![flow.route].cells : flow.cells!).some((c) => !cell(c))
-    )
-      fail('invalid commuting flow')
   for (const project of a.construction ?? [])
     if (
       !a.sites[project.site] ||

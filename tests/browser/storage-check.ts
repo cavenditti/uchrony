@@ -34,10 +34,16 @@ async function run() {
       }
       if (abort) tx.abort()
     })
-  const world = generateWorld('Legacy and large Blob fidelity', 3, 8, undefined, 'regional')
+  const world = generateWorld('Large Blob fidelity', 3, 8, undefined, 'regional')
   const legacy = { version: 1 as const, savedAt: Date.now(), world }
   await transaction(legacy)
-  check(JSON.stringify(await browser.read()) === JSON.stringify(legacy), 'Legacy object save changed')
+  let rejected = false
+  try {
+    await browser.read()
+  } catch {
+    rejected = true
+  }
+  check(rejected, 'Retired browser object records must be rejected')
   const large = { ...world, storageFixture: Array.from({ length: 35000 }, () => 'abcd'.repeat(1000)) }
   const blob = worldBlob(large, legacy.savedAt + 1),
     expected = await digest(blob)
@@ -67,7 +73,7 @@ async function run() {
   return {
     bytes: blob.size,
     sha256: expected,
-    legacy: true,
+    retiredObjectRejected: true,
     browser: true,
     disk: true,
     rollback: true,

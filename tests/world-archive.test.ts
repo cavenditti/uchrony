@@ -87,7 +87,7 @@ test('old saves get a truthful baseline and coarse dates use the preceding recor
   recordWorldArchive(w)
   assert.throws(() => queryWorldArchive(w, { id: 1, month: 0 }), /unknown/)
   w.month = 66
-  w.fastForward = { months: 6, lastMonth: 66, phase: 0 }
+  w.fastForward = { months: 6, lastMonth: 66 }
   recordWorldArchive(w)
   const gap = queryWorldArchive(w, { id: 2, month: 65 })
   assert.equal(gap.month, 60)

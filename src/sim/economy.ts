@@ -97,7 +97,6 @@ export function produce(world: World, coarse = false) {
   ensureFirms(world)
   if (world.adaptive) {
     const known = coarse ? knownCommuteCandidates(world) : undefined
-    world.adaptive.commuting = []
     world.adaptive.commutingRows = []
     world.adaptive.commuteRoutes = {}
     for (const r of economicRegions(world)) hireFirms(world, r)

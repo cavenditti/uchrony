@@ -111,7 +111,7 @@ function sample() {
     largestCentres: [...active]
       .sort((a, b) => b.population - a.population)
       .slice(0, 8)
-      .map((c) => ({ id: c.id, name: c.name, population: c.population, standing: c.standing })),
+      .map((c) => ({ id: c.id, name: c.name, population: c.population, field: c.field })),
     buildings: homes.filter((h) => h.building && h.capacity > 0).length,
     occupiedBuildings: homes.filter((h) => h.building && (h.residents ?? 0) > 0).length,
     capacity: homes.reduce((n, h) => n + h.capacity, 0),

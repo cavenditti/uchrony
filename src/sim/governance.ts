@@ -20,7 +20,6 @@ export function governance(world: World, owner: number): Nation {
     color: '#8a927f',
     capital: -1,
     government: 'None',
-    personality: 'agrarian',
     treasury: 0,
     debt: 0,
     stability: 50,

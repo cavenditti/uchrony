@@ -95,13 +95,13 @@ export function residentialPools(w: World) {
   return pools
 }
 
-/** Authoritative migration, never called from rendering or a spatial query. It
+/** Authoritative opening initialization, never called from rendering or a spatial query. It
  * localizes the existing census; no building, stock, account or person is added.
  */
 export function ensureResidentialSites(w: World) {
   const a = w.adaptive
   if (!a || !w.localEconomy || a.residentialVersion === 1) return
-  if (w.viewOnly) throw new Error('Display snapshots cannot migrate residential locations')
+  if (w.viewOnly) throw new Error('Display snapshots cannot initialize residential locations')
   for (const site of residentialSites(w)) {
     site.residents = w.localEconomy.units[site.pool].residents[site.cell] ?? 0
     // Opening housing is a coarse physical support, not known individual lots.
@@ -113,9 +113,6 @@ export function ensureResidentialSites(w: World) {
   }
   a.residentialVersion = 1
   a.nextResidence = 0
-  a.migration.assumptions.push(
-    'Opening home occupancy is localized at its recorded site; subsequent parcels and moves are explicit and funded. Numerical refinement preserves every physical parcel.',
-  )
 }
 
 /** Dated cohorts are retained in their pool. Between census updates we know the

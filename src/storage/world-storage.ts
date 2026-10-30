@@ -36,9 +36,8 @@ export class WorldStorage {
     // Capture before the first await. The world may advance once the Blob exists.
     let blob: Blob
     try {
-      // Validate before either replica can replace its last good save. Recovery
-      // performs the same narrow legacy/roundoff repairs as imports, without
-      // changing the running world's records.
+      // Validate before either replica can replace its last good save. Census
+      // normalization and roundoff guards never mutate the running world.
       blob = worldBlob(restoreWorld(world), Date.now())
     } catch (error) {
       report({

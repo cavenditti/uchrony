@@ -197,13 +197,6 @@ export interface NationalAccounting {
   >
 }
 export interface EconomicSystem {
-  /** Costing adoption is recorded once; legacy quotes are rebased outside GDP.
-   * The signed correction is in thousands of crowns, not a cash adjustment. */
-  inventoryValuation?: {
-    method: 'weighted-average'
-    adoptedMonth: number
-    legacyAdjustment: number
-  }
   /** Duration of the last goods/cash accounting period. Absent in legacy monthly saves. */
   periodMonths?: number
   version: 1

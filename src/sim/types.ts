@@ -9,6 +9,7 @@ import type { ForeignOffices } from './diplomatic-friction'
 import type { Geopolitics, Occupation } from './geopolitics'
 import type { SovereigntyState } from './sovereignty'
 import type { SimulationSettings } from './settings'
+import type { WORLD_VERSION } from './save-version'
 import type { PressureState } from './pressures'
 import type { HistoricalRecord, HistoricalState, StorytellerStatus } from './history-types'
 import type { Statecraft, AgentServiceStatus } from './statecraft-types'
@@ -177,7 +178,6 @@ export interface Nation {
   government: string
   identity?: NationalIdentity
   character?: StateCharacter
-  personality: 'mercantile' | 'expansionist' | 'scholarly' | 'agrarian'
   treasury: number
   debt: number
   stability: number
@@ -303,11 +303,11 @@ export interface World {
   archive?: import('./world-archive').WorldArchive
   influence?: import('./influence').InfluenceState
   /** Persistent provenance; coarse history remains approximate after returning to monthly play. */
-  fastForward?: { months: number; lastMonth: number; phase: number }
+  fastForward?: { months: number; lastMonth: number }
   almanac?: import('./almanac-types').Almanac
   viewPlaces?: import('./almanac-types').PlaceLabel[]
   adaptive?: import('./adaptive-types').AdaptiveWorld
-  modelProvenance?: import('./llm-policy').ModelProvenance
+  modelProvenance: import('./llm-policy').ModelProvenance
   localEconomy?: import('./district-types').DistrictEconomy
   spatial?: import('./spatial').SpatialState
   viewOnly?: true
@@ -343,9 +343,8 @@ export interface World {
     construction?: number
   }[]
   economy?: EconomicSystem
-  version: 1
-  configuration?: import('./configuration').WorldConfiguration
-  simulation?: SimulationSettings
+  version: typeof WORLD_VERSION
+  configuration: import('./configuration').WorldConfiguration
   institutions?: InstitutionalState
   intelligence?: IntelligenceState
   foreignOffices?: ForeignOffices
@@ -440,7 +439,6 @@ export type Command =
       autonomy: number
       powers: ProvincialDelegation['powers']
     }
-  | { type: 'conditions'; settings: SimulationSettings }
   | {
       type: 'configuration'
       values: import('./configuration-defaults').ConfigurationValues
@@ -525,7 +523,7 @@ export type WorkerRequest =
   | { type: 'playback'; running: boolean; speed: import('./playback').PlaybackSpeed }
   | { type: 'command'; command: Command }
   | { type: 'load'; world: unknown }
-  | { type: 'restore'; legacy: string | null }
+  | { type: 'restore' }
   | { type: 'import'; file: Blob }
   | { type: 'export' }
   | { type: 'save'; force?: boolean }

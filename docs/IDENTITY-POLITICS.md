@@ -47,7 +47,7 @@ Automatic governments approach leadership-derived identity targets in bounded 0.
 
 ## Persistence and inspection
 
-New fields are optional in old saves and validated when present. Loading retains old preset direction through explicit fallback values; it does not reconstruct a lost history of implementation. New local implementation ramps from zero. Packed saves preserve political and implementation fields.
+Political and implementation fields are validated when present and preserved by packed saves. Only current-schema worlds can be restored. New local implementation ramps from zero. Packed saves preserve political and implementation fields.
 
 Snapshots include population-weighted attitudes and government support. The community dossier displays each large group's response to declared policy, explicitly distinguished from its actual local implementation and material welfare. An approval score is never interpreted as a share expelled or converted.
 

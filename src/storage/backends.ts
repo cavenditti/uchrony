@@ -1,3 +1,4 @@
+import { UnsupportedSaveError } from '../sim/save-version'
 import { MAX_SAVE_BYTES, type WorldSave } from './save-types'
 import { worldBlob } from './json-blob'
 
@@ -24,8 +25,11 @@ export function diskBackend(): SaveBackend {
         ...(save ? { body: save } : {}),
       })
       if (method === 'GET' && response.status === 404) return { save: null }
-      if (!response.ok) throw new Error(`Local disk autosave returned HTTP ${response.status}.`)
       const result = await response.json()
+      if (!response.ok) {
+        if (response.status === 409) throw new UnsupportedSaveError(result.error)
+        throw new Error(result.error ?? `Local disk autosave returned HTTP ${response.status}.`)
+      }
       if (typeof result.slot === 'string') slot = result.slot
       return result
     } finally {
@@ -95,10 +99,10 @@ export function browserBackend(): SaveBackend {
   }
   const transaction = async (write?: Blob) => {
     const db = await database()
-    return new Promise<WorldSave | Blob | null>((resolve, reject) => {
+    return new Promise<Blob | null>((resolve, reject) => {
       const tx = db.transaction('worlds', write ? 'readwrite' : 'readonly'),
         store = tx.objectStore('worlds')
-      let result: WorldSave | Blob | null = null
+      let result: Blob | null = null
       const timer = setTimeout(() => {
         try {
           tx.abort()
@@ -137,7 +141,9 @@ export function browserBackend(): SaveBackend {
     name: 'browser',
     async read() {
       const stored = await transaction()
-      if (!(stored instanceof Blob)) return stored // Existing object records remain readable.
+      if (stored === null) return null
+      if (!(stored instanceof Blob))
+        throw new UnsupportedSaveError('Unsupported browser save format. Create a new world.')
       if (stored.size > MAX_SAVE_BYTES) throw new Error('The browser save exceeds the supported size.')
       return JSON.parse(await stored.text()) as WorldSave
     },

@@ -21,7 +21,7 @@ export interface ModelProvenance {
   accepted: number
   lastMonth: number
   roles: Record<string, number>
-  source: 'native' | 'model-assisted' | 'legacy-unknown'
+  source: 'native' | 'model-assisted'
 }
 
 export function samePermission(policy: LlmPolicySnapshot, generation: number, instance = policy.instance) {

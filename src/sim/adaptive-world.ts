@@ -50,7 +50,7 @@ const membershipCache = new WeakMap<
 /** Persistent pools are closure records, not mesh cells. Their account IDs never follow a mesh boundary. */
 export function ensureAdaptiveWorld(w: World) {
   if (w.adaptive) return w.adaptive
-  if (w.viewOnly) throw new Error('Display snapshots cannot migrate an adaptive world')
+  if (w.viewOnly) throw new Error('Display snapshots cannot initialize an adaptive world')
   const local = ensureDistrictEconomy(w)
   w.adaptive = {
     version: 1,
@@ -65,24 +65,7 @@ export function ensureAdaptiveWorld(w: World) {
     nextJurisdiction: 0,
     boundaries: [],
     names: [],
-    commuting: [],
     reviewMonth: w.month,
-    migration: {
-      source: 'legacy',
-      month: w.month,
-      assumptions: [
-        'Terrain samples occupy aligned 1,024 m squares; numerical refinement preserves this geography.',
-        'Opening residential capacity equals 115% of residents plus existing built-land capacity.',
-        'Legacy markets and household pools retain their exact identities and heterogeneous closure state.',
-        'Opening site capacity is a balance-sheet initialization, not output or GDP.',
-      ],
-    },
-  }
-  w.modelProvenance ??= {
-    accepted: 0,
-    lastMonth: w.month,
-    roles: {},
-    source: 'legacy-unknown',
   }
   for (const id of local.active) {
     const pool = local.units[id]

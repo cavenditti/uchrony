@@ -5,26 +5,9 @@ import type { Graph } from './economy'
 export const TRADE_INERTIA = parameterGroup('tradeMemory')
 export const laneKey = (from: number, to: number) => `${from}-${to}`
 
-/** Previous monthly shipments seed memory when opening an older save. */
+/** Only explicit retained supplier memory influences current trading decisions. */
 export function rememberedTrade(world: World) {
-  const lanes =
-    world.tradeLanes ??
-    world.routes
-      .filter(
-        (r) =>
-          r.from !== r.to &&
-          r.path.length >= 2 &&
-          new Set(r.path).size === r.path.length &&
-          r.path[0] === r.from &&
-          r.path.at(-1) === r.to,
-      )
-      .map((r) => ({
-        from: r.from,
-        to: r.to,
-        path: r.path,
-        flow: { ...r.goods },
-        lastActive: Math.max(0, world.month - 1),
-      }))
+  const lanes = world.tradeLanes ?? []
   return new Map(
     lanes
       .filter((lane) => {

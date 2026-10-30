@@ -152,8 +152,6 @@ function placeName(w: World, cell: number, used: Set<string>) {
 function updateRelation(w: World, city: City, centre: City, p: number, newborn: boolean) {
   const P = PLACE_TOPOLOGY
   let relation = city.metropolis
-  delete relation?.dominantSince
-  delete relation?.overwhelmingSince
   if (relation?.incorporated === undefined) {
     if (p >= P.incorporation) {
       separate(w, city)
@@ -344,7 +342,6 @@ export function refreshPlaces(w: World, structure: SettlementStructure = settlem
       developed: Math.round(fabric),
       ...coreCentre(m, list),
     }
-    delete city.standing
     if (principal[modes[m].area] === m) {
       separate(w, city)
       continue

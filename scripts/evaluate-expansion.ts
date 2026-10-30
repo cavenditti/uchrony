@@ -1,6 +1,7 @@
 import { DECISION_POLICIES, withDecisionPolicy, type DecisionPolicy } from '../src/sim/decision-policy'
 import { dynamicsDiagnostics } from './dynamics-diagnostics'
-import { simulationSettings, validateSettings } from '../src/sim/settings'
+import { simulationSettings } from '../src/sim/settings'
+import { configurationDraft, applyConfiguration } from '../src/sim/configuration'
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { generateWorld } from '../src/sim/generate'
@@ -65,7 +66,11 @@ const revision = hash.digest('hex'),
 const w = resume
   ? restoreWorld(JSON.parse(readFileSync(resume, 'utf8')))
   : generateWorld(seed, 3, 8, undefined, scale, start)
-if (abundance) w.simulation = validateSettings({ ...simulationSettings(w), abundance: Number(abundance) })
+if (abundance) {
+  const values = configurationDraft(w)
+  values.conditions.abundance = Number(abundance)
+  applyConfiguration(w, values, w.configuration.revision)
+}
 const startMonth = w.month,
   duration = months - startMonth,
   initialStates = w.nations.length

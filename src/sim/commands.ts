@@ -35,7 +35,6 @@ import { buildPublicWork } from './public-works'
 import { recruit } from './recruitment'
 import { TECH_NAMES } from './research'
 import { syncResidentialPopulation } from './residential-sites'
-import { validateSettings } from './settings'
 import { event } from './simulation-events'
 import { refreshSpatial } from './spatial'
 import {
@@ -357,17 +356,6 @@ const COMMAND_HANDLERS = {
   },
   configuration: (w, command) => {
     return applyConfiguration(w, command.values, command.revision)
-  },
-  conditions: (w, command) => {
-    w.simulation = validateSettings(command.settings)
-    if (w.configuration) {
-      w.configuration = {
-        ...w.configuration,
-        revision: w.configuration.revision + 1,
-        values: { ...w.configuration.values, conditions: w.simulation },
-      }
-    }
-    return 'Simulation conditions updated. Existing people, stocks and commitments are preserved.'
   },
   commission: (w, command) => {
     return commissionFleet(w, command.nation, command.region, command.warships, command.transports)

@@ -75,7 +75,6 @@ test('a physically inaccessible workplace loses commuter hiring and payroll with
   for (const f of source.economy!.firms!) if (f.labor) f.labor.unfilled = f.id === chosen.id ? 50 : 0
   chosen.cash = 100
   rebaseEndowments(source)
-  source.adaptive!.commuting = []
   source.adaptive!.commutingRows = []
   source.adaptive!.commuteRoutes = {}
   const open = structuredClone(source),

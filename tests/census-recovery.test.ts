@@ -8,7 +8,7 @@ import { generateWorld } from '../src/sim/generate'
 import { restoreWorld, validateWorld } from '../src/sim/persistence'
 import { communitySize, coalesceCommunities } from '../src/sim/population'
 import { extractAges } from '../src/sim/age-cohorts'
-import { persistSave } from '../src/storage/autosave'
+import { WorldStorage } from '../src/storage/world-storage'
 import { DiskAutosaves } from '../server/autosave'
 import type { PopulationCommunity } from '../src/sim/population-types'
 import type { WorldSave } from '../src/storage/save-types'
@@ -70,20 +70,19 @@ test('autosave writes the checked canonical snapshot rather than the rejected du
   const world = generateWorld('duplicate-autosave')
   duplicate(world.regions[0].communities!)
   let written: WorldSave | undefined
-  await persistSave(
+  const storage = new WorldStorage(
     [
       {
         name: 'browser',
-        async read() {
-          return null
-        },
-        async write(save) {
-          written = save
+        async writeBlob(blob) {
+          written = JSON.parse(await blob.text())
+          written!.world = restoreWorld(written!.world)
         },
       },
     ],
-    { version: 1, savedAt: Date.now(), world },
+    () => {},
   )
+  await storage.save(world, 1)
   assert(written)
   validateWorld(written.world)
   assert.notEqual(written.world, world)

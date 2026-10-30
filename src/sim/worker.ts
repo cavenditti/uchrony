@@ -332,12 +332,7 @@ async function launch(
         // A cosmetic review may become obsolete while governments act; it is not a model failure.
         if (withWorldConfiguration(world!, () => accept(result.proposal, result.model)) === false) return
         if (!isWritingTask(role)) advanceAlmanac(world, true)
-        const provenance = (world.modelProvenance ??= {
-          accepted: 0,
-          lastMonth: world.month,
-          roles: {},
-          source: 'legacy-unknown',
-        })
+        const provenance = world.modelProvenance
         provenance.accepted++
         provenance.lastMonth = world.month
         provenance.roles[role] = (provenance.roles[role] ?? 0) + 1
@@ -690,7 +685,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     }
     if (data.type === 'restore') {
       try {
-        const saved = await restoreSave(backends, data.legacy)
+        const saved = await restoreSave(backends)
         data = saved.world
           ? { type: 'load', world: saved.world }
           : { type: 'generate', seed: 'A world unwritten' }

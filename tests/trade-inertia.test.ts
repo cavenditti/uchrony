@@ -10,7 +10,7 @@ import {
   BASE_PRICE,
   type Graph,
 } from '../src/sim/economy'
-import { establishedPath, TRADE_INERTIA } from '../src/sim/trade-memory'
+import { establishedPath, rememberedTrade, TRADE_INERTIA } from '../src/sim/trade-memory'
 import { parseSave, validateWorld } from '../src/sim/persistence'
 import { GOODS, inventory, relation, type Good, type World } from '../src/sim/types'
 
@@ -183,8 +183,7 @@ test('trade memory survives exact save continuation, backfills old shipments, an
   const legacy = structuredClone(f.world)
   delete legacy.tradeLanes
   validateWorld(legacy)
-  trade(legacy)
-  assert(legacy.tradeLanes!.length > 0)
+  assert.equal(rememberedTrade(legacy).size, 0, 'shipment records do not recreate missing supplier memory')
   for (const mutate of [
     (w: World) => {
       w.tradeLanes![0].flow.coal = -1

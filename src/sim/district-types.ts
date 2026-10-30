@@ -25,7 +25,7 @@ export interface DistrictShipment {
   legs: RouteLeg[]
 }
 /** A place: the administrative identity of one prominent mode of the settlement
- * field (see `places.ts`). Saved as `cities` for save compatibility; it holds no
+ * field (see `places.ts`). The `cities` registry holds no
  * assets, residents or accounts of its own, only who it administers. */
 export interface City {
   id: number
@@ -52,8 +52,6 @@ export interface City {
    * prominence (0–1), developed residents administered (the urban core that sets
    * `kind`), and the centre of mass of that core in metres. */
   field?: { reach: number; prominence: number; developed: number; x: number; y: number }
-  /** @deprecated Prestige/wealth indicators of the retired integration rule; dropped on refresh. */
-  standing?: { prestige: number; wealthPerResident: number }
   /** Link to, or incorporation as a quarter of, the place `centre` that administers it. */
   metropolis?: {
     centre: number
@@ -63,10 +61,6 @@ export interface City {
     incorporated?: number
     /** Month the pending incorporation or release condition began. */
     pending?: number
-    /** @deprecated Retired dominance timers; dropped on refresh. */
-    dominantSince?: number
-    /** @deprecated Retired dominance timers; dropped on refresh. */
-    overwhelmingSince?: number
   }
   history?: {
     month: number

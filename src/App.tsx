@@ -57,7 +57,6 @@ import {
   type Layer,
   dateLabel,
 } from './sim/types'
-import { LEGACY_SAVE_KEY } from './storage/autosave'
 import { PLAYBACK_SPEEDS, type PlaybackSpeed } from './sim/playback'
 import { MAX_SAVE_BYTES } from './storage/save-types'
 import type { AgentServiceStatus } from './sim/statecraft-types'
@@ -346,13 +345,7 @@ export default function App() {
     }
     const restore = () => {
       setStartupError(null)
-      let legacy: string | null = null
-      try {
-        legacy = localStorage.getItem(LEGACY_SAVE_KEY)
-      } catch {
-        /* Other replicas can restore. */
-      }
-      instance.postMessage({ type: 'restore', legacy } satisfies WorkerRequest)
+      instance.postMessage({ type: 'restore' } satisfies WorkerRequest)
     }
     retryRestore.current = () => {
       void restore()

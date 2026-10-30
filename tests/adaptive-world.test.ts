@@ -191,19 +191,9 @@ test('a representative commute starts at its sampled home and uses its own trave
   // Publish the fixture's moved sites before querying cached mesh membership,
   // just as the simulation does after a physical change.
   w.adaptive!.revision++
-  w.adaptive!.commutingRows = []
-  w.adaptive!.commuting = [
-    {
-      residence: home.pool,
-      workplace: workplace.id,
-      route: 'display-fixture',
-      stratum: 'laborer',
-      workers: 1,
-      wage: 1,
-      minutes: 60,
-      mode: 'walk',
-    },
-  ]
+  const firm = Number(workplace.id.slice('firm:'.length))
+  w.adaptive!.commutingRows = [[home.pool, firm, 'display-fixture', 1, 0, 0, 0, 0, 1, 0, 0, 0, 0]]
+  w.adaptive!.commuteRoutes = { 'display-fixture': { cells: [home.cell], minutes: 60, mode: 'walk' } }
   const before = digest(w)
   const view = inspectWorld(w, {
     id: 1,

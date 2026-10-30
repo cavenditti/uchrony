@@ -23,57 +23,34 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
 
 /**
- * Stage 1 of validation: structural merge and forward-compatible migration.
- *
- * - Missing keys or subtrees inherit `DEFAULT_CONFIGURATION_VALUES` so older
- *   saves and partial overrides (e.g. `{ model: { bankCapitalRatio: 0.12 } }`)
- *   hydrate cleanly when new parameters are added to the schema.
+ * Stage 1: expand intentional scenario overrides; saved configurations must
+ * supply every field. Partial input is a creation/editing API, never a migration.
  * - Unknown/misspelled keys are rejected immediately instead of being silently
  *   ignored, ensuring typos in presets or tests fail loudly.
  */
-function mergeKnown(defaults: unknown, input: unknown, path = 'configuration'): unknown {
-  if (input === undefined) return structuredClone(defaults)
+function mergeKnown(defaults: unknown, input: unknown, complete: boolean, path = 'configuration'): unknown {
+  if (input === undefined) {
+    if (complete) throw new Error(`${path}: missing parameter.`)
+    return structuredClone(defaults)
+  }
   if (Array.isArray(defaults)) {
     if (!Array.isArray(input) || input.length !== defaults.length)
       throw new Error(`${path}: wrong number of values.`)
-    return defaults.map((item, i) => mergeKnown(item, input[i], `${path}.${i}`))
+    return defaults.map((item, i) => mergeKnown(item, input[i], complete, `${path}.${i}`))
   }
   if (isRecord(defaults)) {
     if (!isRecord(input)) throw new Error(`${path}: expected an object.`)
     for (const key of Object.keys(input))
       if (!Object.hasOwn(defaults, key)) throw new Error(`${path}.${key}: unknown parameter.`)
     return Object.fromEntries(
-      Object.entries(defaults).map(([key, value]) => [key, mergeKnown(value, input[key], `${path}.${key}`)]),
+      Object.entries(defaults).map(([key, value]) => [
+        key,
+        mergeKnown(value, input[key], complete, `${path}.${key}`),
+      ]),
     )
   }
   if (typeof input !== typeof defaults) throw new Error(`${path}: expected ${typeof defaults}.`)
   return input
-}
-
-/** Parameters whose mechanism was replaced, as dotted paths. Saved worlds may
- * still carry them; they describe nothing the current simulation reads, so they
- * are dropped before the strict unknown-key check rather than rejecting the save. */
-const RETIRED_CONFIGURATION_PATHS: readonly string[] = [
-  // Prestige/wealth city integration, replaced by settlement-field place topology.
-  'urbanIntegration',
-  // Footprint density floor, replaced by the agglomeration reach of places.
-  'settlements.minimumDensity',
-]
-function withoutRetiredPaths(input: unknown): unknown {
-  if (!isRecord(input)) return input
-  let result = input
-  for (const path of RETIRED_CONFIGURATION_PATHS) {
-    const [group, key] = path.split('.')
-    if (key === undefined) {
-      if (Object.hasOwn(result, group))
-        result = Object.fromEntries(Object.entries(result).filter(([k]) => k !== group))
-    } else if (isRecord(result[group]) && Object.hasOwn(result[group], key))
-      result = {
-        ...result,
-        [group]: Object.fromEntries(Object.entries(result[group]).filter(([k]) => k !== key)),
-      }
-  }
-  return result
 }
 
 /**
@@ -179,7 +156,11 @@ function validateConfigurationInvariants(values: ConfigurationValues) {
  * returning a deeply frozen `ConfigurationValues` object.
  */
 export function validateConfigurationValues(input: unknown): ConfigurationValues {
-  const values = mergeKnown(DEFAULT_CONFIGURATION_VALUES, withoutRetiredPaths(input)) as ConfigurationValues
+  return checkedConfiguration(input, false)
+}
+
+function checkedConfiguration(input: unknown, complete: boolean): ConfigurationValues {
+  const values = mergeKnown(DEFAULT_CONFIGURATION_VALUES, input, complete) as ConfigurationValues
   for (const readonlyField of READONLY_CONFIGURATION_FIELDS) {
     if (configurationValue(values, readonlyField) !== readonlyField.expected)
       throw new Error(readonlyField.error)
@@ -201,41 +182,19 @@ export function validateWorldConfiguration(value: unknown): WorldConfiguration {
     !isRecord(value.values)
   )
     throw new Error('Invalid or unsupported world configuration.')
-  return { version: 1, revision: Number(value.revision), values: validateConfigurationValues(value.values) }
+  return { version: 1, revision: Number(value.revision), values: checkedConfiguration(value.values, true) }
 }
 
-/**
- * Resolves the effective `ConfigurationValues` for a `World`.
- *
- * Legacy worlds (or worlds generated without an explicit `configuration` argument)
- * do not carry `world.configuration`, but may still have custom `world.simulation`
- * settings (`{ instability, abundance, extremity }`). When `world.simulation`
- * matches the default conditions, we return `DEFAULT_CONFIGURATION_VALUES`
- * directly to avoid allocating a wrapper object on hot paths like `localClimate`.
- */
-export function configurationFor(world: Pick<World, 'configuration' | 'simulation'>): ConfigurationValues {
-  if (world.configuration) return world.configuration.values
-  const sim = world.simulation
-  if (
-    sim &&
-    (sim.instability !== DEFAULT_CONFIGURATION_VALUES.conditions.instability ||
-      sim.abundance !== DEFAULT_CONFIGURATION_VALUES.conditions.abundance ||
-      sim.extremity !== DEFAULT_CONFIGURATION_VALUES.conditions.extremity)
-  ) {
-    return { ...DEFAULT_CONFIGURATION_VALUES, conditions: sim }
-  }
-  return DEFAULT_CONFIGURATION_VALUES
-}
+/** Read the world's authoritative configuration without allocating or merging defaults. */
+export const configurationFor = (world: Pick<World, 'configuration'>): ConfigurationValues =>
+  world.configuration.values
 
 /** Returns a mutable deep copy suitable for staging edits in the UI or test fixtures. */
-export const configurationDraft = (world?: Pick<World, 'configuration' | 'simulation'>) =>
+export const configurationDraft = (world?: Pick<World, 'configuration'>) =>
   structuredClone(world ? configurationFor(world) : DEFAULT_CONFIGURATION_VALUES)
 
 /** Binds a world's effective configuration into the synchronous dynamic scope for `run()`. */
-export function withWorldConfiguration<T>(
-  world: Pick<World, 'configuration' | 'simulation'>,
-  run: () => T,
-): T {
+export function withWorldConfiguration<T>(world: Pick<World, 'configuration'>, run: () => T): T {
   return withConfigurationValues(configurationFor(world), run)
 }
 
@@ -244,11 +203,11 @@ export function withWorldConfiguration<T>(
  * 1. Optimistic concurrency check (`expectedRevision`) rejects stale editor drafts.
  * 2. Validates the full candidate and verifies no `creationOnly` field was altered
  *    before mutating any world state.
- * 3. Synchronizes `world.simulation` and banking policy parameters while preserving
+ * 3. Updates banking policy parameters while preserving
  *    existing loan contracts and historical inflation observations.
  */
 export function applyConfiguration(world: World, input: unknown, expectedRevision: number): string {
-  const revision = world.configuration?.revision ?? 0
+  const revision = world.configuration.revision
   if (revision !== expectedRevision)
     throw new Error('Configuration changed while you were editing. Reopen the controls and try again.')
   const values = validateConfigurationValues(input)
@@ -257,7 +216,6 @@ export function applyConfiguration(world: World, input: unknown, expectedRevisio
     if (field.creationOnly && isFieldChanged(field, values, previous))
       throw new Error(`${field.label} can only be changed when creating a world.`)
   world.configuration = { version: 1, revision: revision + 1, values }
-  world.simulation = { ...values.conditions }
   // Existing loan contracts and observation history survive; only policy rule
   // coefficients and an explicitly edited current policy rate change here.
   const bank = world.economy?.banking

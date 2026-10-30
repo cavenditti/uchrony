@@ -1,3 +1,4 @@
+import { configurationDraft } from '../src/sim/configuration'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
@@ -45,6 +46,7 @@ function fixture(water: (q: number, r: number) => boolean = (q) => q >= 10) {
   }
   const world = {
     seed: 'Renderer regression',
+    configuration: { version: 1, revision: 0, values: configurationDraft() },
     month: 7,
     width,
     height,

@@ -27,5 +27,3 @@ export const MAX_STATE_IDENTITIES = 256
 export const LOT_SPAN = 16
 export const BUILDING_CAPACITY = 8
 export const URBAN_BLOCK_SPAN = 128
-
-// Compatibility value; active enclave policy lives in configuration-defaults.

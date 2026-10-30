@@ -50,7 +50,7 @@ export function classifyBiome(
 /** Geographic climate, not weather or a second random stream. Both hemispheres
  * share annual means; growing seasons differ by half a calendar year. */
 export function localClimate(
-  world: Pick<World, 'height' | 'month' | 'configuration' | 'simulation'>,
+  world: Pick<World, 'height' | 'month' | 'configuration'>,
   cell: ClimateCell,
 ): LocalClimate {
   const climate = configurationFor(world).climate

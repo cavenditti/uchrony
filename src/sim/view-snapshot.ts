@@ -382,7 +382,6 @@ function projectAdaptiveSnapshot(adaptive: NonNullable<World['adaptive']>) {
     ...adaptive,
     urban: undefined,
     sites: {},
-    commuting: [],
     commutingRows: [],
     commuteRoutes: {},
     construction: [],

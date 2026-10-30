@@ -1,24 +1,28 @@
-import { parseSave, restoreWorld } from '../sim/persistence'
+import { UnsupportedSaveError } from '../sim/save-version'
+import { restoreWorld } from '../sim/persistence'
 import type { World } from '../sim/types'
 import type { SaveBackend } from './backends'
 import type { WorldSave } from './save-types'
 
-export const LEGACY_SAVE_KEY = 'uchrony.world.v1'
 export interface RestoredSave {
   world: World | null
-  source: 'disk' | 'browser' | 'legacy' | 'none'
+  source: 'disk' | 'browser' | 'none'
 }
 function checked(record: WorldSave) {
   if (!record || record.version !== 1 || !Number.isSafeInteger(record.savedAt) || record.savedAt < 0)
     throw new Error('The autosave envelope is invalid.')
   return { ...record, world: restoreWorld(record.world) }
 }
-export async function restoreSave(backends: SaveBackend[], legacy: string | null): Promise<RestoredSave> {
+/** Restore the newest valid replica, retaining corruption recovery within the current schema. */
+export async function restoreSave(backends: SaveBackend[]): Promise<RestoredSave> {
   // Read encoded replicas together, but never expand two complete worlds just to
   // choose a timestamp. Invalid newer copies still fall back to an older one.
   const reads = await Promise.allSettled(backends.map((backend) => backend.read()))
   let invalid = reads.some((result) => result.status === 'rejected')
-  let incompatible: Error | undefined
+  let unsupported: UnsupportedSaveError | undefined
+  for (const result of reads)
+    if (result.status === 'rejected' && result.reason instanceof UnsupportedSaveError)
+      unsupported = result.reason
   const candidates = reads
     .flatMap((result, index) =>
       result.status === 'fulfilled' && result.value
@@ -35,70 +39,14 @@ export async function restoreSave(backends: SaveBackend[], legacy: string | null
     try {
       return { world: checked(candidate.record).world, source: candidate.source }
     } catch (error) {
-      if (error instanceof Error && error.message.includes('retired hex grid')) incompatible = error
+      if (error instanceof UnsupportedSaveError) unsupported = error
       invalid = true
     }
   }
-  if (legacy) return { world: parseSave(legacy), source: 'legacy' }
-  if (incompatible) throw incompatible
+  if (unsupported) throw unsupported
   if (invalid)
     throw new Error(
       'Your saved world could not be checked. Existing saves have been kept. Retry restoring before starting a new world.',
     )
   return { world: null, source: 'none' }
-}
-export async function persistSave(backends: SaveBackend[], record: WorldSave) {
-  record = checked(record)
-  const writes = await Promise.allSettled(backends.map((backend) => backend.write(record)))
-  const success = writes.findIndex((result) => result.status === 'fulfilled')
-  if (success >= 0) return backends[success].name
-  const reasons = writes
-    .map(
-      (result, i) =>
-        `${backends[i].name === 'disk' ? 'Local disk' : 'Browser database'}: ${result.status === 'rejected' && result.reason instanceof Error ? result.reason.message : 'unavailable'}`,
-    )
-    .join(' ')
-  throw new Error(
-    `Autosave could not complete. ${reasons} Your previous save is intact; keep this tab open and retry saving or export the world.`,
-  )
-}
-
-/** At most one write runs; a burst of snapshots retains only the newest pending world. */
-export class LatestSaveQueue {
-  private pending: { world: World; epoch: number } | null = null
-  private flight: Promise<void> | null = null
-  private epoch = 0
-  constructor(
-    private write: (world: World) => Promise<string>,
-    private report: (result: { world: World; source?: string; error?: string }) => void,
-  ) {}
-  reset() {
-    this.epoch++
-    this.pending = null
-  }
-  enqueue(world: World) {
-    this.pending = { world, epoch: this.epoch }
-    if (!this.flight)
-      this.flight = this.drain().finally(() => {
-        this.flight = null
-        if (this.pending) void this.enqueue(this.pending.world)
-      })
-    return this.flight
-  }
-  private async drain() {
-    while (this.pending) {
-      const next = this.pending
-      this.pending = null
-      try {
-        const source = await this.write(next.world)
-        if (next.epoch === this.epoch) this.report({ world: next.world, source })
-      } catch (error) {
-        if (next.epoch === this.epoch)
-          this.report({
-            world: next.world,
-            error: error instanceof Error ? error.message : 'Autosave failed.',
-          })
-      }
-    }
-  }
 }

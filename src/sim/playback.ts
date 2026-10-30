@@ -18,9 +18,10 @@ export class Playback {
   ) {}
   start(speed: PlaybackSpeed) {
     this.stop()
+    if (!Number.isFinite(speed) || speed < 1 || speed > 60)
+      throw new Error('Choose a playback speed between 1 and 60 months per second.')
     this.active = true
-    // Old clients may still send 'max'. Unsupported values resume regular 1× playback.
-    this.speed = Math.max(1, Math.min(60, Number.isFinite(speed) ? speed : 1))
+    this.speed = speed
     const interval = 1000 / this.speed
     this.due = performance.now() + interval
     this.lastPublished = -Infinity

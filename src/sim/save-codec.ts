@@ -1,5 +1,5 @@
 import { gunzipSync, gzipSync, strFromU8, strToU8 } from 'three/examples/jsm/libs/fflate.module.js'
-import type { AdaptiveWorld } from './adaptive-types'
+import { assertWorldVersion } from './save-version'
 import { packWorldCensus, unpackWorldCensus } from './census-codec'
 import { MAX_ENCODED_SAVE_BYTES as LIMIT } from './simulation-invariants'
 import type { World } from './types'
@@ -59,12 +59,10 @@ const ECONOMY_TABLES: Layout = {
 const ADAPTIVE_TABLES: Layout = {
   sites: true,
   jurisdictions: true,
-  commuting: true,
   commutingRows: true,
   commuteRoutes: true,
   boundaries: true,
 }
-const ADAPTIVE_RECORDS = new Set(['sites', 'jurisdictions', 'commuteRoutes'])
 const LOCAL_TABLES: Layout = { units: true, built: true, reserves: true, shipments: true }
 interface Table {
   kind: 'array' | 'record'
@@ -106,17 +104,14 @@ function unpackSection(
   layout: Layout,
   budget = { bytes: 0 },
   blockSize = 256,
-  legacyOrder = false,
 ): Record<string, unknown> {
   const object = (x: unknown): x is Record<string, unknown> =>
     !!x && typeof x === 'object' && !Array.isArray(x)
   if (
     !value ||
-    (!legacyOrder && !Array.isArray(value.keys)) ||
-    (value.keys !== undefined &&
-      (!Array.isArray(value.keys) ||
-        value.keys.some((k) => typeof k !== 'string') ||
-        new Set(value.keys).size !== value.keys.length)) ||
+    !Array.isArray(value.keys) ||
+    value.keys.some((k) => typeof k !== 'string') ||
+    new Set(value.keys).size !== value.keys.length ||
     !object(value.fields)
   )
     throw new Error('Invalid economic save section')
@@ -157,53 +152,17 @@ function unpackSection(
       fields.set(key, Object.fromEntries(pairs))
     }
   }
-  // Adaptive v1 stored an optional key order and always emitted empty optional
-  // tables. Retain that wire contract while using the same bounded decoder.
-  if (legacyOrder)
-    return value.keys
-      ? Object.fromEntries(value.keys.map((key) => [key, fields.get(key)]))
-      : Object.fromEntries(fields)
   if (fields.size !== value.keys.length || value.keys.some((key) => !fields.has(key)))
     throw new Error('Invalid economic save key order')
   return Object.fromEntries(value.keys.map((key) => [key, fields.get(key)]))
 }
-/** Preserve adaptive-blocks-v1 on disk; only its internal table codec is shared. */
-function packAdaptive(value: AdaptiveWorld) {
-  const section = packSection(value as unknown as Record<string, unknown>, ADAPTIVE_TABLES, 4096)
-  return {
-    encoding: 'adaptive-blocks-v1',
-    keys: Object.keys(value),
-    core: section.core,
-    ...Object.fromEntries(
-      Object.keys(ADAPTIVE_TABLES).map((key) => [
-        key,
-        (section.fields[key] as Table | undefined)?.blocks ?? [],
-      ]),
-    ),
-  }
-}
 function unpackAdaptive(value: unknown): unknown {
-  if (!value || typeof value !== 'object' || !('encoding' in value)) return value
-  const source = value as Record<string, unknown>
-  if (source.encoding !== 'adaptive-blocks-v1') throw new Error('Unsupported adaptive save encoding')
-  const fields = Object.fromEntries(
-    Object.keys(ADAPTIVE_TABLES).map((key) => [
-      key,
-      {
-        kind: ADAPTIVE_RECORDS.has(key) ? 'record' : 'array',
-        blocks: key === 'commutingRows' ? (source[key] ?? []) : source[key],
-      },
-    ]),
-  )
-  return unpackSection(
-    { keys: source.keys, core: source.core, fields } as Section,
-    ADAPTIVE_TABLES,
-    { bytes: 0 },
-    4096,
-    true,
-  )
+  const section = value as Section & { encoding?: unknown }
+  if (section.encoding !== 'adaptive-blocks-v2') throw new Error('Unsupported adaptive save encoding')
+  return unpackSection(section, ADAPTIVE_TABLES, { bytes: 0 }, 4096)
 }
-/** History uses independent bounded blocks even in older provincial worlds. */
+
+/** Historical registries have independent bounded blocks, including at month zero. */
 function packHistoricalSections(world: World) {
   return {
     ...(world.archive
@@ -250,13 +209,21 @@ function unpackHistoricalSections(source: Record<string, unknown>) {
   }
   return result
 }
+/** Encode large registries with bounded buffers and preserve record order exactly. */
 export function packWorldSave(world: World): unknown {
   const historical = packHistoricalSections(world)
   if (!world.localEconomy) return Object.keys(historical).length ? { ...world, ...historical } : world
   const packed = packWorldCensus(world) as Record<string, unknown>
   return {
     ...packed,
-    ...(world.adaptive ? { adaptive: packAdaptive(world.adaptive) } : {}),
+    ...(world.adaptive
+      ? {
+          adaptive: {
+            encoding: 'adaptive-blocks-v2',
+            ...packSection(world.adaptive as unknown as Record<string, unknown>, ADAPTIVE_TABLES, 4096),
+          },
+        }
+      : {}),
     ...historical,
     regions: (packed.regions as unknown[]).map(encodeSaveBlock),
     economy: packSection(packed.economy as Record<string, unknown>, ECONOMY_TABLES),
@@ -264,16 +231,13 @@ export function packWorldSave(world: World): unknown {
     worldEncoding: FORMAT,
   }
 }
+/** Decode only the current wire format; semantic validation follows expansion. */
 export function unpackWorldSave(value: unknown): unknown {
-  if (!value || typeof value !== 'object') return value
+  assertWorldVersion(value)
   const source = value as Record<string, unknown>
   if (source.worldEncoding === undefined)
     return unpackWorldCensus({ ...source, ...unpackHistoricalSections(source) })
-  if (
-    ![FORMAT, 'district-blocks-v1'].includes(String(source.worldEncoding)) ||
-    !Array.isArray(source.regions) ||
-    source.regions.length > 4096
-  )
+  if (source.worldEncoding !== FORMAT || !Array.isArray(source.regions) || source.regions.length > 4096)
     throw new Error('Unsupported compressed world')
   const { worldEncoding: _encoding, ...packed } = source
   return unpackWorldCensus({
@@ -281,13 +245,7 @@ export function unpackWorldSave(value: unknown): unknown {
     ...(source.adaptive ? { adaptive: unpackAdaptive(source.adaptive) } : {}),
     ...unpackHistoricalSections(source),
     regions: source.regions.map(decodeSaveBlock),
-    economy:
-      source.worldEncoding === FORMAT
-        ? unpackSection(source.economy as Section, ECONOMY_TABLES)
-        : decodeSaveBlock(source.economy),
-    localEconomy:
-      source.worldEncoding === FORMAT
-        ? unpackSection(source.localEconomy as Section, LOCAL_TABLES)
-        : decodeSaveBlock(source.localEconomy),
+    economy: unpackSection(source.economy as Section, ECONOMY_TABLES),
+    localEconomy: unpackSection(source.localEconomy as Section, LOCAL_TABLES),
   })
 }

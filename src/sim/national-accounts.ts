@@ -141,7 +141,7 @@ function addStore(w: World, key: string, opening = true) {
   a.stores[key] = store
   return store
 }
-/** Open a fresh period, preserving old balances before any one-time legacy revaluation. */
+/** Open a fresh period using carried acquisition costs, never current selling quotes. */
 export function beginNationalAccounts(w: World) {
   w.economy!.accounts = {
     month: w.month,
@@ -161,32 +161,8 @@ export function beginNationalAccounts(w: World) {
   for (const f of w.economy!.firms ?? []) addStore(w, firmStore(f.id))
   for (const a of w.armies) addStore(w, armyStore(a.id))
   for (const f of w.warfare?.fleets ?? []) addStore(w, fleetStore(f.id))
-  adoptInventoryCosting(w)
 }
 
-/** Old saves retain only the last lot's quote, so historical average costs cannot
- * be recovered. Rebase purchased goods once to local market quotes as an explicit
- * approximation. Keeping openingValue unchanged recognizes the correction as a
- * holding gain/loss, never GDP, a goods flow, or a cash payment. Produced goods
- * already use explicit firm revaluation and keep their existing treatment. */
-function adoptInventoryCosting(w: World) {
-  const e = w.economy!
-  if (e.inventoryValuation) return
-  let legacyAdjustment = 0
-  if (e.inventoryPrices)
-    for (const [key, s] of Object.entries(e.accounts!.stores)) {
-      if (key.startsWith('firm:')) continue
-      // Stored ownership already identifies the price location. Avoid another
-      // linear shipment search for each transit inventory during migration.
-      const quotes = s.government ? w.regions[s.region].prices : economicRegion(w, s.region).prices
-      for (const good of GOODS) {
-        const price = (quotes[good] || BASE_PRICE[good]) / 1000
-        legacyAdjustment += s.quantity[good] * (price - s.price[good])
-        s.price[good] = price
-      }
-    }
-  e.inventoryValuation = { method: 'weighted-average', adoptedMonth: w.month, legacyAdjustment }
-}
 function store(w: World, key: string) {
   return w.economy!.accounts!.stores[key] ?? addStore(w, key, false)
 }

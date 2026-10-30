@@ -1,14 +1,15 @@
 import { COMMODITIES, EXTENDED_GOODS } from './commodity-catalog'
 import { configurationValues, withConfigurationValues } from './configuration-context'
 import { validateConfigurationValues } from './configuration'
-import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './configuration-defaults'
+import { WORLD_VERSION } from './save-version'
+import type { ConfigurationValues } from './configuration-defaults'
 import { applyStartingEndowments, apportionPopulation } from './starting-conditions'
 import { advanceAlmanac } from './almanac'
 import { habitableLand } from './terrain-access'
 import { seedLandscape, settlementWeight } from './landscape'
 import { refreshSpatial } from './spatial'
 import { WORLD_SCALES, worldScale, type WorldScale } from './scale'
-import { DEFAULT_SETTINGS, validateSettings, type SimulationSettings } from './settings'
+import { DEFAULT_SETTINGS, type SimulationSettings } from './settings'
 import { ensureWarfare, commissionFleet, portAt } from './navy'
 import { ensureIntelligence } from './intelligence'
 import { militaryPeople } from './forces'
@@ -34,18 +35,18 @@ export { CELL_SIZE, neighbors } from './grid'
 export { GRID_W } from './simulation-invariants'
 export { GRID_H } from './simulation-invariants'
 export const NAMES = [
-  ['Aurelian Republic', 'Aurelia', '#d9b86c', 'Republic', 'mercantile'],
-  ['Kingdom of Veyr', 'Veyr', '#759faf', 'Monarchy', 'expansionist'],
-  ['Serrane League', 'Serrane', '#ba8582', 'Federation', 'scholarly'],
-  ['Verdant Commonwealth', 'Verdant', '#88a67e', 'Commonwealth', 'agrarian'],
-  ['Thalassic Union', 'Thalassa', '#a794bb', 'Republic', 'mercantile'],
-  ['Ordan Empire', 'Ordan', '#c59162', 'Empire', 'expansionist'],
-  ['Republic of Illyra', 'Illyra', '#79b5ab', 'Republic', 'scholarly'],
-  ['Nordmark Dominion', 'Nordmark', '#b2b9c5', 'Monarchy', 'agrarian'],
-  ['Sovereignty of Caelis', 'Caelis', '#a6ae66', 'Federation', 'scholarly'],
-  ['Kingdom of Rhenn', 'Rhenn', '#c7859f', 'Monarchy', 'expansionist'],
-  ['Isles of Meridia', 'Meridia', '#78a4c8', 'Republic', 'mercantile'],
-  ['Ashari Confederation', 'Ashar', '#d0a077', 'Federation', 'agrarian'],
+  ['Aurelian Republic', 'Aurelia', '#d9b86c', 'Republic'],
+  ['Kingdom of Veyr', 'Veyr', '#759faf', 'Monarchy'],
+  ['Serrane League', 'Serrane', '#ba8582', 'Federation'],
+  ['Verdant Commonwealth', 'Verdant', '#88a67e', 'Commonwealth'],
+  ['Thalassic Union', 'Thalassa', '#a794bb', 'Republic'],
+  ['Ordan Empire', 'Ordan', '#c59162', 'Empire'],
+  ['Republic of Illyra', 'Illyra', '#79b5ab', 'Republic'],
+  ['Nordmark Dominion', 'Nordmark', '#b2b9c5', 'Monarchy'],
+  ['Sovereignty of Caelis', 'Caelis', '#a6ae66', 'Federation'],
+  ['Kingdom of Rhenn', 'Rhenn', '#c7859f', 'Monarchy'],
+  ['Isles of Meridia', 'Meridia', '#78a4c8', 'Republic'],
+  ['Ashari Confederation', 'Ashar', '#d0a077', 'Federation'],
 ] as const
 const roots = [
   'Aster',
@@ -100,7 +101,7 @@ function provinceName(id: number) {
 
 export function makeNation(id: number, capital: number): Nation {
   let [name, shortName, color] = NAMES[id % NAMES.length] as readonly string[]
-  const [, , , government, personality] = NAMES[id % NAMES.length]
+  const [, , , government] = NAMES[id % NAMES.length]
   if (id >= NAMES.length) {
     shortName = provinceName(id * 7)
     name = `${government === 'Monarchy' ? 'Kingdom' : government} of ${shortName}`
@@ -125,7 +126,6 @@ export function makeNation(id: number, capital: number): Nation {
     color,
     capital,
     government,
-    personality,
     treasury: 24000,
     debt: 0,
     stability: 75,
@@ -143,14 +143,7 @@ export function makeNation(id: number, capital: number): Nation {
     },
     technologies: Object.fromEntries(FIELDS.map((k) => [k, 0])) as Record<Research, number>,
     researchProgress: Object.fromEntries(FIELDS.map((k) => [k, 0])) as Record<Research, number>,
-    researchFocus:
-      personality === 'expansionist'
-        ? 'military'
-        : personality === 'agrarian'
-          ? 'agriculture'
-          : personality === 'scholarly'
-            ? 'medicine'
-            : 'logistics',
+    researchFocus: configurationValues().starting.researchFocus,
     income: 0,
     spending: 0,
     gdp: 0,
@@ -172,19 +165,10 @@ export function generateWorld(
   start: 'settled' | 'frontier' = 'settled',
   configuration?: ConfigurationValues,
 ): World {
-  const values =
-    configuration === undefined ? DEFAULT_CONFIGURATION_VALUES : validateConfigurationValues(configuration)
+  const values = validateConfigurationValues(configuration ?? { conditions: settings })
   if (!['settled', 'frontier'].includes(start)) throw new Error('Unknown settlement pattern.')
   return withConfigurationValues(values, () =>
-    generateConfiguredWorld(
-      seed,
-      continents,
-      nationCount,
-      configuration ? values.conditions : settings,
-      scale,
-      start,
-      configuration === undefined ? undefined : values,
-    ),
+    generateConfiguredWorld(seed, continents, nationCount, scale, start, values),
   )
 }
 
@@ -194,14 +178,12 @@ function generateConfiguredWorld(
   seed: string,
   continents: number,
   nationCount: number,
-  settings: SimulationSettings,
   scale: WorldScale,
   start: 'settled' | 'frontier',
-  configuration?: ConfigurationValues,
+  configuration: ConfigurationValues,
 ): World {
   const opening = configurationValues().starting
   const extent = WORLD_SCALES[worldScale(scale)]
-  settings = validateSettings(settings)
   continents = Math.round(clamp(continents, 1, 5))
   nationCount = Math.round(clamp(nationCount, 4, 48))
   const rng = { rng: hashSeed(seed) },
@@ -540,15 +522,14 @@ function generateConfiguredWorld(
       n.population = opening.capitalPopulation
     }
   }
-  if (configuration) applyStartingEndowments(regions, nations, start, opening)
+  applyStartingEndowments(regions, nations, start, opening)
   const world: World = {
-    ...(configuration ? { configuration: { version: 1 as const, revision: 0, values: configuration } } : {}),
-    version: 1,
+    configuration: { version: 1, revision: 0, values: configuration },
+    version: WORLD_VERSION,
     generatorVersion: 5,
     ...(start === 'frontier' ? { settlementStart: 'frontier' as const } : {}),
     gridTopology: GRID_TOPOLOGY,
     modelProvenance: { accepted: 0, lastMonth: 0, roles: {}, source: 'native' },
-    simulation: { ...settings },
     seed,
     rng: rng.rng,
     month: 0,

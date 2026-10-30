@@ -1,3 +1,4 @@
+import { configurationDraft, applyConfiguration } from '../src/sim/configuration'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
@@ -10,7 +11,6 @@ import {
 import { DRIVE_AXES, strategicPressures } from '../src/sim/ambitions'
 import { advancePressures, ensurePressures } from '../src/sim/pressures'
 import { applyCommand, tick } from '../src/sim/engine'
-import { DEFAULT_SETTINGS } from '../src/sim/settings'
 import { validateWorld } from '../src/sim/persistence'
 import { ensureStatecraft, stateAgentContext } from '../src/sim/statecraft'
 import { population } from '../src/sim/types'
@@ -71,8 +71,12 @@ test('instability changes irregular local/state/regional/international event fre
     quiet = structuredClone(original),
     normal = structuredClone(original),
     volatile = structuredClone(original)
-  quiet.simulation!.instability = 0
-  volatile.simulation!.instability = 3
+  const quietConfig = configurationDraft(quiet),
+    volatileConfig = configurationDraft(volatile)
+  quietConfig.conditions.instability = 0
+  volatileConfig.conditions.instability = 3
+  applyConfiguration(quiet, quietConfig, 0)
+  applyConfiguration(volatile, volatileConfig, 0)
   const owners = original.regions.map((r) => r.nation),
     initialPeople = people(original)
   for (let month = 1; month <= 240; month++)
@@ -97,10 +101,9 @@ test('conditions, pressure RNG and extreme leaders survive exact save continuati
   ensureStatecraft(w)
   const before = people(w),
     stocks = w.regions.map((r) => ({ ...r.stocks }))
-  applyCommand(w, {
-    type: 'conditions',
-    settings: { ...DEFAULT_SETTINGS, instability: 3, abundance: 0.6, extremity: 2 },
-  })
+  const values = configurationDraft(w)
+  values.conditions = { instability: 3, abundance: 0.6, extremity: 2 }
+  applyConfiguration(w, values, w.configuration.revision)
   assert.equal(people(w), before)
   assert.deepEqual(
     w.regions.map((r) => r.stocks),
@@ -116,7 +119,7 @@ test('conditions, pressure RNG and extreme leaders survive exact save continuati
   tick(restored)
   assert.deepEqual(w, restored)
   const invalid = structuredClone(w)
-  invalid.simulation!.instability = Infinity
+  invalid.configuration.values.conditions.instability = Infinity
   assert.throws(() => validateWorld(invalid))
   const forged = structuredClone(w)
   forged.nations[0].character!.leader.politics!.drives.riskTolerance = 10

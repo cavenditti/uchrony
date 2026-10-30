@@ -22,7 +22,6 @@ import { validateIntelligence } from './intelligence-persistence'
 import { MAX_ARMIES } from './military-limits'
 import { validateWarfare } from './military-persistence'
 import { validBorderPolicy } from './border-policy'
-import { initialArmyOperations } from './navy'
 import { numberValidator, recordValue, validationFailure } from './persistence-primitives'
 import { POLICY_RULES, validSavedPolicy } from './policy-rules'
 import { coalesceCommunities, communityKey } from './population'
@@ -34,18 +33,17 @@ import { MAX_MAP_CELLS, MAX_PROVINCES } from './scale'
 import { validateSovereignty } from './sovereignty-persistence'
 import { validateSpatial } from './spatial-persistence'
 import { validateStatecraft } from './statecraft-persistence'
+import { assertWorldVersion } from './save-version'
 import { FIELDS, GOODS, MAX_STATE_IDENTITIES, type RouteLeg, type World } from './types'
 
 /** Validates untrusted save files before they enter the simulation worker. */
 export function validateWorld(value: unknown, allowDuplicateCommunities = false): World {
-  const source = value as World | null
-  if (source?.configuration !== undefined) {
-    const configuration = validateWorldConfiguration(source.configuration)
-    return withWorldConfiguration({ configuration }, () =>
-      validateConfiguredWorld({ ...source, configuration }, allowDuplicateCommunities),
-    )
-  }
-  return validateConfiguredWorld(value, allowDuplicateCommunities)
+  assertWorldVersion(value)
+  const source = value as World
+  const configuration = validateWorldConfiguration(source.configuration)
+  return withWorldConfiguration({ configuration }, () =>
+    validateConfiguredWorld({ ...source, configuration }, allowDuplicateCommunities),
+  )
 }
 function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = false): World {
   const fail = validationFailure('Invalid world save: ', '', '')
@@ -58,10 +56,9 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
     if (object(x) || Array.isArray(x)) for (const v of Object.values(x)) walk(v, depth + 1)
   }
   if (!object(value)) fail('expected an object')
+  walk(value)
   const w = value as unknown as World
-  walk(w)
   if (w.viewOnly) fail('display snapshots cannot be restored')
-  if (w.version !== 1) fail('unsupported version; this app supports version 1')
   if (w.gridTopology !== GRID_TOPOLOGY)
     fail(
       'this world uses the retired hex grid. Create a new square-grid world; your existing save file is unchanged',
@@ -82,10 +79,7 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
       !number(w.fastForward.months, 1, w.month) ||
       !Number.isInteger(w.fastForward.lastMonth) ||
       !number(w.fastForward.lastMonth, 1, w.month) ||
-      !Number.isInteger(w.fastForward.phase) ||
-      !number(w.fastForward.phase, 0, 5) ||
-      w.fastForward.phase > w.fastForward.months ||
-      (w.fastForward.phase > 0 && w.fastForward.lastMonth !== w.month))
+      Object.keys(w.fastForward).some((key) => key !== 'months' && key !== 'lastMonth'))
   )
     fail('invalid fast-forward provenance')
   if (
@@ -241,8 +235,6 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
         w.regions.some((r) => r.nation === i))
     )
       fail('invalid extinct state')
-    if (!['mercantile', 'expansionist', 'scholarly', 'agrarian'].includes(n.personality))
-      fail('invalid state personality')
     if (!object(n.policies)) fail('invalid government policies')
     for (const key of Object.keys(POLICY_RULES) as (keyof typeof POLICY_RULES)[])
       if (!validSavedPolicy(key, n.policies[key]))
@@ -601,15 +593,16 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
   validateEconomy(w)
   validateSpatial(w)
   validateAdaptiveWorld(w)
-  if (w.modelProvenance) {
+  {
     const p = w.modelProvenance
     if (
+      !p ||
       !Number.isSafeInteger(p.accepted) ||
       p.accepted < 0 ||
       !number(p.lastMonth, 0, w.month) ||
       !object(p.roles) ||
       Object.values(p.roles).some((n) => !Number.isSafeInteger(n) || n < 0) ||
-      !['native', 'model-assisted', 'legacy-unknown'].includes(p.source)
+      !['native', 'model-assisted'].includes(p.source)
     )
       fail('invalid model provenance')
   }
@@ -643,16 +636,13 @@ export function restoreWorld(value: unknown): World {
       return (copy ?? record) as T
     }
     const armies = source.armies.map((army) => {
-        const operations =
-          army?.operations === undefined && army && typeof army === 'object'
-            ? initialArmyOperations()
-            : army?.operations
-              ? clean(
-                  army.operations,
-                  ['fatigue', 'cohesion', 'loyalty', 'entrenchment'],
-                  ['food', 'arms', 'progress'],
-                )
-              : army?.operations
+        const operations = army?.operations
+          ? clean(
+              army.operations,
+              ['fatigue', 'cohesion', 'loyalty', 'entrenchment'],
+              ['food', 'arms', 'progress'],
+            )
+          : army?.operations
         return operations === army?.operations ? army : { ...army, operations }
       }),
       fleets = source.warfare.fleets.map((fleet) =>

@@ -13,7 +13,8 @@ import { initialArmyOperations } from '../src/sim/navy'
 import { MAX_ARMIES } from '../src/sim/military-limits'
 import { reinforceArmies } from '../src/sim/military-personnel'
 import { allForces } from '../src/sim/forces'
-import { persistSave, restoreSave } from '../src/storage/autosave'
+import { restoreSave } from '../src/storage/autosave'
+import { WorldStorage } from '../src/storage/world-storage'
 import type { WorldSave } from '../src/storage/save-types'
 import { movementNeighbors, stepDistance } from '../src/sim/grid'
 
@@ -30,22 +31,12 @@ test('manual recruitment is immediately saveable, before the next simulation mon
   validateWorld(w)
 })
 
-test('saves from the recruitment bug recover missing operations without inventing supplies or changing people', () => {
+test('missing army operations are rejected without inventing supplies or changing people', () => {
   const w = generateWorld('missing-operations-save')
-  ensureWarfare(w)
   delete w.armies[0].operations
+  const original = JSON.stringify(w)
   assert.throws(() => validateWorld(w), /army \d+ is missing its operations record/)
-  const original = JSON.stringify(w),
-    recovered = restoreWorld(w)
-  validateWorld(recovered)
-  assert.equal(recovered.armies[0].operations!.food, 0)
-  assert.equal(recovered.armies[0].operations!.arms, 0)
-  assert.equal(recovered.armies[0].operations!.embarkedOn, null)
-  assert.deepEqual(
-    recovered.armies.map((a) => a.communities),
-    w.armies.map((a) => a.communities),
-  )
-  assert.deepEqual(recovered.regions, w.regions)
+  assert.throws(() => restoreWorld(w), /army \d+ is missing its operations record/)
   assert.equal(JSON.stringify(w), original)
   const malformed = structuredClone(w)
   malformed.armies[0].operations = { food: 1 } as never
@@ -220,11 +211,14 @@ test('recruiting the 501st formation remains saveable and preserves people and m
     name: 'disk' as const,
     read: async () => stored,
     write: async (value: WorldSave) => {
-      stored = JSON.parse(JSON.stringify(value))
+      stored = value
+    },
+    writeBlob: async (blob: Blob) => {
+      stored = JSON.parse(await blob.text())
     },
   }
-  await persistSave([backend], { version: 1, savedAt: 1, world: w })
-  const restored = (await restoreSave([backend], null)).world!
+  await new WorldStorage([backend], () => {}).save(w, 1)
+  const restored = (await restoreSave([backend])).world!
   assert.deepEqual(restored.armies, w.armies)
   assert.equal(people(restored), before)
   const original = JSON.stringify(w)

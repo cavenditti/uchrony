@@ -123,9 +123,5 @@ export function ensureBuildingLots(w: World) {
     pools.set(site.pool, group)
   }
   for (const site of homes) subdivideHousing(w, site, pools.get(site.pool)!)
-  a.riverLaneVersion = 1
-  a.migration.assumptions.push(
-    'Housing is represented by varied, persistent building footprints fronting terrain-aware local lanes. Dated households, production, accounts and market clearing retain their larger economic pools; the quadtree can refine occupied lots to 8 m.',
-  )
   return true
 }

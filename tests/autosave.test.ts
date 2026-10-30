@@ -3,17 +3,17 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { DiskAutosaves, autosaveMiddleware } from '../server/autosave'
 import { generateWorld } from '../src/sim/generate'
-import { LatestSaveQueue, persistSave, restoreSave } from '../src/storage/autosave'
+import { UnsupportedSaveError } from '../src/sim/save-version'
+import { browserBackend, diskBackend } from '../src/storage/backends'
+import { restoreSave } from '../src/storage/autosave'
 import type { SaveBackend } from '../src/storage/backends'
 import type { WorldSave } from '../src/storage/save-types'
-import type { World } from '../src/sim/types'
 import { ensureAdaptiveWorld } from '../src/sim/adaptive-world'
-import { restoreWorld } from '../src/sim/persistence'
 import { packWorldSave } from '../src/sim/save-codec'
 
 const world = generateWorld('Durable autosave')
@@ -30,10 +30,9 @@ const backend = (name: 'disk' | 'browser', value: WorldSave | null, fails = fals
   },
 })
 
-test('retired hex-world restore reports the new-world requirement without writing either replica', async () => {
+test('retired world restore reports the new-world requirement without writing either replica', async () => {
   const old = structuredClone(world)
-  delete old.gridTopology
-  old.generatorVersion = 4
+  Object.assign(old, { version: 1 })
   const original = JSON.stringify(old)
   let writes = 0
   const replicas: SaveBackend[] = (['disk', 'browser'] as const).map((name) => ({
@@ -45,7 +44,7 @@ test('retired hex-world restore reports the new-world requirement without writin
       writes++
     },
   }))
-  await assert.rejects(restoreSave(replicas, null), /retired hex grid.*new square-grid world/)
+  await assert.rejects(restoreSave(replicas, null), /unsupported version.*Create a new world/)
   assert.equal(writes, 0)
   assert.equal(JSON.stringify(old), original)
 })
@@ -78,27 +77,15 @@ test('disk writes validate compressed snapshots without recompressing their byte
   }
 })
 
-test('a browser quota failure does not prevent a disk save, and the reverse also works', async () => {
-  assert.equal(await persistSave([backend('disk', null), backend('browser', null, true)], record(1)), 'disk')
-  assert.equal(
-    await persistSave([backend('disk', null, true), backend('browser', null)], record(2)),
-    'browser',
-  )
-  await assert.rejects(
-    persistSave([backend('disk', null, true), backend('browser', null, true)], record(3)),
-    /previous save is intact/,
-  )
-})
-test('restore chooses the newest valid replica and retains the legacy fallback', async () => {
+test('restore chooses the newest valid replica and reports empty storage', async () => {
   const older = backend('disk', record(1)),
     newer = backend('browser', record(2))
-  assert.equal((await restoreSave([older, newer], null)).source, 'browser')
-  assert.equal((await restoreSave([backend('disk', null, true), newer], null)).source, 'browser')
-  const legacy = JSON.stringify(world),
-    loaded = await restoreSave([backend('disk', null), backend('browser', null)], legacy)
-  assert.equal(loaded.source, 'legacy')
-  assert.deepEqual(loaded.world, world)
-  assert.equal(JSON.stringify(world), legacy)
+  assert.equal((await restoreSave([older, newer])).source, 'browser')
+  assert.equal((await restoreSave([backend('disk', null, true), newer])).source, 'browser')
+  assert.deepEqual(await restoreSave([backend('disk', null), backend('browser', null)]), {
+    world: null,
+    source: 'none',
+  })
 })
 test('restore expands only the winning replica and falls back after a corrupt newer world', async () => {
   const unused = {
@@ -109,70 +96,20 @@ test('restore expands only the winning replica and falls back after a corrupt ne
     },
   }
   const valid = record(2)
-  assert.equal(
-    (await restoreSave([backend('disk', unused), backend('browser', valid)], null)).source,
-    'browser',
-  )
+  assert.equal((await restoreSave([backend('disk', unused), backend('browser', valid)])).source, 'browser')
   const broken = { ...record(3), world: { ...world, rng: NaN } }
-  const recovered = await restoreSave([backend('disk', valid), backend('browser', broken)], null)
+  const recovered = await restoreSave([backend('disk', valid), backend('browser', broken)])
   assert.equal(recovered.source, 'disk')
   assert.deepEqual(recovered.world, world)
-  await assert.rejects(restoreSave([backend('disk', broken)], null), /Existing saves have been kept/)
+  await assert.rejects(restoreSave([backend('disk', broken)]), /Existing saves have been kept/)
   const malformed = { ...valid, savedAt: NaN }
-  assert.equal(
-    (await restoreSave([backend('disk', malformed), backend('browser', valid)], null)).source,
-    'browser',
-  )
+  assert.equal((await restoreSave([backend('disk', malformed), backend('browser', valid)])).source, 'browser')
 })
 test('unreadable saves do not silently generate a replacement world', async () => {
   await assert.rejects(
-    restoreSave([backend('disk', null, true), backend('browser', null)], null),
+    restoreSave([backend('disk', null, true), backend('browser', null)]),
     /Existing saves have been kept/,
   )
-  await assert.rejects(restoreSave([backend('disk', null), backend('browser', null)], 'corrupt saved world'))
-})
-test('the save queue serializes writes and coalesces intermediate worlds', async () => {
-  const writes: number[] = [],
-    reports: number[] = []
-  let release: () => void = () => {}
-  const gate = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  const queue = new LatestSaveQueue(
-    async (w) => {
-      writes.push(w.month)
-      if (writes.length === 1) await gate
-      return 'disk'
-    },
-    ({ world }) => reports.push(world.month),
-  )
-  const flight = queue.enqueue({ month: 1 } as World)
-  void queue.enqueue({ month: 2 } as World)
-  void queue.enqueue({ month: 3 } as World)
-  release()
-  await flight
-  assert.deepEqual(writes, [1, 3])
-  assert.deepEqual(reports, [1, 3])
-})
-test('a replaced world cannot receive stale save-success notifications', async () => {
-  let release: () => void = () => {}
-  const gate = new Promise<void>((resolve) => {
-      release = resolve
-    }),
-    reported: number[] = []
-  const queue = new LatestSaveQueue(
-    async (w) => {
-      if (w.month === 1) await gate
-      return 'disk'
-    },
-    ({ world }) => reported.push(world.month),
-  )
-  const flight = queue.enqueue({ month: 1 } as World)
-  queue.reset()
-  void queue.enqueue({ month: 0 } as World)
-  release()
-  await flight
-  assert.deepEqual(reported, [0])
 })
 test('disk autosaves restore large worlds atomically and recover the previous verified copy', async () => {
   const root = await mkdtemp(join(tmpdir(), 'uchrony-autosave-')),
@@ -248,23 +185,80 @@ test('the disk endpoint requires same-origin writes and isolates browser save sl
   }
 })
 
-test('adaptive migration retains a byte-identical original beyond ordinary backup rotations', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'uchrony-migration-')),
-    store = new DiskAutosaves(root),
+test('disk restoration rejects obsolete schemas without rotating or rewriting files', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'uchrony-obsolete-save-')),
     slot = randomUUID()
+  const old = { ...world, version: 1 }
+  const raw = JSON.stringify({
+    version: 1,
+    savedAt: 1,
+    world: old,
+    checksum: createHash('sha256').update(JSON.stringify(old)).digest('hex'),
+  })
   try {
-    await store.write(slot, record(1))
-    const original = await readFile(join(root, `${slot}.json`), 'utf8')
-    const migrated = structuredClone(world)
-    ensureAdaptiveWorld(migrated)
-    await store.write(slot, record(2, migrated))
-    await store.write(slot, record(3, migrated))
-    await store.write(slot, record(4, migrated))
-    assert.equal(await readFile(join(root, `${slot}.pre-adaptive-v1.json`), 'utf8'), original)
-    assert.equal((await store.read(slot)).save?.savedAt, 4)
-    const transport = (await store.read(slot, true)).save!
-    assert.deepEqual(restoreWorld(transport.world), migrated)
+    await writeFile(join(root, `${slot}.json`), raw)
+    await assert.rejects(new DiskAutosaves(root).read(slot), UnsupportedSaveError)
+    assert.equal(await readFile(join(root, `${slot}.json`), 'utf8'), raw)
+    assert.deepEqual(await readdir(root), [`${slot}.json`])
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('unsupported disk responses survive replica selection and allow a valid browser fallback', async (t) => {
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      new Response(JSON.stringify({ error: 'unsupported version. Create a new world.' }), { status: 409 }),
+  )
+  await assert.rejects(restoreSave([diskBackend(), backend('browser', null)]), UnsupportedSaveError)
+  const restored = await restoreSave([diskBackend(), backend('browser', record(1))])
+  assert.equal(restored.source, 'browser')
+  assert.deepEqual(restored.world, world)
+})
+
+test('browser restoration accepts current byte snapshots and rejects retired object records', async (t) => {
+  let stored: unknown = null
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')
+  // Model only the asynchronous read transaction contract; no legacy data is rewritten.
+  const database = {
+    transaction() {
+      const transaction = {
+        oncomplete: () => {},
+        objectStore: () => ({
+          get() {
+            const request = { result: stored, onsuccess: () => {} }
+            queueMicrotask(() => {
+              request.onsuccess()
+              transaction.oncomplete()
+            })
+            return request
+          },
+        }),
+      }
+      return transaction
+    },
+  }
+  Object.defineProperty(globalThis, 'indexedDB', {
+    configurable: true,
+    value: {
+      open() {
+        const request = { result: database, onsuccess: () => {} }
+        queueMicrotask(() => request.onsuccess())
+        return request
+      },
+    },
+  })
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'indexedDB', original)
+    else Reflect.deleteProperty(globalThis, 'indexedDB')
+  })
+  const backend = browserBackend()
+  assert.equal(await backend.read(), null)
+  stored = record(1)
+  await assert.rejects(backend.read(), UnsupportedSaveError)
+  assert.equal((stored as WorldSave).world, world)
+  stored = new Blob([JSON.stringify(record(2))])
+  assert.deepEqual(await backend.read(), record(2))
 })

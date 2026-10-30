@@ -47,22 +47,16 @@ test('the complete registry validates its defaults and rejects unknown, nonfinit
   assert.throws(() => validateWorldConfiguration({ version: 2, revision: 0, values: {} }), /unsupported/)
 })
 
-test('saved configurations of retired city parameters still load; place bands must be ordered', () => {
-  // A configuration saved before settlement places replaced prestige/wealth integration.
-  const saved = structuredClone(DEFAULT_CONFIGURATION_VALUES) as unknown as Record<
-    string,
-    Record<string, unknown>
-  >
-  delete saved.placeTopology
-  saved.urbanIntegration = { incorporationMonths: 120, mergerMonths: 240, prestigeRatio: 1.5 }
-  saved.settlements = { ...saved.settlements, minimumDensity: 300 }
-  assert.deepEqual(validateConfigurationValues(saved), DEFAULT_CONFIGURATION_VALUES)
-  assert.deepEqual(
-    validateWorldConfiguration({ version: 1, revision: 3, values: saved }).values,
-    DEFAULT_CONFIGURATION_VALUES,
+test('retired city parameters are rejected and place bands must be ordered', () => {
+  for (const values of [{ urbanIntegration: {} }, { settlements: { minimumDensity: 300 } }]) {
+    assert.throws(() => validateConfigurationValues(values), /unknown parameter/)
+  }
+  const incomplete = configurationDraft() as any
+  delete incomplete.placeTopology
+  assert.throws(
+    () => validateWorldConfiguration({ version: 1, revision: 0, values: incomplete }),
+    /missing parameter/,
   )
-  // Retirement applies only to the named paths: other unknown keys still fail loudly.
-  assert.throws(() => validateConfigurationValues({ settlements: { minimumDensityTypo: 1 } }), /unknown/)
   assert.throws(
     () => validateConfigurationValues({ placeTopology: { incorporation: 0.6, release: 0.5 } }),
     /release prominence/,
@@ -136,17 +130,18 @@ test('biome matrix and terrain overrides are exhaustive and preserve original st
 })
 
 test('climate keeps hemispheres half a year apart and wraps negative months', () => {
+  const configuration = fixture().configuration
   const north = { r: 10, elevation: 0.2, terrain: 'plains' as const, moisture: 0.5 }
   const south = { ...north, r: 89 }
   assert(
     Math.abs(
-      localClimate({ height: 100, month: 0 }, north).season -
-        localClimate({ height: 100, month: 6 }, south).season,
+      localClimate({ configuration, height: 100, month: 0 }, north).season -
+        localClimate({ configuration, height: 100, month: 6 }, south).season,
     ) < 1e-12,
   )
   assert.deepEqual(
-    localClimate({ height: 100, month: -1 }, north),
-    localClimate({ height: 100, month: 11 }, north),
+    localClimate({ configuration, height: 100, month: -1 }, north),
+    localClimate({ configuration, height: 100, month: 11 }, north),
   )
 })
 
@@ -208,17 +203,6 @@ test('live updates are atomic, revision checked, world scoped and preserved in s
   assert.equal(restored.rng, world.rng)
 })
 
-test('legacy saves and legacy condition commands retain a coherent configuration', () => {
-  const legacy = generateWorld('legacy-config', 3, 4, undefined, 'regional', 'frontier')
-  assert.equal(legacy.configuration, undefined)
-  const restored = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(legacy))))
-  assert.equal(restored.configuration, undefined)
-  const world = fixture()
-  applyCommand(world, { type: 'conditions', settings: { instability: 0, abundance: 1.2, extremity: 0 } })
-  assert.deepEqual(world.configuration!.values.conditions, world.simulation)
-  assert.equal(world.configuration!.revision, 1)
-})
-
 test('configured age boundaries, terrain and initial policies survive validation', () => {
   const values = configurationDraft()
   values.model.adultAgeMonths = 241
@@ -242,7 +226,7 @@ test('configured age boundaries, terrain and initial policies survive validation
   assert.equal(world.configuration!.values.model.adultAgeMonths, 241)
 })
 
-test('validated parameters are immutable and legacy scopes cannot leak changed values', () => {
+test('validated parameters are immutable and default world scopes cannot leak changed values', () => {
   const values = validateConfigurationValues({ model: { desiredChildrenBase: 3 } })
   assert.throws(() => {
     values.model.desiredChildrenBase = 4

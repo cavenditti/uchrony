@@ -2,7 +2,6 @@ import { expeditionOwner } from './overseas-types'
 import { geographicNeighbors as movementNeighbors, neighbors } from './grid'
 import { integerValidator, numberValidator, recordValue, validationFailure } from './persistence-primitives'
 import { communitySize } from './population'
-import { habitableLand, highMountain } from './terrain-access'
 import { GOODS, population, type World } from './types'
 
 /** Import checks are read-only. Duplicate/missing ownership must never be repaired by minting or deleting assets. */
@@ -187,12 +186,6 @@ export function validateDistrictEconomy(w: World) {
     )
       fail('abandoned city')
     cityIds.add(c.id)
-    // Retired prestige/wealth indicators may remain in older saves until the next refresh.
-    if (
-      c.standing !== undefined &&
-      (!obj(c.standing) || !num(c.standing.prestige) || !num(c.standing.wealthPerResident))
-    )
-      fail('city standing')
     if (
       c.field !== undefined &&
       (!obj(c.field) ||
@@ -211,9 +204,7 @@ export function validateDistrictEconomy(w: World) {
         !int(m.centre, 0, s.nextCity - 1) ||
         m.centre === c.id ||
         !int(m.since, 0, w.month) ||
-        [m.dominantSince, m.overwhelmingSince, m.incorporated, m.pending].some(
-          (month) => month !== undefined && !int(month, m.since, w.month),
-        ) ||
+        [m.incorporated, m.pending].some((month) => month !== undefined && !int(month, m.since, w.month)) ||
         c.absorbedBy !== undefined
       )
         fail('city metropolis')
@@ -315,21 +306,6 @@ export function validateDistrictEconomy(w: World) {
       fail('firm site or ownership')
   }
   if (s.shipments.length > w.cells.length * 100) fail('shipment budget')
-  // These are completed clearing records, not newly planned journeys. The
-  // mountain migration moves market centres but preserves their exact history.
-  // Accept only an old peak within the same district after that correction;
-  // ordinary mismatches and endpoints in another district must still fail.
-  const shipmentEndpoint = (district: number, cell: number) => {
-    const unit = s.units[district]
-    return (
-      cell === unit.center ||
-      (w.adaptive?.terrainVersion === 1 &&
-        int(cell, 0, w.cells.length - 1) &&
-        highMountain(w.cells[cell]) &&
-        habitableLand(w.cells[unit.center]) &&
-        unit.cells.includes(cell))
-    )
-  }
   for (const shipment of s.shipments) {
     if (
       !obj(shipment) ||
@@ -345,7 +321,7 @@ export function validateDistrictEconomy(w: World) {
     )
       fail('shipment')
     let last = shipment.legs[0]?.cells?.[0] ?? s.units[shipment.from].center
-    if (!shipmentEndpoint(shipment.from, last)) fail('shipment origin')
+    if (last !== s.units[shipment.from].center) fail('shipment origin')
     for (const leg of shipment.legs) {
       if (
         !leg ||
@@ -366,6 +342,6 @@ export function validateDistrictEconomy(w: World) {
       }
       last = leg.cells.at(-1)!
     }
-    if (!shipmentEndpoint(shipment.to, last)) fail('shipment destination')
+    if (last !== s.units[shipment.to].center) fail('shipment destination')
   }
 }

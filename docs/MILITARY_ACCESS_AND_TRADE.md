@@ -1,6 +1,6 @@
 # Military access and trade restrictions
 
-The bilateral diplomacy dossier now separates commerce from the host's permission for foreign forces. Policies are directional, stored on each side of a relation, and survive save/restore. War overrides every peaceful grant. Old saves without policy records continue to use their treaties.
+The bilateral diplomacy dossier now separates commerce from the host's permission for foreign forces. Policies are directional, stored on each side of a relation, and survive save/restore. War overrides every peaceful grant. Unspecified border policies follow the current treaty rules.
 
 ## Permissions and agreements
 

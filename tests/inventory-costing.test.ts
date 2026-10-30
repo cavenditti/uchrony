@@ -193,7 +193,7 @@ test('delayed freight preserves the purchased lot cost through dispatch, save an
   near(store.quantity.iron * store.price.iron, 1000)
   near(reconcileGDP(w)!.holdingGains, 0)
   const saved = parseSave(JSON.stringify(packWorldSave(w)))
-  assert.deepEqual(saved.economy!.inventoryValuation, w.economy!.inventoryValuation)
+  assert.deepEqual(saved.economy!.accounts!.stores, w.economy!.accounts!.stores)
   saved.month = shipment.arrives
   beginNationalAccounts(saved)
   arriveFreight(saved)
@@ -252,54 +252,15 @@ test('district merges and splits preserve different original inventory costs wit
   }
 })
 
-test('legacy inventory quotes are rebased once outside GDP without rewriting cash, goods or history', () => {
+test('carried acquisition costs survive saves and new accounting periods without rebasing', () => {
   const { w, buyer } = fixture()
-  inventoryQuote(w, marketStore(buyer.id), 'iron', 1000)
+  inventoryQuote(w, marketStore(buyer.id), 'iron', 5)
   reconcileGDP(w)
-  delete w.economy!.inventoryValuation
-  const restored = parseSave(JSON.stringify(w)),
-    cash = balances(restored),
-    goods = restored.regions.map((r) => ({ ...r.stocks })),
-    history = structuredClone(restored.history)
-  near(value(restored, buyer.id), 1_000_000, 'loading alone leaves completed accounts intact')
+  const restored = parseSave(JSON.stringify(w))
+  restored.regions[buyer.id].prices.iron *= 2
   restored.month++
   beginNationalAccounts(restored)
-  const result = reconcileGDP(restored)!
-  near(value(restored, buyer.id), 1000)
-  near(result.productionGDP, 0)
-  near(result.holdingGains, -999000)
-  assert.deepEqual(restored.economy!.inventoryValuation, {
-    method: 'weighted-average',
-    adoptedMonth: restored.month,
-    legacyAdjustment: -999000,
-  })
-  assert.deepEqual(balances(restored), cash)
-  assert.deepEqual(
-    restored.regions.map((r) => r.stocks),
-    goods,
-  )
-  assert.deepEqual(restored.history, history)
-  const copy = parseSave(JSON.stringify(restored))
-  copy.regions[buyer.id].prices.iron *= 2
-  copy.month++
-  beginNationalAccounts(copy)
-  near(reconcileGDP(copy)!.holdingGains, 0)
-  near(value(copy, buyer.id), 1000, 'a new selling quote does not repeat the legacy rebase')
-  assert.deepEqual(copy.economy!.inventoryValuation, restored.economy!.inventoryValuation)
-  validateWorld(copy)
-})
-
-test('invalid costing adoption metadata cannot bypass save validation', () => {
-  const { w } = fixture()
-  reconcileGDP(w)
-  for (const invalid of [
-    null,
-    { method: 'latest-price', adoptedMonth: 0, legacyAdjustment: 0 },
-    { method: 'weighted-average', adoptedMonth: w.month + 1, legacyAdjustment: 0 },
-    { method: 'weighted-average', adoptedMonth: 0, legacyAdjustment: Number.NaN },
-  ]) {
-    const copy = structuredClone(w)
-    copy.economy!.inventoryValuation = invalid as never
-    assert.throws(() => validateWorld(copy), /inventory valuation|non-finite number/)
-  }
+  near(value(restored, buyer.id), 5000)
+  near(reconcileGDP(restored)!.holdingGains, 0)
+  validateWorld(restored)
 })

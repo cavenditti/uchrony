@@ -86,7 +86,6 @@ function establishCityState(w: World, region: Region, city: City, units: Region[
   nation.name = `Free City of ${city.name}`.slice(0, 180)
   nation.shortName = city.name.slice(0, 80)
   nation.government = 'Republic'
-  nation.personality = 'mercantile'
   nation.researchFocus = 'logistics'
   nation.treasury = 0
   nation.debt = 0

@@ -148,18 +148,14 @@ test('a place below the label threshold persists until its last resident leaves'
   assert.equal(JSON.stringify(place), before)
 })
 
-test('legacy prestige and dominance fields are dropped without disturbing an incorporation', () => {
+test('a place retains its incorporation across refreshes', () => {
   const w = settlementWorld(32, 32)
   addTown(w, { x: 6000, y: 6000 }, 20000, 512)
   addTown(w, { x: 9000, y: 6000 }, 5000)
   refreshPlaces(w)
   const [, quarter] = livingPlaces(w)
   assert.equal(quarter.metropolis!.incorporated, 0, 'a new basin on a city flank is born a quarter')
-  quarter.standing = { prestige: 3, wealthPerResident: 10 }
-  quarter.metropolis!.dominantSince = 0
-  quarter.metropolis!.overwhelmingSince = 0
   advance(w, 1)
-  assert.equal(quarter.standing, undefined)
   assert.deepEqual(quarter.metropolis, { centre: livingPlaces(w)[0].id, since: 0, incorporated: 0 })
 })
 

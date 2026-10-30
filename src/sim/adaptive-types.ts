@@ -96,7 +96,6 @@ export interface AdaptiveWorld {
   nextJurisdiction: number
   boundaries: BoundaryRecord[]
   names: { id: string; name: string; cell: number; since: number; aliases: string[] }[]
-  commuting: CommuteFlow[]
   commutingRows?: import('./commute-ledger').CommuteRow[]
   commuteRoutes?: Record<string, { cells: number[]; minutes: number; mode: 'walk' | 'rail' | 'road' }>
   nextTransit?: number
@@ -118,12 +117,9 @@ export interface AdaptiveWorld {
     sponsor?: string
     host?: number
   }[]
-  migration: { source: 'legacy'; month: number; assumptions: string[] }
   reviewMonth: number
   residentialVersion?: 1
   buildingVersion?: 1
-  terrainVersion?: 1
-  riverLaneVersion?: 1
   /** Surveyed local access paths; geometry persists independently of the mesh. */
   lanes?: SettlementLane[]
   nextResidence?: number

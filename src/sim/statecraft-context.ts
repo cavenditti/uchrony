@@ -44,7 +44,7 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
           message.to.includes(nation) || message.from === nation || knowledge.broadcasts.includes(message.id),
       )
       .slice(-(strategic ? 24 : 6))
-  const { character: _profile, personality: _legacyPersonality, ...government } = n
+  const { character: _profile, ...government } = n
   const currentOffers = visible
     .filter((offer) => offer.status === 'proposed' || offer.status === 'ratified')
     .slice(-30)
