@@ -1,3 +1,4 @@
+import { borderPolicy, type BorderPolicy } from './border-policy'
 import { applyRoyalAgreement, royalAgreementObstacle } from './dynasties'
 import { CAPITULATION_OUTCOMES, type CapitulationOutcome } from './capitulation'
 import { settleStateEstate } from './state-succession'
@@ -180,6 +181,22 @@ function validateTerms(world: World, terms: DiplomaticClause[], parties: number[
         throw new Error('State creation needs a name and territory.')
       creation = true
     }
+    if (['transit', 'access', 'basing', 'preferential-trade', 'trade'].includes(term.kind)) {
+      if (term.from === term.to) throw new Error('Access and trade agreements require distinct states.')
+      if (
+        relation(world, term.from, term.to)?.treaty === 'war' &&
+        !terms.some(
+          (t) => t.kind === 'peace' && [t.from, t.to].includes(term.from) && [t.from, t.to].includes(term.to),
+        )
+      )
+        throw new Error('Warring states must agree peace before access or trade can resume.')
+      if (
+        ['transit', 'access', 'basing'].includes(term.kind) &&
+        (new Set(term.regions).size !== term.regions.length ||
+          term.regions.some((id) => world.regions[id]?.nation !== term.from))
+      )
+        throw new Error('A military access corridor must name distinct host provinces.')
+    }
     if (['cede', 'create'].includes(term.kind)) {
       if (!term.regions.length || new Set(term.regions).size !== term.regions.length)
         throw new Error('Territorial terms need distinct provinces.')
@@ -230,6 +247,13 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
       'model',
     )
     return `Cabinet directed to ${order.key}. Routine economic and security work continues.`
+  } else if (order.kind === 'trade-policy' || order.kind === 'military-access') {
+    const rel = relation(world, nation, order.target)
+    if (!rel) throw new Error('Choose another state for a border policy.')
+    const policy = { ...borderPolicy(rel, nation) }
+    if (order.kind === 'trade-policy') policy.trade = order.key as BorderPolicy['trade']
+    else policy.military = order.key as BorderPolicy['military']
+    command = { type: 'border-policy', nation, target: order.target, policy }
   } else if (order.kind === 'found') {
     const province = world.cells[order.target]?.region
     if (
@@ -264,14 +288,14 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
   } else if (order.kind === 'naval') {
     if (
       !world.warfare?.fleets.some((f) => f.id === order.target && f.nation === nation) ||
-      !['patrol', 'escort', 'blockade', 'transport', 'return'].includes(order.key)
+      !['patrol', 'escort', 'blockade', 'raid', 'transport', 'return'].includes(order.key)
     )
       throw new Error('Naval orders require an owned fleet and a supported mission.')
     command = {
       type: 'fleet-order',
       fleet: order.target,
       target: order.value,
-      mission: order.key as 'patrol' | 'escort' | 'blockade' | 'transport' | 'return',
+      mission: order.key as Extract<Command, { type: 'fleet-order' }>['mission'],
     }
   } else if (order.kind === 'embark') {
     if (
@@ -301,7 +325,7 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
       type: 'army-orders',
       army: order.target,
       stance: order.key as 'march' | 'hold' | 'entrench',
-      conduct: order.text as 'restrained' | 'requisition' | 'pillage',
+      conduct: order.text as Extract<Command, { type: 'army-orders' }>['conduct'],
     }
   } else if (order.kind === 'identity') {
     if (!['culture', 'language', 'belief'].includes(order.key))
@@ -668,6 +692,9 @@ export function settleConventionalOffers(world: World) {
     'personal-union',
     'war',
     'trade',
+    'preferential-trade',
+    'transit',
+    'basing',
     'alliance',
     'peace',
     'access',
@@ -747,11 +774,10 @@ function normalizeStates(world: World) {
     if (
       at.nation !== army.nation &&
       army.operations?.embarkedOn == null &&
-      !diplomaticAccess(world, army.nation, at.nation) &&
-      relation(world, at.nation, army.nation)?.treaty !== 'war' &&
-      relation(world, at.nation, army.nation)?.treaty !== 'alliance'
+      !diplomaticAccess(world, army.nation, at.nation, 'transit', at.id) &&
+      relation(world, at.nation, army.nation)?.treaty !== 'war'
     ) {
-      army.region = world.nations[army.nation].capital
+      // The monthly military phase orders a physical withdrawal; no teleportation.
       army.target = null
     }
   }

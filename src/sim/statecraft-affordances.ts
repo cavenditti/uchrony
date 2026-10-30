@@ -1,3 +1,4 @@
+import { borderPolicy } from './border-policy'
 /** Action menus are individually executable quotes, never promises that an
  * entire list can be purchased together. Execution revalidates changed worlds. */
 import { cabinetCrown, capitulationOptions } from './sovereign-strategy'
@@ -16,6 +17,20 @@ export function statecraftAffordances(w: World, nation: number) {
       own = w.regions.filter((r) => r.nation === nation && !r.control)
     return {
       quotedMonth: w.month,
+      borderPolicies: w.relations
+        .filter((r) => r.a === nation || r.b === nation)
+        .map((r) => {
+          const other = r.a === nation ? r.b : r.a
+          return {
+            nation: other,
+            war: r.treaty === 'war',
+            own: borderPolicy(r, nation),
+            counterpart: borderPolicy(r, other),
+          }
+        }),
+      accessNotice:
+        'Host policies override treaties. Transit permits a three-month visit; resupply also allows provisions; basing permits permanent deployment. Wars close formal commerce and peaceful access. Restricted trade permits 20% route capacity, no arms and normal tariffs plus 25 points. Embargoes close all formal bilateral trade and transit.',
+
       crown: cabinetCrown(w, nation),
       dependency: dependencyOf(w, nation),
       capitulations: w.relations

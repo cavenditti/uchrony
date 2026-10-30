@@ -3,6 +3,7 @@ import { DistrictEconomies } from './DistrictEconomies'
 import { spatialState } from '../sim/spatial'
 import { MacroAccounts } from './EconomicAccounts'
 import { SovereignRelations } from './SovereignRelations'
+import { BorderAccess } from './BorderAccess'
 import { PeaceNegotiation } from './PeaceNegotiation'
 import { StateAdvisor } from './StateAdvisor'
 import { StateSecurity } from './StateSecurity'
@@ -875,6 +876,13 @@ export function Inspector({
                   target={target.id}
                   command={command}
                 />
+                <BorderAccess
+                  key={`borders:${n.id}:${target.id}`}
+                  world={w}
+                  nation={n.id}
+                  target={target.id}
+                  command={command}
+                />
                 {targetRel.treaty === 'war' && (
                   <PeaceNegotiation
                     key={`${n.id}:${target.id}`}
@@ -932,7 +940,7 @@ export function Inspector({
                       command({ type: 'diplomacy', nation: n.id, target: target.id, action: 'embargo' })
                     }
                   >
-                    Revoke preferential access
+                    Impose trade embargo
                   </button>
                 )}
                 <button className="text-button" onClick={() => onNation(target.id)}>

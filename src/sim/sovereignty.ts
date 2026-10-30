@@ -19,8 +19,10 @@ import { ensureWarfare, warEvent } from './navy'
 import { allForces } from './forces'
 import { sharedInstitution } from './institutions'
 import { provincialServiceLookup } from './public-services'
+import { capitalConnections, isolationPressure } from './territorial-supply'
 
 export interface ProvincialAuthority {
+  isolation?: number
   region: number
   nation: number
   since: number
@@ -265,6 +267,7 @@ export function advanceSovereignty(world: World) {
     indexed = new Map(state.provinces.map((report) => [report.region, report])),
     pending: ProvincialAuthority[] = []
   const provincialService = provincialServiceLookup(world)
+  const connected = capitalConnections(world)
   for (const r of world.regions) {
     if (r.nation < 0) continue
     const n = world.nations[r.nation],
@@ -296,6 +299,7 @@ export function advanceSovereignty(world: World) {
         nation: r.nation,
         since: world.month,
         protection: 1,
+        isolation: 0,
         neglect: 0,
         contested: 0,
         movement,
@@ -314,6 +318,15 @@ export function advanceSovereignty(world: World) {
       report.organization *= 0.5
       report.support *= 0.7
       report.movement = movement
+    }
+    const isolation = isolationPressure(report.isolation ?? 0, !!connected[r.id])
+    report.isolation = isolation.months
+    if (isolation.pressure > 0) {
+      r.unrest = clamp(r.unrest + isolation.pressure * 0.8, 0, 100)
+      for (const group of groups) {
+        group.loyalty = clamp(group.loyalty - isolation.pressure * 0.003)
+        group.grievance = clamp(group.grievance + isolation.pressure * 0.004)
+      }
     }
     let loyal = 0,
       hostile = 0
@@ -365,7 +378,8 @@ export function advanceSovereignty(world: World) {
         ) *
         (1 - (r.unrest / 100) * 0.3) *
         (0.75 + r.foodCoverage * 0.25),
-      civilSafe = civil / (1 + Math.max(0, hostile + challenge - loyal) / need),
+      civilSafe =
+        (civil * (1 - isolation.pressure * 0.65)) / (1 + Math.max(0, hostile + challenge - loyal) / need),
       armed = clamp(loyal / (need + hostile * 0.8 + challenge)),
       protection = clamp(civilSafe + (1 - civilSafe) * armed)
     report.protection = protection

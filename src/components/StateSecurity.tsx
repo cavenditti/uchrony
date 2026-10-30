@@ -11,6 +11,8 @@ export function StateSecurity({
   onFocus: (region: number) => void
 }) {
   const report = authoritySummary(world, nation)
+  const isolated =
+    world.sovereignty?.provinces.filter((p) => p.nation === nation && (p.isolation ?? 0) > 0) ?? []
   return (
     <section className="state-security" aria-label="Protection and territorial authority">
       <h3>Protection and authority</h3>
@@ -26,6 +28,23 @@ export function StateSecurity({
         <span>Control contested</span>
         <b>{report.contested}</b>
       </div>
+      {isolated.length > 0 && (
+        <details>
+          <summary>Cut off from the capital: {isolated.length} provinces</summary>
+          <p className="panel-note">
+            Closed borders and port blockades interrupt support. After three months, isolation gradually
+            weakens civil authority and loyalty. Restore a trade corridor or sea access.
+          </p>
+          {isolated.map((p) => (
+            <div className="data-row" key={p.region}>
+              <button className="text-button" onClick={() => onFocus(p.region)}>
+                {world.regions[p.region].name}
+              </button>
+              <b>{p.isolation} months</b>
+            </div>
+          ))}
+        </details>
+      )}
       {!world.sovereignty && <p className="panel-note">Provincial assessments begin with the next month.</p>}
       {report.emergencies.map((entry) => (
         <article className="security-emergency" key={entry.region}>

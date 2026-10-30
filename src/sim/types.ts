@@ -163,6 +163,8 @@ export interface Nation {
   ai: boolean
 }
 export interface Relation {
+  aPolicy?: import('./border-policy').BorderPolicy
+  bPolicy?: import('./border-policy').BorderPolicy
   /** An intervention supports this original victim; it must not manufacture another defense call. */
   defenseOf?: number
   aggressor?: number
@@ -394,6 +396,16 @@ export type Command =
   | { type: 'policy'; nation: number; key: keyof Policies; value: Policies[keyof Policies] }
   | { type: 'identity-policy'; nation: number; key: 'culture' | 'language' | 'belief'; identity: number }
   | { type: 'research'; nation: number; field: Research }
+  | { type: 'border-policy'; nation: number; target: number; policy: import('./border-policy').BorderPolicy }
+  | {
+      type: 'access-proposal'
+      nation: number
+      target: number
+      kind: 'transit' | 'access' | 'basing' | 'preferential-trade'
+      duration: number
+      regions: number[]
+    }
+  | { type: 'access-answer'; nation: number; offer: number; accept: boolean }
   | {
       type: 'diplomacy'
       nation: number
@@ -406,14 +418,14 @@ export type Command =
       type: 'army-orders'
       army: number
       stance: 'march' | 'hold' | 'entrench'
-      conduct: 'restrained' | 'requisition' | 'pillage'
+      conduct: ArmyOperations['conduct']
     }
   | { type: 'commission'; nation: number; region: number; warships: number; transports: number }
   | {
       type: 'fleet-order'
       fleet: number
       target: number
-      mission: 'patrol' | 'escort' | 'blockade' | 'transport' | 'return'
+      mission: import('./military-types').Fleet['mission']
     }
   | { type: 'embark'; army: number; fleet: number }
   | {

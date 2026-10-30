@@ -6,7 +6,8 @@ import { visibleAgreement } from '../sim/agreement-references'
 import { AgreementReference, AgreementText } from './AgreementReference'
 import { foreignOfficeContext } from '../sim/diplomatic-friction'
 
-function describe(world: World, term: DiplomaticClause) {
+/** Plain-language terms are shared by the archive and the bilateral signature controls. */
+export function describeClause(world: World, term: DiplomaticClause) {
   const from = world.nations[term.from]?.shortName ?? 'New state',
     to = world.nations[term.to]?.shortName ?? 'New state',
     places = term.regions.map((id) => world.regions[id]?.name).join(', '),
@@ -31,7 +32,11 @@ function describe(world: World, term: DiplomaticClause) {
     case 'research':
       return `${from} shares research in ${term.field} with ${to}${duration}.`
     case 'access':
-      return `${from} grants military access to ${to}${duration}.`
+    case 'transit':
+    case 'basing':
+      return `${from} grants ${term.kind === 'basing' ? 'permanent military basing' : term.kind === 'transit' ? 'military transit' : 'military transit and resupply'} to ${to}${places ? ` in ${places}` : ''}${duration}.`
+    case 'preferential-trade':
+      return `${from} and ${to} halve their normal tariffs${duration}; border restrictions still apply.`
     case 'war':
       return `${from} declares war on ${to}.`
     case 'custom':
@@ -231,8 +236,8 @@ export function DiplomaticChancery({
             <ul>
               {offer.terms.map((term, index) => (
                 <li key={index}>
-                  {text(describe(world, term))}
-                  {term.text && !describe(world, term).includes(term.text) && (
+                  {text(describeClause(world, term))}
+                  {term.text && !describeClause(world, term).includes(term.text) && (
                     <small className="agreement-clause-note">{text(term.text)}</small>
                   )}
                 </li>

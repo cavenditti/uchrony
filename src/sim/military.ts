@@ -18,8 +18,10 @@ import {
   pillageProvince,
 } from './military-control'
 import { MAX_ARMIES } from './military-limits'
+import { militaryVisit } from './military-access'
+import type { MilitaryPermission } from './border-policy'
 import { armyStore, fleetStore, marketStore, recordGift, recordUse } from './national-accounts'
-import { seaPassageView } from './naval-control'
+import { seaPassageView, portBlockadeView } from './naval-control'
 import {
   canEmbarkArmy,
   cargoCapacity,
@@ -47,10 +49,8 @@ export function advanceArmies(w: World) {
   // Movement can change owners, but diplomatic commitments stay fixed in this phase.
   const passage = seaPassageView(w),
     access = diplomaticAccessView(w),
-    accessible = (world: World, nation: number, region: number) =>
-      controller(world, region) === nation ||
-      relation(world, nation, controller(world, region))?.treaty === 'alliance' ||
-      access(nation, controller(world, region))
+    accessible = (world: World, nation: number, region: number, purpose: MilitaryPermission = 'transit') =>
+      controller(world, region) === nation || access(nation, controller(world, region), purpose, region)
   const state = ensureWarfare(w),
     profile = corridorProfile(w),
     remaining = profile.capacity.slice()
@@ -114,18 +114,25 @@ export function advanceArmies(w: World) {
         // depots. Permission to leave a province does not imply permission to
         // enter it. Index once per nation/control revision, retaining each edge's
         // actual delivery legs and capacity rather than inventing a reverse trip.
-        const access = w.regions.map((region) => accessible(w, nation, region.id))
+        const access = w.regions.map((region) => accessible(w, nation, region.id, 'supply'))
         graph = w.regions.map(() => [])
         for (const [from, edges] of transportGraph(w, nation, profile).entries()) {
           if (!access[from]) continue
-          for (const edge of edges) if (access[edge.to]) graph[edge.to].push({ ...edge, to: from })
+          for (const edge of edges)
+            if (
+              access[edge.to] &&
+              edge.legs.every((leg) =>
+                leg.cells.every((cell) => w.cells[cell].terrain === 'water' || access[w.cells[cell].region]),
+              )
+            )
+              graph[edge.to].push({ ...edge, to: from })
         }
       }
       cache.set(nation, graph)
     }
     return graph
   }
-  function supply(army: Army) {
+  function supply(army: Army, withdrawing = false) {
     const ops = army.operations!,
       r = w.regions[army.region],
       n = w.nations[army.nation]
@@ -136,11 +143,18 @@ export function advanceArmies(w: World) {
     const sources = w.regions
       .filter(
         (r) =>
-          r.nation === army.nation &&
+          !withdrawing &&
+          accessible(w, army.nation, r.id, 'supply') &&
+          (r.nation === army.nation || access(army.nation, r.nation, 'supply', r.id)) &&
           (r.id === n.capital || (r.infrastructure >= 0.5 && r.industry >= 0.4 && r.devastation < 0.5)) &&
           Number.isFinite(paths.distance[r.id]),
       )
-      .sort((a, b) => paths.distance[a.id] - paths.distance[b.id] || a.id - b.id)
+      .sort(
+        (a, b) =>
+          Number(b.nation === army.nation) - Number(a.nation === army.nation) ||
+          paths.distance[a.id] - paths.distance[b.id] ||
+          a.id - b.id,
+      )
     let delivered = 0
     for (const source of sources) {
       const needFood = Math.max(0, army.soldiers * 0.034 * 3 - ops.food),
@@ -202,7 +216,12 @@ export function advanceArmies(w: World) {
       delivered += food + arms
     }
     const need = army.soldiers * 0.034
-    if (ops.food < need && ops.conduct !== 'restrained' && accessible(w, army.nation, r.id)) {
+    if (
+      ops.food < need &&
+      ['requisition', 'pillage'].includes(ops.conduct) &&
+      !withdrawing &&
+      accessible(w, army.nation, r.id, 'supply')
+    ) {
       const taken = Math.min(r.stocks.food, need - ops.food, population(r) * 0.025 * 0.25)
       recordGift(w, marketStore(r.id), armyStore(army.id), 'food', taken)
       r.stocks.food -= taken
@@ -478,12 +497,32 @@ export function advanceArmies(w: World) {
         fleet.mission === 'transport' &&
         !fleet.course.length &&
         fleet.target !== null &&
+        portBlockadeView(w)(a.nation, fleet.target) > 0 &&
         relation(w, a.nation, w.regions[fleet.target].nation)?.treaty === 'war'
       )
         if (battle(a, fleet.target, true)) disembark(w, a, fleet, fleet.target)
       continue
     }
-    supply(a)
+    const visit = militaryVisit(w, a.nation, a.region, ops.foreignStay, access)
+    if (visit.stay) ops.foreignStay = visit.stay
+    else delete ops.foreignStay
+    if (visit.withdraw) {
+      // Revocation never teleports a formation through the surrounding enemy.
+      // Use the same directional physical graph to find an attainable home port or province.
+      const paths = pathsFrom(graphFor(a.nation, true), a.region)
+      const home = w.regions
+        .filter(
+          (r) =>
+            r.nation === a.nation &&
+            controller(w, r.id) === a.nation &&
+            Number.isFinite(paths.distance[r.id]),
+        )
+        .sort((x, y) => paths.distance[x.id] - paths.distance[y.id])[0]
+      a.target = home?.id ?? null
+      ops.stance = 'march'
+      ops.entrenchment = 0
+    }
+    supply(a, visit.withdraw)
     pillageProvince(w, a)
     if (engaged.has(a.id) || ops.disorder || a.soldiers < 50 || ops.stance !== 'march') continue
     if (a.target === null && !wars.has(a.nation)) continue

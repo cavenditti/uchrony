@@ -25,6 +25,7 @@ export function validateSovereignty(world: World) {
       !integer(report.since, 0, world.month) ||
       !integer(report.warned, 0, world.month) ||
       !integer(report.neglect, 0, world.month + 1) ||
+      (report.isolation !== undefined && !integer(report.isolation, 0, world.month + 1)) ||
       !integer(report.contested, 0, world.month + 1) ||
       !unit(report.protection) ||
       !unit(report.organization) ||

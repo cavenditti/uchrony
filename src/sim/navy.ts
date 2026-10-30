@@ -1,4 +1,6 @@
 import { diplomaticAccess } from './agreements'
+import { portBlockadeView } from './naval-control'
+import { militaryVisit } from './military-access'
 import { effectMultiplier } from './effects'
 import { recordWorldEvent } from './event-memory'
 import { unitLoyalty } from './forces'
@@ -66,9 +68,8 @@ export function ensureWarfare(w: World) {
 export const portAt = (w: World, region: number) =>
   transportNetwork(w).harbors.find((h) => h.region === region)
 export const friendlyPort = (w: World, nation: number, region: number) =>
-  w.regions[region].nation === nation ||
-  relation(w, nation, w.regions[region].nation)?.treaty === 'alliance' ||
-  diplomaticAccess(w, nation, w.regions[region].nation)
+  diplomaticAccess(w, nation, w.regions[region].nation, 'transit', region) &&
+  portBlockadeView(w)(nation, region) > 0
 
 const paths = new WeakMap<World['cells'], Map<string, number[]>>()
 function sailingDistance(w: World, path: number[]) {
@@ -212,10 +213,13 @@ export function orderFleet(w: World, id: number, target: number, mission: Fleet[
   const f = ensureWarfare(w).fleets.find((f) => f.id === id),
     harbor = portAt(w, target)
   if (!f || !harbor) throw new Error('Choose a fleet and a coastal destination.')
-  if (!['patrol', 'escort', 'blockade', 'transport', 'return'].includes(mission))
+  if (!['patrol', 'escort', 'blockade', 'raid', 'transport', 'return'].includes(mission))
     throw new Error('Unknown naval mission.')
-  if (mission === 'blockade' && relation(w, f.nation, w.regions[target].nation)?.treaty !== 'war')
-    throw new Error('A blockade requires war with the port owner.')
+  if (mission === 'blockade' || mission === 'raid') {
+    if (relation(w, f.nation, w.regions[target].nation)?.treaty !== 'war')
+      throw new Error('A blockade or route raid requires war with the port owner.')
+    if (!f.warships) throw new Error('Blockades and raids require warships.')
+  }
   if (mission === 'return' && !friendlyPort(w, f.nation, target))
     throw new Error('Returning fleets need port access.')
   if (
@@ -230,6 +234,7 @@ export function orderFleet(w: World, id: number, target: number, mission: Fleet[
   f.course = path.slice(1)
   f.sailingProgress = 0
   f.mission = mission
+  w.warfare!.revision++
   for (const army of w.armies.filter((a) => f.embarked.includes(a.id))) army.target = target
   return 'Naval orders recorded. Ships sail and consume provisions on subsequent months.'
 }
@@ -285,6 +290,9 @@ export function militaryDeaths(w: World, force: Army, amount: number) {
 export function advanceNavy(w: World) {
   const state = ensureWarfare(w)
   for (const f of state.fleets) {
+    // Positions, provisions and missions change within this loop; subsequent
+    // harbor checks must not reuse pressure from the previous fleet's position.
+    state.revision++
     if (!w.regions.some((r) => r.nation === f.nation)) {
       const home = w.regions[f.region]
       recordGift(w, fleetStore(f.id), marketStore(home.id), 'food', f.food)
@@ -300,13 +308,19 @@ export function advanceNavy(w: World) {
       returnArmyPeople(w, f, home)
       continue
     }
-    const dock = transportNetwork(w).harbors.find(
-      (h) => h.water === f.cell && friendlyPort(w, f.nation, h.region),
-    )
+    const coast = transportNetwork(w).harbors.find((h) => h.water === f.cell)
+    const visit = coast
+      ? militaryVisit(w, f.nation, coast.region, f.foreignStay)
+      : { stay: undefined, withdraw: false }
+    if (visit.stay) f.foreignStay = visit.stay
+    else delete f.foreignStay
+    const dock =
+      !visit.withdraw &&
+      transportNetwork(w).harbors.find((h) => h.water === f.cell && friendlyPort(w, f.nation, h.region))
     const n = w.nations[f.nation],
       aboard = w.armies.filter((a) => f.embarked.includes(a.id))
     f.hull = Math.max(0.05, f.hull - (dock ? 0.001 : 0.003))
-    if (dock) {
+    if (dock && diplomaticAccess(w, f.nation, w.regions[dock.region].nation, 'supply', dock.region)) {
       const r = w.regions[dock.region]
       const foodPrice = r.prices.food / 1000,
         armsPrice = r.prices.arms / 1000
@@ -411,12 +425,22 @@ export function advanceNavy(w: World) {
       for (const a of aboard) disembark(w, a, f, f.target)
     const invalidMission =
       f.target !== null &&
-      ['blockade', 'transport'].includes(f.mission) &&
-      !friendlyPort(w, f.nation, f.target) &&
-      relation(w, f.nation, w.regions[f.target].nation)?.treaty !== 'war'
-    if ((f.supply < 0.35 || f.hull < 0.3 || invalidMission) && f.mission !== 'return') {
+      ((['blockade', 'raid'].includes(f.mission) &&
+        relation(w, f.nation, w.regions[f.target].nation)?.treaty !== 'war') ||
+        (f.mission === 'transport' &&
+          !friendlyPort(w, f.nation, f.target) &&
+          relation(w, f.nation, w.regions[f.target].nation)?.treaty !== 'war'))
+    if (
+      (f.supply < 0.35 || f.hull < 0.3 || invalidMission || visit.withdraw) &&
+      (f.mission !== 'return' || !f.course.length)
+    ) {
       const port = transportNetwork(w)
-        .harbors.filter((h) => friendlyPort(w, f.nation, h.region))
+        .harbors.filter(
+          (h) =>
+            friendlyPort(w, f.nation, h.region) &&
+            (!visit.withdraw ||
+              diplomaticAccess(w, f.nation, w.regions[h.region].nation, 'basing', h.region)),
+        )
         .map((h) => ({ h, path: waterPath(w, f.cell, h.water) }))
         .filter((v) => v.path.length)
         .sort((a, b) => sailingDistance(w, a.path) - sailingDistance(w, b.path))[0]

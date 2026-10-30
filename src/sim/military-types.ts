@@ -9,7 +9,9 @@ export interface ArmyOperations {
   entrenchment: number
   progress: number
   stance: 'march' | 'hold' | 'entrench'
-  conduct: 'restrained' | 'requisition' | 'pillage'
+  conduct: 'restrained' | 'requisition' | 'pillage' | 'raid'
+  /** Temporary access permits a three-month visit, not an indefinite garrison. */
+  foreignStay?: { host: number; months: number }
   isolated: number
   disorder: number
   embarkedOn: number | null
@@ -26,13 +28,15 @@ export interface Fleet extends Army {
   hull: number
   food: number
   arms: number
-  mission: 'patrol' | 'escort' | 'blockade' | 'transport' | 'return'
+  mission: 'patrol' | 'escort' | 'blockade' | 'raid' | 'transport' | 'return'
+  foreignStay?: { host: number; months: number }
   course: number[]
   /** Distance already travelled toward the next waypoint, in terrain-sample spans. */
   sailingProgress?: number
   embarked: number[]
 }
 export interface Warfare {
+  raids?: import('./trade-raids').TradeRaid[]
   version: 1
   revision: number
   fleets: Fleet[]

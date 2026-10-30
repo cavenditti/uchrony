@@ -27,17 +27,9 @@ import { retainRoadBackbone } from './road-backbone'
 import { refreshRetailQuote } from './retail-pricing'
 import { periodFlow, simulationMonths } from './simulation-period'
 import { tradePolicy } from './trade-policy'
+import { tradeRaidView } from './trade-raids'
 import { refreshTransport, reverseLegs, transportNetwork } from './transport'
-import {
-  GOODS,
-  inventory,
-  population,
-  relation,
-  type Good,
-  type Route,
-  type RouteLeg,
-  type World,
-} from './types'
+import { GOODS, inventory, population, type Good, type Route, type RouteLeg, type World } from './types'
 
 export interface DistrictLink {
   to: number
@@ -83,12 +75,13 @@ export function districtNetwork(w: World): DistrictNetwork {
     cellUnit = updateDistrictNeighbors(w)
   refreshTransport(w, profile)
   const graph = new Map(system.active.map((id) => [id, [] as DistrictLink[]])),
-    passage = seaPassageView(w)
+    passage = seaPassageView(w),
+    policy = tradePolicy(w)
   const add = (from: number, to: number, legs: RouteLeg[]) => {
     if (from === to || !graph.has(from) || !graph.has(to)) return
     const a = system.units[from],
       b = system.units[to]
-    if (a.nation !== b.nation && relation(w, a.nation, b.nation)?.treaty === 'war') return
+    if (!policy.routeAllowed(a.nation, b.nation, legs)) return
     const usage = corridorUsage(profile, legs)
     let capacity = Infinity
     for (const [edge, count] of usage) capacity = Math.min(capacity, profile.capacity[edge] / count)
@@ -131,14 +124,6 @@ export function districtNetwork(w: World): DistrictNetwork {
       ...link.legs,
       ...(tail.length > 1 ? [{ mode: 'land' as const, cells: tail }] : []),
     ]
-    // A trunk must not bypass a closed land border inside a long route.
-    const traversed = new Set(
-      legs
-        .filter((l) => l.mode === 'land')
-        .flatMap((l) => l.cells.map((c) => w.regions[w.cells[c].region]?.nation))
-        .filter((n) => n !== undefined),
-    )
-    if ([...traversed].some((n) => n !== a.nation && relation(w, a.nation, n)?.treaty === 'war')) continue
     add(from, to, legs)
     add(to, from, reverseLegs(legs))
   }
@@ -147,7 +132,13 @@ export function districtNetwork(w: World): DistrictNetwork {
   return { graph, profile }
 }
 
-function nearby(graph: Map<number, DistrictLink[]>, from: number, maxCost: number, maxContacts = Infinity) {
+function nearby(
+  graph: Map<number, DistrictLink[]>,
+  from: number,
+  maxCost: number,
+  maxContacts = Infinity,
+  permitted: (edge: DistrictLink) => boolean = () => true,
+) {
   const distance = new Map([[from, 0]]),
     previous = new Map<number, { from: number; edge: DistrictLink }>(),
     children = new Map<number, number[]>(),
@@ -168,6 +159,7 @@ function nearby(graph: Map<number, DistrictLink[]>, from: number, maxCost: numbe
       if (reached.length >= maxContacts) break
     }
     for (const edge of graph.get(current.id) ?? []) {
+      if (!permitted(edge)) continue
       const cost = current.cost + edge.cost
       if (cost < (distance.get(edge.to) ?? Infinity)) {
         distance.set(edge.to, cost)
@@ -203,7 +195,10 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
   const paths = new Map<number, ReturnType<typeof nearby>>(),
     routes: Route[] = []
   system.shipments = []
-  const policy = tradePolicy(w)
+  const policy = tradePolicy(w),
+    raid = tradeRaidView(w),
+    passage = seaPassageView(w)
+  const quotas = new Map<string, number>()
   const tariffFor = (buyer: number, seller: number) =>
     policy.tariff(system.units[buyer].nation, system.units[seller].nation)
   // Within goods clearing, loan principal can only increase and bank lending
@@ -246,6 +241,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
   const ship = (buyerId: number, sellerId: number, good: Good, requested: number, donor?: number) => {
     const buyer = system.units[buyerId],
       seller = system.units[sellerId]
+    if (!policy.allowed(buyer.nation, seller.nation, good)) return 0
     const tariff = donor !== undefined ? 0 : tariffFor(buyerId, sellerId)
     const price = seller.prices[good] / 1000,
       freightRate = price * paths.get(buyerId)!.distance.get(sellerId)! * 0.002
@@ -259,6 +255,21 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       return 0
     const path = pathFor(buyerId, sellerId)
     if (!path) return 0
+    const legs = path.chain.flatMap((edge) => reverseLegs(edge.legs))
+    if (!policy.routeAllowed(buyer.nation, seller.nation, legs, good)) return 0
+    const quotaId = `${sellerId}:${buyerId}`
+    if (!quotas.has(quotaId)) {
+      let capacity = Infinity
+      for (const [index, count] of path.usage)
+        capacity = Math.min(capacity, periodFlow(profile.capacity[index]) / count)
+      quotas.set(
+        quotaId,
+        capacity *
+          (policy.routeRestricted(buyer.nation, seller.nation, legs) ? 0.2 : 1) *
+          Math.min(passage(buyer.nation, legs), passage(seller.nation, legs)),
+      )
+    }
+    requested = Math.min(requested, quotas.get(quotaId)!)
     // A loan finances only an executable order. Exhausted corridors and unavailable
     // stocks must not leave a buyer with new debt and idle deposits.
     requested = Math.max(0, Math.min(requested, seller.stocks[good], exportable.get(sellerId)![good]))
@@ -295,8 +306,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       }
     }
     seller.stocks[good] = Math.max(0, seller.stocks[good] - amount)
-    const legs = path.chain.flatMap((edge) => reverseLegs(edge.legs))
-    deliverFreight(
+    const delivered = deliverFreight(
       w,
       sellerId,
       buyerId,
@@ -304,6 +314,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       amount,
       legs,
       amount * (donor === undefined ? unitCost : price),
+      raid,
     )
     for (const [index, count] of path.usage) remaining[index] = Math.max(0, remaining[index] - amount * count)
     for (const edge of path.chain)
@@ -313,6 +324,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
     refreshRetailQuote(w, buyer, good, donor === undefined ? unitCost : price)
     creditLimits.delete(buyerId)
     exportable.get(sellerId)![good] -= amount
+    quotas.set(quotaId, quotas.get(quotaId)! - amount)
     system.shipments.push({
       from: sellerId,
       to: buyerId,
@@ -342,7 +354,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
       capacity: amount,
       international: buyer.nation !== seller.nation,
     })
-    return amount
+    return delivered
   }
   const search = (id: number) => {
     if (!paths.has(id))
@@ -357,6 +369,7 @@ export function tradeDistricts(w: World, network = districtNetwork(w)) {
           // Coarse clearing samples nearby markets on real corridors. Global
           // provincial trade still runs; detailed monthly supplier search is unchanged.
           simulationMonths() > 1 ? 32 : Infinity,
+          (edge) => policy.routeAllowed(system.units[id].nation, system.units[id].nation, edge.legs),
         ),
       )
     return paths.get(id)!

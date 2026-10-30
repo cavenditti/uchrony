@@ -372,6 +372,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   w.totals.deaths = 0
   w.totals.migration = 0
   ensureWarfare(w)
+  if (w.warfare!.raids) w.warfare!.raids = []
   beginPopulationMonth(w)
   beginEconomyMonth(w)
   completeFarmProjects(w)

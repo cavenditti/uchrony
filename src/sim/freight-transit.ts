@@ -2,6 +2,9 @@ import { simulationMonths } from './simulation-period'
 import { inventory, type World, type Good, type RouteLeg } from './types'
 import { cellPosition } from './physical-space'
 import { recordGift, marketStore } from './national-accounts'
+import { tradePolicy } from './trade-policy'
+import { seaPassageView } from './naval-control'
+import { tradeRaidView } from './trade-raids'
 
 export function freightDays(w: World, legs: RouteLeg[]) {
   let days = 0
@@ -28,12 +31,13 @@ export function deliverFreight(
   amount: number,
   legs: RouteLeg[],
   acquisitionValue?: number,
+  raid = tradeRaidView(w),
 ) {
   const days = w.adaptive ? freightDays(w, legs) : 0
   const buyer = w.localEconomy!.units[to]
   if (days <= 30 * simulationMonths() || !w.adaptive) {
     buyer.stocks[good] += amount
-    return
+    return raid(from, to, good, amount, legs)
   }
   const a = w.adaptive
   a.transit ??= []
@@ -52,15 +56,32 @@ export function deliverFreight(
   // Settlement temporarily booked this particular lot at the destination. Remove
   // its acquisition value, not the blended cost of goods already in that market.
   recordGift(w, marketStore(to), `transit:${id}`, good, amount, acquisitionValue)
+  return amount
 }
 export function arriveFreight(w: World) {
+  if (!w.adaptive?.transit?.some((s) => s.arrives <= w.month)) return
+  const policy = tradePolicy(w),
+    passage = seaPassageView(w),
+    raid = tradeRaidView(w)
   for (const shipment of w.adaptive?.transit ?? [])
     if (shipment.arrives <= w.month) {
       const buyer = w.localEconomy!.units[shipment.to]
+      const seller = w.localEconomy!.units[shipment.from]
+      // Paid cargo waits in its conserved transit store when war, an embargo or
+      // a port cordon closes its route. Reopening releases it without charging twice.
+      if (
+        !seller ||
+        !buyer ||
+        !policy.routeAllowed(seller.nation, buyer.nation, shipment.legs) ||
+        !passage(seller.nation, shipment.legs) ||
+        !passage(buyer.nation, shipment.legs)
+      )
+        continue
       for (const [good, quantity] of Object.entries(shipment.goods) as [Good, number][])
-        if (quantity) {
+        if (quantity && policy.routeAllowed(seller.nation, buyer.nation, shipment.legs, good)) {
           recordGift(w, `transit:${shipment.id}`, marketStore(shipment.to), good, quantity)
           buyer.stocks[good] += quantity
+          raid(shipment.from, shipment.to, good, quantity, shipment.legs)
           shipment.goods[good] = 0
         }
     }

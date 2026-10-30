@@ -45,7 +45,16 @@ export function hasActiveReplacement(w: World, parent: number, current = 0) {
   })
 }
 const symmetric = new Set(['trade', 'alliance', 'peace', 'nonaggression'])
-const ordinaryRights = new Set(['trade', 'alliance', 'access', 'nonaggression', 'guarantee'])
+const ordinaryRights = new Set([
+  'trade',
+  'preferential-trade',
+  'alliance',
+  'access',
+  'transit',
+  'basing',
+  'nonaggression',
+  'guarantee',
+])
 function termKey(t: DiplomaticClause) {
   const pair = symmetric.has(t.kind) ? [t.from, t.to].sort((a, b) => a - b) : [t.from, t.to]
   return [

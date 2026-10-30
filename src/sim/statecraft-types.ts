@@ -13,10 +13,13 @@ export interface DiplomaticClause {
     | 'tribute'
     | 'goods'
     | 'trade'
+    | 'preferential-trade'
     | 'alliance'
     | 'peace'
     | 'nonaggression'
     | 'access'
+    | 'transit'
+    | 'basing'
     | 'guarantee'
     | 'cede'
     | 'merge'
@@ -81,6 +84,8 @@ export const DOMESTIC_ORDER_KINDS = [
   'naval',
   'embark',
   'army',
+  'trade-policy',
+  'military-access',
   'annex',
   'capitulate',
   'found',

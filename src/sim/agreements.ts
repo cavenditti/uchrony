@@ -2,6 +2,7 @@ import { sameSovereign } from './state-dependencies'
 import { institutionEligible } from './institution-lifecycle'
 import { relation } from './types'
 import { sharedInstitution } from './institutions'
+import { borderPolicy, MILITARY_LEVEL, type MilitaryPermission } from './border-policy'
 import type { World } from './types'
 import type { DiplomaticClause } from './statecraft-types'
 
@@ -22,58 +23,84 @@ export function agreementTerms(world: World, kind?: DiplomaticClause['kind']) {
       .map((term) => ({ offer, term })),
   )
 }
-export function diplomaticAccess(world: World, traveler: number, host: number) {
-  if (host === -1) return true
-  if (relation(world, traveler, host)?.treaty === 'war') return false
-  if (sameSovereign(world, traveler, host)) return true
-  if (sharedInstitution(world, traveler, host, 'defense')) return true
-  return agreementTerms(world).some(
-    ({ term }) =>
-      (term.kind === 'alliance' &&
-        [term.from, term.to].includes(traveler) &&
-        [term.from, term.to].includes(host)) ||
-      (term.kind === 'access' && term.from === host && term.to === traveler),
-  )
+/** Access is directional and can be limited to named host provinces. */
+export function diplomaticAccess(
+  world: World,
+  traveler: number,
+  host: number,
+  purpose: MilitaryPermission = 'transit',
+  region?: number,
+) {
+  return diplomaticAccessView(world)(traveler, host, purpose, region)
 }
-/** A phase-local access index. Rebuild after agreements or institutions change. */
+/** Index grants once per phase. War and a host's explicit policy override every grant. */
 export function diplomaticAccessView(world: World) {
-  const hosts = new Map<number, Set<number>>()
-  const allow = (traveler: number, host: number) => {
-    let entries = hosts.get(traveler)
-    if (!entries) hosts.set(traveler, (entries = new Set()))
-    entries.add(host)
+  const grants = new Map<number, Map<number, { level: number; regions: readonly number[] }[]>>()
+  const relations = new Map<number, Map<number, World['relations'][number]>>()
+  for (const rel of world.relations)
+    for (const [a, b] of [
+      [rel.a, rel.b],
+      [rel.b, rel.a],
+    ]) {
+      if (!relations.has(a)) relations.set(a, new Map())
+      relations.get(a)!.set(b, rel)
+    }
+  const allow = (traveler: number, host: number, level = 3, regions: readonly number[] = []) => {
+    if (!grants.has(traveler)) grants.set(traveler, new Map())
+    const hosts = grants.get(traveler)!
+    if (!hosts.has(host)) hosts.set(host, [])
+    hosts.get(host)!.push({ level, regions })
   }
   for (const { term } of agreementTerms(world)) {
-    if (term.kind === 'access') allow(term.to, term.from)
-    else if (term.kind === 'alliance')
-      for (const traveler of [term.from, term.to])
-        for (const host of [term.from, term.to]) allow(traveler, host)
-  }
-  for (const d of world.dependencies ?? []) {
-    allow(d.senior, d.junior)
-    allow(d.junior, d.senior)
+    if (term.kind === 'access' || term.kind === 'transit' || term.kind === 'basing')
+      allow(
+        term.to,
+        term.from,
+        term.kind === 'basing' ? 3 : term.kind === 'access' ? 2 : 1,
+        term.regions ?? [],
+      )
+    else if (term.kind === 'alliance') {
+      allow(term.from, term.to)
+      allow(term.to, term.from)
+    }
   }
   for (const body of world.institutions?.organizations ?? [])
-    if (body.status !== 'dissolved' && body.charter.powers.includes('defense'))
-      for (const traveler of body.members)
-        for (const host of body.members)
-          if (
-            traveler !== host &&
-            institutionEligible(world, body, traveler) &&
-            institutionEligible(world, body, host)
-          )
-            allow(traveler, host)
-  return (traveler: number, host: number) =>
-    host === -1 ||
-    (relation(world, traveler, host)?.treaty !== 'war' &&
-      ((hosts.get(traveler)?.has(host) ?? false) || sameSovereign(world, traveler, host)))
+    if (body.status !== 'dissolved' && body.charter.powers.includes('defense')) {
+      const members = body.members.filter((id) => institutionEligible(world, body, id))
+      for (const traveler of members) for (const host of members) allow(traveler, host)
+    }
+  return (traveler: number, host: number, purpose: MilitaryPermission = 'transit', region?: number) => {
+    if (host === -1 || traveler === host) return true
+    const rel = relations.get(traveler)?.get(host)
+    if (rel?.treaty === 'war') return false
+    const policy = borderPolicy(rel, host).military
+    const required = MILITARY_LEVEL[purpose]
+    if (policy !== 'treaties') return MILITARY_LEVEL[policy] >= required
+    if (rel?.treaty === 'alliance' || sameSovereign(world, traveler, host)) return true
+    return (
+      grants
+        .get(traveler)
+        ?.get(host)
+        ?.some(
+          (grant) =>
+            grant.level >= required &&
+            (!grant.regions.length || (region !== undefined && grant.regions.includes(region))),
+        ) ?? false
+    )
+  }
 }
 export function preferentialTrade(world: World, a: number, b: number) {
-  if (relation(world, a, b)?.treaty === 'war') return false
+  const rel = relation(world, a, b)
+  if (
+    rel?.treaty === 'war' ||
+    borderPolicy(rel, a).trade !== 'normal' ||
+    borderPolicy(rel, b).trade !== 'normal'
+  )
+    return false
   if (sharedInstitution(world, a, b, 'trade')) return true
   return agreementTerms(world).some(
     ({ term }) =>
-      ['trade', 'alliance'].includes(term.kind) &&
+      ['trade', 'preferential-trade', 'alliance'].includes(term.kind) &&
       [term.from, term.to].includes(a) &&
       [term.from, term.to].includes(b),
   )

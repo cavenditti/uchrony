@@ -1,7 +1,7 @@
 import { movementNeighbors, stepDistance } from './grid'
 import { MAX_ARMIES } from './military-limits'
 import { integerAtMost, numberAtMost, recordValue, validationFailure } from './persistence-primitives'
-import type { RouteLeg, World } from './types'
+import { GOODS, type RouteLeg, type World } from './types'
 
 export function validateWarfare(
   w: World,
@@ -18,6 +18,9 @@ export function validateWarfare(
   const integer = integerAtMost(1e10, false)
   const region = (id: number) => integer(id, w.regions.length - 1)
   const water = (id: number) => integer(id, w.cells.length - 1) && w.cells[id].terrain === 'water'
+  const visit = (value: { host: number; months: number } | undefined) =>
+    value === undefined ||
+    (object(value) && integer(value.host, w.nations.length - 1) && integer(value.months))
   if (!s) {
     if (w.armies.some((a) => a.operations !== undefined)) fail('missing warfare ledger')
     return
@@ -56,7 +59,8 @@ export function validateWarfare(
       f.warships + f.transports < 1 ||
       !number(f.food) ||
       !number(f.arms) ||
-      !['patrol', 'escort', 'blockade', 'transport', 'return'].includes(f.mission) ||
+      !['patrol', 'escort', 'blockade', 'raid', 'transport', 'return'].includes(f.mission) ||
+      !visit(f.foreignStay) ||
       !Array.isArray(f.course) ||
       f.course.length > w.cells.length ||
       !Array.isArray(f.embarked) ||
@@ -107,7 +111,8 @@ export function validateWarfare(
       !integer(o.isolated) ||
       !integer(o.disorder) ||
       !['march', 'hold', 'entrench'].includes(o.stance) ||
-      !['restrained', 'requisition', 'pillage'].includes(o.conduct) ||
+      !['restrained', 'requisition', 'pillage', 'raid'].includes(o.conduct) ||
+      !visit(o.foreignStay) ||
       !(o.source === null || region(o.source)) ||
       !Array.isArray(o.line) ||
       o.line.length > w.regions.length ||
@@ -140,5 +145,22 @@ export function validateWarfare(
     if (d.path.length === 1) {
       if (d.legs.length) fail()
     } else validateLegs(d.from, d.path.at(-1)!, d.legs)
+  }
+  if (s.raids !== undefined) {
+    if (!Array.isArray(s.raids) || s.raids.length > 50000) fail('route raids')
+    for (const raid of s.raids)
+      if (
+        !object(raid) ||
+        !integer(raid.month, w.month) ||
+        !integer(raid.force, w.nextArmy - 1) ||
+        !integer(raid.nation, w.nations.length - 1) ||
+        !integer(raid.victim, w.nations.length - 1) ||
+        !integer(raid.from) ||
+        !integer(raid.to) ||
+        !GOODS.includes(raid.good) ||
+        !number(raid.captured) ||
+        !number(raid.destroyed)
+      )
+        fail('route raid quantities')
   }
 }

@@ -4,6 +4,8 @@ import type { Army, Command, World } from '../sim/types'
 import { portAt, transportSeats } from '../sim/navy'
 import { censusUnitLoyalty as unitLoyalty } from '../sim/view-snapshot'
 import { annexationObstacle } from '../sim/military-control'
+import type { Fleet } from '../sim/military-types'
+import { portBlockadeView } from '../sim/naval-control'
 
 const count = (v: number) => Math.round(v).toLocaleString()
 const pct = (v: number) => `${Math.round(v * 100)}%`
@@ -92,7 +94,7 @@ export function ArmyLogistics({
         </select>
       </label>
       <label className="select-label">
-        Occupation conduct
+        Civilian and trade conduct
         <select
           value={o.conduct}
           onChange={(e) =>
@@ -100,18 +102,32 @@ export function ArmyLogistics({
               type: 'army-orders',
               army: a.id,
               stance: o.stance,
-              conduct: e.target.value as 'restrained' | 'requisition' | 'pillage',
+              conduct: e.target.value as NonNullable<Army['operations']>['conduct'],
             })
           }
         >
           <option value="restrained">Protect civilian reserves</option>
           <option value="requisition">Requisition when provision fails</option>
           <option value="pillage">Pillage occupied enemy territory</option>
+          <option value="raid">Sack hostile trade routes nearby</option>
         </select>
       </label>
       {o.conduct === 'requisition' && (
         <p className="panel-note">Taking household food increases local grievance and weakens cooperation.</p>
       )}
+      {o.conduct === 'raid' && (
+        <p className="panel-note">
+          Intercept hostile cargo crossing this province. Capture provisions and ammunition within carrying
+          limits; destroy other intercepted goods. Enemy guards reduce the raid.
+        </p>
+      )}
+      {o.foreignStay && (
+        <p className="panel-note">
+          Temporary foreign deployment: {o.foreignStay.months} months. After three months, basing rights are
+          required to remain.
+        </p>
+      )}
+      <RaidReport world={world} force={a.id} />
       {o.conduct === 'pillage' && (
         <p className="panel-note">
           Seize local wealth for your treasury. Pillage damages production and increases fear and opposition;
@@ -163,11 +179,10 @@ export function NavalForces({
     owned = ports.filter((r) => r.nation === nation)
   const [port, setPort] = useState<number | null>(null),
     [destinations, setDestinations] = useState<Record<number, number>>({}),
-    [missions, setMissions] = useState<
-      Record<number, 'patrol' | 'escort' | 'blockade' | 'transport' | 'return'>
-    >({})
+    [missions, setMissions] = useState<Record<number, Fleet['mission']>>({})
   const fleets = w.warfare?.fleets.filter((f) => f.nation === nation) ?? [],
     yard = owned.find((p) => p.id === port) ?? owned[0]
+  const blockade = portBlockadeView(w)
   return (
     <section className="naval-forces" aria-label="Navy">
       <h3>Naval forces</h3>
@@ -237,10 +252,31 @@ export function NavalForces({
               <option value="escort">Escort trade and convoys</option>
               <option value="patrol">Patrol the coast</option>
               <option value="blockade">Blockade an enemy port</option>
+              <option value="raid">Sack hostile sea trade routes</option>
               <option value="transport">Transport and land troops</option>
               <option value="return">Return to an accessible port</option>
             </select>
           </label>
+          {(missions[f.id] ?? f.mission) === 'blockade' && (
+            <p className="panel-note">
+              Nearby supplied warships close the target port to all trade and troop landings, including
+              neutral traffic. Escorts can contest the cordon.
+            </p>
+          )}
+          {f.mission === 'blockade' && f.target !== null && (
+            <p className="panel-note">
+              {blockade(w.regions[f.target].nation, f.target) === 0
+                ? `${w.regions[f.target].name}: port closed by blockade.`
+                : 'The target port is not fully closed; position and naval strength determine access.'}
+            </p>
+          )}
+          {(missions[f.id] ?? f.mission) === 'raid' && (
+            <p className="panel-note">
+              Raid hostile cargo within four water-cell spans of the fleet. Neutral-only trade is spared;
+              escorts reduce interception.
+            </p>
+          )}
+          <RaidReport world={w} force={f.id} />
           <button
             className="button full"
             onClick={() =>
@@ -297,5 +333,17 @@ export function NavalForces({
         <p className="panel-note">A coastal port is required to commission ships.</p>
       )}
     </section>
+  )
+}
+
+/** Reports count intercepted consignments rather than potential loot. */
+function RaidReport({ world, force }: { world: World; force: number }) {
+  const raids = world.warfare?.raids?.filter((r) => r.force === force && r.month === world.month) ?? []
+  if (!raids.length) return null
+  return (
+    <p className="panel-note">
+      Cargo sacked this month: {raids.reduce((sum, r) => sum + r.captured, 0).toFixed(1)} t captured;{' '}
+      {raids.reduce((sum, r) => sum + r.destroyed, 0).toFixed(1)} t destroyed.
+    </p>
   )
 }

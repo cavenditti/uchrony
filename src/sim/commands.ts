@@ -6,6 +6,7 @@ import { respondToInstitutionDefense } from './institution-defense'
 /** Commands apply one typed handler under world configuration, then reconcile derived views. */
 import { refreshAdaptiveTotals } from './adaptive-world'
 import { diplomaticAccess } from './agreements'
+import { borderPolicy, setBorderPolicy } from './border-policy'
 import { buildFarm } from './agriculture'
 import { refreshCityLabels } from './cities'
 import { applyConfiguration, withWorldConfiguration } from './configuration'
@@ -111,6 +112,82 @@ function applyCommandConfigured(w: World, command: Command): string {
 
 /** Exhaustive dispatch keeps each command's narrowed payload with its handler. */
 const COMMAND_HANDLERS = {
+  'border-policy': (w, command) => {
+    activeNation(w, command.target)
+    setBorderPolicy(w, command.nation, command.target, command.policy)
+    return 'Border policy updated. War overrides permissions; existing forces must withdraw when access ends.'
+  },
+  'access-proposal': (w, command) => {
+    const rel = relation(w, command.nation, command.target)
+    activeNation(w, command.target)
+    if (!rel || rel.treaty === 'war')
+      throw new Error('Access and trade agreements require two states at peace.')
+    if (
+      !['transit', 'access', 'basing', 'preferential-trade'].includes(command.kind) ||
+      !Number.isInteger(command.duration) ||
+      command.duration < 0 ||
+      command.duration > 240 ||
+      !Array.isArray(command.regions) ||
+      new Set(command.regions).size !== command.regions.length ||
+      command.regions.some((id) => w.regions[id]?.nation !== command.target)
+    )
+      throw new Error('Choose valid agreement terms and provinces belonging to the host.')
+    const commercial = command.kind === 'preferential-trade'
+    const offer = tryStandingOffer(
+      w,
+      command.nation,
+      {
+        title: `${w.nations[command.nation].shortName}–${w.nations[command.target].shortName}: ${command.kind === 'access' ? 'military resupply' : command.kind}`,
+        parties: [command.nation, command.target],
+        visibility: 'public',
+        duration: 24,
+        supersedes: 0,
+        terms: [
+          {
+            kind: command.kind,
+            from: commercial ? command.nation : command.target,
+            to: commercial ? command.target : command.nation,
+            amount: 0,
+            good: '',
+            field: '',
+            regions: commercial ? [] : command.regions,
+            duration: command.duration,
+            text: '',
+          },
+        ],
+      },
+      true,
+    )
+    if (!offer) return foreignOfficeContext(w, command.nation).notice
+    // The native counterpart evaluates the request; the caller never signs for it.
+    const threshold = command.kind === 'basing' ? 45 : commercial ? 10 : 20
+    const hostPolicy = borderPolicy(rel, command.target)
+    if (
+      nativeDomesticControl(w, w.nations[command.target]) &&
+      rel.opinion >= threshold &&
+      (commercial ? hostPolicy.trade === 'normal' : hostPolicy.military !== 'closed')
+    )
+      admitDiplomaticConsent(w, command.target, offer)
+    return 'Terms proposed. The host must consent, and diplomatic preparation must finish before access changes.'
+  },
+  'access-answer': (w, command) => {
+    const offer = w.statecraft?.offers.find(
+      (o) =>
+        o.id === command.offer &&
+        o.status === 'proposed' &&
+        o.parties.includes(command.nation) &&
+        o.terms.every((t) => ['transit', 'access', 'basing', 'preferential-trade', 'trade'].includes(t.kind)),
+    )
+    if (!offer) throw new Error('Choose a pending access or trade proposal addressed to this government.')
+    if (!command.accept) {
+      offer.status = 'rejected'
+      return 'Access or trade proposal declined.'
+    }
+    if (!admitDiplomaticConsent(w, command.nation, offer))
+      return foreignOfficeContext(w, command.nation).notice
+    settleConventionalOffers(w)
+    return 'Terms signed; the remaining signatures and preparation period still apply.'
+  },
   capitulate: (w, command) =>
     imposeCapitulation(w, command.nation, command.target, command.outcome, command.indemnity),
   'royal-proposal': (w, command) => {
@@ -301,7 +378,7 @@ const COMMAND_HANDLERS = {
     if (
       !army ||
       !['march', 'hold', 'entrench'].includes(command.stance) ||
-      !['restrained', 'requisition', 'pillage'].includes(command.conduct)
+      !['restrained', 'requisition', 'pillage', 'raid'].includes(command.conduct)
     )
       throw new Error('Choose a valid army stance and civilian conduct.')
     army.operations!.stance = command.stance
@@ -377,10 +454,9 @@ const COMMAND_HANDLERS = {
     if (
       target.nation !== army.nation &&
       rel?.treaty !== 'war' &&
-      rel?.treaty !== 'alliance' &&
-      !diplomaticAccess(w, army.nation, target.nation)
+      !diplomaticAccess(w, army.nation, target.nation, 'transit', target.id)
     )
-      return 'Military access requires an alliance or a declared war.'
+      return 'The host has not granted military transit to this province. Negotiate access or choose another destination.'
     const paths = shortestPaths(landGraph(w, army.nation), army.region)
     if (!Number.isFinite(paths.distance[target.id]))
       return 'No accessible land route reaches this province. Overseas movement requires a transport fleet.'
@@ -465,8 +541,7 @@ const COMMAND_HANDLERS = {
         : foreignOfficeContext(w, n.id).notice
     } else if (command.action === 'embargo') {
       if (rel.treaty === 'war') return 'Wartime borders are already closed.'
-      rel.treaty = 'neutral'
-      rel.opinion = clamp(rel.opinion - 15, -100, 100)
+      setBorderPolicy(w, n.id, other.id, { ...borderPolicy(rel, n.id), trade: 'embargo' })
     } else throw new Error('Unknown diplomatic action.')
     rel.since = w.month
     event(
@@ -474,11 +549,13 @@ const COMMAND_HANDLERS = {
       command.action === 'war' ? 'war' : 'diplomacy',
       `${n.shortName} → ${other.shortName}: ${rel.treaty}`,
       command.action === 'embargo'
-        ? 'Preferential access is revoked. Standard tariffs apply.'
+        ? 'All formal trade and commercial transit with this state are suspended.'
         : 'Diplomatic status changes military access, commerce, and future decisions.',
       n.id,
     )
-    return `Diplomatic status with ${other.shortName}: ${rel.treaty}.`
+    return command.action === 'embargo'
+      ? `Trade embargo imposed on ${other.shortName}.`
+      : `Diplomatic status with ${other.shortName}: ${rel.treaty}.`
   },
 } satisfies { [K in Command['type']]: (world: World, command: Extract<Command, { type: K }>) => string }
 function activeNation(w: World, id: number) {

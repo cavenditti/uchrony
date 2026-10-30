@@ -16,6 +16,7 @@ import { validateInstitutions } from './institutions'
 import { validateIntelligence } from './intelligence-persistence'
 import { MAX_ARMIES } from './military-limits'
 import { validateWarfare } from './military-persistence'
+import { validBorderPolicy } from './border-policy'
 import { initialArmyOperations } from './navy'
 import { numberValidator, recordValue, validationFailure } from './persistence-primitives'
 import { POLICY_RULES, validSavedPolicy } from './policy-rules'
@@ -289,6 +290,8 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
       !number(r.warExhaustion) ||
       !number(r.since) ||
       !number(r.grievance) ||
+      (r.aPolicy !== undefined && !validBorderPolicy(r.aPolicy)) ||
+      (r.bPolicy !== undefined && !validBorderPolicy(r.bPolicy)) ||
       (r.aggressor !== undefined && r.aggressor !== r.a && r.aggressor !== r.b) ||
       (r.defenseOf !== undefined && !nationId(r.defenseOf))
     )
