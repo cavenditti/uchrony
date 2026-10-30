@@ -533,6 +533,8 @@ export const CONFIGURATION_SCHEMA: SchemaNode<ConfigurationValues> = {
     urbanDensity: num(1, 1e6),
     agglomerationWeight: num(0, 2),
     agglomerationReach: num(1, 1e7),
+    openingCoreDensity: num(100, 1e6, { creationOnly: true }),
+    openingDensityElasticity: num(0, 1, { creationOnly: true }),
     entryBuiltCover: unitInterval(),
     retainedBuiltCover: unitInterval(),
     movingFriction: unitInterval(),

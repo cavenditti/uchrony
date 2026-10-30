@@ -9,6 +9,7 @@ import { consolidateClaims } from './district-finance'
 import type { DistrictEconomy, DistrictUnit } from './district-types'
 import { STRATA, type EconomicStratum, type ProducerAccount } from './economic-types'
 import { neighbors } from './grid'
+import { spreadSettlement } from './opening-settlements'
 import { cellResourcePotential, landscapeAt, openingResourceReserve } from './landscape'
 import {
   accountAddress,
@@ -242,6 +243,13 @@ export function ensureDistrictEconomy(w: World) {
   spatial.settlements.forEach((s, i) => {
     if (!settlementByCell.has(s.cell)) settlementByCell.set(s.cell, i)
   })
+  // The spatial plan spread each settlement over its province by its density
+  // profile; districts keep that shape rather than collapsing onto one sample.
+  const profile = new Float64Array(w.cells.length)
+  for (const s of spatial.settlements) {
+    const settled = (cell: number) => w.cells[cell].region === s.region && habitableLand(w.cells[cell])
+    for (const [cell, people] of spreadSettlement(w, s.cell, s.population, settled)) profile[cell] += people
+  }
   for (const r of w.regions) {
     const parts = districtsByProvince.get(r.id) ?? []
     const targets = parts.map((d) => {
@@ -272,13 +280,19 @@ export function ensureDistrictEconomy(w: World) {
         unit.cells.map((c) => landscapeAt(w.cells[c]).habitat ** 2),
         unit.cells.map((c) => (habitableLand(w.cells[c]) ? Infinity : 0)),
       )
-      unit.cells.forEach(
-        (c, j) => (unit.residents[c] = rural[j] + (c === (site?.cell ?? unit.center) ? urban : 0)),
-      )
+      // Hamlets below the visible threshold have no profile and stay on their
+      // district's first settlement sample, or its centre.
+      const weights = unit.cells.map((c) => profile[c]),
+        nucleus = site?.cell ?? unit.center
+      const urbanCells = weights.some((x) => x > 0)
+        ? apportion(urban, weights)
+        : unit.cells.map((c) => (c === nucleus ? urban : 0))
+      unit.cells.forEach((c, j) => {
+        unit.residents[c] = rural[j] + urbanCells[j]
+        system.built[c] = clamp(urbanCells[j] / MODEL_PARAMETERS.fullBuiltPopulationPerCell)
+      })
       unit.urban = population(unit) ? urban / population(unit) : 0
       for (const g of unit.communities!) g.urban = unit.urban
-      for (const c of unit.cells)
-        system.built[c] = clamp((c === site?.cell ? urban : 0) / MODEL_PARAMETERS.fullBuiltPopulationPerCell)
     })
     const weights = parts.map((d) => d.population + d.cells.length * 10)
     for (const good of GOODS) {

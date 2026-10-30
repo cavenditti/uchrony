@@ -304,6 +304,8 @@ export interface World {
     >
     works?: { stage: string; progress: number; disruptive: boolean }
     developed?: boolean
+    /** Residents housed in developed fabric (`developedResidents`), rounded. */
+    urbanResidents?: number
     construction?: number
   }[]
   economy?: EconomicSystem

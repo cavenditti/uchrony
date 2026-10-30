@@ -4,7 +4,8 @@ import { buildingFootprint, LOT_SPAN } from './building-lots'
 import { apportion } from './allocation'
 import { population, type World } from './types'
 import type { PhysicalSite, SpatialBounds, PointMeters } from './adaptive-types'
-import { cellPolygon, pointInPolygon } from './physical-space'
+import { cellPolygon, cellPosition, pointInPolygon } from './physical-space'
+import { CELL_METERS } from './grid'
 import { queryAdaptiveLeaves } from './adaptive-grid'
 import { SETTLEMENT } from './settlement-model'
 import { MODEL_PARAMETERS } from './model-parameters'
@@ -63,6 +64,20 @@ export const openingHousingCapacity = (people: number, built: number) =>
 /** Side of the square physical support localized for coarse opening housing. */
 export const openingSupportSize = (capacity: number) => Math.min(850, Math.max(64, Math.sqrt(capacity * 40)))
 
+/** Square support of a coarse opening record, centred as near its fabric
+ * position as its own sample allows: it never spills into a neighbouring
+ * sample, and the record's point is its centre, so the drawn parcel and the
+ * settlement field's deposit coincide. */
+export function openingSupport(w: World, cell: number, point: PointMeters, capacity: number) {
+  const size = openingSupportSize(capacity),
+    middle = cellPosition(w, cell),
+    fit = (v: number, mid: number) =>
+      Math.max(mid - CELL_METERS / 2 + size / 2, Math.min(mid + CELL_METERS / 2 - size / 2, v))
+  const x = fit(point.x, middle.x),
+    y = fit(point.y, middle.y)
+  return { x, y, parcel: { x: x - size / 2, y: y - size / 2, size } }
+}
+
 export function residentialSites(w: World) {
   return Object.values(w.adaptive?.sites ?? {}).filter(
     (s) => s.kind === 'residential' && s.retired === undefined,
@@ -91,8 +106,10 @@ export function ensureResidentialSites(w: World) {
     site.residents = w.localEconomy.units[site.pool].residents[site.cell] ?? 0
     // Opening housing is a coarse physical support, not known individual lots.
     // New funded parcels have smaller, explicitly recorded physical extents.
-    const size = openingSupportSize(site.capacity)
-    site.parcel = { x: site.x - size / 2, y: site.y - size / 2, size }
+    const support = openingSupport(w, site.cell, site, site.capacity)
+    site.x = support.x
+    site.y = support.y
+    site.parcel = support.parcel
   }
   a.residentialVersion = 1
   a.nextResidence = 0

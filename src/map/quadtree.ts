@@ -7,6 +7,7 @@ import type { SpatialBounds, PointMeters } from '../sim/adaptive-types'
 import type { World } from '../sim/types'
 import { urbanBlocks, urbanBlockId, type UrbanBlock } from '../sim/urban-blocks'
 import { RenderQuadtree, type RenderBounds } from './spatial-index'
+import type { FabricRecord } from './built-up-area'
 
 /** Visible physical area in metres; camera LoD never alters the simulation. */
 export type MapWindow = RenderBounds
@@ -73,6 +74,7 @@ const plotCache = new WeakMap<
     homes: World['viewHomes']
     plots: Map<number, UrbanPlot[]>
     tree: RenderQuadtree<UrbanPlot>
+    neighbours: Map<string, FabricRecord[]>
   }
 >()
 const blockCache = new WeakMap<
@@ -105,10 +107,40 @@ function plotIndex(world: World) {
     homes: world.viewHomes,
     plots,
     tree: new RenderQuadtree(entries),
+    neighbours: new Map<string, FabricRecord[]>(),
   }
   plotCache.set(world, result)
   return result
 }
+
+/** Drawn fabric of the developed coarse records whose envelopes can touch this
+ * one. A drawn support is at most 1.2 samples wide, so the 3×3 sample block
+ * around the record is exhaustive. Memoized per snapshot, like the index. */
+export function urbanPlotNeighbours(world: World, plot: UrbanPlot): FabricRecord[] {
+  const index = plotIndex(world),
+    known = index.neighbours.get(plot.id)
+  if (known) return known
+  const p = urbanFabricSupport(plot),
+    q = plot.cell % world.width,
+    r = Math.floor(plot.cell / world.width),
+    found: FabricRecord[] = []
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dq = -1; dq <= 1; dq++) {
+      if (q + dq < 0 || q + dq >= world.width || r + dr < 0 || r + dr >= world.height) continue
+      for (const other of index.plots.get(plot.cell + dr * world.width + dq) ?? []) {
+        if (other === plot || other.building || !other.developed) continue
+        const o = urbanFabricSupport(other)
+        if (
+          Math.hypot(o.x + o.size / 2 - p.x - p.size / 2, o.y + o.size / 2 - p.y - p.size / 2) <
+          (o.size + p.size) * 0.75
+        )
+          found.push({ support: o, intensity: urbanFabricIntensity(other) })
+      }
+    }
+  index.neighbours.set(plot.id, found)
+  return found
+}
+
 const intersects = (b: SpatialBounds, v: MapWindow) =>
   b.x < v.x + v.width && b.x + b.size > v.x && b.y < v.y + v.height && b.y + b.size > v.y
 
@@ -233,6 +265,31 @@ export function mapUrbanBlockAt(world: World, point: PointMeters) {
     blockCache.set(world, cached)
   }
   return cached.blocks.get(urbanBlockId(point))
+}
+
+/** Intensity of a coarse record's developed fabric on a log scale: 0 at 400
+ * developed residents (a hamlet's worth), 1 at 30,000 (a dense city core).
+ * Supports are sized from all residents, so density per support area is nearly
+ * constant across records and cannot tell a village from a core; the developed
+ * count can. */
+export function urbanFabricIntensity(plot: UrbanPlot) {
+  const urban = plot.urbanResidents ?? plot.residents ?? 0
+  return Math.max(0, Math.min(1, Math.log(Math.max(1, urban) / 400) / Math.log(75)))
+}
+
+/** Square with the area a coarse record's developed residents cover at its
+ * intensity, centred on the record's support. Density rises tenfold from the
+ * fringe to the core, ρ = 2,000 · 10^t residents per km²: detached houses and
+ * gardens at t = 0, terraces and courtyards at t = 1. The support itself holds
+ * all residents at a fixed 40 m² per place, so it is both denser and smaller
+ * than the fabric it stands for; drawn at that size, a city's records would be
+ * separate spots instead of one built-up area. */
+export function urbanFabricSupport(plot: UrbanPlot): SpatialBounds {
+  const urban = plot.urbanResidents ?? plot.residents ?? 0,
+    density = 2000 * 10 ** urbanFabricIntensity(plot),
+    size = Math.min(CELL_METERS * 1.2, Math.max(48, Math.sqrt((urban / density) * 1e6))),
+    p = plot.parcel
+  return { x: p.x + p.size / 2 - size / 2, y: p.y + p.size / 2 - size / 2, size }
 }
 
 /** Stable physical density scale: camera movement and city names cannot recolor a home. */

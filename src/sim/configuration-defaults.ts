@@ -406,6 +406,8 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     urbanDensity: 1500, // developed residents / km² at which living conditions are half urban
     agglomerationWeight: 0.1, // location utility per log-unit of developed residents within reach
     agglomerationReach: 2000, // developed residents within reach at which that pull reaches log 2
+    openingCoreDensity: 12000, // residents / km² at the core of a generated 10,000-resident settlement
+    openingDensityElasticity: 0.25, // growth of generated core density with settlement size
     entryBuiltCover: 0.03,
     retainedBuiltCover: 0.02,
     movingFriction: 0.08,

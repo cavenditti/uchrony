@@ -5,6 +5,7 @@ import { METERS_PER_MAP_UNIT } from './physical-space'
 import { localFirmRegion } from './local-units'
 import { apportion } from './allocation'
 import { landscapeAt, settlementWeight } from './landscape'
+import { spreadSettlement } from './opening-settlements'
 import { neighbors } from './grid'
 import { clamp, population, type World } from './types'
 import type { City } from './district-types'
@@ -246,10 +247,15 @@ export function buildSpatial(w: World, urbanByCell?: ReadonlyMap<number, number>
         concentrated,
         sites.map((_, i) => (i + 1) ** -1.15),
       )
+      // A settlement's residents follow its density profile over the province's
+      // habitable land, not the single sample that holds its nucleus.
+      const settled = (cell: number) => w.cells[cell].region === r.id && habitableLand(w.cells[cell])
       sites.forEach((cell, i) => {
         const size = sizes[i]
-        urban[cell] += size
-        counts[cell] += size
+        for (const [c, people] of spreadSettlement(w, cell, size, settled)) {
+          urban[c] += people
+          counts[c] += people
+        }
         if (!isVisibleSettlement(size)) return
         settlements.push({
           id: `settlement:${r.id}:${cell}`,

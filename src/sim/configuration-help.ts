@@ -309,6 +309,10 @@ const GROUP_HELP: Partial<Record<keyof ConfigurationValues, Readonly<Record<stri
       'How strongly households prefer homes within reach of large developed centres. Larger values concentrate growth in established towns.',
     agglomerationReach:
       'Developed residents within about two kilometres at which the agglomeration preference has its reference strength. The preference rises logarithmically.',
+    openingCoreDensity:
+      'Residents per square kilometre at the centre of a generated 10,000-resident settlement. Density falls exponentially from the centre, so lower values spread towns over more land.',
+    openingDensityElasticity:
+      'How much denser the centres of larger generated settlements are. At zero every settlement has the same core density; higher values make cities more compact relative to towns.',
     entryBuiltCover: 'Built-area fraction needed for a cell to enter the urban footprint.',
     retainedBuiltCover:
       'Built-area fraction needed to keep a cell in an existing urban footprint. It cannot exceed the entry threshold.',

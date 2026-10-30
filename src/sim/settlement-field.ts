@@ -34,13 +34,13 @@ import type { World } from './types'
 import type { PhysicalSite, SpatialBounds } from './adaptive-types'
 import { CELL_METERS } from './grid'
 import { MODEL_PARAMETERS } from './model-parameters'
-import { cellPosition } from './physical-space'
 import { SETTLEMENT } from './settlement-model'
+import { openingFabricPosition } from './opening-settlements'
 import {
   developedResidents,
   occupiedResidents,
   openingHousingCapacity,
-  openingSupportSize,
+  openingSupport,
   residentialSites,
 } from './residential-sites'
 
@@ -152,14 +152,18 @@ export function fieldSources(w: World): FieldSource[] {
       const people = unit.residents[cell] ?? 0,
         built = local.built[cell] ?? 0
       if (!(people > 0)) continue
-      const p = cellPosition(w, cell),
-        size = openingSupportSize(openingHousingCapacity(people, built))
+      const { parcel, ...p } = openingSupport(
+        w,
+        cell,
+        openingFabricPosition(w, cell, (c) => local.built[c] ?? 0),
+        openingHousingCapacity(people, built),
+      )
       sources.push({
         id: `home:${cell}`,
         cell,
         pool: id,
         ...p,
-        support: { x: p.x - size / 2, y: p.y - size / 2, size },
+        support: parcel,
         people,
         developed: Math.min(people, built * MODEL_PARAMETERS.fullBuiltPopulationPerCell),
       })

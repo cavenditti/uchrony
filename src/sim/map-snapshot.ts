@@ -1,5 +1,10 @@
 import { adaptiveMesh } from './adaptive-world'
-import { compactResidence, occupiedResidents, residentialSites } from './residential-sites'
+import {
+  compactResidence,
+  developedResidents,
+  occupiedResidents,
+  residentialSites,
+} from './residential-sites'
 import type { World } from './types'
 import { activeUrbanProject } from './urban-projects'
 
@@ -77,6 +82,7 @@ export function mapHomesSnapshot(world: World): NonNullable<World['viewHomes']> 
           }
         : {}),
       developed: compactResidence(site),
+      urbanResidents: Math.round(developedResidents(world, site)),
       construction: construction.get(site.id) ?? 0,
     }))
 }

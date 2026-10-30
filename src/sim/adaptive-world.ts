@@ -5,6 +5,7 @@ import { localFirmRegion } from './local-units'
 import { ensureDistrictEconomy } from './districts'
 import { CELL_METERS } from './grid'
 import { compactResidence, openingHousingCapacity } from './residential-sites'
+import { openingFabricPosition } from './opening-settlements'
 import { SpatialBuckets } from './spatial-buckets'
 import {
   METERS_PER_MAP_UNIT,
@@ -87,7 +88,7 @@ export function ensureAdaptiveWorld(w: World) {
     const pool = local.units[id]
     for (const cell of pool.cells) {
       const capacity = openingHousingCapacity(pool.residents[cell] ?? 0, local.built[cell] ?? 0)
-      addSite(w, {
+      const home = addSite(w, {
         id: `home:${cell}`,
         cell,
         pool: id,
@@ -95,6 +96,12 @@ export function ensureAdaptiveWorld(w: World) {
         entity: `residents:${id}`,
         capacity,
       })
+      // Coarse housing sits where its sample's opening fabric is, not at the
+      // sample centre; `ensureResidentialSites` fits its support around it.
+      Object.assign(
+        home,
+        openingFabricPosition(w, cell, (c) => local.built[c] ?? 0),
+      )
     }
     addSite(w, {
       id: `market:${id}`,
