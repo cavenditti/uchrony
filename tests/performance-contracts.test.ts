@@ -299,3 +299,77 @@ test('retained mesh geometry agrees with a full rebuild through activity changes
     assert.deepEqual(w.adaptive!.tree, cold.adaptive!.tree)
   }
 })
+
+test('pooled settlement-field deposits match a naive per-building reference at both scales', async () => {
+  const { AGGLOMERATION, FABRIC, buildSettlementField } = await import('../src/sim/settlement-field')
+  const width = 6,
+    height = 5,
+    cells = Array.from({ length: width * height }, () => ({}))
+  // Dense clusters, coincident houses, and houses against all four world edges.
+  let seed = 7
+  const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  const sources = Array.from({ length: 4000 }, (_, i) => {
+    const edge = i % 9 === 0
+    const x = edge ? (i % 2 ? 3 : width * 1024 - 3) : 1500 + random() * 2500,
+      y = edge ? random() * height * 1024 : i % 5 === 0 ? 2048 : 1000 + random() * 2500
+    return {
+      id: `s${i}`,
+      cell: 0,
+      pool: 0,
+      x,
+      y,
+      support: { x: x - 8, y: y - 8, size: 16 },
+      people: 1 + (i % 7),
+      developed: 1 + (i % 7),
+    }
+  })
+  const cdf = (u: number) =>
+    u <= -1 ? 0 : u >= 1 ? 1 : 0.5 + (15 / 16) * u * (1 - (2 * u * u) / 3 + u ** 4 / 5)
+  for (const scale of [FABRIC, AGGLOMERATION]) {
+    const field = buildSettlementField({ width, height, cells } as never, sources, scale)
+    const { span, bandwidth } = scale,
+      columns = width * (1024 / span),
+      rows = height * (1024 / span)
+    // Reference: deposit every building separately as its own node box, clipped and renormalized.
+    const reference = new Map<number, number>()
+    const axis = (node: number, limit: number) => {
+      const out: [number, number][] = []
+      for (let i = Math.max(0, node - 20); i < Math.min(limit, node + 21); i++) {
+        const c = (i + 0.5) * span,
+          a = node * span,
+          b = a + span
+        const weight = cdf((c - a) / bandwidth) - cdf((c - b) / bandwidth)
+        if (weight > 0) out.push([i, weight])
+      }
+      const total = out.reduce((sum, [, weight]) => sum + weight, 0)
+      return out.map(([i, weight]) => [i, weight / total] as const)
+    }
+    for (const s of sources) {
+      const nx = Math.floor(s.x / span),
+        ny = Math.floor(s.y / span)
+      for (const [x, wx] of axis(nx, columns))
+        for (const [y, wy] of axis(ny, rows))
+          reference.set(
+            y * columns + x,
+            (reference.get(y * columns + x) ?? 0) + (s.developed * wx * wy) / (span / 1000) ** 2,
+          )
+    }
+    const tile = 1024 / span
+    let compared = 0
+    for (const [node, expected] of reference) {
+      const x = node % columns,
+        y = Math.floor(node / columns)
+      const actual = field.tiles.get(Math.floor(y / tile) * width + Math.floor(x / tile))![
+        (y % tile) * tile + (x % tile)
+      ]
+      assert(
+        Math.abs(actual - expected) <= 1e-9 * Math.max(1, expected),
+        `node ${node}: ${actual} vs ${expected}`,
+      )
+      compared++
+    }
+    let nonzero = 0
+    for (const values of field.tiles.values()) for (const value of values) if (value > 0) nonzero++
+    assert.equal(nonzero, compared, 'the pooled field has no mass outside the reference support')
+  }
+})

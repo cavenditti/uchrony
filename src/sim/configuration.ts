@@ -50,6 +50,32 @@ function mergeKnown(defaults: unknown, input: unknown, path = 'configuration'): 
   return input
 }
 
+/** Parameters whose mechanism was replaced, as dotted paths. Saved worlds may
+ * still carry them; they describe nothing the current simulation reads, so they
+ * are dropped before the strict unknown-key check rather than rejecting the save. */
+const RETIRED_CONFIGURATION_PATHS: readonly string[] = [
+  // Prestige/wealth city integration, replaced by settlement-field place topology.
+  'urbanIntegration',
+  // Footprint density floor, replaced by the agglomeration reach of places.
+  'settlements.minimumDensity',
+]
+function withoutRetiredPaths(input: unknown): unknown {
+  if (!isRecord(input)) return input
+  let result = input
+  for (const path of RETIRED_CONFIGURATION_PATHS) {
+    const [group, key] = path.split('.')
+    if (key === undefined) {
+      if (Object.hasOwn(result, group))
+        result = Object.fromEntries(Object.entries(result).filter(([k]) => k !== group))
+    } else if (isRecord(result[group]) && Object.hasOwn(result[group], key))
+      result = {
+        ...result,
+        [group]: Object.fromEntries(Object.entries(result[group]).filter(([k]) => k !== key)),
+      }
+  }
+  return result
+}
+
 /**
  * Stage 2 of validation: per-field bounds, integer constraints, and select options
  * driven by the compiled `CONFIGURATION_FIELDS` registry.
@@ -131,6 +157,13 @@ function validateConfigurationInvariants(values: ConfigurationValues) {
   if (values.settlements.retainedBuiltCover > values.settlements.entryBuiltCover)
     throw new Error('Retained built cover cannot exceed entry built cover.')
 
+  // Place status uses two hysteresis bands on prominence; inverted bands would
+  // flip a centre between quarter and independent place every refresh.
+  if (values.placeTopology.release <= values.placeTopology.incorporation)
+    throw new Error('Quarter release prominence must exceed incorporation prominence.')
+  if (values.placeTopology.quarterRetirement > values.placeTopology.quarterBirth)
+    throw new Error('Quarter retirement prominence cannot exceed quarter birth prominence.')
+
   // Age-specific fertility weights are normalized into a probability distribution
   // over fertile age bands; disabling births is done via desiredChildrenBase = 0
   // and ruralFamilyMotive = 0 rather than zeroing the age-shape vector.
@@ -146,7 +179,7 @@ function validateConfigurationInvariants(values: ConfigurationValues) {
  * returning a deeply frozen `ConfigurationValues` object.
  */
 export function validateConfigurationValues(input: unknown): ConfigurationValues {
-  const values = mergeKnown(DEFAULT_CONFIGURATION_VALUES, input) as ConfigurationValues
+  const values = mergeKnown(DEFAULT_CONFIGURATION_VALUES, withoutRetiredPaths(input)) as ConfigurationValues
   for (const readonlyField of READONLY_CONFIGURATION_FIELDS) {
     if (configurationValue(values, readonlyField) !== readonlyField.expected)
       throw new Error(readonlyField.error)

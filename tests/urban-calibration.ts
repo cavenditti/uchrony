@@ -45,7 +45,11 @@ const { residentialSites } = (await moduleAt(
   'residential-sites',
 )) as typeof import('../src/sim/residential-sites')
 const { urbanBlocks } = (await moduleAt('urban-blocks')) as typeof import('../src/sim/urban-blocks')
-const { URBAN_INTEGRATION } = (await moduleAt('urban-centres')) as typeof import('../src/sim/urban-centres')
+// Place thresholds live with the settlement-field topology; frozen engines from
+// before that revision still expose their prestige/wealth integration rule.
+const thresholds = await moduleAt('settlement-topology')
+  .then((m) => (m as typeof import('../src/sim/settlement-topology')).PLACE_TOPOLOGY)
+  .catch(() => moduleAt('urban-centres').then((m) => (m as { URBAN_INTEGRATION: unknown }).URBAN_INTEGRATION))
 const digest = createHash('sha256')
 for (const name of readdirSync(resolve(engineRoot, 'src/sim'))
   .filter((n) => n.endsWith('.ts'))
@@ -139,7 +143,7 @@ function save(complete: boolean, failure?: string) {
     fromMonth,
     throughMonth: w.month,
     sourceHash,
-    thresholds: URBAN_INTEGRATION,
+    thresholds,
     complete,
     failure,
     elapsedSeconds: (performance.now() - began) / 1000,

@@ -6,10 +6,16 @@ import { multiCentreHousingDemand, housingCentres, coarseHousingDemand } from '.
 import { urbanBlocks } from '../src/sim/urban-blocks'
 import { SETTLEMENT } from '../src/sim/settlement-model'
 function rectangularFootprint(p: { x: number; y: number }, width: number, depth: number, angle: number) {
-  return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y]) => ({ x: p.x+x*width/2*Math.cos(angle)-y*depth/2*Math.sin(angle), y: p.y+x*width/2*Math.sin(angle)+y*depth/2*Math.cos(angle) }))
+  return [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ].map(([x, y]) => ({
+    x: p.x + ((x * width) / 2) * Math.cos(angle) - ((y * depth) / 2) * Math.sin(angle),
+    y: p.y + ((x * width) / 2) * Math.sin(angle) + ((y * depth) / 2) * Math.cos(angle),
+  }))
 }
-import { partitionCentres } from '../src/sim/urban-centres'
-import type { City } from '../src/sim/district-types'
 
 function fixture() {
   const homes = [128, 512, 896].map(
@@ -131,7 +137,9 @@ test('growth is bounded by the pool shortage and projects offset it locally', ()
 
 test('coarse housing demand conserves the pool shortage and deducts funded capacity once', () => {
   const { w, homes, access } = fixture()
-  homes.forEach((s) => { s.capacity = s.residents! * 0.8 })
+  homes.forEach((s) => {
+    s.capacity = s.residents! * 0.8
+  })
   const total = () => [...coarseHousingDemand(w, access).values()].reduce((a, b) => a + b, 0)
   assert(Math.abs(total() - 420) < 1e-9)
   w.adaptive!.construction!.push({ site: homes[0].id, capacity: 20, cost: 10, remaining: 3 })
@@ -150,44 +158,21 @@ test('nearby duplicate sites do not create extra demand centres', () => {
   )
 })
 
-test('physical centre catchments preserve both nuclei and distinguish broad frontage from a ribbon', () => {
-  const { w } = fixture()
-  const sites: PhysicalSite[] = []
-  for (let y = 200; y <= 320; y += 30)
-    for (let x = 200; x <= 410; x += 30) {
-      const point = { x, y }
-      sites.push({
-        ...Object.values(w.adaptive!.sites)[0],
-        ...point,
-        id: `site:${x}:${y}`,
-        residents: 100,
-        parcel: { x: x - 8, y: y - 8, size: 16 },
-        building: rectangularFootprint(point, 16, 16, 0),
-      })
-    }
-  const cities = [sites[0], sites[7]].map((s, i) => ({ id: i, nucleusSite: s.id, nucleus: 0 })) as City[]
-  w.localEconomy!.cities = cities
-  const result = partitionCentres(w, sites, cities)
-  assert.equal(new Set([...result.groups.values()].flat().map((s) => s.id)).size, sites.length)
-  for (const city of cities) assert(result.groups.get(city.id)!.some((s) => s.id === city.nucleusSite))
-  assert(result.contacts.get('0:1')!.a.size >= 3)
-  assert(result.contacts.get('0:1')!.b.size >= 3)
-  const reversed = partitionCentres(w, [...sites].reverse(), [...cities].reverse())
-  for (const city of cities)
-    assert.deepEqual(
-      result.groups
-        .get(city.id)!
-        .map((s) => s.id)
-        .sort(),
-      reversed.groups
-        .get(city.id)!
-        .map((s) => s.id)
-        .sort(),
-    )
-  const ribbon = partitionCentres(
-    w,
-    sites.filter((s) => s.y === 200),
-    cities,
-  )
-  assert.equal(ribbon.contacts.get('0:1')!.a.size, 1)
+test('new households gravitate toward the more attractive reachable centre', () => {
+  const { w, homes, access } = fixture()
+  homes.forEach((s) => {
+    s.capacity = s.residents! * 0.8
+  })
+  // Only the left centre is attractive; the others are equally plain.
+  const gravity = { ...access, baseUtility: (s: PhysicalSite) => (s.id === 'home:0' ? 1 : 0.1) }
+  gravity.utility = gravity.baseUtility
+  const demand = multiCentreHousingDemand(w, gravity)
+  const total = [...demand.values()].reduce((a, b) => a + b, 0)
+  assert(Math.abs(total - 420) < 1e-9, 'the pool shortage is conserved, only relocated')
+  assert(demand.get('home:0')! > 0.9 * total)
+  assert(demand.get('home:1')! < 0.05 * total)
+  // With equal attraction every household forms where it already lives.
+  const equal = { ...access, baseUtility: () => 1, utility: () => 1 }
+  const even = multiCentreHousingDemand(w, equal)
+  assert(Math.abs(even.get('home:1')! - (1000 * 1.15 - 800)) < 1e-9)
 })

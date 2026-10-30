@@ -10,7 +10,7 @@ import { validateWorld, restoreWorld } from '../src/sim/persistence'
 import { packWorldSave } from '../src/sim/save-codec'
 import { viewSnapshot } from '../src/sim/view-snapshot'
 import { residentialSites, syncResidentialPopulation } from '../src/sim/residential-sites'
-import { refreshCityLabels } from '../src/sim/cities'
+import { refreshPlaces } from '../src/sim/places'
 import { refreshAdaptiveTotals } from '../src/sim/adaptive-world'
 import { rollupPopulation } from '../src/sim/population'
 import { ensureAges } from '../src/sim/age-cohorts'
@@ -186,7 +186,7 @@ test('unclaimed communities can become visible settlements without becoming stat
   syncResidentialPopulation(w)
   aggregateDistricts(w)
   refreshAdaptiveTotals(w)
-  refreshCityLabels(w)
+  refreshPlaces(w)
   assert(w.localEconomy!.cities.some((c) => c.sites?.includes(home.id) && c.absorbedBy === undefined))
   assert.equal(unit.nation, -1)
   assert.equal(w.nations.length, 8)

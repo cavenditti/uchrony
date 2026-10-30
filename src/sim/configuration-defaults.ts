@@ -400,7 +400,9 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     villagePopulation: 500,
     townPopulation: 5000,
     cityPopulation: 50000,
-    minimumDensity: 300, // residents / km² of the physical footprint
+    urbanDensity: 1500, // developed residents / km² at which living conditions are half urban
+    agglomerationWeight: 0.1, // location utility per log-unit of developed residents within reach
+    agglomerationReach: 2000, // developed residents within reach at which that pull reaches log 2
     entryBuiltCover: 0.03,
     retainedBuiltCover: 0.02,
     movingFriction: 0.08,
@@ -408,13 +410,13 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     accessMinutes: 60,
     searchMeters: 6000,
   },
-  urbanIntegration: {
-    incorporationMonths: 120,
-    mergerMonths: 240,
-    prestigeRatio: 1.5,
-    wealthRatio: 1.25,
-    mergerPrestigeRatio: 2,
-    mergerWealthRatio: 1.75,
+  placeTopology: {
+    placeReach: 100, // developed residents within market reach for land to belong to a place
+    incorporation: 0.4,
+    release: 0.6,
+    quarterBirth: 0.2,
+    quarterRetirement: 0.1,
+    transitionMonths: 12,
   },
   farming: { timber: 5, stone: 7, laborMonths: 100, fertility: 0.12, duration: 6 },
   transportProjects: {

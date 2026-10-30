@@ -1079,7 +1079,7 @@ export function WorldMap({
           </p>
           {closeCity.metropolis && (
             <p>
-              {closeCity.metropolis.incorporated ? 'District of' : 'Linked with'} {closeCity.metropolis.name}
+              {closeCity.metropolis.incorporated ? 'Quarter of' : 'Growing into'} {closeCity.metropolis.name}
             </p>
           )}
         </div>

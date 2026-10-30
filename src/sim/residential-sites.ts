@@ -15,23 +15,53 @@ export function occupiedResidents(w: World, site: PhysicalSite) {
   return site.residents ?? w.localEconomy?.units[site.pool]?.residents[site.cell] ?? 0
 }
 
-/** An opening rural record represents dispersed housing, not a compact block.
- * Building elsewhere in its source cell must not urbanize all its occupants.
- * New surveyed parcels represent compact development; opening sites retain the
- * known built footprint rather than borrowing another parcel's investment.
- */
-export function compactResidence(site: PhysicalSite, retained = false) {
-  if (site.building) return site.capacity > 0
-  const opening =
+/** Fraction of its terrain sample a coarse housing record has built up: the
+ * opening cover plus capacity added by paid construction. Surveyed buildings
+ * and funded parcels describe their fabric directly instead. */
+export function builtCover(site: PhysicalSite) {
+  return (
     (site.openingBuilt ?? 0) +
     ((site.investedValue ?? 0) > 0
       ? Math.max(0, site.capacity - site.openingCapacity) / MODEL_PARAMETERS.fullBuiltPopulationPerCell
       : 0)
-  return (
-    opening >= (retained ? SETTLEMENT.retainedBuiltCover : SETTLEMENT.entryBuiltCover) ||
-    (site.id.startsWith('residence:') && (site.investedValue ?? 0) > 0)
   )
 }
+
+/** Explicit physical fabric: a surveyed building or a funded compact parcel. */
+const recordedFabric = (site: PhysicalSite) =>
+  !!site.building || (site.id.startsWith('residence:') && (site.investedValue ?? 0) > 0)
+
+/** An opening rural record represents dispersed housing, not a compact block.
+ * This predicate only selects the physical representation (draw and survey a
+ * compact footprint or not). How urban its occupants live is continuous and
+ * belongs to the settlement field, never to this threshold.
+ */
+export function compactResidence(site: PhysicalSite, retained = false) {
+  if (site.building) return site.capacity > 0
+  return (
+    builtCover(site) >= (retained ? SETTLEMENT.retainedBuiltCover : SETTLEMENT.entryBuiltCover) ||
+    recordedFabric(site)
+  )
+}
+
+/** Residents housed in developed fabric. Built cover converts to housed people
+ * at the same `fullBuiltPopulationPerCell` rate that created it, so a partly
+ * built coarse record splits continuously into compact and dispersed occupants
+ * instead of being classified wholesale as town or countryside. */
+export function developedResidents(w: World, site: PhysicalSite) {
+  const people = occupiedResidents(w, site)
+  return recordedFabric(site)
+    ? people
+    : Math.min(people, builtCover(site) * MODEL_PARAMETERS.fullBuiltPopulationPerCell)
+}
+
+/** Opening capacity of a coarse record: 115% of residents, or what its built
+ * cover already houses at the legacy 12,000 spaces per fully built sample. */
+export const openingHousingCapacity = (people: number, built: number) =>
+  Math.max(Math.ceil(people * 1.15), built * 12000)
+
+/** Side of the square physical support localized for coarse opening housing. */
+export const openingSupportSize = (capacity: number) => Math.min(850, Math.max(64, Math.sqrt(capacity * 40)))
 
 export function residentialSites(w: World) {
   return Object.values(w.adaptive?.sites ?? {}).filter(
@@ -61,7 +91,7 @@ export function ensureResidentialSites(w: World) {
     site.residents = w.localEconomy.units[site.pool].residents[site.cell] ?? 0
     // Opening housing is a coarse physical support, not known individual lots.
     // New funded parcels have smaller, explicitly recorded physical extents.
-    const size = Math.min(850, Math.max(64, Math.sqrt(site.capacity * 40)))
+    const size = openingSupportSize(site.capacity)
     site.parcel = { x: site.x - size / 2, y: site.y - size / 2, size }
   }
   a.residentialVersion = 1

@@ -101,60 +101,67 @@ test('rural spare capacity and empty parcels do not become towns or municipal ca
   validateWorld(w)
 })
 
-test('occupied infill links two persistent centres without moving assets or resetting their street frames', () => {
-  const { w, make, first, second, total } = prepareTwinParcels()
+test('parcels within market reach form one place whose identity survives infill, saves and display', () => {
+  const { w, make, first, second } = prepareTwinParcels()
   const before = holdings(w)
   evolveCities(w, true)
   refreshSpatial(w)
-  const initial = w.localEconomy!.cities.filter((c) => c.population)
-  assert.equal(initial.length, 2)
-  assert.equal(initial[0].nucleus, initial[1].nucleus)
-  assert.notEqual(initial[0].nucleusSite, initial[1].nucleusSite)
-  assert.equal(settlementPlaces(w).length, 2)
-  assert.notEqual(describeCity(w, settlementPlaces(w)[0]).x, describeCity(w, settlementPlaces(w)[1]).x)
+  const living = () => w.localEconomy!.cities.filter((c) => c.population && c.absorbedBy === undefined)
+  const initial = living()
+  // Two dense parcels 500 m apart share one market: one place, not two twin towns.
+  assert.equal(initial.length, 1)
+  const [place] = initial
+  assert(place.sites!.includes(first.id) && place.sites!.includes(second.id))
+  // It also administers the rural records within reach; its census is all of them.
+  const census = place.population
+  assert.equal(
+    census,
+    place.sites!.reduce((sum, id) => sum + (w.adaptive!.sites[id].residents ?? 0), 0),
+  )
+  // Only the two compact parcels are drawn as townscape; the rural records it administers are not.
+  assert.deepEqual(
+    settlementPlaces(w)
+      .map((p) => p.id.split(':patch:')[1])
+      .sort(),
+    [first.id, second.id].sort(),
+  )
   const bridge = make(0, 0)
   bridge.capacity = 500
   refreshAdaptiveTotals(w)
+  const field = JSON.stringify(place.field)
   evolveCities(w, true)
-  assert.equal(
-    w.localEconomy!.cities.filter((c) => c.population && c.absorbedBy === undefined).length,
-    2,
-    'empty capacity cannot merge towns',
+  // Vacant housing joins the territory it stands in, but it is not fabric: no
+  // new place, no census change and an unchanged field.
+  assert.deepEqual(
+    living().map((c) => [c.id, c.population]),
+    [[place.id, census]],
   )
+  assert(place.sites!.includes(bridge.id))
+  assert.equal(JSON.stringify(place.field), field)
   first.residents! -= 250
   bridge.residents = 250
   syncResidentialPopulation(w)
   evolveCities(w, true)
   refreshSpatial(w)
-  const active = w.localEconomy!.cities.filter((c) => c.population && c.absorbedBy === undefined)
-  assert.equal(active.length, 2)
-  assert.equal(
-    active.reduce((sum, c) => sum + c.population, 0),
-    total,
-  )
-  assert.equal(new Set(active.flatMap((c) => c.sites!)).size, 3)
   assert.deepEqual(
-    active.map((c) => c.id),
-    initial.map((c) => c.id),
+    living().map((c) => c.id),
+    [place.id],
   )
-  assert.equal(active.filter((c) => c.metropolis).length, 1)
-  const patches = settlementPlaces(w)
-  assert.equal(new Set(patches.map((p) => p.form!.planSeed)).size, 2)
-  const labels = JSON.stringify(active)
+  assert.equal(place.population, census, 'residents moved within the place')
+  assert(place.sites!.includes(bridge.id))
+  const settled = JSON.stringify(living())
   evolveCities(w, true)
-  assert.equal(JSON.stringify(active), labels, 'same-month refresh does not advance integration')
+  assert.equal(JSON.stringify(living()), settled, 'same-month refreshes do not advance any dwell')
   const restored = restoreWorld(JSON.parse(JSON.stringify(packWorldSave(w))))
   assert.deepEqual(restored.localEconomy!.cities, w.localEconomy!.cities)
   first.residents! += bridge.residents!
   bridge.residents = 0
   syncResidentialPopulation(w)
   evolveCities(w, true)
-  assert.equal(active.filter((c) => c.metropolis).length, 0)
-  assert.equal(
-    active.reduce((sum, c) => sum + c.population, 0),
-    total,
+  assert.deepEqual(
+    living().map((c) => [c.id, c.population]),
+    [[place.id, census]],
   )
-  assert(active.some((c) => c.history?.some((e) => e.kind === 'separated')))
   refreshSpatial(w)
   assert.equal(holdings(w), before)
   validateWorld(w)
@@ -468,9 +475,13 @@ test('occupied parcels merge across terrain boundaries without a mandatory cente
   evolveCities(w, true)
   refreshSpatial(w)
   const cities = local.cities.filter((c) => c.population && c.absorbedBy === undefined)
-  assert.equal(cities.length, 1)
-  assert.equal(cities[0].population, 2000)
-  assert(cities[0].sites!.includes(added[0].id) && cities[0].sites!.includes(added[1].id))
+  const shared = cities.filter((c) => c.sites!.includes(added[0].id) && c.sites!.includes(added[1].id))
+  assert.equal(shared.length, 1, 'one place administers the parcels on both sides of the sample boundary')
+  // A place administers its hinterland too: its census is every occupant of its homes.
+  assert.equal(
+    shared[0].population,
+    shared[0].sites!.reduce((sum, id) => sum + (w.adaptive!.sites[id].residents ?? 0), 0),
+  )
   assert.equal(holdings(w), before)
   validateWorld(w)
 })

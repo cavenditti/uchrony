@@ -8,7 +8,7 @@ import { desiredFertility } from '../src/sim/age-cohorts'
 import { rollupPopulation } from '../src/sim/population'
 import { aggregateDistricts } from '../src/sim/districts'
 import { syncResidentialPopulation } from '../src/sim/residential-sites'
-import { refreshCityLabels } from '../src/sim/cities'
+import { refreshPlaces } from '../src/sim/places'
 import { refreshAdaptiveTotals } from '../src/sim/adaptive-world'
 import { refreshSpatial } from '../src/sim/spatial'
 import { balances, auditLedger } from '../src/sim/ledger'
@@ -58,18 +58,18 @@ test('settlement label thresholds do not erase residents, and empty cities becom
   const sites = city.sites!.map((id) => w.adaptive!.sites[id])
   for (const site of sites) site.residents = 0
   sites[0].residents = 123
-  refreshCityLabels(w)
+  refreshPlaces(w)
   assert.equal(city.population, 123)
   assert.equal(city.abandoned, undefined)
   assert(city.sites!.includes(sites[0].id))
   sites[0].residents = 0
-  refreshCityLabels(w)
+  refreshPlaces(w)
   assert.equal(city.population, 0)
   assert.equal(city.abandoned, w.month)
   assert.equal(city.cells.length, 0)
   assert.equal(city.sites!.length, 0)
   const before = JSON.stringify(city)
-  refreshCityLabels(w)
+  refreshPlaces(w)
   assert.equal(JSON.stringify(city), before)
 })
 
@@ -101,7 +101,7 @@ test('a zero-population state relinquishes claims and diplomacy without deleting
   applyCommand(w, { type: 'control', nation: null })
   assert.equal(nation.ai, false, 'observer mode cannot revive an extinct government')
   assert.throws(() => applyCommand(w, { type: 'control', nation: 0 }), /ceased to exist/)
-  refreshCityLabels(w)
+  refreshPlaces(w)
   refreshAdaptiveTotals(w)
   refreshSpatial(w)
   summarize(w, false)

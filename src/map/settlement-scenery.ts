@@ -3,6 +3,8 @@ import { urbanForm, type UrbanForm } from './urban-form'
 import type { World } from '../sim/types'
 import { spatialState, type Settlement } from '../sim/spatial'
 import { isVisibleSettlement } from '../sim/settlement-model'
+import { compactResidence } from '../sim/residential-sites'
+import type { PhysicalSite } from '../sim/adaptive-types'
 
 export type SettlementPlace = Settlement & {
   form?: UrbanForm
@@ -10,6 +12,10 @@ export type SettlementPlace = Settlement & {
   civic?: boolean
   parcel?: import('../sim/adaptive-types').SpatialBounds
 }
+
+/** Compact fabric as published in the display snapshot, or read from the site. */
+const developed = (home: NonNullable<World['viewHomes']>[number] | PhysicalSite) =>
+  'kind' in home ? compactResidence(home) : !!home.developed
 
 /** One named settlement can have many connected residential patches. Spare
  * housing in the countryside is never promoted to a village by the renderer.
@@ -76,7 +82,9 @@ export function settlementPlaces(world: World): SettlementPlace[] {
     return ids.flatMap((id) => {
       const home = homes.get(id)
       const people = home && (home.residents ?? world.localEconomy?.units[home.pool]?.residents[home.cell])
-      if (!home || home.building || !people) return []
+      // A place administers its hinterland, but only developed fabric is drawn
+      // as townscape; dispersed farm records stay countryside on the map.
+      if (!home || home.building || !people || !developed(home)) return []
       const cell = home.cell,
         civic = city.nucleusSite ? id === city.nucleusSite : cell === city.cell
       const nearby: NonNullable<SettlementPlace['parcel']>[] = []

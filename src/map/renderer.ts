@@ -387,6 +387,9 @@ export function drawPlaceLabels(
       settlement.population < 50000
     )
       continue
+    // Quarters are part of the place administering them: label them only once
+    // the view is close enough to separate neighbourhoods.
+    if (settlement.metropolis?.incorporated && scale < 3) continue
     if (!capital && scale < (kind === 'city' ? 0.7 : kind === 'town' ? 1.4 : 3)) continue
     const radius = (capital ? 2.8 : kind === 'city' ? 2.4 : kind === 'town' ? 1.7 : 1) / scale
     ctx.beginPath()

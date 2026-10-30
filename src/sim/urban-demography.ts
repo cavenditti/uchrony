@@ -1,20 +1,21 @@
 import { population, type World } from './types'
 import { expansionParameters } from './expansion-parameters'
-import { settlementComponents } from './settlement-morphology'
-import { occupiedResidents } from './residential-sites'
+import { settlementStructure, type SettlementStructure } from './settlement-topology'
 
-/** Compact housing is not metropolitan opportunity cost. Weight occupied,
- * connected physical footprints by population; names and city records are
- * observer data and must never affect births. Tiny unnamed camps count too. */
-export function urbanOpportunityByDistrict(w: World) {
+/** Metropolitan opportunity cost of children rises with the developed
+ * population within market reach of a household's home, read from the
+ * agglomeration field. Place names and records never enter it, and homes in
+ * open country have no developed neighbours to count. */
+export function urbanOpportunityByDistrict(w: World, structure?: SettlementStructure) {
   const scale = expansionParameters().urbanOpportunityPopulation
   if (!w.localEconomy || !w.adaptive || !scale) return undefined
+  const { sources, sourceReach } = structure ?? settlementStructure(w)
   const weighted = new Map<number, number>()
-  for (const component of settlementComponents(w, undefined, 1)) {
-    const opportunity = Math.min(1, component.population / scale)
-    for (const site of component.sites)
-      weighted.set(site.pool, (weighted.get(site.pool) ?? 0) + occupiedResidents(w, site) * opportunity)
-  }
+  sources.forEach((source, i) => {
+    if (!source.people) return
+    const opportunity = Math.min(1, sourceReach[i] / scale)
+    weighted.set(source.pool, (weighted.get(source.pool) ?? 0) + source.people * opportunity)
+  })
   return new Map(
     w.localEconomy.active.map((id) => [
       id,

@@ -47,6 +47,32 @@ test('the complete registry validates its defaults and rejects unknown, nonfinit
   assert.throws(() => validateWorldConfiguration({ version: 2, revision: 0, values: {} }), /unsupported/)
 })
 
+test('saved configurations of retired city parameters still load; place bands must be ordered', () => {
+  // A configuration saved before settlement places replaced prestige/wealth integration.
+  const saved = structuredClone(DEFAULT_CONFIGURATION_VALUES) as unknown as Record<
+    string,
+    Record<string, unknown>
+  >
+  delete saved.placeTopology
+  saved.urbanIntegration = { incorporationMonths: 120, mergerMonths: 240, prestigeRatio: 1.5 }
+  saved.settlements = { ...saved.settlements, minimumDensity: 300 }
+  assert.deepEqual(validateConfigurationValues(saved), DEFAULT_CONFIGURATION_VALUES)
+  assert.deepEqual(
+    validateWorldConfiguration({ version: 1, revision: 3, values: saved }).values,
+    DEFAULT_CONFIGURATION_VALUES,
+  )
+  // Retirement applies only to the named paths: other unknown keys still fail loudly.
+  assert.throws(() => validateConfigurationValues({ settlements: { minimumDensityTypo: 1 } }), /unknown/)
+  assert.throws(
+    () => validateConfigurationValues({ placeTopology: { incorporation: 0.6, release: 0.5 } }),
+    /release prominence/,
+  )
+  assert.throws(
+    () => validateConfigurationValues({ placeTopology: { quarterBirth: 0.1, quarterRetirement: 0.2 } }),
+    /retirement prominence/,
+  )
+})
+
 test('every editable parameter has explanatory help, including matrix cells and distinct treasury costs', () => {
   for (const field of CONFIGURATION_FIELDS) {
     assert(field.description.length > 30, `${field.path} needs an explanation`)

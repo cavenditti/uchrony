@@ -106,12 +106,12 @@ export const CONFIGURATION_GROUPS: Record<keyof ConfigurationValues, Configurati
   settlements: {
     label: 'Urban settlement',
     tags: ['towns', 'cities', 'urbanization'],
-    description: 'Classification thresholds, moving friction and accessibility.',
+    description: 'Size thresholds, urbanity, agglomeration pull, moving friction and accessibility.',
   },
-  urbanIntegration: {
-    label: 'City integration',
-    tags: ['merger', 'metropolis', 'incorporation'],
-    description: 'Time and relative wealth needed for incorporation and merger.',
+  placeTopology: {
+    label: 'Places and quarters',
+    tags: ['merger', 'metropolis', 'incorporation', 'quarter', 'municipality'],
+    description: 'Density prominence at which centres become quarters, separate or retire.',
   },
   farming: {
     label: 'Agriculture',
@@ -510,7 +510,9 @@ export const CONFIGURATION_SCHEMA: SchemaNode<ConfigurationValues> = {
     villagePopulation: int(1, 1e6),
     townPopulation: int(2, 1e7),
     cityPopulation: int(3, 1e8),
-    minimumDensity: num(1, 1e6),
+    urbanDensity: num(1, 1e6),
+    agglomerationWeight: num(0, 2),
+    agglomerationReach: num(1, 1e7),
     entryBuiltCover: unitInterval(),
     retainedBuiltCover: unitInterval(),
     movingFriction: unitInterval(),
@@ -518,13 +520,13 @@ export const CONFIGURATION_SCHEMA: SchemaNode<ConfigurationValues> = {
     accessMinutes: num(1, 240),
     searchMeters: num(100, 12000),
   },
-  urbanIntegration: {
-    incorporationMonths: int(1, 1200),
-    mergerMonths: int(1, 2400),
-    prestigeRatio: num(1, 10),
-    wealthRatio: num(1, 10),
-    mergerPrestigeRatio: num(1, 10),
-    mergerWealthRatio: num(1, 10),
+  placeTopology: {
+    placeReach: num(1, 1e7),
+    incorporation: unitInterval(),
+    release: unitInterval(),
+    quarterBirth: unitInterval(),
+    quarterRetirement: unitInterval(),
+    transitionMonths: int(0, 1200),
   },
   farming: {
     timber: num(0, 1000),

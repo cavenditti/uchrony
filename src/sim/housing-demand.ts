@@ -114,22 +114,36 @@ export function multiCentreHousingDemand(w: World, access: Access) {
       const local =
         nearby.find((c) => commuteSiteMinutes(w, home, c, SETTLEMENT.accessMinutes) !== null) ?? home
       const need = totalDeficit ? (deficits[i] * shortfall) / totalDeficit : 0
-      growth.set(local.id, (growth.get(local.id) ?? 0) + need)
       const vacancy =
         access.baseUtility(home) >= access.baseUtility(local) - SETTLEMENT.movingFriction
           ? access.vacancy(home)
           : 0
       spare.set(local.id, (spare.get(local.id) ?? 0) + vacancy + (pending.get(home.id) ?? 0))
       funded.set(local.id, (funded.get(local.id) ?? 0) + (pending.get(home.id) ?? 0))
-      const options: { site: PhysicalSite; weight: number }[] = []
+      // New households form where they would rather live: the local centre or,
+      // in a logit split, a reachable centre with better net utility. Existing
+      // residents also pay the moving friction; new households do not.
+      const options: { site: PhysicalSite; weight: number }[] = [],
+        settling = [{ site: local, weight: 1 }]
+      const localUtility = access.baseUtility(local)
       for (const target of index.query(home.x - 6000, home.y - 6000, home.x + 6000, home.y + 6000)) {
         if (home === target || Math.hypot(target.x - home.x, target.y - home.y) > 6000) continue
         const gain = access.baseUtility(target) - access.baseUtility(home) - SETTLEMENT.movingFriction
-        if (gain <= 0) continue
+        const pull = target === local ? 0 : access.baseUtility(target) - localUtility
+        if (gain <= 0 && pull <= 0) continue
         const minutes = commuteSiteMinutes(w, home, target, SETTLEMENT.accessMinutes)
-        if (minutes === null || gain <= minutes / 600) continue
-        options.push({ site: target, weight: 1 - Math.exp(-(gain - minutes / 600) / 0.15) })
+        if (minutes === null) continue
+        if (gain > minutes / 600)
+          options.push({ site: target, weight: 1 - Math.exp(-(gain - minutes / 600) / 0.15) })
+        if (pull > minutes / 600)
+          settling.push({ site: target, weight: Math.exp((pull - minutes / 600) / 0.15) })
       }
+      const settlingWeight = settling.reduce((sum, o) => sum + o.weight, 0)
+      for (const option of settling)
+        growth.set(
+          option.site.id,
+          (growth.get(option.site.id) ?? 0) + (need * option.weight) / settlingWeight,
+        )
       const weight = options.reduce((sum, o) => sum + o.weight, 0)
       const budget =
         access.occupied(home) *

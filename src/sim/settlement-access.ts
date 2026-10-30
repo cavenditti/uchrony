@@ -4,6 +4,7 @@ import type { PhysicalSite } from './adaptive-types'
 import { snapshotSiteSearch } from './adaptive-grid'
 import { commuteSiteMinutes, withCommuteCostSnapshot, snapshotSiteAccessibility } from './commuting'
 import { settlementInfluence } from './settlement-influence'
+import { AGGLOMERATION, buildSettlementField, fieldReach, fieldSources } from './settlement-field'
 import { SETTLEMENT } from './settlement-model'
 import { multiCentreHousingDemand } from './housing-demand'
 import { apportion } from './allocation'
@@ -22,10 +23,30 @@ export function settlementAccess(w: World, coarse = false) {
   const vacancy = (home: PhysicalSite) => Math.max(0, Math.floor(home.capacity - occupied(home)))
   // Coarse housing decisions use local crowding; regional location preferences
   // return to full spatial surveys when monthly playback resumes.
-  const baseUtility = coarse ? (_home: PhysicalSite) => 0 : settlementInfluence(w, pools)
+  const baseUtility = coarse ? (_home: PhysicalSite) => 0 : locationUtility(w, pools)
   const utility = (home: PhysicalSite, people = occupied(home)) =>
     baseUtility(home) - 0.25 * (people / Math.max(1, home.capacity)) ** 2
   return { homes, occupied, vacancy, baseUtility, utility }
+}
+
+/** Work and service access plus agglomeration pull. Households value homes
+ * within market reach of developed neighbours (markets, trades, company), so
+ * moves and new households gravitate toward established centres rather than
+ * spreading evenly. The pull is logarithmic in developed residents within
+ * reach: concave, so crowding and rising rebuilding costs bound any one centre. */
+function locationUtility(w: World, pools: ReturnType<typeof residentialPools>) {
+  const access = settlementInfluence(w, pools)
+  const weight = SETTLEMENT.agglomerationWeight
+  if (!weight) return access
+  const field = buildSettlementField(w, fieldSources(w), AGGLOMERATION),
+    reference = SETTLEMENT.agglomerationReach
+  const pull = new Map<string, number>()
+  return (home: PhysicalSite) => {
+    let value = pull.get(home.id)
+    if (value === undefined)
+      pull.set(home.id, (value = weight * Math.log1p(fieldReach(field, home.x, home.y) / reference)))
+    return access(home) + value
+  }
 }
 
 /** Nearby housing pools found through the dynamic mesh, then tested against the

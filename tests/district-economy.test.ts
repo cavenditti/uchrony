@@ -19,7 +19,8 @@ import { validateWorld, restoreWorld } from '../src/sim/persistence'
 import { auditBanks } from '../src/sim/banking'
 import { auditNationalAccounts } from '../src/sim/national-accounts'
 import { tradeDistricts, districtNetwork } from '../src/sim/district-transport'
-import { neighbors, movementNeighbors } from '../src/sim/grid'
+import { CELL_METERS, neighbors, movementNeighbors } from '../src/sim/grid'
+import { cellPosition } from '../src/sim/physical-space'
 import { ensureFirms, firmCapacity, regionalFirms } from '../src/sim/firms'
 import { viewSnapshot } from '../src/sim/view-snapshot'
 import { relocateHouseholdClaims } from '../src/sim/district-finance'
@@ -497,7 +498,7 @@ test('blocked freight cannot originate loans for undeliverable goods', async () 
   auditBanks(w)
 })
 
-test('dispersed farming density stays rural while neighboring concentrations form a town', async () => {
+test('evenly settled farmland is never a grid of towns; a real concentration becomes the centre', async () => {
   const { aggregateDistricts } = await import('../src/sim/districts')
   const w = generateWorld('Rural land use')
   ensureDistrictEconomy(w)
@@ -536,7 +537,11 @@ test('dispersed farming density stays rural while neighboring concentrations for
   }
   aggregateDistricts(w)
   for (let month = 0; month < 120; month++) evolveCities(w)
-  assert.equal(local.cities.filter((c) => c.population).length, 0)
+  // Every sample holds the same 3,000 people: at market scale that is a plateau
+  // per sovereign landmass (with lobes only where coasts pinch the land), not a
+  // town in every sample.
+  const living = () => local.cities.filter((c) => c.population && c.absorbedBy === undefined)
+  assert(living().length > 0 && living().length * 50 < local.active.length)
   assert(Object.values(local.built).every((fraction) => fraction < 0.12))
   const a = local.units[local.active.find((id) => local.units[id].neighbors.length)!],
     b = local.units[a.neighbors[0]]
@@ -553,8 +558,11 @@ test('dispersed farming density stays rural while neighboring concentrations for
   for (let month = 0; month < 120; month++) evolveCities(w)
   const city = local.cities.find((c) => c.absorbedBy === undefined && c.cells.includes(a.center))!
   assert(city && city.cells.includes(b.center))
-  assert.equal(city.population, 40000)
-  assert.equal(city.kind, 'town')
+  assert.equal(city.metropolis, undefined, 'the concentration is a principal place')
+  // The summit, and so the label, sits on the concentration rather than mid-plateau.
+  const position = cellPosition(w, a.center)
+  assert(Math.hypot(city.field!.x - position.x, city.field!.y - position.y) < 4 * CELL_METERS)
+  assert(city.population >= 40000)
   assert.equal(
     w.regions.reduce((sum, r) => sum + population(r), 0),
     before,

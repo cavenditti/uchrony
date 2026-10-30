@@ -20,15 +20,9 @@ import { relocateHouseholdClaims } from './district-finance'
 import { governmentAccount, householdAccount, producerAccount, transfer } from './ledger'
 import { marketStore, recordGift, recordOwnCapital, recordUse, recordWages } from './national-accounts'
 import { STRATA } from './economic-types'
-import {
-  residentialSites,
-  occupiedResidents,
-  createResidentialParcel,
-  syncResidentialPopulation,
-} from './residential-sites'
-import { refreshCityLabels } from './cities'
+import { residentialSites, createResidentialParcel, syncResidentialPopulation } from './residential-sites'
+import { refreshPlaces } from './places'
 import { rebuildAdaptiveMesh } from './adaptive-world'
-import { settlementComponents, type SettlementComponent } from './settlement-morphology'
 
 export const FOUNDING = parameterGroup('founding')
 
@@ -136,7 +130,7 @@ function configuredFoundingPlan(w: World, nation: number, cell: number, expediti
 
 /** A paid, immediately inhabited founding camp. Later housing uses ordinary timed construction. */
 export function foundSettlement(w: World, nation: number, cell: number, pioneer = false) {
-  return settleFounding(w, nation, cell, false, undefined, pioneer ? pioneerExpedition(w, nation) : FOUNDING)
+  return settleFounding(w, nation, cell, false, pioneer ? pioneerExpedition(w, nation) : FOUNDING)
 }
 
 function settleFounding(
@@ -144,7 +138,6 @@ function settleFounding(
   nation: number,
   cell: number,
   deferMesh: boolean,
-  refreshLabels?: (nation: number) => void,
   expedition: Expedition = FOUNDING,
 ) {
   const { state, region, target, source, point } = foundingPlan(w, nation, cell, expedition)
@@ -247,8 +240,9 @@ function settleFounding(
   aggregateDistricts(w)
   syncResidentialPopulation(w)
   if (!deferMesh) rebuildAdaptiveMesh(w)
-  if (refreshLabels) refreshLabels(nation)
-  else refreshCityLabels(w)
+  // The new camp is part of the settlement field at once; the place refresh
+  // names it (or joins it to the place it adjoins) before the next decision.
+  refreshPlaces(w)
   recordWorldEvent(w, {
     id: w.nextEvent++,
     month: w.month,
@@ -266,22 +260,6 @@ function settleFounding(
 export function advanceFounding(w: World) {
   if (!w.localEconomy || !w.adaptive || !w.economy) return
   let founded = 0
-  let components: SettlementComponent[] | undefined
-  const refreshLabels = (nation: number) => {
-    // Each expedition changes only its own state and newly claimed wilderness.
-    // Keep the ordered label updates, but reuse other states' unchanged physical
-    // components during this synchronous founding round.
-    const changed = new Set([nation, -1])
-    const allBuildings = residentialSites(w).every((s) => !occupiedResidents(w, s) || !!s.building)
-    components =
-      components && allBuildings
-        ? [
-            ...components.filter((part) => !changed.has(w.localEconomy!.units[part.sites[0].pool].nation)),
-            ...settlementComponents(w, changed),
-          ].sort((a, b) => a.sites[0].id.localeCompare(b.sites[0].id))
-        : settlementComponents(w)
-    refreshCityLabels(w, components)
-  }
   const p = expansionParameters()
   for (const n of w.nations) {
     const expedition = pioneerExpedition(w, n.id)
@@ -308,7 +286,7 @@ export function advanceFounding(w: World) {
     for (let review = 0; review < reviews; review++) {
       const option = foundingOptions(w, n.id, 1)[0]
       if (!option) break
-      settleFounding(w, n.id, option.cell, true, refreshLabels, expedition)
+      settleFounding(w, n.id, option.cell, true, expedition)
       founded++
     }
   }

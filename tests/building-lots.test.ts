@@ -19,7 +19,8 @@ import { mapLeafAt, mapBuildingAt } from '../src/map/quadtree'
 import { mapHomesSnapshot } from '../src/sim/map-snapshot'
 import { balances } from '../src/sim/ledger'
 import { physicalStocks } from '../src/sim/goods-accounting'
-import { settlementComponents } from '../src/sim/settlement-morphology'
+import { settlementStructure } from '../src/sim/settlement-topology'
+import { refreshPlaces } from '../src/sim/places'
 import { planHousingInvestment } from '../src/sim/housing-investment'
 import { settlementAccess } from '../src/sim/settlement-access'
 import { apportion } from '../src/sim/allocation'
@@ -108,7 +109,7 @@ test('building geometry and occupancy survive coarse/fine numerical remeshing an
   validateWorld(w)
 })
 
-test('occupied building connections merge settlements; empty buildings do not bridge them', () => {
+test('occupied buildings in a gap become urban fabric; empty ones add none; nearby clusters share one place', () => {
   const w = fixture(),
     unit = w.localEconomy!.units[w.nations[0].capital]
   const homes = residentialSites(w).filter((s) => s.pool === unit.id && s.building)
@@ -136,16 +137,40 @@ test('occupied building connections merge settlements; empty buildings do not br
   bridges.forEach((s, i) => place(s, -232 + i * 16, 0, 0))
   syncResidentialPopulation(w)
   rebuildAdaptiveMesh(w)
-  const clusters = () => settlementComponents(w).filter((c) => c.nucleus.pool === unit.id)
-  assert.equal(clusters().length, 2)
+  // Neighbourhood urbanity of the buildings in the gap, and the market-scale places.
+  const gap = () => {
+    const structure = settlementStructure(w)
+    return bridges.map((b) => {
+      const i = structure.sources.findIndex((s) => s.id === b.id)
+      return { urban: structure.sourceUrbanity[i], developed: structure.sources[i].developed }
+    })
+  }
+  const vacant = gap()
+  assert(
+    vacant.every((b) => b.urban === 0 && b.developed === 0),
+    'empty capacity is not fabric',
+  )
+  refreshPlaces(w)
+  const ours = () =>
+    w.localEconomy!.cities.filter(
+      (c) => c.absorbedBy === undefined && c.abandoned === undefined && c.sites!.includes(homes[0].id),
+    )
+  assert.equal(ours().length, 1, 'clusters 400 m apart are one place at market scale')
+  const identity = ours()[0].id
   bridges.forEach((s, i) => {
     homes[i].residents! -= 4
     s.residents = 4
   })
   syncResidentialPopulation(w)
   refreshAdaptiveTotals(w)
-  assert.equal(clusters().length, 1)
-  assert.equal(clusters()[0].population, total)
+  assert(gap().every((b) => b.urban > 0 && b.developed === 4))
+  w.month++
+  refreshPlaces(w)
+  assert.deepEqual(
+    ours().map((c) => c.id),
+    [identity],
+  )
+  assert(homes.slice(0, 168).every((s) => ours()[0].sites!.includes(s.id)))
 })
 
 test('outward housing investment surveys one building lot with finite material and labor costs', () => {

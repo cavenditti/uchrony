@@ -11,7 +11,7 @@ import { advanceAlmanac } from './almanac'
 import { withLoanOriginationBatch } from './banking'
 import { ensureBuildingLots } from './building-lots'
 import { advanceCharacters } from './character'
-import { advanceSettlements, evolveCities, refreshCityLabels } from './cities'
+import { advanceSettlements } from './cities'
 import { withWorldConfiguration } from './configuration'
 import { decisionPolicy } from './decision-policy'
 import { advanceCabinet } from './cabinet-ai'
@@ -75,6 +75,7 @@ import { advanceSovereignty } from './sovereignty'
 import { refreshSpatial } from './spatial'
 import { advanceStatecraft } from './statecraft'
 import { reconcileMountainTerrain } from './terrain-migration'
+import { refreshPlaces } from './places'
 import { absorbUnclaimedEnclaves } from './territorial-expansion'
 import { territorialIndex } from './territory-index'
 import { type World, FIELDS, clamp, population } from './types'
@@ -317,10 +318,8 @@ function prepareSpatialWorldConfigured(w: World) {
 
 function initializeSpatialWorld(w: World) {
   ensurePopulation(w)
-  const converting = !w.localEconomy
   const initializing = !w.adaptive || w.adaptive.residentialVersion !== 1
   ensureDistrictEconomy(w)
-  if (converting) evolveCities(w, true)
   ensureAdaptiveWorld(w)
   ensureResidentialSites(w)
   const terrainChanged = reconcileMountainTerrain(w)
@@ -329,8 +328,14 @@ function initializeSpatialWorld(w: World) {
   syncResidentialPopulation(w)
   if (initializing || buildingsChanged || terrainChanged) {
     rebuildAdaptiveMesh(w)
-    refreshCityLabels(w)
-    refreshSpatial(w)
+    // Urban shares, district activity and places are all read from the
+    // localized physical census, so a converted world starts consistent.
+    const settlements = advanceSettlements(w, true)
+    refreshPlaces(w, settlements)
+    // As after the monthly refresh: re-aggregate so pool shares are the canonical
+    // community roll-up, and a repeated preparation is bitwise idempotent.
+    aggregateDistricts(w)
+    refreshSpatial(w, settlements)
   }
 }
 
@@ -443,13 +448,13 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   recordDevelopment(w)
   if (w.adaptive?.transit)
     w.adaptive.transit = w.adaptive.transit.filter((s) => Object.values(s.goods).some((q) => q > 0))
-  advanceSettlements(
+  const settlements = advanceSettlements(
     w,
     false,
     access,
     coarse ? 0 : detail === 'reconcile' ? (w.fastForward?.phase ?? 0) + 1 : 1,
   )
-  refreshCityLabels(w)
+  refreshPlaces(w, settlements)
   aggregateDistricts(w)
   syncSites(w)
   if (!coarse && (w.month % 6 === 0 || detail === 'reconcile')) rebuildAdaptiveMesh(w)
@@ -457,7 +462,8 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   reconcileInstitutions(w)
   summarize(w)
   // Saves may occur between coarse substeps; their physical settlement census must be current.
-  refreshSpatial(w)
+  // No residents move after the settlement refresh, so its field is still exact here.
+  refreshSpatial(w, settlements)
   advanceAlmanac(w)
   recordWorldArchive(w)
   return w

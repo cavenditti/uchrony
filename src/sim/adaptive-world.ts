@@ -4,7 +4,7 @@ import { population } from './types'
 import { localFirmRegion } from './local-units'
 import { ensureDistrictEconomy } from './districts'
 import { CELL_METERS } from './grid'
-import { compactResidence } from './residential-sites'
+import { compactResidence, openingHousingCapacity } from './residential-sites'
 import { SpatialBuckets } from './spatial-buckets'
 import {
   METERS_PER_MAP_UNIT,
@@ -86,10 +86,7 @@ export function ensureAdaptiveWorld(w: World) {
   for (const id of local.active) {
     const pool = local.units[id]
     for (const cell of pool.cells) {
-      const capacity = Math.max(
-        Math.ceil((pool.residents[cell] ?? 0) * 1.15),
-        (local.built[cell] ?? 0) * 12000,
-      )
+      const capacity = openingHousingCapacity(pool.residents[cell] ?? 0, local.built[cell] ?? 0)
       addSite(w, {
         id: `home:${cell}`,
         cell,

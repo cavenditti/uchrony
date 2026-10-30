@@ -1,5 +1,6 @@
 import { numberValidator, validationFailure } from './persistence-primitives'
 import type { World } from './types'
+import { placePosition } from './spatial'
 
 export function validateSpatial(w: World) {
   const fail = validationFailure('Invalid world save: invalid spatial districts or settlements')
@@ -150,14 +151,15 @@ export function validateSpatial(w: World) {
         )
           fail()
         if (city!.sites) {
-          const site = w.adaptive.sites[city!.nucleusSite!]
+          const site = w.adaptive.sites[city!.nucleusSite!],
+            position = placePosition(w, city!).position
           if (
             !site ||
             settlement.nucleusSite !== city!.nucleusSite ||
             settlement.siteIds?.length !== city!.sites.length ||
             city!.sites.some((id, i) => id !== settlement.siteIds![i]) ||
-            settlement.position?.x !== site.x ||
-            settlement.position?.y !== site.y
+            settlement.position?.x !== position?.x ||
+            settlement.position?.y !== position?.y
           )
             fail()
         }

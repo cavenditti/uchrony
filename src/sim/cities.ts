@@ -1,30 +1,34 @@
+/**
+ * Monthly settlement physics for resident markets: activity, natural regrowth,
+ * legacy built cover and the share of residents living under urban conditions.
+ *
+ * The urban share is read from the continuous settlement field, never from a
+ * place record: a pool's `urban` is the occupant-weighted mean urbanity of its
+ * homes, so a growing village becomes gradually more urban and a farm beside a
+ * town is partly urban, with no threshold at which land changes kind. Named
+ * places (`places.ts`) are an administrative reading of the same field.
+ */
 import { periodRate } from './simulation-period'
-import {
-  settlementComponents,
-  settledResidentsByCell,
-  type SettlementComponent,
-} from './settlement-morphology'
 import { optimizeResidentialLocations, settlementAccess } from './settlement-access'
 import { clamp, population, type World } from './types'
 import { neighbors } from './grid'
 import { landscapeAt } from './landscape'
-import { hashSeed } from './random'
 import { localFirmRegion } from './local-units'
 import { updateResidentCounts } from './districts'
 import { regionalFirms } from './firms'
-import type { City, DistrictActivity } from './district-types'
+import type { DistrictActivity } from './district-types'
 import { MODEL_PARAMETERS } from './model-parameters'
-import { cellPolygon, polygonArea } from './physical-space'
-import { SETTLEMENT, isVisibleSettlement, settlementKind } from './settlement-model'
-import { integrateCentres, partitionCentres, separateCentre } from './urban-centres'
+import { refreshPlaces } from './places'
+import { settlementStructure, type SettlementStructure } from './settlement-topology'
 
-/** Built land changes slowly. Population growth alone does not instantly pave a cell. */
+/** Built land changes slowly. Population growth alone does not instantly pave a cell.
+ * Returns the settlement structure of the resulting census for the place refresh. */
 export function advanceSettlements(
   w: World,
   initialize = false,
   access?: ReturnType<typeof settlementAccess>,
   mobilityMonths = 1,
-) {
+): SettlementStructure | undefined {
   const local = w.localEconomy
   if (!local) return
   const residents = new Float64Array(w.cells.length),
@@ -38,34 +42,8 @@ export function advanceSettlements(
     }
   for (const id of local.active) updateResidentCounts(local.units[id])
   if (w.adaptive && !initialize && mobilityMonths) optimizeResidentialLocations(w, access, mobilityMonths)
-  for (const id of local.active) {
-    const u = local.units[id]
-    for (const c of u.cells) residents[c] = u.residents[c] ?? 0
-    const industry = w.economy?.firms ? regionalFirms(w, id).filter((f) => f.active) : []
-    const production = { food: 0, mining: 0, factory: 0 }
-    for (const f of industry) {
-      production.food += f.employment * (f.laborMix?.food ?? 0)
-      production.mining +=
-        f.employment * ((f.laborMix?.iron ?? 0) + (f.laborMix?.coal ?? 0) + (f.laborMix?.stone ?? 0))
-      production.factory +=
-        f.employment * ((f.laborMix?.tools ?? 0) + (f.laborMix?.textiles ?? 0) + (f.laborMix?.arms ?? 0))
-    }
-    const labor = production.food + production.mining + production.factory
-    const density = population(u) / Math.max(1, u.cells.length)
-    const activity: DistrictActivity =
-      population(u) === 0
-        ? 'wilderness'
-        : production.mining > labor * 0.45
-          ? 'mining'
-          : production.factory > labor * 0.4
-            ? 'industrial'
-            : density > 8000
-              ? 'urban'
-              : production.food > labor * 0.5 || u.fertility > 0.5
-                ? 'agricultural'
-                : 'mixed'
-    u.activity = activity
-  }
+  for (const id of local.active)
+    for (const c of local.units[id].cells) residents[c] = local.units[id].residents[c] ?? 0
   if (!initialize)
     for (const id of local.active)
       for (const c of local.units[id].cells) {
@@ -83,216 +61,53 @@ export function advanceSettlements(
         const demand = clamp((residents[c] + jobs[c] * 2) / MODEL_PARAMETERS.fullBuiltPopulationPerCell)
         const target =
           habitat < 0.06 ? demand * 0.1 : clamp(demand + spread * 0.15 * Math.min(1, residents[c] / 1000))
-        if (!initialize && !w.adaptive)
-          local.built[c] = clamp(oldBuilt[c] + clamp(target - oldBuilt[c], -0.003, 0.006))
+        local.built[c] = clamp(oldBuilt[c] + clamp(target - oldBuilt[c], -0.003, 0.006))
       }
   }
-  const settled = settledResidentsByCell(w)
+  // The field is read after relocation and built-cover growth, so this month's
+  // urban shares, activity and places all describe the same census.
+  const structure = settlementStructure(w)
+  const urban = new Map<number, number>()
+  structure.sources.forEach((source, i) =>
+    urban.set(source.pool, (urban.get(source.pool) ?? 0) + source.people * structure.sourceUrbanity[i]),
+  )
   for (const id of local.active) {
-    const u = local.units[id]
-    const urban = u.cells.reduce((sum, c) => sum + (settled.get(c) ?? 0), 0)
-    u.urban = population(u) ? urban / population(u) : 0
+    const u = local.units[id],
+      people = population(u)
+    u.urban = people ? clamp((urban.get(id) ?? 0) / people) : 0
     for (const g of u.communities ?? []) g.urban = u.urban
+    u.activity = districtActivity(w, id, u.urban)
   }
+  return structure
 }
 
-/** Observer projection only: names and ancestry never determine physical activity. */
-export function refreshCityLabels(w: World, prepared?: SettlementComponent[]) {
-  const local = w.localEconomy
-  if (!local) return
-  const residents = new Float64Array(w.cells.length)
-  for (const id of local.active)
-    for (const c of local.units[id].cells) residents[c] = local.units[id].residents[c] ?? 0
-  const physical = w.adaptive?.residentialVersion === 1 ? (prepared ?? settlementComponents(w)) : undefined
-  let components: number[][]
-  if (physical) components = physical.map((p) => p.cells)
-  else {
-    const remaining = new Set(
-      local.active
-        .flatMap((id) => local.units[id].cells)
-        .filter(
-          (c) =>
-            (local.built[c] ?? 0) >= 0.24 &&
-            residents[c] / (polygonArea(cellPolygon(w, c)) / 1e6) >= SETTLEMENT.minimumDensity,
-        ),
-    )
-    components = []
-    for (const start of [...remaining].sort((a, b) => a - b)) {
-      if (!remaining.delete(start)) continue
-      const cells = [start]
-      for (let i = 0; i < cells.length; i++)
-        for (const next of neighbors(cells[i], w.width, w.height))
-          if (remaining.delete(next)) cells.push(next)
-      if (isVisibleSettlement(cells.reduce((sum, cell) => sum + residents[cell], 0)))
-        components.push(cells.sort((a, b) => a - b))
+/** Descriptive activity of a resident market from its firms' labor mix and its
+ * residents' urbanity. Labels only: production never reads them. */
+function districtActivity(w: World, id: number, urban: number): DistrictActivity {
+  const u = w.localEconomy!.units[id]
+  if (!population(u)) return 'wilderness'
+  const production = { food: 0, mining: 0, factory: 0 }
+  for (const f of w.economy?.firms ? regionalFirms(w, id) : [])
+    if (f.active) {
+      production.food += f.employment * (f.laborMix?.food ?? 0)
+      production.mining +=
+        f.employment * ((f.laborMix?.iron ?? 0) + (f.laborMix?.coal ?? 0) + (f.laborMix?.stone ?? 0))
+      production.factory +=
+        f.employment * ((f.laborMix?.tools ?? 0) + (f.laborMix?.textiles ?? 0) + (f.laborMix?.arms ?? 0))
     }
-  }
-  const componentBySite = new Map<string, number>()
-  physical?.forEach((part, i) => part.sites.forEach((site) => componentBySite.set(site.id, i)))
-  const active = local.cities.filter((c) => c.absorbedBy === undefined && c.abandoned === undefined),
-    claimed = new Set<number>(),
-    componentAt = new Int32Array(w.cells.length).fill(-1)
-  components.forEach((cells, i) => cells.forEach((cell) => (componentAt[cell] = i)))
-  const home = new Map<number, number>()
-  for (const city of active) {
-    const nucleus = physical
-      ? (componentBySite.get(city.nucleusSite ?? `home:${city.nucleus}`) ?? -1)
-      : componentAt[city.nucleus]
-    if (nucleus >= 0) {
-      home.set(city.id, nucleus)
-      continue
-    }
-    const overlap = new Map<number, number>()
-    if (physical) {
-      for (const id of city.sites ?? city.cells.map((c) => `home:${c}`)) {
-        const part = componentBySite.get(id)
-        if (part !== undefined)
-          overlap.set(part, (overlap.get(part) ?? 0) + (w.adaptive!.sites[id]?.residents ?? 0))
-      }
-    } else
-      for (const cell of city.cells)
-        if (componentAt[cell] >= 0)
-          overlap.set(componentAt[cell], (overlap.get(componentAt[cell]) ?? 0) + residents[cell])
-    const largest = [...overlap].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]
-    if (largest) home.set(city.id, largest[0])
-  }
-  const byComponent = new Map<number, City[]>()
-  for (const city of active) {
-    const part = home.get(city.id)
-    if (part === undefined) continue
-    const members = byComponent.get(part) ?? []
-    members.push(city)
-    byComponent.set(part, members)
-  }
-  const usedNames = new Set(local.cities.map((c) => c.name))
-  for (const [part, cells] of components.entries()) {
-    const overlaps = (byComponent.get(part) ?? []).sort(
-      (a, b) => a.founded - b.founded || b.population - a.population || a.id - b.id,
-    )
-    let city = overlaps[0]
-    if (!city) {
-      const nucleus =
-        physical?.[part].nucleus.cell ?? [...cells].sort((a, b) => residents[b] - residents[a] || a - b)[0]
-      const region = w.regions[w.cells[nucleus].region]
-      const suffix = ['Ford', 'Cross', 'Vale', 'Heath', 'Bank', 'Mere', 'Ridge', 'Field'][
-        hashSeed(`${w.seed}:place:${nucleus}`) % 8
-      ]
-      const base = region.name
-      let name = `${base} ${suffix}`
-      if (usedNames.has(name)) name += ` ${local.nextCity + 1}`
-      usedNames.add(name)
-      city = {
-        id: local.nextCity++,
-        name,
-        aliases: [],
-        founded: w.month,
-        nucleus,
-        cells: [],
-        population: 0,
-        kind: 'village',
-        parents: [],
-        lastNameChange: w.month,
-      }
-      local.cities.push(city)
-    }
-    if (physical) {
-      const sites = physical[part].sites
-      const members = overlaps.length ? overlaps : [city]
-      const available = new Map(sites.map((s) => [s.id, s]))
-      const seeded: City[] = []
-      for (const centre of members) {
-        const nucleus =
-          available.get(centre.nucleusSite ?? `home:${centre.nucleus}`) ??
-          centre.sites?.map((id) => available.get(id)).find((s) => s !== undefined) ??
-          (members.length === 1 ? available.get(physical[part].nucleus.id) : undefined)
-        if (!nucleus) continue
-        centre.nucleusSite = nucleus.id
-        centre.nucleus = nucleus.cell
-        available.delete(nucleus.id)
-        seeded.push(centre)
-        claimed.add(centre.id)
-      }
-      if (!seeded.length) {
-        city.nucleusSite = physical[part].nucleus.id
-        seeded.push(city)
-        claimed.add(city.id)
-      }
-      integrateCentres(w, seeded, partitionCentres(w, sites, seeded))
-      continue
-    }
-    claimed.add(city.id)
-    const previousPopulation = city.population
-    for (const other of overlaps.slice(1)) {
-      other.absorbedBy = city.id
-      city.parents.push(other.id)
-      city.aliases = [...new Set([...city.aliases, other.name, ...other.aliases])]
-      // Comparable centers retain a compound toponym after sustained urban continuity.
-      if (other.population > previousPopulation * 0.35 && w.month - city.lastNameChange >= 60) {
-        city.aliases.push(city.name)
-        city.name = `${city.name.split('–')[0]}–${other.name.split('–')[0]}`.slice(0, 180)
-        city.lastNameChange = w.month
-      }
-      claimed.add(other.id)
-    }
-    city.cells = cells
-    if (!cells.includes(city.nucleus))
-      city.nucleus = [...cells].sort((a, b) => residents[b] - residents[a] || a - b)[0]
-    city.population = cells.reduce((sum, c) => sum + residents[c], 0)
-    city.kind = settlementKind(city.population)
-  }
-  // Falling below the map's label threshold is not extinction. Keep the real
-  // remaining census; abandon an identity only when its last residents leave.
-  for (const city of active)
-    if (!claimed.has(city.id)) {
-      separateCentre(w, city)
-      if (city.sites && w.adaptive) {
-        city.sites = city.sites.filter(
-          (id) => (w.adaptive!.sites[id]?.residents ?? 0) > 0 && !componentBySite.has(id),
-        )
-        city.cells = [...new Set(city.sites.map((id) => w.adaptive!.sites[id].cell))]
-        city.population = city.sites.reduce((sum, id) => sum + w.adaptive!.sites[id].residents!, 0)
-        if (city.sites.length && !city.sites.includes(city.nucleusSite!)) {
-          city.nucleusSite = city.sites[0]
-          city.nucleus = w.adaptive.sites[city.nucleusSite].cell
-        }
-      } else {
-        city.cells = city.cells.filter((c) => residents[c] > 0 && componentAt[c] < 0)
-        city.population = city.cells.reduce((sum, c) => sum + residents[c], 0)
-      }
-      city.kind = settlementKind(city.population)
-      if (!city.population) city.abandoned = w.month
-    }
-  const cityAt = new Map<number, City>()
-  for (const city of local.cities)
-    if (city.absorbedBy === undefined && city.abandoned === undefined)
-      for (const c of city.cells) {
-        const previous = cityAt.get(c)
-        if (
-          !previous ||
-          city.population > previous.population ||
-          (city.population === previous.population && city.id < previous.id)
-        )
-          cityAt.set(c, city)
-      }
-  for (const id of local.active) {
-    const u = local.units[id]
-    const city = cityAt.get(u.center)
-    const suffix =
-      u.activity === 'mining'
-        ? 'mining district'
-        : u.activity === 'industrial'
-          ? 'industrial district'
-          : u.activity === 'agricultural'
-            ? 'farmland'
-            : u.activity === 'wilderness'
-              ? 'uplands'
-              : 'district'
-    u.name = city?.name ?? `${w.regions[u.province].name} ${suffix}`
-  }
+  const labor = production.food + production.mining + production.factory
+  return production.mining > labor * 0.45
+    ? 'mining'
+    : production.factory > labor * 0.4
+      ? 'industrial'
+      : urban >= 0.5
+        ? 'urban'
+        : production.food > labor * 0.5 || u.fertility > 0.5
+          ? 'agricultural'
+          : 'mixed'
 }
 
-/** Compatibility entry point for fixtures and legacy initialization. */
+/** Settlement physics followed by the place refresh, as one step (fixtures and conversion). */
 export function evolveCities(w: World, initialize = false) {
-  advanceSettlements(w, initialize)
-  refreshCityLabels(w)
+  refreshPlaces(w, advanceSettlements(w, initialize))
 }

@@ -14,7 +14,7 @@ $$
 \mathbb E[B_t]=\frac{T}{2.505}\,(1-0.8s)\,\xi_B\sum_a\frac{F_a f_a}{12}
 $$
 
-Planned lifetime fertility $T$ is desired surviving children divided by expected childhood survival. Desired children are $2.3+1.2(1-\ell)(1-v)-0.6v\ell$, with literacy $\ell$ and urban opportunity exposure $v$. In adaptive worlds, each connected occupied residential footprint contributes $\min(1,N/50{,}000)$, weighted by its actual residents into their economic district; rural residents contribute zero. Physical density alone does not make a farming village metropolitan. The baseline comparison profile and non-adaptive worlds retain their previous urban-share input. Food shortage is $s$; $\xi_B$ is the active fertility-effect multiplier.
+Planned lifetime fertility $T$ is desired surviving children divided by expected childhood survival. Desired children are $2.3+1.2(1-\ell)(1-v)-0.6v\ell$, with literacy $\ell$ and urban opportunity exposure $v$. In adaptive worlds, each home contributes $\min(1,R_i/50{,}000)$, where $R_i$ is developed residents within market reach (below), weighted by its occupants into their economic district; homes in open country contribute zero. A compact farming village does not become metropolitan. The baseline comparison profile and non-adaptive worlds retain their previous urban-share input. Food shortage is $s$; $\xi_B$ is the active fertility-effect multiplier.
 
 $$
 \Pr(\text{death in month})=1-e^{-\widetilde h/12}
@@ -250,23 +250,31 @@ Municipalities and provinces annually compare local mergers, splits and boundary
 
 ## Settlement formation and residential choice
 
-Town scenery requires occupied, connected development: village $N\ge500$, town $N\ge5000$, city $N\ge50000$. Developed parcels need density at least 300/km²; gaps up to 150 m connect along their closest developed edges only when the intervening land is traversable within the same sovereign state. A detour via terrain-cell centers is not required; water gaps and zero-width diagonal passages remain barriers. Empty plots cannot join settlements. Urban shares are measured from occupied developed parcels independently of this label catalogue. These are classification conventions, not growth targets or a fitted definition of cities. [Degree of Urbanisation](https://human-settlement.emergency.copernicus.eu/degurbaDefinitions.php).
+Home $j$ houses $D_j$ developed residents on a square support $B_j$: all occupants of a building or funded parcel, or $\min(N_j,\,c_j\cdot48{,}000)$ for a coarse record with built cover $c_j$. With the biweight $k(u)=\tfrac{15}{16}(1-u^2)^2$ on $[-1,1]$ and the separable kernel $K_b(x,y)=k(x/b)k(y/b)/b^2$, a field is
+
+$$
+\rho_b(\mathbf x)=\sum_j D_j\,(\mathbf 1_{B_j}/|B_j| * K_b)(\mathbf x),
+$$
+
+sampled on aligned quadtree nodes with each axis' weights renormalized after world clipping, so $\sum\rho_b\,\Delta A=\sum_jD_j$ exactly. The fabric field uses $b=160$ m on 32 m nodes; urbanity is $v=\rho^2/(\rho^2+1500^2)$ for developed residents and uses the terrain sample's mean $\rho$ for dispersed ones. The agglomeration field uses $b=2{,}048$ m on 256 m nodes and is read as reach $R=\rho/K_b(0)$, so a point mass reads its own size.
+
+Urban areas are connected components of $\{R\ge100\}$ on habitable land within one state. Processing nodes in descending $R$ with a union–find gives each mode $m$ a peak $R_m$, the saddle $s_m$ where it first joins a higher mode, and prominence $p_m=(R_m-s_m)/R_m$. A mode is significant if it is an area summit or $p_m\ge0.2$ ($\ge0.1$ while it already holds a place). A significant mode is named once at least 500 developed residents ascend to it; smaller basins join the place they adjoin. A non-summit place becomes a quarter after $p_m<0.4$ for 12 months and is released after $p_m\ge0.6$ for 12 months. Village, town and city denote 500, 5,000 and 50,000 administered residents. These are classification conventions, not growth targets or a fitted definition of cities. [Degree of Urbanisation](https://human-settlement.emergency.copernicus.eu/degurbaDefinitions.php); [persistence-based clustering](https://doi.org/10.1145/2535927).
 
 For home $i$, accessible nonfarm work $A_i$, funded administrative service access $S_i$ and locational utility are
 
 $$
 A_i=\sum_{j:\tau_{ji}\le60}(E_j+V_j)(1-f_j)e^{-\tau_{ji}/30},\qquad
 S_i=\sum_{k:\tau_{ki}\le60}P_ke^{-\tau_{ki}/30},\qquad
-u_i=0.18\log(1+A_i/100)+0.12\log(1+S_i/100)+0.12h_i-0.25(N_i/H_i)^2.
+u_i=0.18\log(1+A_i/100)+0.12\log(1+S_i/100)+0.12h_i+0.1\log(1+R_i/2000)-0.25(N_i/H_i)^2.
 $$
 
-$E,V$ are filled and unfilled jobs; $f$ is the food-employment share, $h$ habitat quality, $H$ housing capacity and $N$ occupants. $P_k$ is funded administration, education and policing output / 0.0015, allocated over a municipality's retained offices. No service is supplied by an unfunded office. Sources must be within 6 km. Reverse shortest-path searches supply source-to-home network times with domestic passage, water/corner barriers, terrain, roads and congestion. Door offsets walk at 4 km/h. Within a source square, direct walking uses its terrain penalty; between accessible adjacent squares it uses the larger endpoint terrain penalty. Direct walking competes with the network route, so road congestion cannot block a neighboring footpath. Actual relocation retains the exact physical route check.
+$E,V$ are filled and unfilled jobs; $f$ is the food-employment share, $h$ habitat quality, $R$ developed residents within market reach (the agglomeration pull), $H$ housing capacity and $N$ occupants. $P_k$ is funded administration, education and policing output / 0.0015, allocated over a municipality's retained offices. No service is supplied by an unfunded office. Sources must be within 6 km. Reverse shortest-path searches supply source-to-home network times with domestic passage, water/corner barriers, terrain, roads and congestion. Door offsets walk at 4 km/h. Within a source square, direct walking uses its terrain penalty; between accessible adjacent squares it uses the larger endpoint terrain penalty. Direct walking competes with the network route, so road congestion cannot block a neighboring footpath. Actual relocation retains the exact physical route check.
 
 A source-tree branch of radius $r$ is approximated at its bounding-box center only if $\exp(rL/30)-1\le0.02$, where $L$ bounds travel-time change per meter (0.015 for network source access, or 0.015 times the larger terrain penalty for direct walking). Branches intersecting the 6 km or 60-minute cutoff are opened. Thus each positive work/service sum has at most 2% relative kernel error; coincident sources and leaves are exact. Source trees do not change when the numerical mesh is refined. Independent batches retain fixed source order on every worker count. These are synthetic coefficients and a numerical error bound, not calibrated urban-growth predictions.
 
 Each month at most $\lfloor N(1-e^{-0.08/12})\rfloor$ residents per household pool consider relocation. Integer apportionment distributes this budget across homes. A move requires funded vacancy and $\Delta u>0.08+\tau_{ik}/600$; its batch shrinks until this remains true after crowding changes. Proposals compete for vacancies in descending gain order. These are bounded local improvements, not a global equilibrium solver. Inter-pool migrants use the existing demographic and financial transfers; within-pool moves change only recorded physical occupancy.
 
-Construction anticipates one year of willingness to move toward the best accessible existing site, net of nearby vacant and pending housing. It also responds to a 15% aggregate capacity buffer shortfall. Capacity cannot appear from preference alone: materials, wages and completion time still bind. The coefficients remain synthetic; this implements job access and congestion mechanisms, not a calibrated prediction of city counts. [Duranton–Puga: agglomeration mechanisms](https://www.nber.org/papers/w9931).
+Construction anticipates one year of willingness to move toward the best accessible existing site, net of nearby vacant and pending housing. It also responds to a 15% aggregate capacity buffer shortfall. That shortfall represents new households, who split between the home's local centre (weight 1) and reachable centres with higher net utility (weight $e^{(u_k-\tau_{ik}/600-u_\text{local})/0.15}$), so new housing gravitates toward established centres. Capacity cannot appear from preference alone: materials, wages and completion time still bind. The coefficients remain synthetic; this implements job access and congestion mechanisms, not a calibrated prediction of city counts. [Duranton–Puga: agglomeration mechanisms](https://www.nber.org/papers/w9931).
 
 ## Housing, commuting and daily inspection
 

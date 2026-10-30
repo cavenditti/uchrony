@@ -1,6 +1,6 @@
 # Dynamic square grid
 
-Urban update, 27 October 2026: connected development now preserves multiple centres, with wealth/prestige-dependent incorporation and eventual identity merger. Sparse block summaries and demand across several physical centres are described in [Urban centres and block detail](URBAN_CENTRES.md). This supersedes the immediate city-identity merging described in the earlier implementation notes below; numerical refinement and legal administration remain separate.
+Settlement update, 30 October 2026: towns are no longer self-contained components. Two continuous settlement fields on canonical quadtree nodes (32 m fabric, 256 m agglomeration) give every home its urbanity and market reach, and named places with their quarters and territories emerge from the agglomeration field's topology. See [Settlement fields, places and block detail](URBAN_CENTRES.md). This supersedes the connected-component city identity and the prestige/wealth integration described in earlier notes below; numerical refinement and legal administration remain separate.
 
 New worlds use `gridTopology: "square-v1"` and geography generator 5. The active numerical grid is a balanced quadtree covering land and water. Terrain samples are aligned 1,024 m squares (12 render units), centred at `(q + 0.5, r + 0.5)` sample spans. The root starts at `(0, 0)` and has a power-of-two number of sample spans. Every subdivision therefore has exactly the same outer boundary and area as its parent. There is no hex topology or staggered-row coordinate adapter.
 

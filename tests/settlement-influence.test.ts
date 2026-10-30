@@ -9,7 +9,8 @@ import { ensureFirms } from '../src/sim/firms'
 import { ensureAdaptiveWorld, refreshAdaptiveTotals, rebuildAdaptiveMesh } from '../src/sim/adaptive-world'
 import { ensureResidentialSites, residentialPools, compactResidence } from '../src/sim/residential-sites'
 import { influenceSnapshot, settlementInfluence, setInfluenceExecutor } from '../src/sim/settlement-influence'
-import { advanceSettlements, refreshCityLabels } from '../src/sim/cities'
+import { advanceSettlements } from '../src/sim/cities'
+import { refreshPlaces } from '../src/sim/places'
 import { balances } from '../src/sim/ledger'
 import { physicalStocks } from '../src/sim/goods-accounting'
 import { tick } from '../src/sim/engine'
@@ -157,7 +158,7 @@ test('numerical refinement and city labels cannot change influence, urban share,
   advanceSettlements(clone)
   assert.deepEqual(w.adaptive!.sites, clone.adaptive!.sites)
   const physical = canonicalHash({ sites: w.adaptive!.sites, people: w.regions.map((r) => r.communities) })
-  refreshCityLabels(w)
+  refreshPlaces(w)
   assert.equal(
     canonicalHash({ sites: w.adaptive!.sites, people: w.regions.map((r) => r.communities) }),
     physical,

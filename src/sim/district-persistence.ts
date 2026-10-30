@@ -186,11 +186,23 @@ export function validateDistrictEconomy(w: World) {
     )
       fail('abandoned city')
     cityIds.add(c.id)
+    // Retired prestige/wealth indicators may remain in older saves until the next refresh.
     if (
       c.standing !== undefined &&
       (!obj(c.standing) || !num(c.standing.prestige) || !num(c.standing.wealthPerResident))
     )
       fail('city standing')
+    if (
+      c.field !== undefined &&
+      (!obj(c.field) ||
+        !num(c.field.reach) ||
+        !(c.field.reach > 0) ||
+        !num(c.field.prominence, 0, 1) ||
+        !int(c.field.developed, 0, c.population) ||
+        !num(c.field.x) ||
+        !num(c.field.y))
+    )
+      fail('place field')
     if (c.metropolis !== undefined) {
       const m = c.metropolis
       if (
@@ -198,7 +210,7 @@ export function validateDistrictEconomy(w: World) {
         !int(m.centre, 0, s.nextCity - 1) ||
         m.centre === c.id ||
         !int(m.since, 0, w.month) ||
-        [m.dominantSince, m.overwhelmingSince, m.incorporated].some(
+        [m.dominantSince, m.overwhelmingSince, m.incorporated, m.pending].some(
           (month) => month !== undefined && !int(month, m.since, w.month),
         ) ||
         c.absorbedBy !== undefined
@@ -214,7 +226,7 @@ export function validateDistrictEconomy(w: World) {
             !int(e.month, i ? c.history![i - 1].month : 0, w.month) ||
             !int(e.with, 0, s.nextCity - 1) ||
             e.with === c.id ||
-            !['linked', 'separated', 'incorporated', 'merged'].includes(e.kind),
+            !['linked', 'separated', 'incorporated', 'released', 'merged'].includes(e.kind),
         ))
     )
       fail('city history')
@@ -260,10 +272,11 @@ export function validateDistrictEconomy(w: World) {
     if (city.history?.some((e) => !cityIds.has(e.with))) fail('city history reference')
     if (city.metropolis) {
       const centre = citiesById.get(city.metropolis.centre)
+      // A centre administers its quarters, so it cannot itself be a quarter.
       if (
         !centre ||
         centre.absorbedBy !== undefined ||
-        centre.metropolis ||
+        centre.metropolis?.incorporated !== undefined ||
         !centre.population ||
         !city.population ||
         w.localEconomy!.units[w.adaptive?.sites[centre.nucleusSite!]?.pool ?? -1]?.nation !==

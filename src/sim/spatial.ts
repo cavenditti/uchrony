@@ -1,12 +1,13 @@
 import { habitableLand } from './terrain-access'
 import { isVisibleSettlement, settlementKind } from './settlement-model'
-import { settledResidentsByCell } from './settlement-morphology'
+import { settlementStructure, urbanResidentsByCell, type SettlementStructure } from './settlement-topology'
 import { METERS_PER_MAP_UNIT } from './physical-space'
 import { localFirmRegion } from './local-units'
 import { apportion } from './allocation'
 import { landscapeAt, settlementWeight } from './landscape'
 import { neighbors } from './grid'
 import { clamp, population, type World } from './types'
+import type { City } from './district-types'
 
 export interface Settlement {
   id: string
@@ -50,6 +51,14 @@ export function settlementPosition(w: World, settlement: Settlement) {
     : w.cells[settlement.cell]
 }
 
+/** Labels sit at the centre of mass of a place's developed fabric; a place
+ * without recorded field topology falls back to its nucleus home. */
+export function placePosition(w: World, city: City): Pick<Settlement, 'position'> {
+  if (city.field && city.sites) return { position: { x: city.field.x, y: city.field.y } }
+  const site = city.nucleusSite ? w.adaptive?.sites[city.nucleusSite] : undefined
+  return site ? { position: { x: site.x, y: site.y } } : {}
+}
+
 const fallback = new WeakMap<World, SpatialState>()
 export const spatialState = (w: World) => {
   // Old adaptive saves published municipal catchments as towns. Reconstruct a
@@ -63,11 +72,15 @@ export const spatialState = (w: World) => {
   }
   return state
 }
-export function refreshSpatial(w: World) {
-  w.spatial = buildSpatial(w)
+/** Publish the saved spatial projection. Pass the month's settlement structure
+ * when the census has not changed since it was computed, to avoid rebuilding it. */
+export function refreshSpatial(w: World, settlements?: SettlementStructure) {
+  const urban =
+    w.localEconomy && !w.viewOnly ? urbanResidentsByCell(settlements ?? settlementStructure(w)) : undefined
+  w.spatial = buildSpatial(w, urban)
   if (w.localEconomy) {
     const proposal = w.spatial,
-      settled = settledResidentsByCell(w)
+      settled = urban ?? new Map<number, number>()
     const jobs = new Map<number, number>(),
       capital = new Map<number, number>()
     for (const f of w.economy?.firms ?? []) {
@@ -94,7 +107,8 @@ export function refreshSpatial(w: World) {
         span: u.span,
         cells: [...u.cells],
         population: population(u),
-        urbanPopulation: u.cells.reduce((sum, c) => sum + (settled.get(c) ?? 0), 0),
+        // The urbanity-weighted census is continuous; the saved projection counts whole residents.
+        urbanPopulation: Math.round(u.cells.reduce((sum, c) => sum + (settled.get(c) ?? 0), 0)),
         industrialEmployment: jobs.get(id) ?? 0,
         capital: (w.economy?.producers[id]?.capital ?? 0) + (capital.get(id) ?? 0),
       }
@@ -116,8 +130,10 @@ export function districtDensityScale(w: World) {
 }
 
 /** Read-only adaptive partition proposal. Local economic state is conservatively remapped
- * by remeshDistricts; legacy worlds retain the provincial projection until conversion. */
-export function buildSpatial(w: World): SpatialState {
+ * by remeshDistricts; legacy worlds retain the provincial projection until conversion.
+ * `urbanByCell` is the urbanity-weighted census of the settlement field; it is
+ * derived from authoritative sites, so read-only displays reuse the saved projection. */
+export function buildSpatial(w: World, urbanByCell?: ReadonlyMap<number, number>): SpatialState {
   const counts = new Float64Array(w.cells.length),
     urban = new Float64Array(w.cells.length),
     jobs = new Float64Array(w.cells.length),
@@ -139,7 +155,8 @@ export function buildSpatial(w: World): SpatialState {
     }
   if (w.localEconomy) {
     const local = w.localEconomy
-    const settled = settledResidentsByCell(w)
+    const settled =
+      urbanByCell ?? (w.viewOnly ? new Map<number, number>() : urbanResidentsByCell(settlementStructure(w)))
     for (const id of local.active) {
       const r = local.units[id],
         total = Math.max(1, population(r))
@@ -170,7 +187,7 @@ export function buildSpatial(w: World): SpatialState {
           region,
           cell: city.nucleus,
           name: city.name,
-          kind: settlementKind(city.population),
+          kind: city.kind,
           population: city.population,
           capital: w.nations.some(
             (n) =>
@@ -190,14 +207,7 @@ export function buildSpatial(w: World): SpatialState {
               }
             : {}),
           ...(city.sites ? { siteIds: [...city.sites], nucleusSite: city.nucleusSite } : {}),
-          ...(city.nucleusSite && w.adaptive?.sites[city.nucleusSite]
-            ? {
-                position: {
-                  x: w.adaptive.sites[city.nucleusSite].x,
-                  y: w.adaptive.sites[city.nucleusSite].y,
-                },
-              }
-            : {}),
+          ...placePosition(w, city),
         })
       }
     // Unincorporated concentrations still drive refinement; settlement names are not fabricated to fill every tile.
@@ -311,7 +321,7 @@ export function buildSpatial(w: World): SpatialState {
         span,
         cells: group,
         population: group.reduce((s, cell) => s + counts[cell], 0),
-        urbanPopulation: group.reduce((s, cell) => s + urban[cell], 0),
+        urbanPopulation: Math.round(group.reduce((s, cell) => s + urban[cell], 0)),
         industrialEmployment: group.reduce((s, cell) => s + jobs[cell], 0),
         capital: group.reduce((s, cell) => s + capital[cell], 0),
       })

@@ -301,7 +301,12 @@ const GROUP_HELP: Partial<Record<keyof ConfigurationValues, Readonly<Record<stri
       'Minimum population for a settlement to be classified as a town. Must exceed the village threshold.',
     cityPopulation:
       'Minimum population for a settlement to be classified as a city. Must exceed the town threshold.',
-    minimumDensity: 'Minimum residents per square kilometre used to identify a populated urban footprint.',
+    urbanDensity:
+      'Developed residents per square kilometre at which residents live half under urban conditions. Urbanity rises smoothly with density on either side.',
+    agglomerationWeight:
+      'How strongly households prefer homes within reach of large developed centres. Larger values concentrate growth in established towns.',
+    agglomerationReach:
+      'Developed residents within about two kilometres at which the agglomeration preference has its reference strength. The preference rises logarithmically.',
     entryBuiltCover: 'Built-area fraction needed for a cell to enter the urban footprint.',
     retainedBuiltCover:
       'Built-area fraction needed to keep a cell in an existing urban footprint. It cannot exceed the entry threshold.',
@@ -311,17 +316,17 @@ const GROUP_HELP: Partial<Record<keyof ConfigurationValues, Readonly<Record<stri
     accessMinutes: 'Travel-time budget used to evaluate access to work and services, in minutes.',
     searchMeters: 'Radius for discovering housing and employment options, in metres.',
   },
-  urbanIntegration: {
-    incorporationMonths:
-      'Months of sustained dominance needed before a smaller urban centre becomes a district of a larger one.',
-    mergerMonths:
-      'Additional sustained overwhelming dominance needed for incorporated urban centres to merge.',
-    prestigeRatio:
-      'Prestige advantage a dominant centre needs for incorporation, relative to the smaller centre.',
-    wealthRatio:
-      'Wealth advantage a dominant centre needs for incorporation, relative to the smaller centre.',
-    mergerPrestigeRatio: 'Stronger prestige ratio required for the later merger of urban centres.',
-    mergerWealthRatio: 'Stronger wealth ratio required for the later merger of urban centres.',
+  placeTopology: {
+    placeReach:
+      'Developed residents within about two kilometres that make land part of a place. Homes beyond the reach of every place are open country.',
+    incorporation:
+      'Prominence below which an independent centre sharing an urban area becomes a quarter. Prominence is the density drop from a centre to the fabric joining it to a larger one, as a share of its peak.',
+    release: 'Prominence at which a quarter becomes an independent place again. Must exceed incorporation.',
+    quarterBirth: 'Prominence a new density peak needs before it can be named as a place or quarter.',
+    quarterRetirement:
+      'Prominence below which an existing quarter loses its own peak and merges into the place it adjoins. Must not exceed quarter birth.',
+    transitionMonths:
+      'Months an incorporation or release condition must persist before the administrative status changes.',
   },
   farming: {
     timber: 'Tonnes of timber required for an agricultural improvement project.',

@@ -8,7 +8,7 @@ import { refreshAdaptiveTotals } from './adaptive-world'
 import { diplomaticAccess } from './agreements'
 import { borderPolicy, setBorderPolicy } from './border-policy'
 import { buildFarm } from './agriculture'
-import { refreshCityLabels } from './cities'
+import { refreshPlaces } from './places'
 import { applyConfiguration, withWorldConfiguration } from './configuration'
 import { foreignOfficeContext } from './diplomatic-friction'
 import { aggregateDistricts, linkDistrictPeople } from './districts'
@@ -92,7 +92,7 @@ function applyCommandConfigured(w: World, command: Command): string {
   const result = executeCommand(w, command)
   if (command.type === 'found-settlement' && absorbUnclaimedEnclaves(w)) {
     reconcileJurisdictionSovereignty(w)
-    refreshCityLabels(w)
+    refreshPlaces(w)
   }
   if (w.localEconomy) {
     linkDistrictPeople(w)
