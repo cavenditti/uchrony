@@ -95,6 +95,8 @@ export interface Institution {
   dissolved?: number
   events?: InstitutionEvent[]
   calls?: DefenseCall[]
+  /** Last constitutional event reviewed by the lightweight namer, including unchanged names. */
+  nameReview?: { event: number; model: string }
 }
 export interface InstitutionalState {
   nextId: number

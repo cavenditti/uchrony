@@ -102,6 +102,13 @@ export function validateInstitutionHistory(w: World, o: Institution) {
         fail()
   }
   if (!validInstitutionCharter(o.charter)) fail()
+  if (
+    o.nameReview !== undefined &&
+    (!o.nameReview ||
+      !integer(o.nameReview.event, o.events?.length ?? 0, 1) ||
+      !text(o.nameReview.model, 160))
+  )
+    fail()
   if (o.events === undefined) {
     if (
       o.status === 'crisis' ||

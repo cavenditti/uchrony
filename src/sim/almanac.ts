@@ -1,4 +1,4 @@
-import { ensureInstitutionRecord, recordInstitution } from './institution-lifecycle'
+import { ensureInstitutionRecord } from './institution-lifecycle'
 import { dateLabel, type World } from './types'
 import { geographicNeighbors } from './grid'
 import { hashSeed } from './random'
@@ -426,6 +426,8 @@ export function advanceAlmanac(w: World, force = false) {
       org.name,
       { founded: org.founded },
     )
+    // Constitutional names have their own event-driven review, independent of language batches.
+    p.naming = 'established'
     if (p.name !== org.name) {
       p.names.push({
         name: p.name,
@@ -659,7 +661,9 @@ export function writingContext(w: World, r: WritingRequest): WritingContext {
     question: (r.question ?? '').trim().slice(0, 500),
     targets: (r.task === 'naming'
       ? Object.values(w.almanac!.entries)
-          .filter((e) => e.naming === 'pending' && e.language === p.language)
+          .filter(
+            (e) => e.naming === 'pending' && e.language === p.language && !e.id.startsWith('institution:'),
+          )
           .slice(0, 20)
       : [p]
     ).map(({ id, name, kind, attributes }) => ({ id, name, kind, attributes })),
@@ -702,7 +706,7 @@ export function acceptWriting(w: World, context: WritingContext, value: unknown,
     }
     for (const n of v.names) {
       const place = a.entries[n.id]
-      if (place.naming !== 'pending') continue
+      if (place.naming !== 'pending' || place.id.startsWith('institution:')) continue
       renamePlace(w, place, n.name, n.reason)
       for (const alt of n.alternatives)
         if (alt !== place.name && !place.names.some((x) => x.name === alt))
@@ -799,14 +803,6 @@ function renamePlace(w: World, p: AtlasEntry, name: string, reason: string) {
       leader.name = name
       const society = w.historical?.societies.find((s) => s.nation === id)
       if (society) society.leader = name
-    }
-  }
-  if (p.id.startsWith('institution:')) {
-    const org = w.institutions?.organizations.find((o) => o.id === id)
-    if (org && org.status !== 'dissolved' && org.name !== name) {
-      ensureInstitutionRecord(w, org)
-      org.name = name
-      recordInstitution(w, org, 'renamed', 'An established institutional name was recorded in the atlas.')
     }
   }
 }

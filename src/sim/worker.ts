@@ -1,6 +1,7 @@
 import { queryWorldArchive, recordWorldArchive } from './world-archive'
 import { withWorldConfiguration } from './configuration'
 import { advanceAlmanac, queryPlaces, writingContext, acceptWriting } from './almanac'
+import { institutionNamingContext, acceptInstitutionNames } from './institution-naming'
 import { defaultModelSettings, isWritingTask, type ModelTask } from './model-tasks'
 import type { WritingRequest } from './almanac-types'
 import { browserInfluencePool } from './influence-runtime'
@@ -263,7 +264,7 @@ async function launch(
   key: string,
   nation: number,
   context: unknown,
-  accept: (value: unknown, model: string) => void,
+  accept: (value: unknown, model: string) => void | boolean,
 ) {
   if (
     !world ||
@@ -328,7 +329,8 @@ async function launch(
       )
         return
       try {
-        withWorldConfiguration(world!, () => accept(result.proposal, result.model))
+        // A cosmetic review may become obsolete while governments act; it is not a model failure.
+        if (withWorldConfiguration(world!, () => accept(result.proposal, result.model)) === false) return
         if (!isWritingTask(role)) advanceAlmanac(world, true)
         const provenance = (world.modelProvenance ??= {
           accepted: 0,
@@ -406,6 +408,18 @@ function schedule() {
   if (requestedWriting && jobs.size < 4 && now >= nextBackgroundAt) {
     writingQueue.delete(requestedWriting.id)
     startWriting(current, requestedWriting)
+  }
+  if (writingSettings.backgroundWriting && now >= nextWritingAt && now >= nextBackgroundAt && jobs.size < 3) {
+    const key = 'writing:institutions'
+    const context = eligible(key, 0) ? institutionNamingContext(current) : undefined
+    if (context?.targets.length) {
+      nextWritingAt = now + writingSettings.backgroundInterval * 1000
+      void launch('naming', key, -1, context, (value, model) => {
+        const accepted = acceptInstitutionNames(current, context, value, model)
+        if (accepted) advanceAlmanac(current, true)
+        return accepted
+      })
+    }
   }
   if (writingSettings.backgroundWriting && now >= nextWritingAt && now >= nextBackgroundAt && jobs.size < 3) {
     const pending = Object.values(current.almanac?.entries ?? {}).find(
