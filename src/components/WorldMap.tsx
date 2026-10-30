@@ -9,7 +9,6 @@ import {
   Maximize2,
   MapPin,
   Layers3,
-  Info,
   X,
   Users,
   Route,
@@ -71,6 +70,7 @@ const layers: { id: Layer; name: string }[] = [
   { id: 'trade', name: 'Trade' },
   { id: 'military', name: 'Military' },
 ]
+/** Interactive atlas with persistent layer guidance and transient inspection controls. */
 export function WorldMap({
   world,
   mapKey,
@@ -124,7 +124,6 @@ export function WorldMap({
   const [hover, setHover] = useState<MapPick | null>(null)
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null)
   const [layerMenu, setLayerMenu] = useState(false),
-    [legendOpen, setLegendOpen] = useState(false),
     [picked, setPicked] = useState<MapPick | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{ distance: number; center: { x: number; y: number }; view: typeof view } | null>(null)
@@ -139,7 +138,6 @@ export function WorldMap({
     const close = (event: PointerEvent) => {
       if (holderRef.current && !holderRef.current.contains(event.target as Node)) {
         setLayerMenu(false)
-        setLegendOpen(false)
         setPicked(null)
       }
     }
@@ -764,7 +762,6 @@ export function WorldMap({
           if (e.key === 'Escape') {
             setPicked(null)
             setLayerMenu(false)
-            setLegendOpen(false)
           }
         }}
         onContextMenu={(e) => {
@@ -908,17 +905,14 @@ export function WorldMap({
           </div>
         )}
       </div>
-      <button
-        className="map-key-toggle"
-        aria-expanded={legendOpen}
-        aria-controls="map-key"
-        onClick={() => setLegendOpen((v) => !v)}
-      >
-        <Info size={14} />
-        Map key
-      </button>
-      {legendOpen && (
-        <div id="map-key" className={`map-legend ${layer !== 'political' ? 'thematic-legend' : ''}`}>
+      {/* Keep the key available while transient map controls open and close. */}
+      <div className="map-information">
+        <div
+          id="map-key"
+          role="group"
+          aria-label="Map legend"
+          className={`map-legend ${layer !== 'political' ? 'thematic-legend' : ''}`}
+        >
           {quantitativeLegend ? (
             <div className="quantitative-legend">
               <span>{quantitativeLegend.label}</span>
@@ -1002,7 +996,44 @@ export function WorldMap({
             </>
           )}
         </div>
-      )}
+        {closeCity && (
+          <div className="city-view-caption" aria-label="City view">
+            <h2>{closeCity.name}</h2>
+            {world.adaptive && (onInspectArea || onInspectDaily) && (
+              <button
+                onClick={() => {
+                  exploreCity(closeCity)
+                  if (closeCity.position && onInspectArea)
+                    onInspectArea({
+                      x: closeCity.position.x - 500,
+                      y: closeCity.position.y - 500,
+                      size: 1000,
+                    })
+                  else onInspectDaily?.(closeCity.cell)
+                }}
+              >
+                Inspect daily life
+              </button>
+            )}
+            <p>
+              {compact(closeCity.population)} people ·{' '}
+              {closeCity.capital
+                ? 'Capital'
+                : closeCity.kind === 'city'
+                  ? 'City'
+                  : closeCity.kind === 'town'
+                    ? 'Town'
+                    : 'Village'}
+            </p>
+            {closeCity.metropolis && (
+              <p>
+                {closeCity.metropolis.incorporated ? 'Quarter of' : 'Growing into'}{' '}
+                {closeCity.metropolis.name}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
       <div className="map-scale">
         <span />
         <small>
@@ -1050,38 +1081,6 @@ export function WorldMap({
       {reliefError && (
         <div className="map-render-note" role="status">
           3D unavailable · Quadtree view active
-        </div>
-      )}
-      {closeCity && !legendOpen && (
-        <div className="city-view-caption" aria-label="City view">
-          <h2>{closeCity.name}</h2>
-          {world.adaptive && (onInspectArea || onInspectDaily) && (
-            <button
-              onClick={() => {
-                exploreCity(closeCity)
-                if (closeCity.position && onInspectArea)
-                  onInspectArea({ x: closeCity.position.x - 500, y: closeCity.position.y - 500, size: 1000 })
-                else onInspectDaily?.(closeCity.cell)
-              }}
-            >
-              Inspect daily life
-            </button>
-          )}
-          <p>
-            {compact(closeCity.population)} people ·{' '}
-            {closeCity.capital
-              ? 'Capital'
-              : closeCity.kind === 'city'
-                ? 'City'
-                : closeCity.kind === 'town'
-                  ? 'Town'
-                  : 'Village'}
-          </p>
-          {closeCity.metropolis && (
-            <p>
-              {closeCity.metropolis.incorporated ? 'Quarter of' : 'Growing into'} {closeCity.metropolis.name}
-            </p>
-          )}
         </div>
       )}
       <div className="zoom-controls">

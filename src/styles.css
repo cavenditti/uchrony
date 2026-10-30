@@ -4315,22 +4315,12 @@ select option {
 .atlas-shell .map-canvas-wrap:not([data-layer='political']) .map-scale {
   bottom: 26px;
 }
-.map-key-toggle {
-  position: absolute;
-  left: 18px;
-  bottom: 79px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #d4ded3;
-  font-size: 11px;
-  background: #21373ddf;
-  padding: 6px 8px;
-  border-radius: 4px;
+.map-information {
+  display: contents;
 }
 .atlas-shell .map-legend {
   left: 18px;
-  bottom: 115px;
+  bottom: 79px;
   max-width: min(335px, calc(100% - 40px));
   background: #203239fa;
   color: #e0e6dc;
@@ -4625,15 +4615,6 @@ select option {
   .atlas-shell .map-canvas-wrap:not([data-layer='political']) .map-scale {
     bottom: 24px;
   }
-  .map-key-toggle {
-    left: 12px;
-    bottom: 88px;
-    font-size: 10px;
-  }
-  .atlas-shell .map-legend {
-    left: 12px;
-    bottom: 123px;
-  }
   .atlas-shell .zoom-controls {
     right: 12px;
     bottom: 89px;
@@ -4657,12 +4638,6 @@ select option {
   }
   .atlas-shell .map-canvas-wrap:not([data-layer='political']) .map-scale {
     bottom: 90px;
-  }
-  .map-key-toggle {
-    bottom: 137px;
-  }
-  .atlas-shell .map-legend {
-    bottom: 170px;
   }
 }
 @media (max-width: 760px) {
@@ -4890,9 +4865,21 @@ select option {
   border-radius: 4px;
 }
 @media (max-width: 760px) {
-  .atlas-shell .map-legend {
+  /* Stack the persistent key and city caption so changing layers cannot cover either. */
+  .map-information {
+    position: absolute;
     top: 64px;
-    bottom: auto;
+    left: 12px;
+    max-width: min(335px, calc(100% - 24px));
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .atlas-shell .map-information > .map-legend,
+  .map-information > .city-view-caption {
+    position: static;
+    max-width: 100%;
   }
   .map-view-switch {
     right: 12px;
