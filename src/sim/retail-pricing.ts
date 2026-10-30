@@ -1,6 +1,7 @@
 /** Merchant offers recover the cost of the stock actually available for sale.
  * Procurement and retail share this rule so a marginal cheap lot, imported
  * freight, or a competing factory sale cannot reset an entire warehouse's price. */
+import { FACILITY_POLICY, regionalFacilityLevels } from './productive-facilities'
 import { loansForBorrower } from './banking'
 import { householdNeed, reserveTarget } from './economy'
 import { producerAccount } from './ledger'
@@ -10,8 +11,11 @@ import { periodInterest, periodRate } from './simulation-period'
 import type { Good, Region, World } from './types'
 
 /** Expected physical loss over the current accounting period. */
-export const retailDecay = (good: Good) =>
-  periodRate(good === 'food' ? 0.035 : good === 'timber' || good === 'textiles' ? 0.006 : 0.001)
+export const retailDecay = (good: Good, w?: World, r?: Region) =>
+  periodRate(
+    (good === 'food' ? 0.035 : good === 'timber' || good === 'textiles' ? 0.006 : 0.001) /
+      (1 + FACILITY_POLICY.marketPreservation * (w && r ? regionalFacilityLevels(w, r).market : 0)),
+  )
 
 /** Recover expected inventory loss and financing per sale, plus a trading margin. */
 export function retailMarkup(w: World, r: Region, good: Good) {
@@ -25,7 +29,13 @@ export function retailMarkup(w: World, r: Region, good: Good) {
       ? loans.reduce((sum, l) => sum + l.principal * (l.rate ?? P.policyRateMonthly + P.bankLoanSpread), 0) /
         principal
       : (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
-  return 0.04 + (Math.max(0, target - sales) * retailDecay(good) + target * periodInterest(rate)) / sales
+  const market = regionalFacilityLevels(w, r).market
+  // Better handling reduces the trading margin and actual storage losses;
+  // it does not waive interest owed to a bank or change inventory book cost.
+  return (
+    0.04 / (1 + FACILITY_POLICY.marketHandling * market) +
+    (Math.max(0, target - sales) * retailDecay(good, w, r) + target * periodInterest(rate)) / sales
+  )
 }
 
 /** Quote the blended landed cost, not the latest lot or a competitor's receipt.

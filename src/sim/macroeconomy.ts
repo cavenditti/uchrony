@@ -338,7 +338,7 @@ export function consumeHouseholds(w: World) {
     r.foodCoverage = food / total
     r.materialCoverage = material / total
     for (const g of GOODS) {
-      const loss = r.stocks[g] * retailDecay(g)
+      const loss = r.stocks[g] * retailDecay(g, w, r)
       recordUse(w, marketStore(r.id), g, loss, 'loss')
       r.stocks[g] -= loss
       f.losses[g] += loss

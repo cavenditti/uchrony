@@ -34,6 +34,9 @@ import { dominantIdentity, identityAxis, identityColor } from '../map/identity'
 import { censusOf, mergeCensuses, censusDistribution } from '../sim/view-snapshot'
 import { drawWarfare, fleetMapPosition } from '../map/warfare'
 import { compact, type Tab } from './Inspector'
+import { ResourceLegend } from './ResourceLegend'
+import type { NaturalResource } from '../sim/landscape'
+import { RESOURCE_KEYS, resourceAtPoint, resourceMapData, resourceQuantity } from '../map/natural-resources'
 
 interface Props {
   world: World
@@ -61,6 +64,7 @@ interface Props {
 const layers: { id: Layer; name: string }[] = [
   { id: 'political', name: 'Political' },
   { id: 'terrain', name: 'Terrain' },
+  { id: 'resources', name: 'Natural resources' },
   { id: 'population', name: 'Population' },
   { id: 'culture', name: 'Cultural communities' },
   { id: 'language', name: 'Languages' },
@@ -99,6 +103,11 @@ export function WorldMap({
   const reliefCanvasRef = useRef<HTMLCanvasElement>(null)
   const reliefRef = useRef<ReliefMap | null>(null)
   const [presentation, setPresentation] = useState<'relief' | 'atlas'>('atlas')
+  const [resource, setResource] = useState<NaturalResource>('iron')
+  const resources = useMemo(
+    () => (layer === 'resources' ? resourceMapData(world, resource) : undefined),
+    [world, layer, resource],
+  )
   const [tilt, setTilt] = useState(true)
   const [reliefReady, setReliefReady] = useState<string | null>(null)
   const [reliefError, setReliefError] = useState(false)
@@ -180,7 +189,7 @@ export function WorldMap({
   // its visible-area texture when a pan, tilt or zoom needs new coverage.
   const overlayRevision = useMemo(
     () => ({}),
-    [world, layer, nation, region, showRoutes, showArmies, running, scale, hover?.id, atlas],
+    [world, layer, resources, nation, region, showRoutes, showArmies, running, scale, hover?.id, atlas],
   )
   const transforms = useRef({ scale, offsetX, offsetY })
   transforms.current = { scale, offsetX, offsetY }
@@ -335,8 +344,8 @@ export function WorldMap({
   }, [isRelief, size, scale, view.x, view.y, tilt])
 
   useEffect(() => {
-    if (isRelief) reliefRef.current?.paint(world, layer, scale)
-  }, [world, layer, scale, isRelief])
+    if (isRelief) reliefRef.current?.paint(world, layer, scale, resources)
+  }, [world, layer, scale, isRelief, resources])
 
   useEffect(() => {
     if (isRelief) {
@@ -357,23 +366,24 @@ export function WorldMap({
     ctx.clearRect(0, 0, size.w, size.h)
     ctx.translate(offsetX, offsetY)
     ctx.scale(scale, scale)
-    drawAtlas(ctx, atlas, world, layer, scale, false, true, !!world.adaptive)
+    drawAtlas(ctx, atlas, world, layer, scale, false, true, !!world.adaptive, resources)
     const meters = world.adaptive?.metersPerMapUnit ?? METERS_PER_MAP_UNIT
-    drawQuadtree(
-      ctx,
-      world,
-      layer,
-      scale,
-      {
-        x: (-offsetX / scale) * meters,
-        y: (-offsetY / scale) * meters,
-        width: (size.w / scale) * meters,
-        height: (size.h / scale) * meters,
-      },
-      atlas.land,
-    )
+    if (layer !== 'resources')
+      drawQuadtree(
+        ctx,
+        world,
+        layer,
+        scale,
+        {
+          x: (-offsetX / scale) * meters,
+          y: (-offsetY / scale) * meters,
+          width: (size.w / scale) * meters,
+          height: (size.h / scale) * meters,
+        },
+        atlas.land,
+      )
     baseRef.current = base
-  }, [world, layer, size.w, size.h, offsetX, offsetY, atlas, scale, isRelief])
+  }, [world, layer, size.w, size.h, offsetX, offsetY, atlas, scale, isRelief, resources])
 
   const [fontReady, setFontReady] = useState(false)
   useEffect(() => {
@@ -453,13 +463,20 @@ export function WorldMap({
           ctx.stroke()
         }
         if (hover) {
+          const deposit = resources ? resourceAtPoint(world, resources, hover.point) : undefined
           const cell =
             !isRelief &&
             (layer === 'population'
               ? mapPopulationCellAt(world, hover.point, scale)
               : mapLeafAt(world, hover.point))
           ctx.fillStyle = '#f5efd72b'
-          if (cell) {
+          if (deposit) {
+            const c = world.cells[deposit.cell]
+            ctx.fillRect(c.q * CELL_SIZE, c.r * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            ctx.lineWidth = 1.2 / scale
+            ctx.strokeStyle = '#f1ca79'
+            ctx.strokeRect(c.q * CELL_SIZE, c.r * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+          } else if (cell) {
             const b = cell.bounds,
               meters = world.adaptive!.metersPerMapUnit
             ctx.fillRect(b.x / meters, b.y / meters, b.size / meters, b.size / meters)
@@ -606,6 +623,8 @@ export function WorldMap({
     return null
   }
   const maxZoom = Math.max(32, 160 / fit)
+  const hoveredResource = resources && hover ? resourceAtPoint(world, resources, hover.point) : undefined
+  const pickedResource = resources && picked ? resourceAtPoint(world, resources, picked.point) : undefined
   const hoveredCell =
     !isRelief && hover
       ? layer === 'population'
@@ -913,7 +932,9 @@ export function WorldMap({
           aria-label="Map legend"
           className={`map-legend ${layer !== 'political' ? 'thematic-legend' : ''}`}
         >
-          {quantitativeLegend ? (
+          {resources ? (
+            <ResourceLegend data={resources} onResource={setResource} />
+          ) : quantitativeLegend ? (
             <div className="quantitative-legend">
               <span>{quantitativeLegend.label}</span>
               <div
@@ -1129,6 +1150,17 @@ export function WorldMap({
             {compact(population(world.regions[picked.id]))} people <span>·</span>{' '}
             {world.regions[picked.id].terrain}
           </p>
+          {resources && pickedResource && (
+            <div className="picked-cell">
+              <strong>
+                {RESOURCE_KEYS[resources.good].name} · {resourceQuantity(pickedResource.quantity)} remaining
+              </strong>
+              <span>
+                Terrain tile {pickedResource.cell} ·{' '}
+                {resources.good === 'timber' ? 'Standing timber' : 'Unextracted reserve'}
+              </span>
+            </div>
+          )}
           {pickedCell && (
             <div className="picked-cell">
               <span>
@@ -1265,11 +1297,13 @@ export function WorldMap({
           </strong>
           <span>{world.nations[world.regions[hover.id].nation]?.name ?? 'Unclaimed land'}</span>
           <small>
-            {hoveredBuilding
-              ? `Building · ${hoveredBuilding.residents} residents · ${Math.floor(hoveredBuilding.capacity)} spaces`
-              : hoveredCell
-                ? `${hoveredCell.bounds.size.toLocaleString()} m ${layer === 'population' ? 'square' : 'cell'} · ${Math.round(hoveredCell.population).toLocaleString()} residents`
-                : `${population(world.regions[hover.id]).toLocaleString()} people · ${world.regions[hover.id].terrain}`}
+            {resources && hoveredResource
+              ? `${RESOURCE_KEYS[resources.good].name} · ${resourceQuantity(hoveredResource.quantity)} remaining in this tile`
+              : hoveredBuilding
+                ? `Building · ${hoveredBuilding.residents} residents · ${Math.floor(hoveredBuilding.capacity)} spaces`
+                : hoveredCell
+                  ? `${hoveredCell.bounds.size.toLocaleString()} m ${layer === 'population' ? 'square' : 'cell'} · ${Math.round(hoveredCell.population).toLocaleString()} residents`
+                  : `${population(world.regions[hover.id]).toLocaleString()} people · ${world.regions[hover.id].terrain}`}
           </small>
         </div>
       )}

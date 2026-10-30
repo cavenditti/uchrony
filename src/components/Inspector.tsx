@@ -1,6 +1,7 @@
 import { IdentityPolicyControls } from './IdentityPolicyControls'
 import { supplierDebt } from '../sim/supplier-credit'
 import { DistrictEconomies } from './DistrictEconomies'
+import { FacilityDevelopment } from './FacilityDevelopment'
 import { spatialState } from '../sim/spatial'
 import { MacroAccounts } from './EconomicAccounts'
 import { SovereignRelations } from './SovereignRelations'
@@ -67,6 +68,7 @@ import { PopulationIdentities } from './PopulationIdentities'
 import { StateCharacter } from './StateCharacter'
 import { ArmyLogistics, NavalForces } from './MilitaryOperations'
 import { militaryPeople } from '../sim/forces'
+import { provinceLandDevelopment } from '../sim/productive-land'
 
 export type Tab =
   'atlas' | 'population' | 'economy' | 'diplomacy' | 'military' | 'research' | 'government' | 'chronicle'
@@ -1126,6 +1128,7 @@ function Province({
   onClose: () => void
   onFocus: (id: number) => void
 }) {
+  const land = provinceLandDevelopment(world, r)
   return (
     <>
       <div className="province-title">
@@ -1207,9 +1210,24 @@ function Province({
       </div>
       <PopulationIdentities world={world} nation={r.nation} region={r.id} />
       <SectionTitle>Develop this province</SectionTitle>
+      <FacilityDevelopment world={world} province={r.id} command={command} />
+      <div className="data-row">
+        <span>Average site refinement</span>
+        <b>
+          {land.level.toFixed(2)} / {land.limit}
+        </b>
+      </div>
+      <div className="data-row">
+        <span>Output capacity from site works</span>
+        <b>
+          +{((land.multiplier - 1) * 100).toFixed(1)}%
+          {land.pending > 0 ? ` · ${land.pending} under construction` : ''}
+        </b>
+      </div>
       <div className="development-list">
         {(
           [
+            { id: 'land-works', label: 'Refine productive land', cost: 'Local cost', icon: Factory },
             { id: 'farm', label: 'Improve farmland', cost: 'Local cost', icon: Wheat },
             { id: 'industry', label: 'Fund tool workshops', cost: 'Local cost', icon: Factory },
             { id: 'textile-works', label: 'Fund textile workshops', cost: 'Local cost', icon: Factory },
@@ -1234,13 +1252,15 @@ function Province({
         ))}
       </div>
       <p className="panel-note">
-        Farmland works buy local timber, stone and available construction labor, scale to available funds, and
-        finish in six months. Productive enterprises buy timber, stone, tools and construction labor; the
-        state receives an equity share and future dividends. Surplus materials may be supplied on credit;
-        taxes and wages remain payable in crowns. Gravel roads and schools use 50 t timber and 70 t stone.
-        Paved roads use 40 t timber, 160 t stone and 10 t tools; railways use 100 t timber, 100 t stone, 80 t
-        iron and 30 t tools; docks use 100 t timber, 120 t stone, 20 t iron and 10 t tools. Materials come
-        from the provincial depot.
+        Productive land works refine one tile at a time with timber, stone, tools and paid labor. Agriculture,
+        industry and logistics research unlock up to six levels; each adds a smaller output gain and costs
+        more to build. Farmland works buy local timber, stone and available construction labor, scale to
+        available funds, and finish in six months. Productive enterprises buy timber, stone, tools and
+        construction labor; the state receives an equity share and future dividends. Surplus materials may be
+        supplied on credit; taxes and wages remain payable in crowns. Gravel roads and schools use 50 t timber
+        and 70 t stone. Paved roads use 40 t timber, 160 t stone and 10 t tools; railways use 100 t timber,
+        100 t stone, 80 t iron and 30 t tools; docks use 100 t timber, 120 t stone, 20 t iron and 10 t tools.
+        Materials come from the provincial depot.
       </p>
       <details className="sandbox-tools">
         <summary>

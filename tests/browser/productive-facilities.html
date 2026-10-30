@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>District facilities qualification</title>
+    <style>
+      body {
+        overflow: auto;
+      }
+      .facility-review {
+        padding: 20px;
+      }
+      .facility-review h1 {
+        font:
+          28px Alegreya,
+          Georgia,
+          serif;
+      }
+      .facility-review p {
+        max-width: 65ch;
+      }
+      .facility-review .inspector {
+        position: static;
+        width: 390px;
+        max-width: 100%;
+        max-height: none;
+        margin-top: 16px;
+      }
+      .facility-review .review-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      @media (max-width: 760px) {
+        .facility-review {
+          padding: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/tests/browser/productive-facilities.tsx"></script>
+  </body>
+</html>

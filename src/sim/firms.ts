@@ -1,5 +1,13 @@
 /** Competitive firms hire from local labor pools and produce against real inputs.
  * Payroll, inventories, capital projects and sales remain reconciled with the ledger. */
+import {
+  FACILITY_POLICY,
+  publicWorkshopJobs,
+  regionalFacilityLevels,
+  weightFacilityLabor,
+} from './productive-facilities'
+import { GOOD_FACILITY } from './facility-types'
+import { regionalLandProductivity } from './productive-land'
 import { participatingLabor } from './age-cohorts'
 import { loansForBorrower, payBank, writeDownLoan } from './banking'
 import { localClimate } from './climate'
@@ -230,7 +238,8 @@ export function hireFirms(w: World, r: Region) {
         (n.treasury * population(r)) / Math.max(1, n.population),
         labor * averageWage * collectedTaxRate(w, r) * serviceShare,
       )
-  const privateLabor = Math.max(0, labor - publicFunds / Math.max(1e-9, averageWage))
+  const privateLabor = Math.max(0, labor - publicFunds / Math.max(1e-9, averageWage)),
+    sharedPremises = publicWorkshopJobs(w, r, firms.length)
   for (const f of firms) {
     const share = 1 / Math.max(1, firms.length)
     const benchmarkJobs = privateLabor * share
@@ -261,7 +270,7 @@ export function hireFirms(w: World, r: Region) {
     // land/resource capacities below, so a depreciating workshop cannot evict
     // farmers or prevent a new rural enterprise from employing anyone.
     const indoor = required.tools + required.textiles + required.arms
-    const premises = w.adaptive?.sites[`firm:${f.id}`]?.capacity ?? Infinity
+    const premises = (w.adaptive?.sites[`firm:${f.id}`]?.capacity ?? Infinity) + sharedPremises
     const indoorScale = Math.min(1, premises / Math.max(1e-9, benchmarkJobs * indoor))
     for (const good of ['tools', 'textiles', 'arms'] as const) required[good] *= indoorScale
     const needed = GOODS.reduce((sum, g) => sum + required[g], 0)
@@ -406,7 +415,7 @@ function baseLaborMix(w: World, r: Region, f?: CompetitiveFirm): Inventory {
     const total = GOODS.reduce((sum, g) => sum + mix[g], 0)
     for (const g of GOODS) mix[g] /= total
   }
-  return mix
+  return weightFacilityLabor(w, r, mix)
 }
 export function firmCapacity(
   w: World,
@@ -417,12 +426,14 @@ export function firmCapacity(
 ) {
   const n = governance(w, r.nation),
     t = n.technologies,
-    abundance = simulationSettings(w).abundance
+    abundance = simulationSettings(w).abundance,
+    facilities = regionalFacilityLevels(w, r)
   const eff =
     (1 + r.literacy * 0.35 + t.industry * 0.13) *
     (1 - r.devastation * 0.55) *
     (0.75 + 0.25 * (r.materialCoverage ?? 1)) *
-    f.productivity
+    f.productivity *
+    regionalLandProductivity(w, r)
   // Each base cell supports 1,800 reference labor units, fertility-adjusted and
   // divided among active firms so entry cannot multiply the same land endowment.
   const land = Math.max(1, r.cells.length * 1800 * (0.35 + r.fertility * 0.65)) / Math.max(1, active)
@@ -446,7 +457,8 @@ export function firmCapacity(
     season *
     w.climate *
     eff *
-    effectMultiplier(w, 'harvest', n.id, r.id)
+    effectMultiplier(w, 'harvest', n.id, r.id) *
+    (1 + FACILITY_POLICY.productivity * Math.log1p(facilities['farm-estate']))
   for (const [g, rate] of [
     ['timber', 0.13],
     ['stone', 0.12],
@@ -460,16 +472,26 @@ export function firmCapacity(
       r.deposits[g] *
       eff *
       abundance *
-      effectMultiplier(w, 'extraction', n.id, r.id)
+      effectMultiplier(w, 'extraction', n.id, r.id) *
+      (1 + FACILITY_POLICY.productivity * Math.log1p(facilities[GOOD_FACILITY[g]]))
   const agglomeration =
     r.province === undefined
       ? 1
       : Math.min(1.4, 1 + 0.04 * Math.log1p(population(r) / Math.max(1, r.cells.length) / 1000))
-  const factory =
-    f.employment * capital * eff * agglomeration * effectMultiplier(w, 'manufacturing', n.id, r.id)
-  q.tools = factory * mix.tools * (0.007 / 0.19 / 0.35)
-  q.textiles = factory * mix.textiles * (0.013 / 0.19 / 0.5)
-  q.arms = factory * mix.arms * (0.0025 / 0.19 / 0.15) * (n.policies.priority === 'military' ? 2 : 1)
+  const manufacturing = effectMultiplier(w, 'manufacturing', n.id, r.id)
+  const factory = f.employment * capital * eff * agglomeration * manufacturing
+  // Public workshops contain paid productive equipment, so a district with no
+  // inherited private equipment can develop industry. Employment and input
+  // procurement below still bound actual production; firm entry cannot multiply it.
+  const publicEquipment = f.employment * FACILITY_POLICY.equipment * eff * agglomeration * manufacturing
+  q.tools = (factory + publicEquipment * facilities['tool-industry']) * mix.tools * (0.007 / 0.19 / 0.35)
+  q.textiles =
+    (factory + publicEquipment * facilities['textile-industry']) * mix.textiles * (0.013 / 0.19 / 0.5)
+  q.arms =
+    (factory + publicEquipment * facilities['arms-industry']) *
+    mix.arms *
+    (0.0025 / 0.19 / 0.15) *
+    (n.policies.priority === 'military' ? 2 : 1)
   if (simulationMonths() !== 1) for (const g of GOODS) q[g] *= simulationMonths()
   return { q }
 }

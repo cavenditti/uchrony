@@ -172,9 +172,9 @@ export function WorldOverview({
       { key: 'treasury', label: 'Treasury, k', format: financial },
       { key: 'debt', label: 'Debt, k', format: financial },
       { key: 'supplierDebt', label: 'Supplier debt, k', format: financial },
-      { key: 'capitalSpending', label: 'Enterprise investment, k', format: financial },
+      { key: 'capitalSpending', label: 'Productive investment, k', format: financial },
       { key: 'enterpriseIncome', label: 'Enterprise income, k', format: financial },
-      { key: 'operating', label: 'Before enterprise investment, k', format: financial },
+      { key: 'operating', label: 'Before productive investment, k', format: financial },
       { key: 'tax', label: 'Tax %' },
       { key: 'food', label: 'Food met', format: percent },
       { key: 'materials', label: 'Other needs', format: percent },
@@ -361,8 +361,8 @@ export function WorldOverview({
       {view === 'economy' && (
         <p className="panel-note">
           Revenue and spending are monthly flows; treasury and debt are accumulated balances. Supplier debt is
-          included in total debt. Unsold reserves are goods, not cash. Before enterprise investment adds back
-          only that investment category.
+          included in total debt. Unsold reserves are goods, not cash. Before productive investment adds back
+          enterprise equipment, farmland works, district facilities and productive site refinements.
         </p>
       )}
       {columns[view] && (

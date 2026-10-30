@@ -1,3 +1,4 @@
+import { farmsteadLayout } from './farmstead-layout'
 import { habitableLand } from '../sim/terrain-access'
 import { CELL_SIZE, cellAt } from '../sim/grid'
 import { hashSeed } from '../sim/random'
@@ -251,20 +252,29 @@ export function activityLayout(
   }
   const yardX = cell.x + (random(18) - 0.5) * 1.5,
     yardZ = cell.y + (random(19) - 0.5) * 1.5
-  if (use === 'fields' || use === 'pasture') {
+  const farm = use === 'fields' || use === 'pasture' ? farmsteadLayout(w, id, roads) : undefined
+  if (farm) {
     box(
-      yardX + 0.85,
-      yardZ + 0.7,
+      farm.x,
+      farm.z,
       0.7 + random(27) * 0.3,
       0.6 + random(28) * 0.3,
       0.5 + random(29) * 0.25,
       'farmhouse',
+      stone,
+      farm.angle,
     )
-    box(yardX + 1.8, yardZ + 0.7, 0.85, 1.4, 0.65, 'barn', timber)
+    box(farm.barnX, farm.barnZ, 0.85, 1.4, 0.65, 'barn', timber, farm.barnAngle)
+    const farmPoint = (x: number, z: number) => ({
+      x: farm.x + x * Math.cos(farm.angle) + z * Math.sin(farm.angle),
+      z: farm.z - x * Math.sin(farm.angle) + z * Math.cos(farm.angle),
+    })
     if (climate.crop === 'orchard')
       for (let row = 0; row < 5; row++)
-        for (let col = 0; col < 6; col++)
-          tree(yardX - 4.6 + col * 0.65, yardZ - 4.4 + row * 0.75, row * 6 + col, true)
+        for (let col = 0; col < 6; col++) {
+          const p = farmPoint(-4.6 + col * 0.65, -4.4 + row * 0.75)
+          tree(p.x, p.z, row * 6 + col, true)
+        }
     if (use === 'pasture' || climate.crop === 'pasture')
       for (let i = 0; i < 10; i++) {
         const x = yardX - 3 + random(i + 400) * 2,
@@ -272,25 +282,15 @@ export function activityLayout(
         add('sheep', x, z, 0.14, 0.24, 0.28, 0.46, '#dfdac2', 'livestock', random(i) * 6)
       }
     else if (random(88) < 0.28) {
-      const x = yardX - 1.2,
-        z = yardZ + 1
+      const { x, z } = farmPoint(-1.2, 1.7)
       add('cone', x, z, 0.65, 0.75, 1.3, 0.75, stone, 'windmill', 0)
       add('cone', x, z, 1.45, 0.85, 0.45, 0.85, roof, 'windmill', 0)
       motions.push({ kind: 'mill', x, z: z + 0.43, angle: 0, phase: random(77) * 6, baseY: height?.(x, z) })
     }
-    for (let i = 0; i < 6; i++)
-      add(
-        'cylinder',
-        yardX + 2.5 + (i % 3) * 0.35,
-        yardZ - 0.6 + Math.floor(i / 3) * 0.4,
-        0.18,
-        0.28,
-        0.36,
-        0.28,
-        '#c2a765',
-        'harvest',
-        0,
-      )
+    for (let i = 0; i < 6; i++) {
+      const p = farmPoint(1 + (i % 3) * 0.35, -1.5 + Math.floor(i / 3) * 0.4)
+      add('cylinder', p.x, p.z, 0.18, 0.28, 0.36, 0.28, '#c2a765', 'harvest', farm.angle)
+    }
   }
   if (use === 'timber') {
     box(yardX, yardZ, 1.2, 1.8, 0.7, 'sawmill', timber)

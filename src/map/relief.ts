@@ -3,6 +3,7 @@ import { CityScenery } from './city-scenery'
 import { describeCity } from './city-layout'
 import * as THREE from 'three'
 import { type World, type Layer } from '../sim/types'
+import type { ResourceMapData } from './natural-resources'
 import { type AtlasCache, drawAtlas, drawAtlasLinework } from './renderer'
 import { OverlayUpdates, resizeCanvas } from './render-budget'
 import { overlayWindow, TerrainCoverage, type OverlayWindow } from './overlay-window'
@@ -295,7 +296,7 @@ export class ReliefMap {
     }
   }
 
-  paint(world: World, layer: Layer, scale: number) {
+  paint(world: World, layer: Layer, scale: number, resources?: ResourceMapData) {
     this.lineworkWorld = world
     this.lineworkLayer = layer
     this.cities.update(world)
@@ -316,7 +317,7 @@ export class ReliefMap {
     const ratio = this.textureCanvas.width / this.width
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
-    drawAtlas(ctx, this.atlas, world, layer, scale, true, false)
+    drawAtlas(ctx, this.atlas, world, layer, scale, true, false, false, resources)
     ctx.globalCompositeOperation = 'destination-in'
     ctx.fillStyle = '#fff'
     ctx.fill(this.atlas.land, 'evenodd')

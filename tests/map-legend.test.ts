@@ -46,6 +46,7 @@ test('every map layer renders its legend immediately without a disclosure button
   const expectations = {
     political: 'Sovereign borders',
     terrain: 'Occupied homes',
+    resources: 'Remaining tonnes / terrain tile',
     population: 'Residents / km²',
     culture: 'Largest community in each province',
     language: 'Largest community in each province',

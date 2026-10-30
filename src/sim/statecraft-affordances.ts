@@ -1,3 +1,4 @@
+import { facilityOpportunities } from './facility-investment'
 import { overseasOptions } from './overseas'
 import { commissionOptions } from './navy'
 import { borderPolicy } from './border-policy'
@@ -68,8 +69,8 @@ export function statecraftAffordances(w: World, nation: number) {
         })
         .sort((a, b) => b.soldiers - a.soldiers || a.id - b.id)
         .slice(0, 8),
-      canBuildIn: own
-        .flatMap((r) =>
+      canBuildIn: [
+        ...own.flatMap((r) =>
           PUBLIC_WORKS.flatMap((kind) => {
             const q = publicWorkQuote(w, r.id, kind)
             return q.obstacle
@@ -84,7 +85,18 @@ export function statecraftAffordances(w: World, nation: number) {
                   },
                 ]
           }),
-        )
+        ),
+        ...facilityOpportunities(w, n).map((q) => ({
+          id: q.province,
+          district: q.district,
+          cell: q.cell,
+          name: `${w.regions[q.province].name} · district ${q.district}`,
+          building: q.kind,
+          cost: q.cost,
+          score: q.score,
+          reason: q.reason,
+        })),
+      ]
         .sort((a, b) => b.score - a.score || a.id - b.id)
         .slice(0, 12),
       canFoundTargets: foundingOptions(w, nation),

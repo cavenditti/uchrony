@@ -6,6 +6,7 @@ import type { World, Cell } from '../src/sim/types'
 import { TILE_ACTIVITIES, type EconomicLandscape } from '../src/sim/economic-landscape'
 import { landSurface, renderedLand, footprint, LandSurface } from '../src/map/land-surface'
 import { activityLayout, detailRoads, distanceTo } from '../src/map/activity-layout'
+import { farmsteadLayout } from '../src/map/farmstead-layout'
 import { activityPose } from '../src/map/activity-motion'
 import { tradeRoadEdges } from '../src/map/road-curves'
 import { groundRoads } from '../src/map/ground-roads'
@@ -72,6 +73,69 @@ function cameraAt(x: number, z: number, span = 40) {
   camera.updateMatrixWorld()
   return camera
 }
+
+test('farmsteads vary their yards and orientations without depending on time, camera or economic randomness', () => {
+  const { world, land } = fixture(),
+    initialRng = world.rng,
+    ids = [33, 34, 35, 49, 50, 51, 65, 66, 67]
+  const layouts = ids.map((id) => farmsteadLayout(world, id, [])!)
+  assert(layouts.every(Boolean))
+  assert(new Set(layouts.map((p) => p.angle.toFixed(2))).size >= 6)
+  assert(new Set(layouts.map((p, i) => (p.x - world.cells[ids[i]].x).toFixed(1))).size >= 6)
+  assert(layouts.some((p, i) => Math.abs(p.x - world.cells[ids[i]].x) > CELL_SIZE * 0.2))
+  assert(
+    layouts.every((p) => p.angle !== p.barnAngle),
+    'barns respond to the yard without identical alignments',
+  )
+  world.month += 8
+  assert.deepEqual(
+    ids.map((id) => farmsteadLayout(world, id, [])!),
+    layouts,
+  )
+  assert.equal(world.rng, initialRng)
+  for (const id of ids) {
+    const plan = activityLayout(world, land, id)
+    for (const piece of plan.pieces.filter((p) => p.role === 'farmhouse' || p.role === 'barn'))
+      assert(
+        footprint(piece.x, piece.z, piece.w, piece.d, piece.angle).every((p) =>
+          renderedLand(world, p.x, p.z),
+        ),
+      )
+  }
+})
+
+test('farmyard buildings respect roads, coastlines and the conservative river corridor', () => {
+  const { world } = fixture(),
+    id = 69,
+    c = world.cells[id]
+  const roads = [
+    {
+      a: id,
+      b: id + 1,
+      surface: 'dirt' as const,
+      traffic: false,
+      points: [
+        { x: c.x - 6, y: c.y },
+        { x: c.x + 6, y: c.y },
+      ],
+    },
+  ]
+  const farm = farmsteadLayout(world, id, roads)!
+  assert(farm)
+  assert(Math.abs(farm.z - c.y) > 2.8)
+  assert(Math.abs(farm.barnZ - c.y) >= 1.6)
+  world.cells[id].river = true
+  const riverFarm = farmsteadLayout(world, id, [])!
+  assert(riverFarm)
+  assert(Math.abs(riverFarm.x - c.x) > 1.8)
+  assert(Math.abs(riverFarm.barnX - c.x) > 1.8)
+  for (const cell of world.cells.filter((c) => c.q === 9)) {
+    const layout = farmsteadLayout(world, cell.id, [])
+    if (!layout) continue
+    assert(footprint(layout.x, layout.z, 1.1, 1.1, layout.angle).every((p) => renderedLand(world, p.x, p.z)))
+  }
+  assert.equal(farmsteadLayout(world, 47, []), undefined, 'water cannot acquire a farmstead')
+})
 
 test('land mask follows the visible quadratic coast, including corners and inland water', () => {
   const surface = new LandSurface([

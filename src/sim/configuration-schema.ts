@@ -4,6 +4,7 @@ import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './config
 import { configurationHelp } from './configuration-help'
 import { STRATA } from './economic-types'
 import { POLICY_RULES } from './policy-rules'
+import { FACILITY_KINDS } from './facility-types'
 import { FIELDS, GOODS } from './types'
 
 export interface ConfigurationGroupMeta {
@@ -113,6 +114,21 @@ export const CONFIGURATION_GROUPS: Record<keyof ConfigurationValues, Configurati
     label: 'Places and quarters',
     tags: ['merger', 'metropolis', 'incorporation', 'quarter', 'municipality'],
     description: 'Density prominence at which centres become quarters, separate or retire.',
+  },
+  facilities: {
+    label: 'District facilities',
+    tags: ['mines', 'industry', 'markets', 'specialization'],
+    description: 'Construction time, sector effects, market efficiency and native investment choices.',
+  },
+  facilityRecipes: {
+    label: 'Facility construction recipes',
+    tags: ['mines', 'factories', 'markets', 'materials', 'technology'],
+    description: 'Real materials, worker-months and technology for the first tier of each facility.',
+  },
+  productiveLand: {
+    label: 'Productive land development',
+    tags: ['investment', 'productivity', 'tiles', 'technology'],
+    description: 'Paid site refinements, diminishing returns and public investment allocation.',
   },
   farming: {
     label: 'Agriculture',
@@ -531,6 +547,38 @@ export const CONFIGURATION_SCHEMA: SchemaNode<ConfigurationValues> = {
     quarterBirth: unitInterval(),
     quarterRetirement: unitInterval(),
     transitionMonths: int(0, 1200),
+  },
+  facilities: {
+    duration: int(1, 120),
+    costGrowth: num(0, 10),
+    productivity: num(0, 2),
+    equipment: num(0, 2),
+    jobsPerTier: num(1, 10000),
+    laborBias: num(0, 10),
+    marketHandling: num(0, 2),
+    marketPreservation: num(0, 2),
+    budgetShare: unitInterval(),
+    minimumDeposit: num(0.001, 1),
+    minimumHabitat: unitInterval(),
+    neighborDemand: unitInterval(),
+  },
+  facilityRecipes: recordOf(FACILITY_KINDS, {
+    timber: num(0, 10000),
+    stone: num(0, 10000),
+    iron: num(0, 10000),
+    tools: num(0, 10000),
+    laborMonths: num(1, 10000),
+    technology: int(0, 6),
+  }),
+  productiveLand: {
+    timber: num(0, 1000),
+    stone: num(0, 1000),
+    tools: num(0, 1000),
+    laborMonths: num(1, 10000),
+    duration: int(1, 120),
+    productivity: num(0, 2),
+    costGrowth: num(0, 10),
+    budgetShare: unitInterval(),
   },
   farming: {
     timber: num(0, 1000),

@@ -10,6 +10,9 @@ import { respondToInstitutionDefense } from './institution-defense'
 /** Commands apply one typed handler under world configuration, then reconcile derived views. */
 import { refreshAdaptiveTotals } from './adaptive-world'
 import { borderPolicy, setBorderPolicy } from './border-policy'
+import { buildFacility } from './facility-investment'
+import { isFacilityKind } from './facility-types'
+import { buildLandDevelopment } from './land-investment'
 import { buildFarm } from './agriculture'
 import { refreshPlaces } from './places'
 import { applyConfiguration, withWorldConfiguration } from './configuration'
@@ -411,6 +414,10 @@ const COMMAND_HANDLERS = {
       ? 'Observer mode: all states govern themselves.'
       : `You now govern ${w.nations[command.nation].name}.`
   },
+  'build-facility': (w, command) => {
+    if (!isFacilityKind(command.facility)) throw new Error('Choose a recognized productive facility.')
+    return buildFacility(w, command.region, command.facility, command.district, command.cell)
+  },
   build: (w, command) => {
     const r = w.regions[command.region]
     if (!r) throw new Error('That province does not exist.')
@@ -424,6 +431,7 @@ const COMMAND_HANDLERS = {
         r.id,
         command.building === 'industry' ? 'tools' : command.building === 'food-works' ? 'food' : 'textiles',
       )
+    if (command.building === 'land-works') return buildLandDevelopment(w, r.id)
     if (command.building === 'farm') return buildFarm(w, r.id)
     return buildPublicWork(w, r.id, command.building)
   },

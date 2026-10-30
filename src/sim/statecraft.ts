@@ -43,6 +43,7 @@ import { INTELLIGENCE_PRIORITIES, type IntelligencePriority } from './intelligen
 import { publicTransfer } from './ledger'
 import { inWorldText } from './narrative'
 import { POLICY_RULES, policyCommandValue } from './policy-rules'
+import { isFacilityKind } from './facility-types'
 import { ensurePopulation, returnArmyPeople } from './population'
 import { previousResearchOutput } from './public-services'
 import { hashSeed } from './random'
@@ -359,9 +360,17 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
     if (world.regions[order.target]?.nation !== nation)
       throw new Error('An agent may only recruit or invest in its own provinces.')
     if (order.kind === 'recruit') command = { type: 'recruit', nation, region: order.target }
+    else if (isFacilityKind(order.text))
+      command = {
+        type: 'build-facility',
+        region: order.target,
+        facility: order.text,
+        ...(order.key === 'district' ? { district: order.value } : {}),
+      }
     else {
       if (
         ![
+          'land-works',
           'farm',
           'food-works',
           'textile-works',

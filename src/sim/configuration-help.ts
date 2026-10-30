@@ -1,3 +1,4 @@
+import { FACILITY_DEFINITIONS, type FacilityKind } from './facility-types'
 import { IDENTITY_POLICY_FIELDS, type IdentityPolicyKey } from './identity-policy'
 import type { ConfigurationValues } from './configuration-defaults'
 
@@ -329,6 +330,46 @@ const GROUP_HELP: Partial<Record<keyof ConfigurationValues, Readonly<Record<stri
     transitionMonths:
       'Months an incorporation or release condition must persist before the administrative status changes.',
   },
+  facilities: {
+    jobsPerTier:
+      'Industrial workplaces supplied by each completed workshop tier, shared across active local firms so entry cannot duplicate premises.',
+    duration:
+      'Months before a fully funded mine, workshop, farm estate or market becomes usable. Existing projects keep their completion date.',
+    costGrowth:
+      'Extra fraction of first-tier materials and labor required for each completed tier at this facility.',
+    productivity:
+      'Diminishing output gain for agricultural and extractive facilities: coefficient times log(1 + average installed tiers).',
+    equipment:
+      'Manufacturing equipment added per average installed tier of the matching workshop type. It does not produce without workers and raw inputs.',
+    laborBias:
+      'Strength with which installed sector premises influence labor plans before firms adjust for demand and available inputs.',
+    marketHandling:
+      'Reduction of the basic retail handling margin with installed markets. Inventory financing costs remain payable.',
+    marketPreservation:
+      'Reduction in physical retail spoilage and storage losses from paid market and warehouse facilities.',
+    budgetShare:
+      'Share of productive funding remaining after general land works offered to district facilities. Unspent money remains available to enterprise equity.',
+    minimumDeposit:
+      'Minimum remaining local resource potential needed to construct a matching mine, quarry or timber yard. Construction never creates ore.',
+    minimumHabitat: 'Minimum local agricultural suitability for a new agricultural estate.',
+    neighborDemand:
+      'Share of adjacent domestic market demand considered when estimating potential customers for a specialized district.',
+  },
+  productiveLand: {
+    timber: 'Tonnes of timber for the first complete refinement of one productive terrain tile.',
+    stone: 'Tonnes of stone for the first complete refinement of one productive terrain tile.',
+    tools: 'Tonnes of tools for the first complete refinement of one productive terrain tile.',
+    laborMonths:
+      'Worker-months needed for the first complete refinement of one tile. Later levels require more inputs.',
+    duration:
+      'Months before paid site works begin increasing productive capacity. Existing projects retain their completion dates.',
+    productivity:
+      'Output gain coefficient: the multiplier is one plus this value times log(1 + completed level). Technology unlocks at most six paid levels.',
+    costGrowth:
+      'Additional fraction of first-level materials and labor required for each previously completed level.',
+    budgetShare:
+      'Share of the public productive investment budget offered to site refinements first. Unspent funds remain available for enterprise equipment.',
+  },
   farming: {
     timber: 'Tonnes of timber required for an agricultural improvement project.',
     stone: 'Tonnes of stone required for an agricultural improvement project.',
@@ -408,6 +449,14 @@ const TRANSPORT_PROJECT_NAMES: Readonly<Record<string, string>> = {
 const GROUP_HELP_TEMPLATES: Partial<
   Record<keyof ConfigurationValues, (parts: readonly string[]) => string | undefined>
 > = {
+  facilityRecipes: ([kind, field]) => {
+    const name = FACILITY_DEFINITIONS[kind as FacilityKind]?.name ?? kind
+    if (field === 'laborMonths')
+      return `Worker-months required to build the first tier of ${name}. Later tiers scale with the configured rising cost.`
+    if (field === 'technology')
+      return `Minimum relevant research level for ${name}; further research unlocks additional paid tiers.`
+    return `Tonnes of ${field} consumed to build the first tier of ${name}, purchased at actual local prices.`
+  },
   consumptionBudget: ([good]) =>
     `Relative weight of ${good} in household spending above subsistence. Weights are normalized together; increasing one redirects spending toward that good.`,
   materialCoverage: ([good]) =>

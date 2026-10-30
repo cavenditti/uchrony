@@ -9,6 +9,8 @@ import { reconcileInstitutions } from './institution-lifecycle'
  * decisions; synchronization at those boundaries carries changes in both directions. */
 import { ensureAdaptiveWorld, rebuildAdaptiveMesh, refreshAdaptiveTotals, syncSites } from './adaptive-world'
 import { agreementTerms } from './agreements'
+import { completeFacilityProjects } from './productive-facilities'
+import { completeLandProjects } from './productive-land'
 import { advanceAgriculturalInvestment, completeFarmProjects } from './agriculture'
 import { advanceAlmanac } from './almanac'
 import { withLoanOriginationBatch } from './banking'
@@ -395,6 +397,8 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   beginPopulationMonth(w)
   beginEconomyMonth(w)
   completeFarmProjects(w)
+  completeLandProjects(w)
+  completeFacilityProjects(w)
   retireEmptyStates(w)
   arriveFreight(w)
   aggregateDistricts(w)

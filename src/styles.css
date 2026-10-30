@@ -724,6 +724,32 @@ button:hover:not(:disabled) {
 .quantitative-legend {
   width: 225px;
 }
+.resource-legend {
+  width: 245px;
+  pointer-events: auto;
+}
+.resource-legend label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+.resource-legend select {
+  width: 110px;
+  flex: none;
+  min-height: 34px;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.resource-legend > span {
+  display: block;
+}
 .legend-ramp {
   height: 7px;
   margin: 7px 0 4px;

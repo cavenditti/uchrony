@@ -1,0 +1,402 @@
+{
+  "seed": "refactor-contract",
+  "scale": "regional",
+  "start": "settled",
+  "states": 4,
+  "elapsedMs": 140650.16462499998,
+  "qualification": "Eight ordinary monthly steps with untouched opening endowments; world validated after every step. This is a mechanism smoke check, not long-run surplus calibration.",
+  "rows": [
+    {
+      "month": 1,
+      "pending": 231,
+      "completed": {
+        "farm-estate": 0,
+        "timber-yard": 0,
+        "quarry": 0,
+        "iron-mine": 0,
+        "coal-mine": 0,
+        "tool-industry": 0,
+        "textile-industry": 0,
+        "arms-industry": 0,
+        "market": 0
+      },
+      "nations": [
+        {
+          "id": 0,
+          "foodCoverage": 1,
+          "treasury": 22044.51523137647,
+          "income": 312.41190606977665,
+          "spending": 217.89667469306454,
+          "gdp": 2240.9284174676773
+        },
+        {
+          "id": 1,
+          "foodCoverage": 1,
+          "treasury": 20856.035825704912,
+          "income": 543.6900593636108,
+          "spending": 1637.6542336586117,
+          "gdp": 3532.6393201035635
+        },
+        {
+          "id": 2,
+          "foodCoverage": 1,
+          "treasury": 21884.278049175915,
+          "income": 142.2726131338344,
+          "spending": 207.9945639577954,
+          "gdp": 926.2609655308614
+        },
+        {
+          "id": 3,
+          "foodCoverage": 1,
+          "treasury": 21902.519253554998,
+          "income": 162.97893804333086,
+          "spending": 210.4596844885738,
+          "gdp": 1009.8485265758154
+        }
+      ]
+    },
+    {
+      "month": 2,
+      "pending": 307,
+      "completed": {
+        "farm-estate": 0,
+        "timber-yard": 0,
+        "quarry": 0,
+        "iron-mine": 0,
+        "coal-mine": 0,
+        "tool-industry": 0,
+        "textile-industry": 0,
+        "arms-industry": 0,
+        "market": 0
+      },
+      "nations": [
+        {
+          "id": 0,
+          "foodCoverage": 1,
+          "treasury": 22124.874273194437,
+          "income": 330.0319434433297,
+          "spending": 249.6729016251949,
+          "gdp": 2369.375787691536
+        },
+        {
+          "id": 1,
+          "foodCoverage": 1,
+          "treasury": 21009.44335584177,
+          "income": 397.7081516882011,
+          "spending": 244.3006215513431,
+          "gdp": 2988.331571929833
+        },
+        {
+          "id": 2,
+          "foodCoverage": 1,
+          "treasury": 21254.762062070007,
+          "income": 216.75158086612308,
+          "spending": 846.2675679719036,
+          "gdp": 1469.972299340742
+        },
+        {
+          "id": 3,
+          "foodCoverage": 1,
+          "treasury": 21860.67256333382,
+          "income": 172.54187955403793,
+          "spending": 214.38856977508001,
+          "gdp": 1128.0082355504119
+        }
+      ]
+    },
+    {
+      "month": 3,
+      "pending": 567,
+      "completed": {
+        "farm-estate": 0,
+        "timber-yard": 0,
+        "quarry": 0,
+        "iron-mine": 0,
+        "coal-mine": 0,
+        "tool-industry": 0,
+        "textile-industry": 0,
+        "arms-industry": 0,
+        "market": 0
+      },
+      "nations": [
+        {
+          "id": 0,
+          "foodCoverage": 1,
+          "treasury": 21269.58368742096,
+          "income": 473.0977196865938,
+          "spending": 1328.388305460068,
+          "gdp": 2661.213173533437
+        },
+        {
+          "id": 1,
+          "foodCoverage": 1,
+          "treasury": 21126.830310901416,
+          "income": 395.4361671192927,
+          "spending": 278.0492120595776,
+          "gdp": 2857.7557116201124
+        },
+        {
+          "id": 2,
+          "foodCoverage": 0.9999989504426836,
+          "treasury": 21180.911185648496,
+          "income": 141.5395037670497,
+          "spending": 215.3903801885716,
+          "gdp": 1075.989660462336
+        },
+        {
+          "id": 3,
+          "foodCoverage": 0.9999997458656966,
+          "treasury": 21150.1857707543,
+          "income": 290.01407395753426,
+          "spending": 1000.5008665372134,
+          "gdp": 1622.9949407964336
+        }
+      ]
+    },
+    {
+      "month": 4,
+      "pending": 638,
+      "completed": {
+        "farm-estate": 0,
+        "timber-yard": 0,
+        "quarry": 0,
+        "iron-mine": 0,
+        "coal-mine": 0,
+        "tool-industry": 0,
+        "textile-industry": 0,
+        "arms-industry": 0,
+        "market": 0
+      },
+      "nations": [
+        {
+          "id": 0,
+          "foodCoverage": 0.9997916276363272,
+          "treasury": 21289.78703469295,
+          "income": 336.1918156552295,
+          "spending": 315.9884683831735,
+          "gdp": 2136.2688087073884
+        },
+        {
+          "id": 1,
+          "foodCoverage": 1,
+          "treasury": 20651.050855755297,
+          "income": 443.7760934757233,
+          "spending": 919.5555486218926,
+          "gdp": 3112.892847969638
+        },
+        {
+          "id": 2,
+          "foodCoverage": 1,
+          "treasury": 21110.275013918796,
+          "income": 147.02926650906312,
+          "spending": 217.6654382388084,
+          "gdp": 1081.862982534368
+        },
+        {
+          "id": 3,
+          "foodCoverage": 1,
+          "treasury": 21079.68536493109,
+          "income": 178.48612970859293,
+          "spending": 248.9865355318062,
+          "gdp": 1114.1527800650701
+        }
+      ]
+    },
+    {
+      "month": 5,
+      "pending": 674,
+      "completed": {
+        "farm-estate": 0,
+        "timber-yard": 0,
+        "quarry": 0,
+        "iron-mine": 0,
+        "coal-mine": 0,
+        "tool-industry": 0,
+        "textile-industry": 0,
+        "arms-industry": 0,
+        "market": 0
+      },
+      "nations": [
+        {
+          "id": 0,
+          "foodCoverage": 1,
+          "treasury": 21296.905383977042,
+          "income": 343.5236021432346,
+          "spending": 336.40525285915515,
+          "gdp": 2095.382265750392
+        },
+        {
+          "id": 1,
+          "foodCoverage": 0.9932349435140766,
+          "treasury": 20684.38351503995,
+          "income": 384.24898291544895,
+          "spending": 350.91632363094254,
+          "gdp": 2546.230058408479
+        },
+        {
+          "id": 2,
+          "foodCoverage": 1,
+          "treasury": 20639.646493583634,
+          "income": 182.65092899082805,
+          "spending": 653.2794493259978,
+          "gdp": 1416.8176041869235
+        },
+        {
+          "id": 3,
+          "foodCoverage": 0.9990256085390344,
+          "treasury": 20993.913020166765,
+          "income": 167.69529842445365,
+          "spending": 253.4676431887206,
+          "gdp": 1102.4622867380556
+        }
+      ]
+    },
+    {
+      "month": 6,
+      "pending": 772,
+      "completed": {
+        "farm-estate": 0,
+        "timber-yard": 0,
+        "quarry": 0,
+        "iron-mine": 0,
+        "coal-mine": 0,
+        "tool-industry": 0,
+        "textile-industry": 0,
+        "arms-industry": 0,
+        "market": 0
+      },
+      "nations": [
+        {
+          "id": 0,
+          "foodCoverage": 0.9909311487983306,
+          "treasury": 20786.0259767354,
+          "income": 322.7504210632685,
+          "spending": 322.50409908939565,
+          "gdp": 1831.3598367608345
+        },
+        {
+          "id": 1,
+          "foodCoverage": 0.9901789261946384,
+          "treasury": 20709.37545265978,
+          "income": 380.3888017472091,
+          "spending": 355.3968641271629,
+          "gdp": 2446.347366269682
+        },
+        {
+          "id": 2,
+          "foodCoverage": 0.9996837054111393,
+          "treasury": 20529.276373414094,
+          "income": 137.88377560075713,
+          "spending": 248.25389577024342,
+          "gdp": 1057.8456721602174
+        },
+        {
+          "id": 3,
+          "foodCoverage": 0.9937015308167398,
+          "treasury": 20973.676425505393,
+          "income": 144.95228278685232,
+          "spending": 165.18887744824156,
+          "gdp": 900.8285387542762
+        }
+      ]
+    },
+    {
+      "month": 7,
+      "pending": 697,
+      "completed": {
+        "farm-estate": 205,
+        "timber-yard": 4,
+        "quarry": 0,
+        "iron-mine": 0,
+        "coal-mine": 0,
+        "tool-industry": 0,
+        "textile-industry": 0,
+        "arms-industry": 0,
+        "market": 22
+      },
+      "nations": [
+        {
+          "id": 0,
+          "foodCoverage": 0.9874780891163704,
+          "treasury": 20708.634695427278,
+          "income": 322.0190666693224,
+          "spending": 399.41034797751007,
+          "gdp": 2008.9548666662763
+        },
+        {
+          "id": 1,
+          "foodCoverage": 0.9854012028181284,
+          "treasury": 20515.572099054374,
+          "income": 348.00686411817446,
+          "spending": 541.8102177237777,
+          "gdp": 2462.4001659158266
+        },
+        {
+          "id": 2,
+          "foodCoverage": 0.9999794224977141,
+          "treasury": 20425.239519034898,
+          "income": 132.30456755676542,
+          "spending": 236.34142193594153,
+          "gdp": 1027.0263747959161
+        },
+        {
+          "id": 3,
+          "foodCoverage": 0.9802139870942915,
+          "treasury": 20840.02544975857,
+          "income": 156.08654829642973,
+          "spending": 289.7375240432331,
+          "gdp": 1013.1899254731818
+        }
+      ]
+    },
+    {
+      "month": 8,
+      "pending": 651,
+      "completed": {
+        "farm-estate": 272,
+        "timber-yard": 10,
+        "quarry": 0,
+        "iron-mine": 0,
+        "coal-mine": 0,
+        "tool-industry": 0,
+        "textile-industry": 0,
+        "arms-industry": 0,
+        "market": 25
+      },
+      "nations": [
+        {
+          "id": 0,
+          "foodCoverage": 0.9907024123254622,
+          "treasury": 20396.721576183838,
+          "income": 321.8676455191662,
+          "spending": 385.2771484176496,
+          "gdp": 2070.8055999203866
+        },
+        {
+          "id": 1,
+          "foodCoverage": 0.9701571396497931,
+          "treasury": 20433.36751510679,
+          "income": 337.63482407490574,
+          "spending": 419.83940802267307,
+          "gdp": 2657.3498774994277
+        },
+        {
+          "id": 2,
+          "foodCoverage": 0.9992806488719891,
+          "treasury": 20370.937792701065,
+          "income": 116.51697143149177,
+          "spending": 170.81869776526295,
+          "gdp": 976.8318472859282
+        },
+        {
+          "id": 3,
+          "foodCoverage": 0.9936640137297209,
+          "treasury": 20724.06689645263,
+          "income": 160.06757856172746,
+          "spending": 276.02613186766604,
+          "gdp": 1003.9728034028046
+        }
+      ]
+    }
+  ]
+}

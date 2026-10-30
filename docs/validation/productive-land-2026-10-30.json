@@ -1,0 +1,201 @@
+{
+  "date": "2026-10-30",
+  "scope": "Technology-limited paid tile refinement, native investment batches, province controls/account labels, and less regular representative farmyards. Existing unrelated working-tree changes are preserved. No commit, push or deployment.",
+  "parameters": {
+    "levelCeiling": "min(6, 1 + floor(min(agriculture, industry, logistics)))",
+    "multiplier": "1 + 0.45 * ln(1 + completed level)",
+    "firstLevelRecipe": {
+      "timberTonnes": 16,
+      "stoneTonnes": 24,
+      "toolsTonnes": 4,
+      "workerMonths": 160
+    },
+    "nextLevelInputScale": "1 + 0.6 * previously completed level",
+    "durationMonths": 6,
+    "nativeAllocation": "After food coverage reaches 97%, offer half the existing productive budget to a ranked batch, at most one tile per economic district per quarterly review; unspent funding remains available for enterprise equipment."
+  },
+  "refinementPasses": {
+    "architecture": "Pure commissioned-capital state and area means are separate from project selection/financing. Shared public-construction settlement now serves farmland and productive tiles. Levels and projects remain attached to original terrain cell IDs.",
+    "functions": "Reviewed all modified/new functions for single responsibilities, whole-tier funding, duplicate projects, technology bounds, zero material recipes, no free labor, occupation, and current configuration.",
+    "performance": "Regional means cache logarithmic levels by world and immutable district cell array; commissioning invalidates the cache, and the live coefficient is read on every query. A deterministic contract checks 100,000 repeated capacity calls without rescanning cells. A shared pending index bounds batch selection to the district/cell scan plus sorting, rather than rescanning all projects per selected site. Fully cash-funded construction bypasses a domestic supplier-credit survey; automatic batches cap full commitments including supplier liabilities.",
+    "style": "Repository formatter completed; new modules and formulas document domain rationale, units, accounting and cache invalidation. Model and rendering documentation updated."
+  },
+  "verification": {
+    "build": {
+      "command": "npm run build",
+      "result": "Final implementation: pass",
+      "warning": "Existing Vite large-chunk advisories remain."
+    },
+    "format": {
+      "command": "npm run format",
+      "result": "npm run format and npm run format:check both pass after the checkpoint fixture was regenerated."
+    },
+    "focused": {
+      "command": "node --import tsx --test tests/productive-land.test.ts tests/productive-land-display.test.ts tests/agriculture.test.ts tests/configuration.test.ts tests/renderer-placement.test.ts tests/development-war.test.ts tests/model-mathematics.test.ts",
+      "tests": 63,
+      "passed": 63,
+      "failed": 0,
+      "result": "Final implementation: all 63 passed."
+    },
+    "equations": {
+      "command": "node --import tsx --test tests/model-mathematics.test.ts",
+      "tests": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "determinism": {
+      "result": "Final implementation: two independent replays agree at all eight checkpoints with validateWorld at every checkpoint; the updated checkpoint regression passes.",
+      "settledAtFinalCheckpoint": {
+        "pendingTileProjects": 459,
+        "completedTiles": 353
+      },
+      "frontierAtFinalCheckpoint": {
+        "pendingTileProjects": 4,
+        "completedTiles": 2
+      }
+    },
+    "fullSuiteAttempt": {
+      "command": "npm test",
+      "tests": 894,
+      "passed": 880,
+      "failed": 14,
+      "elapsedMs": 1143762,
+      "qualification": "This broad run began before final refinements and checkpoint refresh. It is not an all-suite pass. The remaining simulation.test.ts worker was terminated after roughly 19 minutes overall (14 minutes in that worker); unreported cases in that file remain unverified.",
+      "failures": [
+        "housing requires paid labor and real materials, and capacity appears only on completion (2116.138292ms)",
+        "the disk endpoint requires same-origin writes and isolates browser save slots (5.432459ms)",
+        "a more assertive frontier still pays for materials, relocates people and respects player control (3151.389208ms)",
+        "coarse frontier reviews account for multiple scheduled decisions without adding resources (2808.19225ms)",
+        "industrial investment is queued and unfunded capacity does not grow automatically (862.769ms)",
+        "an ordinary frontier expands and produces a funded new state without injected resources (457639.639375ms)",
+        "bounded map lookups retain exact coastline geometry and freight traversal order (1110.610875ms)",
+        "world scale adds physical distance, connected provinces, independent states and a sparse navigable shipping network (8857.630417ms)",
+        "every published guide equation renders with accessible MathML (69.48425ms)",
+        "funded expansion creates a within-cell parcel only after payment; capacity waits for construction (2273.904959ms)",
+        "several centres in one pool can fund housing without duplicating projects or creating money (1824.528ms)",
+        "cabinet planning preserves deterministic settled/frontier monthly and coarse checkpoints (46836.816542ms)",
+        "tests/simulation.test.ts (848163.539209ms)",
+        "lean residential display records preserve every recorded capacity and town description (41897.03375ms)"
+      ],
+      "finalDisposition": "Ten unresolved assertions reproduce on unchanged HEAD; the mathematical-guide, endpoint-permission and refreshed-trajectory cases pass on targeted reruns. The terminated long simulation file remains incomplete."
+    },
+    "resolvedAfterBroadRun": [
+      "The cabinet trajectory fixture was regenerated only after two validated replays agreed; the targeted regression passes.",
+      "The disk endpoint test passes when it may start its local test server.",
+      "The new mathematical documentation also corrects the existing no-math section; both guide rendering tests pass."
+    ],
+    "unchangedHeadReproductions": [
+      "Housing construction outside the owner land",
+      "Two competitive-pressure/frontier review expectations",
+      "Industrial investment fixture",
+      "Bounded map lookup contract",
+      "World-scale contract",
+      "Two residential investment fixtures",
+      "Lean residential display record shape",
+      "Guide mathematical notation (subsequently fixed in the touched investment section)",
+      "Ordinary 480-month frontier growth does not create the expected independent state"
+    ],
+    "frontierLongRunBaseline": {
+      "result": "The same prosperous-independent-settlement assertion fails on unchanged HEAD.",
+      "command": "node --import tsx --test /private/tmp/uchrony-land-baseline.UvYeVN/tests/frontier-growth.test.ts",
+      "elapsedMs": 254526
+    },
+    "performanceSmoke": {
+      "command": "npm run test:performance -- --scale regional --start settled --months 6 --repeats 1 --prepare --seed productive-land-review",
+      "result": "pass",
+      "measurement": {
+        "engine": "/Users/carlo/Devel/personal/uchrony",
+        "seed": "productive-land-review",
+        "start": "settled",
+        "generationMs": 1067,
+        "generationCpuMs": 995,
+        "fromMonth": 0,
+        "months": 6,
+        "repeats": 1,
+        "cells": 8064,
+        "communities": 2120,
+        "results": [
+          {
+            "ms": 117054,
+            "preparationMs": 875,
+            "preparationCpuMs": 818,
+            "startupMs": 1942,
+            "monthsPerSecond": 0.05,
+            "tickMs": [
+              17026,
+              24444,
+              26717,
+              22986,
+              21320,
+              4562
+            ],
+            "cpuMs": 66877,
+            "tickCpuMs": [
+              12415,
+              12147,
+              12341,
+              13464,
+              12440,
+              4070
+            ],
+            "processPeakRssMiB": 870,
+            "finalHash": "e7c059f5d506781252b147db7ba0d472a4fee7979a4bb316a9aa980bdcf74373"
+          }
+        ]
+      },
+      "qualification": "An earlier implementation smoke run, before final batched allocation/funding refinements, concurrent with the broad suite. Wall times are contention-affected and are not a final implementation or before/after performance benchmark. Final production-cache complexity is covered by the focused structural contract."
+    },
+    "designDetector": {
+      "targets": [
+        "src/components/Inspector.tsx",
+        "src/components/WorldOverview.tsx",
+        "src/map/activity-layout.ts",
+        "src/map/farmstead-layout.ts"
+      ],
+      "findings": []
+    },
+    "browser": {
+      "fixture": "tests/browser/productive-land.html",
+      "observed": [
+        "Manual action funded a project for 1.792k crowns.",
+        "Pending project showed 0.00 average level and +0.0% commissioned capacity.",
+        "Completing six months showed average level 0.03 and +0.8% province capacity.",
+        "World comparison headings include Productive investment and Before productive investment."
+      ],
+      "sceneryFixture": "tests/browser/living-world.html?primitives",
+      "screenshots": [
+        "productive-land-farms-desktop-2026-10-30.png",
+        "productive-land-farms-mobile-2026-10-30.png",
+        "productive-land-panel-desktop-2026-10-30.png",
+        "productive-land-panel-mobile-2026-10-30.png"
+      ],
+      "qualification": "Labeled synthetic, paused fixtures with no personal saves or provider calls. Scenery captures use primitives and verify layout, not the Blender kit. A final source/test guard separately checks the offset barn clearance at road bends."
+    }
+  },
+  "limits": [
+    "Capacity improvements do not guarantee a positive operating surplus, a fiscal surplus or long-run historical calibration.",
+    "No matched mature-economy before/after surplus study was completed.",
+    "Field mosaic remains aligned to original terrain; this change varies representative building yards and orientations. Recorded frontier buildings remain authoritative."
+  ],
+  "toolingNote": "Impeccable reports an unset build-path preference (code-first vs comp-first). This optional project-tooling preference was not changed.",
+  "commitBoundary": {
+    "base": "277d3ba",
+    "scope": "Only paid productive land development, district facilities, organic agricultural scenery and natural-resource map changes are included in the prepared commit.",
+    "excluded": "Concurrent state self-image, focused-state map, cultural-rights and world-comparison/enterprise-summary work remains outside this commit.",
+    "build": "Isolated feature tree: npm run build passed.",
+    "trajectories": "Two independent validated settled/frontier replays agree for the isolated feature tree. The staged golden belongs to this feature alone; the working-tree golden continues to describe the combined concurrent work.",
+    "historicalEvidence": "Earlier checks and browser captures in this record used the shared working tree at the time of implementation; see isolated commit checks for the scope that is being committed.",
+    "focusedChecks": {
+      "tests": 97,
+      "passed": 97,
+      "failed": 0,
+      "qualification": "Feature alone, excluding unrelated focused-state tests."
+    },
+    "checkpointTest": {
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "format": "Isolated feature tree: npm run format and npm run format:check passed."
+  }
+}

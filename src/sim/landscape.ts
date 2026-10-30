@@ -1,5 +1,5 @@
 import { habitableLand } from './terrain-access'
-import { clamp, type Cell, type Region } from './types'
+import { clamp, type Cell, type Region, type World } from './types'
 import { hashSeed, noise } from './random'
 import { neighbors } from './grid'
 
@@ -82,4 +82,29 @@ export function landscapeAt(c: Cell): Landscape {
 export const settlementWeight = (c: Cell) => {
   const s = landscapeAt(c)
   return s.habitat * (0.5 + 4 * s.attraction ** 2)
+}
+
+export const NATURAL_RESOURCES = ['iron', 'coal', 'stone', 'timber'] as const
+export type NaturalResource = (typeof NATURAL_RESOURCES)[number]
+
+/** Opening tonnes from geographic potential. Shared by reserve initialization,
+ * declining ore grades and the map's fixed scale, so depletion cannot rescale itself away. */
+export function openingResourceReserve(c: Cell, good: NaturalResource) {
+  return landscapeAt(c).resources[good] * (good === 'timber' ? 5000 : 150000)
+}
+
+/** Stocks stay tied to terrain samples through political or economic remeshing.
+ * Pre-district worlds display their opening endowment without initializing an economy. */
+export function remainingResourceReserve(w: World, cell: number, good: NaturalResource) {
+  if (w.cells[cell].terrain === 'water') return 0
+  return w.localEconomy?.reserves[cell]?.[good] ?? openingResourceReserve(w.cells[cell], good)
+}
+
+/** The same declining ore grade used by district endowments and facility siting.
+ * Timber can regrow; a constructed mine never adds to the natural reserve. */
+export function cellResourcePotential(w: World, cell: number, good: keyof Region['deposits']) {
+  const initial = landscapeAt(w.cells[cell]).resources[good],
+    stock = w.localEconomy?.reserves[cell]?.[good],
+    opening = openingResourceReserve(w.cells[cell], good)
+  return initial * (stock === undefined || !opening ? 1 : clamp(stock / opening))
 }

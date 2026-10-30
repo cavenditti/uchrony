@@ -2,6 +2,7 @@ import { resolveIdentityPolicy } from './identity-policy'
 import type { DecisionPolicy } from './decision-policy'
 import type { ExpansionParameters } from './expansion-parameters'
 import type { Policies, Research, Inventory } from './types'
+import type { FacilityKind } from './facility-types'
 import type { ClimateConfiguration } from './climate-types'
 
 /**
@@ -419,6 +420,44 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     quarterBirth: 0.2,
     quarterRetirement: 0.1,
     transitionMonths: 12,
+  },
+  facilities: {
+    duration: 6,
+    costGrowth: 0.5,
+    productivity: 0.35,
+    equipment: 0.25,
+    jobsPerTier: 120,
+    laborBias: 2,
+    marketHandling: 0.2,
+    marketPreservation: 0.3,
+    budgetShare: 0.65,
+    minimumDeposit: 0.02,
+    minimumHabitat: 0.1,
+    neighborDemand: 0.25,
+  },
+  facilityRecipes: {
+    'farm-estate': { timber: 28, stone: 20, iron: 0, tools: 5, laborMonths: 240, technology: 0 },
+    'timber-yard': { timber: 40, stone: 16, iron: 0, tools: 6, laborMonths: 200, technology: 0 },
+    quarry: { timber: 20, stone: 32, iron: 4, tools: 8, laborMonths: 280, technology: 0 },
+    'iron-mine': { timber: 40, stone: 48, iron: 4, tools: 10, laborMonths: 320, technology: 0 },
+    'coal-mine': { timber: 48, stone: 48, iron: 8, tools: 12, laborMonths: 360, technology: 1 },
+    'tool-industry': { timber: 36, stone: 60, iron: 12, tools: 10, laborMonths: 360, technology: 0 },
+    'textile-industry': { timber: 48, stone: 48, iron: 6, tools: 8, laborMonths: 320, technology: 1 },
+    'arms-industry': { timber: 40, stone: 80, iron: 24, tools: 16, laborMonths: 480, technology: 2 },
+    market: { timber: 60, stone: 48, iron: 2, tools: 6, laborMonths: 280, technology: 0 },
+  } satisfies Record<
+    FacilityKind,
+    { timber: number; stone: number; iron: number; tools: number; laborMonths: number; technology: number }
+  >,
+  productiveLand: {
+    timber: 16,
+    stone: 24,
+    tools: 4,
+    laborMonths: 160,
+    duration: 6,
+    productivity: 0.45,
+    costGrowth: 0.6,
+    budgetShare: 0.5,
   },
   farming: { timber: 5, stone: 7, laborMonths: 100, fertility: 0.12, duration: 6 },
   transportProjects: {

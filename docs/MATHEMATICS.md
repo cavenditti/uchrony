@@ -304,8 +304,68 @@ A viewed day is a deterministic conditional sample of a saved month. Routine wei
 
 ## Public productive investment and supplier compensation
 
-A public project buys a fraction `a` of a real construction recipe. Its value is `V(a) = a * (sum(q_g * local_price_g) + labor_months * local_monthly_wage)`. Feasible scale is limited by materials, available labor, project capacity, and funding. Wages always require cash. The state may defer payment only for materials above the local consumption/input buffer. A bounded search finds the largest `a` such that `V(a) - eligible_supplier_credit(a) <= allocated_cash`. The credit limit is twelve months of the current domestic revenue estimate, less outstanding supplier claims.
+A public project buys a fraction $a$ of a real construction recipe. Its value and financing constraint are
+
+$$
+V(a)=a\left(\frac{\sum_g q_gp_g}{1000}+\ell\bar w\right),\qquad V(a)-D(a)\le B.
+$$
+
+Here $p_g$ is crowns per tonne, $\bar w$ is the monthly occupational wage in thousands of crowns, $\ell$ is worker-months, $D(a)$ is eligible supplier credit and $B$ is allocated cash. Feasible scale is also limited by materials, available labor and project capacity. Wages always require cash. The state may defer payment only for materials above the local consumption/input buffer. A bounded search finds the largest feasible $a$. The credit limit is twelve months of the current domestic revenue estimate, less outstanding supplier claims.
 
 For a deferred material purchase of value `d`: the supplier loses the actual quantity, gains a receivable of `d`, and the state gains the capital contribution and a liability of `d`. Aggregate crowns do not change. A later repayment `p` reduces treasury cash and that liability by `p`, raises supplier cash by `p`, and reduces its receivable by `p`. It is not a new sale or a second capital expense in the national accounts. Cash-basis tax/dividend capacity rises only on actual compensation. Supplier claims move with district financial ownership and survive legal succession.
 
 Public enterprise equity uses `new_shares = contribution_value / opening_book_value * old_total_shares`. This dilutes old ownership proportionally while preserving its book claim; the government gains no cash or production merely by subscribing. Dividends are transfers from realized operating cash under the ordinary firm buffer rule. Strategic reserve profit-tax relief is at most 25%, weighted by the value share of new, sufficiently productive strategic output retained within an unfilled target. Eligible quantity is bounded by `max(0, production - sold)`; sold output cannot also earn a reserve incentive. It neither taxes inventory as revenue nor pays a subsidy for holding old stocks. Food insecurity suspends the reserve incentive.
+
+
+## Technology-limited productive sites
+
+Each original terrain tile retains a commissioned level $L_c$. Its current research ceiling and productivity multiplier are
+
+$$
+L_{\max}=\min\left(6,1+\left\lfloor\min(t_{\mathrm{agriculture}},t_{\mathrm{industry}},t_{\mathrm{logistics}})\right\rfloor\right),
+\qquad m_c=1+0.45\ln(1+L_c),\qquad \bar m_r=\frac{1}{|C_r|}\sum_{c\in C_r}m_c.
+$$
+
+Agriculture, extraction and manufacturing capacity use $\bar m_r$, the area mean over equal-sized terrain samples in district $r$. Completed capital persists after conquest or district remapping; a lower successor technology ceiling prevents new tiers rather than erasing commissioned works. Research alone creates no completed levels. Zero workers, exhausted resources or missing production inputs still constrain actual output.
+
+A complete next level at a tile with level $L$ requires materials and worker-months scaled by $1+0.6L$. The first recipe is 16 tonnes timber, 24 tonnes stone, 4 tonnes tools and 160 worker-months. Only one tier per tile may be under construction, and full financing is required before commissioning it six months later. This replaces neither the separate soil-fertility ceiling nor enterprise equipment. The coefficients and construction duration are live synthetic parameters.
+
+After food coverage reaches 97%, native governments offer half their productive investment budget to a ranked batch of site works, at most one per economic district per quarterly review. With observed output value $Y_r$ and next-tier construction cost $C_{c,L+1}$, the score is
+
+$$
+S_c=\frac{Y_r\left[m(L_c+1)-m(L_c)\right]}{\bar m_r\,|C_r|\,C_{c,L_c+1}}.
+$$
+
+Dividing by current $\bar m_r$ removes the improvement already included in observed output. This is an estimate of marginal productive capacity per construction crown, not a promised sale or financial return. Budget, wages and local material availability bind every project; food emergencies redirect facility and enterprise funding to agriculture. Unspent land funding remains available for enterprise investment. Surplus value and treasury receipts still depend on realized production, input costs and sales.
+
+
+## District facilities and specialization
+
+For facility kind $k$, completed tiers $L_{c,k}$ belong to original terrain cell $c$. Its relevant technology is $t_k$, the configured entry threshold is $t_{0,k}$, and the shared land and research constraints are
+
+$$
+\sum_k L_{c,k}\le 6,\qquad L_{k,\max}=\min\left(6,\max\left(0,1+\lfloor t_k-t_{0,k}\rfloor\right)\right),\qquad
+\bar L_{r,k}=\frac{1}{|C_r|}\sum_{c\in C_r}L_{c,k}.
+$$
+
+Agricultural estates, timber yards, quarries, iron mines and coal mines require the corresponding geographic endowment. Ore-grade potential is reduced by the share of its original reserve remaining. Workshop and market sites require habitable land. Every tier consumes its actual construction recipe and worker-months, scaled by $1+0.5L_{c,k}$, and commissions after six months by default. There can be only one project per cell at a time. Neither technology nor site selection awards construction output.
+
+Primary-sector capacity multiplies by $1+0.35\ln(1+\bar L_{r,k})$ for the matching kind only. Workshop sector equipment is $K^{\mathrm{eff}}_{r,f,k}+0.25\bar L_{r,k}$, retaining its ordinary worker and input constraints. Total public indoor capacity is
+
+$$
+H^{\mathrm{public}}_r=120\sum_{c\in C_r}\sum_{k\in\{\mathrm{tools,textiles,arms}\}}L_{c,k},\qquad
+H^{\mathrm{available}}_{r,f}=H^{\mathrm{private}}_{r,f}+\frac{H^{\mathrm{public}}_r}{\max(1,F^{\mathrm{active}}_r)}.
+$$
+
+The same commissioned capital can therefore establish industrial equipment and finite premises where private workshops are absent. Firms cannot multiply the shared workplace allowance by entering. Installed capacity biases sector labor plans; solvent demand, manufacturing inputs and paid hiring still determine employment and output. A district receives a specialization label only when one broad category holds a strict majority of its commissioned tiers; the label itself has no economic effect.
+
+With mean market tiers $M_r$, the handling margin and integrated physical storage-loss rate are
+
+$$
+\mu^{\mathrm{handling}}_r=\frac{0.04}{1+0.2M_r},\qquad
+\delta_{r,g}(\Delta)=1-\left(1-\frac{\delta_g}{1+0.3M_r}\right)^\Delta.
+$$
+
+Merchants retain weighted inventory acquisition costs and actual interest obligations. The ordinary loss-recovery and financing terms are added to the handling margin. Lower storage losses leave physical goods available; constructing a market never grants new goods or revenue.
+
+Native facilities receive 65% of productive capital funding remaining after general land works. A complete project's total commitment, including supplier claims, must fit the remaining appropriation. Alternatives are ranked by $S_{r,k}=\widehat{\Delta V}_{r,k}/C_{r,k}$. The numerator estimates marginal output capacity or avoided distribution losses from observed local prices and margins, remaining resources, inputs, storage and customer demand. Nearby domestic demand is weighted by infrastructure and a configured 25% neighbor share. It is neither a contract nor proof of a traversable freight route. Food emergencies prioritize estates; otherwise at most one ranked facility is funded per district per review. Coefficients, recipes and thresholds are synthetic, configurable assumptions rather than promised profits or historical estimates.

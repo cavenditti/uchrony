@@ -1,5 +1,6 @@
 /** Narrative projections expose each government's knowledge rather than world truth.
  * The referee projection separately includes evidence needed to validate settlement. */
+import { regionalFacilityLevels, facilityDistrictActivity } from './productive-facilities'
 import { advisorContext } from './advisors'
 import { statecraftAffordances } from './statecraft-affordances'
 import { sovereignStrategyContext } from './sovereign-strategy'
@@ -103,6 +104,12 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
         unrest: region.unrest,
         infrastructure: region.infrastructure,
         publicWorks: region.publicWorks,
+        ...(world.facilities
+          ? {
+              productiveFacilities: regionalFacilityLevels(world, region),
+              installedSpecialization: facilityDistrictActivity(world, region),
+            }
+          : {}),
         militaryControl: region.control,
         delegation: region.delegation,
         industry: region.industry,

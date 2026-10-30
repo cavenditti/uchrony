@@ -1,12 +1,7 @@
 import { parameterGroup } from './configuration-context'
-import { quoteMaterialFinancing, issueSupplierCredit } from './supplier-credit'
 import { nativeDomesticControl } from './domestic-policy'
 import { economicRegions, provinceId } from './local-units'
-import { governmentAccount, householdAccount, producerAccount, transfer } from './ledger'
-import { marketStore, recordGoodsSale, recordOwnCapital, recordWages } from './national-accounts'
-import { collectedTaxRate } from './macroeconomy'
-import { STRATA } from './economic-types'
-import { WAGE_SKILL } from './firms'
+import { fundPublicConstruction, publicConstructionQuote } from './public-construction'
 import { crossedPeriodMonth, simulationMonths } from './simulation-period'
 import { recordWorldEvent } from './event-memory'
 import { population, type Region, type World } from './types'
@@ -33,94 +28,27 @@ function pending(w: World, r: Region) {
 }
 
 export function farmQuote(w: World, r: Region) {
-  const producer = w.economy!.producers[r.id],
-    hh = w.economy!.households[r.id]
-  const area = Math.max(1, r.cells.length)
-  const labor = (FARM_WORK.laborMonths * area) / simulationMonths()
-  const wage = producer.wage
-  const slots = STRATA.map((s) => ({
-    s,
-    jobs: Math.max(0, hh[s].laborForce - hh[s].employed),
-    wage: wage * WAGE_SKILL[s],
-  }))
-  const available = slots.reduce((sum, s) => sum + s.jobs, 0)
-  const averageWage = available ? slots.reduce((sum, s) => sum + s.jobs * s.wage, 0) / available : wage
-  const timber = FARM_WORK.timber * area,
+  const area = Math.max(1, r.cells.length),
+    timber = FARM_WORK.timber * area,
     stone = FARM_WORK.stone * area
-  const cost = (timber * r.prices.timber + stone * r.prices.stone) / 1000 + labor * averageWage
   const room = Math.max(0, Math.min(1, (1.2 - r.fertility - pending(w, r)) / FARM_WORK.fertility))
-  return { cost, labor, slots, available, timber, stone, room }
+  return {
+    ...publicConstructionQuote(w, r, { timber, stone }, FARM_WORK.laborMonths * area),
+    timber,
+    stone,
+    room,
+  }
 }
 
 /** The state pays real sellers and available workers. Quoted future yields do
  * not supply funds; a project can neither mint money nor double-book labor. */
 export function fundFarm(w: World, r: Region, budget: number) {
   if (r.nation < 0 || !population(r) || w.nations[r.nation].extinct !== undefined) return 0
+  if ((w.farmProjects?.length ?? 0) >= w.cells.length) return 0
   const q = farmQuote(w, r),
-    n = w.nations[r.nation],
-    merchant = w.economy!.producers[r.id]
-  if (q.cost <= 0 || merchant.wage <= 0) return 0
-  const financing = quoteMaterialFinancing(
-    w,
-    r,
-    { timber: q.timber, stone: q.stone },
-    q.cost - (q.timber * r.prices.timber + q.stone * r.prices.stone) / 1000,
-    Math.min(q.room, q.available / q.labor),
-    budget,
-  )
-  const amount = financing.amount
-  if (amount < 0.01 || (w.farmProjects?.length ?? 0) >= w.cells.length) return 0
-  const account = governmentAccount(n.id)
-  let spent = 0
-  for (const g of ['timber', 'stone'] as const) {
-    const quantity = Math.min(r.stocks[g], amount * q[g])
-    const deferred = (Math.min(quantity, financing.deferred[g] ?? 0) * r.prices[g]) / 1000
-    issueSupplierCredit(w, r, deferred)
-    const paid = transfer(
-      w,
-      account,
-      producerAccount(r.id),
-      (quantity * r.prices[g]) / 1000 - deferred,
-      'farm construction materials',
-    )
-    recordGoodsSale(w, marketStore(r.id), g, quantity, paid + deferred, {
-      kind: 'business',
-      nation: n.id,
-      account,
-    })
-    r.stocks[g] -= quantity
-    r.consumption[g] += quantity
-    merchant.sales += paid
-    merchant.sold[g] += quantity
-    spent += paid + deferred
-  }
-  for (const slot of q.slots) {
-    const h = w.economy!.households[r.id][slot.s]
-    const jobs = (amount * q.labor * slot.jobs) / q.available
-    const paid = transfer(
-      w,
-      account,
-      householdAccount(r.id, slot.s),
-      jobs * slot.wage,
-      'farm construction wages',
-    )
-    const tax = transfer(
-      w,
-      householdAccount(r.id, slot.s),
-      account,
-      paid * collectedTaxRate(w, r),
-      'construction wage income tax',
-    )
-    h.employed += slot.wage > 0 ? paid / slot.wage : 0
-    h.income += paid
-    h.taxes += tax
-    n.income += tax
-    recordWages(w, r.id, account, paid)
-    spent += paid
-  }
-  n.spending += spent
-  merchant.investment += spent
-  recordOwnCapital(w, r.id, account, spent)
+    n = w.nations[r.nation]
+  const { amount, cost: spent } = fundPublicConstruction(w, r, q, q.room, budget, 'farm construction')
+  if (!spent) return 0
   ;(w.farmProjects ??= []).push({
     nation: n.id,
     cells: [...r.cells],

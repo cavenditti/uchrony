@@ -9,7 +9,7 @@ import { consolidateClaims } from './district-finance'
 import type { DistrictEconomy, DistrictUnit } from './district-types'
 import { STRATA, type EconomicStratum, type ProducerAccount } from './economic-types'
 import { neighbors } from './grid'
-import { landscapeAt } from './landscape'
+import { cellResourcePotential, landscapeAt, openingResourceReserve } from './landscape'
 import {
   accountAddress,
   auditLedger,
@@ -19,6 +19,7 @@ import {
   producerAccount,
 } from './ledger'
 import { MODEL_PARAMETERS } from './model-parameters'
+import { facilityDistrictActivity } from './productive-facilities'
 import { inventoryQuote, marketStore, reconcileGDP, recordGift } from './national-accounts'
 import { coalesceCommunities, communitySize, emptyDynamics, rollupPopulation } from './population'
 import type { BirthCohort, PopulationCommunity } from './population-types'
@@ -142,13 +143,9 @@ export function refreshEndowment(w: World, r: DistrictUnit, refreshFertility = t
   if (refreshFertility)
     r.fertility = r.cells.reduce((s, id) => s + landscapeAt(w.cells[id]).habitat, 0) / area
   for (const good of minerals)
-    r.deposits[good] =
-      r.cells.reduce((s, id) => {
-        const initial = landscapeAt(w.cells[id]).resources[good]
-        const stock = w.localEconomy?.reserves[id]?.[good]
-        const opening = initial * (good === 'timber' ? 5000 : 150000)
-        return s + initial * (stock === undefined || !opening ? 1 : clamp(stock / opening))
-      }, 0) / area
+    r.deposits[good] = r.cells.reduce((sum, id) => sum + cellResourcePotential(w, id, good), 0) / area
+  const specialization = facilityDistrictActivity(w, r)
+  if (specialization) r.activity = specialization
 }
 
 /** Opening partitions inherit the original bank and keep its surviving loan identity. */
@@ -231,7 +228,7 @@ export function ensureDistrictEconomy(w: World) {
     if (c.terrain !== 'water') {
       const natural = landscapeAt(c).resources
       system.reserves[c.id] = Object.fromEntries(
-        minerals.map((g) => [g, natural[g] * (g === 'timber' ? 5000 : 150000)]),
+        minerals.map((g) => [g, openingResourceReserve(c, g)]),
       ) as typeof natural
       system.built[c.id] = 0
     }

@@ -1,10 +1,10 @@
 [
   ["settled", "prepared", "302ba67a94c10b366393a2aa2adc5bebfb6abfa60a951e4e791ee1b958ea3580"],
-  ["settled", "monthly", "aaf1c90ea6e60bd8c5bd18f85d16169dea0444dfc52b17cdeeb045e1e25a595a"],
-  ["settled", "coarse", "876c194bb39348b246dc47fa5c175ccec1536c5ebb5b57b9fd4c137b0db02322"],
-  ["settled", "period", "01438b1c9468aafa60dea0f8efc80ec20d09d43ec976f1dc983960bd6023c708"],
+  ["settled", "monthly", "c10abee5cfb6735cd8c5f85155803bb085e504f6a5e42440733194f6ee3fc5fd"],
+  ["settled", "coarse", "26d862a176fc7dae0b2c7e56c09b718b0102c8d641dabf906d21cd7bc4e26b33"],
+  ["settled", "period", "d0e41a34678a1fc463ba1057a155acf3652cd90945882c47a4e5169869726987"],
   ["frontier", "prepared", "3aba0609690a82d7b39a9a5cc343d6c77749ce6702b05e4930d7835e4bfa41d7"],
-  ["frontier", "monthly", "3486c3d2a7d0d1d98f3301fbbe599077466c48876bb201072e7e5c162b3536f1"],
-  ["frontier", "coarse", "7a3d572344df17e8e5c81d6bb8910b6f04d0ab88ca2803a65b08ba5f121c46a2"],
-  ["frontier", "period", "c420b885ff5cf7ce7ae885aae7133a11efdbbb5c790c4a2ea0edb8b530a66960"]
+  ["frontier", "monthly", "8f8d9429509ab0672c822d4576fbd30ff29528dbe27059d48e08baceaa785f7b"],
+  ["frontier", "coarse", "aac23fc5a5a29991dcd744969db599d85af70ff57fd583201356dd07039e5582"],
+  ["frontier", "period", "b8f10d2dcc19f5a71036685b379253c796147024a5fc234f980233b87d474648"]
 ]

@@ -1,0 +1,155 @@
+{
+  "date": "2026-10-30",
+  "scope": "Paid district facilities and resource-aware specialization, manual/native/model construction choices, remaining-natural-reserve map layer. Earlier productive-land and agricultural-placement work remains included. Existing unrelated working-tree edits are preserved. No commit, push or deployment.",
+  "behavior": {
+    "facilities": [
+      "farm-estate",
+      "timber-yard",
+      "quarry",
+      "iron-mine",
+      "coal-mine",
+      "tool-industry",
+      "textile-industry",
+      "arms-industry",
+      "market"
+    ],
+    "construction": "Six shared facility-tier slots per terrain tile; relevant research bounds individual upgrades. Increasing paid recipes, available construction labor, full funding, one pending project per tile and six-month default completion. Conquest and remeshing retain physical sites. No free ore, stock, workers or instant productive capacity.",
+    "economics": "Matching sectors gain diminishing productive capacity and labor-plan weight. Public workshops provide finite premises shared among firms, including where private capacity is absent. Manufacturing still needs actual inputs, paid workers and customers. Markets reduce actual storage spoilage and handling; they do not create goods or cancel debt. Native ranking uses deposits, demand, neighboring domestic markets, prices, input availability and skills.",
+    "controls": "Develop this province offers district and facility selectors, exact executable quotes, obstacles, recommendations, specialization, pending construction and completed tiers. Model commands use the same paths and can target a district.",
+    "map": "Natural resources is a world-map layer with iron, coal, stone and timber selection, remaining tonnes per original terrain tile, exact quantities on hover/place inspection, a logarithmic legend anchored to opening endowments, renewable-timber guidance, and explicit absent/exhausted states. Flat atlas and relief share the reserve raster. No additional snapshot payload is needed."
+  },
+  "refinementPasses": {
+    "architecture": "Separated facility definitions/state, commissioned capacity, pure economic estimates, construction selection/funding, persistence and presentation. Shared public-construction settlement retains conservation. Shared reserve conversion now serves initialization, declining grade and map fallback. UI geography never initializes or mutates economic state.",
+    "functions": "Reviewed whole-tier commitments, exact district/ownership boundaries, zero wage/material cases, technology and shared-slot limits, input-constrained industry, idempotent completion, integer specialization ties, depleted/barren resource sites, zero-deposit maps and physical pointer boundaries.",
+    "performance": "District mean tiers cache by world/facility state and immutable cell array; commissioning invalidates them. Pending-site indexes append incrementally. A deterministic test exercises 100000 repeated capacity queries without rescanning terrain. Native selection scans nine fixed alternatives per district and sorts funded prospects. Resource cartography is O(terrain cells) per active snapshot/selection, retains one Float64 quantity array and a 4-byte-per-cell raster, and uses a 256-entry palette with no per-cell RGB allocations. Camera redraws reuse a weakly cached raster; other layers do no resource-map work. World-scale simulation throughput was not benchmarked.",
+    "style": "New modules document economic rationale, units, reserve semantics, cache ownership and constraints. Repository format and format:check pass. Model, mathematics and rendering documentation describe the resulting behavior."
+  },
+  "verification": {
+    "build": {
+      "command": "npm run build",
+      "result": "Pass; existing large-chunk warnings remain."
+    },
+    "format": {
+      "commands": [
+        "npm run format",
+        "npm run format:check"
+      ],
+      "result": "Pass."
+    },
+    "finalFocused": {
+      "command": "node --import tsx --test tests/natural-resources.test.ts tests/map-legend.test.ts tests/renderer-placement.test.ts tests/productive-facilities.test.ts tests/productive-facilities-display.test.ts tests/productive-land.test.ts tests/productive-land-display.test.ts tests/agriculture.test.ts tests/configuration.test.ts tests/retail-pricing.test.ts tests/model-mathematics.test.ts tests/living-world.test.ts tests/focused-state-map.test.ts tests/district-economy.test.ts",
+      "tests": 103,
+      "passed": 103,
+      "failed": 0,
+      "elapsedMs": 139288.43475,
+      "qualification": "Final functional implementation, including all resource-map refinements. Timing reflects concurrent validation, not a simulation benchmark."
+    },
+    "additionalIntegration": {
+      "files": [
+        "cabinet-statecraft.test.ts",
+        "banks-firms-gdp.test.ts",
+        "development-war.test.ts",
+        "productive-land-display.test.ts"
+      ],
+      "tests": 54,
+      "passed": 54,
+      "failed": 0,
+      "qualification": "Facility integration checks before the final map-only extension and integer-tie refinement; overlapping focused tests were rerun afterwards."
+    },
+    "trajectories": "Two independent settled/frontier replays agreed at prepared, monthly, coarse and period checkpoints, validating worlds after each step. The expected cabinet trajectory fixture was refreshed for the intentional simulation change, then the checked test passed. The final integer-majority refinement also passed this contract without changing the recorded hashes. Resource cartography is read-only and observation-purity tests pass.",
+    "broadAttempt": {
+      "command": "npm test -- --test-timeout=120000",
+      "tests": 916,
+      "passed": 904,
+      "failed": 12,
+      "qualification": "This broad attempt preceded the resource-map extension. The appended timeout did not bound workers. The final simulation.test.ts worker was manually terminated after about 13 minutes in that worker; its remaining cases are unverified. This is not a full-suite pass.",
+      "existingAssertionsReproducedOnHead": [
+        "housing requires paid labor and real materials, and capacity appears only on completion",
+        "a more assertive frontier still pays for materials, relocates people and respects player control",
+        "coarse frontier reviews account for multiple scheduled decisions without adding resources",
+        "industrial investment is queued and unfunded capacity does not grow automatically",
+        "an ordinary frontier expands and produces a funded new state without injected resources",
+        "bounded map lookups retain exact coastline geometry and freight traversal order",
+        "world scale adds physical distance, connected provinces, independent states and a sparse navigable shipping network",
+        "funded expansion creates a within-cell parcel only after payment; capacity waits for construction",
+        "several centres in one pool can fund housing without duplicating projects or creating money",
+        "lean residential display records preserve every recorded capacity and town description"
+      ],
+      "otherFailures": [
+        "Disk endpoint could not open its temporary server under default execution permissions; targeted rerun with local-server permission passed.",
+        "The manually terminated simulation.test.ts worker."
+      ]
+    },
+    "diskEndpointRerun": {
+      "command": "node --import tsx --test --test-name-pattern='the disk endpoint' tests/autosave.test.ts",
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "monthlySmoke": {
+    "evidence": "productive-facilities-monthly-smoke-2026-10-30.json",
+    "seed": "refactor-contract",
+    "scale": "regional",
+    "start": "settled",
+    "states": 4,
+    "months": 8,
+    "method": "Ordinary monthly steps with untouched opening endowments and world validation after every step.",
+    "completedTiersAtMonth8": {
+      "farm-estate": 272,
+      "timber-yard": 10,
+      "market": 25
+    },
+    "pendingAtMonth8": 651,
+    "qualification": "This checks autonomous paid construction. Early food priorities did not commission mines or workshops in this short run. Controlled comparative fixtures independently prove that an ore-rich district chooses iron mining while a skilled, input-supplied urban district chooses tool industry. Long-run surplus and specialization frequencies are not calibrated. All four governments spent more than their monthly receipts at month eight; productive investments do not promise fiscal surplus."
+  },
+  "browser": {
+    "facilityFixture": "/tests/browser/productive-facilities.html",
+    "resourceFixture": "/tests/browser/natural-resources.html",
+    "qualification": "Paused synthetic worlds; no personal saves, provider calls or background simulation.",
+    "viewports": [
+      "1440x1000",
+      "390x844"
+    ],
+    "observed": [
+      "Iron mine funded for 4.618k crowns, shown pending, then completed after six months with mining specialization.",
+      "A selected barren hinterland disables iron-mine construction and explains the missing reserve.",
+      "All four resource selectors, flat/relief switching, Terrain-to-Natural-resources menu switching, live tile hover quantities, and exhausted-iron neutral rendering work.",
+      "Hover reported Iron 42866 t before depletion and 0 t afterwards, while the scale remained 884755 t.",
+      "No horizontal overflow at either viewport; the selector remains operable on phones."
+    ],
+    "accessibility": {
+      "facilities": "axe WCAG2A/AA: zero violations and zero incomplete rules.",
+      "resources": "axe WCAG2A/AA: zero violations, one incomplete color-contrast rule involving canvas-backed controls. Computed new legend and selector foreground/background contrast exceeds 9.8:1 and 11.6:1 respectively; this is a scoped manual check, not a full WCAG certification."
+    },
+    "captures": [
+      "productive-facilities-desktop-2026-10-30.png",
+      "productive-facilities-mobile-2026-10-30.png",
+      "productive-facilities-no-ore-2026-10-30.png",
+      "natural-resources-desktop-2026-10-30.png",
+      "natural-resources-mobile-2026-10-30.png",
+      "natural-resources-relief-2026-10-30.png",
+      "natural-resources-exhausted-2026-10-30.png"
+    ]
+  },
+  "commitBoundary": {
+    "base": "277d3ba",
+    "scope": "Only paid productive land development, district facilities, organic agricultural scenery and natural-resource map changes are included in the prepared commit.",
+    "excluded": "Concurrent state self-image, focused-state map, cultural-rights and world-comparison/enterprise-summary work remains outside this commit.",
+    "build": "Isolated feature tree: npm run build passed.",
+    "trajectories": "Two independent validated settled/frontier replays agree for the isolated feature tree. The staged golden belongs to this feature alone; the working-tree golden continues to describe the combined concurrent work.",
+    "historicalEvidence": "Earlier checks and browser captures in this record used the shared working tree at the time of implementation; see isolated commit checks for the scope that is being committed.",
+    "focusedChecks": {
+      "tests": 97,
+      "passed": 97,
+      "failed": 0,
+      "qualification": "Feature alone, excluding unrelated focused-state tests."
+    },
+    "checkpointTest": {
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "format": "Isolated feature tree: npm run format and npm run format:check passed."
+  }
+}

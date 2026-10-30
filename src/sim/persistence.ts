@@ -1,3 +1,5 @@
+import { validateFacilities } from './facility-persistence'
+import { validateProductiveLand } from './productive-land-persistence'
 import { validateOverseas } from './overseas-persistence'
 import { validateDynasticState } from './dynastic-persistence'
 import { validateWorldArchive } from './world-archive'
@@ -423,6 +425,8 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
       seen.add(key)
     }
   }
+  validateProductiveLand(w)
+  validateFacilities(w)
   if (w.farmProjects !== undefined) {
     if (!Array.isArray(w.farmProjects) || w.farmProjects.length > w.cells.length)
       fail('invalid farm projects')

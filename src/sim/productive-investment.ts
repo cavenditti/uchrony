@@ -1,9 +1,13 @@
+import { fundFacilityProgram } from './facility-investment'
+import { FACILITY_POLICY } from './productive-facilities'
+import { fundLandDevelopmentProgram } from './land-investment'
+import { LAND_WORK } from './productive-land'
 import { activeDevelopment } from './development'
 import { invest, regionalFirms } from './firms'
 import { economicRegions, provinceId } from './local-units'
 import { crossedPeriodMonth, simulationMonths } from './simulation-period'
 import { recordWorldEvent } from './event-memory'
-import { population, type World } from './types'
+import { population, type Region, type World } from './types'
 
 export type ProductiveActivity = 'food' | 'tools' | 'textiles'
 export const ACTIVITY_NAMES = {
@@ -52,12 +56,21 @@ export function fundProductiveActivity(
 }
 
 export function advanceProductiveInvestment(w: World) {
-  const units = economicRegions(w)
+  const units = economicRegions(w),
+    byNation = new Map<number, Region[]>()
+  // Build domestic portfolios once; adding more states must not multiply the
+  // full world scan for the new district-facility planner.
+  for (const r of units) {
+    const own = byNation.get(r.nation) ?? []
+    own.push(r)
+    byNation.set(r.nation, own)
+  }
   for (const n of w.nations) {
+    const own = byNation.get(n.id) ?? []
     const plan = activeDevelopment(w, n)
     if (!plan || !crossedPeriodMonth(w.month, n.id % 3, 3)) continue
-    const prospects = units
-      .filter((r) => r.nation === n.id && !w.regions[provinceId(r)].control)
+    const prospects = own
+      .filter((r) => !w.regions[provinceId(r)].control)
       .flatMap((r) =>
         (n.foodCoverage < 0.97 ? (['food'] as const) : (['food', 'tools', 'textiles'] as const)).map(
           (activity) => {
@@ -83,8 +96,14 @@ export function advanceProductiveInvestment(w: World) {
       plan.appropriation * 0.3 +
         Math.max(0, n.treasury - plan.revenue * 6) * (1 - 0.98 ** Math.max(3, simulationMonths())),
     )
+    // Food emergencies redirect capital to agricultural facilities and equipment.
+    // Once basic needs are met, general land works can improve mature sites.
+    const landSpent =
+      n.foodCoverage >= 0.97 ? fundLandDevelopmentProgram(w, n, own, budget * LAND_WORK.budgetShare) : 0
+    const facilitySpent = fundFacilityProgram(w, n, own, (budget - landSpent) * FACILITY_POLICY.budgetShare)
+    plan.appropriation = Math.max(0, plan.appropriation - landSpent - facilitySpent)
     for (const p of prospects) {
-      const spent = fundProductiveActivity(w, p.region, p.activity, budget)
+      const spent = fundProductiveActivity(w, p.region, p.activity, budget - landSpent - facilitySpent)
       if (spent > 0) {
         plan.appropriation = Math.max(0, plan.appropriation - spent)
         break

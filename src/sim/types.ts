@@ -37,6 +37,7 @@ export const FIELDS: Research[] = [
 export type Layer =
   | 'political'
   | 'terrain'
+  | 'resources'
   | 'population'
   | 'culture'
   | 'language'
@@ -332,6 +333,8 @@ export interface World {
   routes: Route[]
   tradeLanes?: TradeLane[]
   harbors?: { cell: number; since: number; updated: number; lastActive: number; throughput: number }[]
+  facilities?: import('./facility-types').FacilitySystem
+  productiveLand?: import('./productive-land').ProductiveLand
   farmProjects?: import('./agriculture').FarmProject[]
   corridors?: CorridorTrace[]
   corridorPlan?: CorridorPlan
@@ -446,6 +449,7 @@ export type Command =
       type: 'build'
       region: number
       building:
+        | 'land-works'
         | 'farm'
         | 'food-works'
         | 'textile-works'
@@ -453,6 +457,13 @@ export type Command =
         | 'road'
         | 'school'
         | import('./public-works').TransportProject
+    }
+  | {
+      type: 'build-facility'
+      region: number
+      facility: import('./facility-types').FacilityKind
+      district?: number
+      cell?: number
     }
   | { type: 'control'; nation: number | null }
   | { type: 'disaster'; region: number; disaster: 'drought' | 'epidemic' | 'abundance' }

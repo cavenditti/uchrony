@@ -363,7 +363,8 @@ test('cabinet planning preserves deterministic settled/frontier monthly and coar
     readFileSync(new URL('./fixtures/cabinet-trajectories.json', import.meta.url), 'utf8'),
   )
   // The inspection archive is derived evidence, covered by its own continuation tests.
-  // Keep the physical trajectory fingerprint comparable with the pre-archive baseline.
+  // Paid site development changes this authoritative trajectory; exclude only
+  // inspection evidence when recording its versioned checkpoints.
   const trajectoryHash = (w: World) => {
     const state = { ...w }
     delete state.archive

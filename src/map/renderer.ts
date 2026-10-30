@@ -6,6 +6,7 @@ import { CELL_SIZE, neighbors } from '../sim/grid'
 import { clamp, type World, type Layer } from '../sim/types'
 import { buildGeometry, type MapGeometry, type Ring } from './geometry'
 import { dominantIdentity, identityAxis, identityColor } from './identity'
+import { resourceMapData, resourceRaster, type ResourceMapData } from './natural-resources'
 
 export const terrainColors = {
   plains: '#b9be85',
@@ -175,6 +176,7 @@ export function drawAtlas(
   relief = false,
   linework = true,
   quadtree = false,
+  resources?: ResourceMapData,
 ) {
   ctx.drawImage(cache.ocean, 0, 0, cache.worldWidth, cache.worldHeight)
   ctx.save()
@@ -189,6 +191,20 @@ export function drawAtlas(
       ctx.fillStyle = n.color
       ctx.fill(shape)
     }
+  } else if (layer === 'resources') {
+    ctx.globalAlpha = 1
+    // Nearest-neighbour sampling preserves actual deposit boundaries and empty
+    // cells; interpolation must not paint ore into a neighboring barren tile.
+    const smoothing = ctx.imageSmoothingEnabled
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(
+      resourceRaster(world, resources ?? resourceMapData(world, 'iron')),
+      0,
+      0,
+      cache.worldWidth,
+      cache.worldHeight,
+    )
+    ctx.imageSmoothingEnabled = smoothing
   } else if (layer === 'population' && !quadtree) {
     const spatial = spatialState(world),
       districts = districtAtlas(world)
@@ -230,7 +246,15 @@ export function drawAtlas(
       ctx.fillStyle = fill
       ctx.fill(cache.provinces[r.id], 'evenodd')
     }
-  ctx.globalAlpha = ['population', 'food', 'prosperity', 'culture', 'language', 'belief'].includes(layer)
+  ctx.globalAlpha = [
+    'population',
+    'food',
+    'prosperity',
+    'culture',
+    'language',
+    'belief',
+    'resources',
+  ].includes(layer)
     ? 0.28
     : 0.85
   if (!relief) ctx.drawImage(cache.relief, 0, 0, cache.worldWidth, cache.worldHeight)
