@@ -148,19 +148,23 @@ export function commissionQuote(
   const timber = warships * 55 + transports * 40,
     iron = warships * 18 + transports * 8,
     arms = warships * 10,
-    tools = (warships + transports) * 4
+    tools = (warships + transports) * 4,
+    rope = warships * 5 + transports * 2,
+    textiles = warships * 8 + transports * 3
   if (
     n.treasury < cost ||
     r.population.adults < crew ||
     r.stocks.timber < timber ||
     r.stocks.iron < iron ||
     r.stocks.arms < arms ||
-    r.stocks.tools < tools
+    r.stocks.tools < tools ||
+    r.stocks.rope < rope ||
+    r.stocks.textiles < textiles
   )
     throw new Error(
-      'Shipbuilding needs treasury funds, timber, iron, arms, tools, and adult crews in this port.',
+      'Shipbuilding needs treasury funds, timber, iron, arms, tools, rope, textiles, and adult crews in this port.',
     )
-  return { region, warships, transports, crew, cost, timber, iron, arms, tools }
+  return { region, warships, transports, crew, cost, timber, iron, arms, tools, rope, textiles }
 }
 
 /** Bounded menus share the exact shipyard validation used when executing. */
@@ -183,7 +187,13 @@ export function commissionFleet(
   warships: number,
   transports: number,
 ) {
-  const { crew, cost, timber, iron, arms, tools } = commissionQuote(w, nation, region, warships, transports)
+  const { crew, cost, timber, iron, arms, tools, rope, textiles } = commissionQuote(
+    w,
+    nation,
+    region,
+    warships,
+    transports,
+  )
   const state = ensureWarfare(w),
     n = w.nations[nation],
     r = w.regions[region],
@@ -196,16 +206,22 @@ export function commissionFleet(
     ['iron', iron],
     ['arms', arms],
     ['tools', tools],
+    ['rope', rope],
+    ['textiles', textiles],
   ] as const)
     recordUse(w, marketStore(r.id), good, amount)
   r.stocks.timber -= timber
   r.stocks.iron -= iron
   r.stocks.arms -= arms
   r.stocks.tools -= tools
+  r.stocks.rope -= rope
+  r.stocks.textiles -= textiles
   r.consumption.timber += timber
   r.consumption.iron += iron
   r.consumption.arms += arms
   r.consumption.tools += tools
+  r.consumption.rope += rope
+  r.consumption.textiles += textiles
   state.fleets.push({
     id: w.nextArmy++,
     nation,

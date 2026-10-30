@@ -110,13 +110,17 @@ export function advanceLandUse(
         wages += paid
         recordWages(w, id, producerAccount(id), paid)
       }
-      const { timber, stone } = inputs
+      const { timber, stone, bricks } = inputs
       const materials =
-        recordUse(w, marketStore(id), 'timber', timber) + recordUse(w, marketStore(id), 'stone', stone)
+        recordUse(w, marketStore(id), 'timber', timber) +
+        recordUse(w, marketStore(id), 'stone', stone) +
+        recordUse(w, marketStore(id), 'bricks', bricks)
       r.stocks.timber = Math.max(0, r.stocks.timber - timber)
       r.stocks.stone = Math.max(0, r.stocks.stone - stone)
+      r.stocks.bricks = Math.max(0, r.stocks.bricks - bricks)
       r.consumption.timber += timber
       r.consumption.stone += stone
+      r.consumption.bricks += bricks
       recordOwnCapital(w, id, producerAccount(id), wages + materials)
       a.construction.push({
         site: site.id,

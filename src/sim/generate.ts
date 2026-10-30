@@ -1,3 +1,4 @@
+import { COMMODITIES, EXTENDED_GOODS } from './commodity-catalog'
 import { configurationValues, withConfigurationValues } from './configuration-context'
 import { validateConfigurationValues } from './configuration'
 import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './configuration-defaults'
@@ -321,6 +322,11 @@ function generateConfiguredWorld(
     stocks.tools = size * 0.002
     stocks.textiles = size * 0.003
     stocks.arms = size * 0.001
+    // Existing upstream inventories seed a working chain, not permanent free inputs.
+    stocks.ironOre = size * 0.012
+    stocks.charcoal = size * 0.006
+    stocks.wool = size * 0.004
+    for (const good of EXTENDED_GOODS) stocks[good] = size * COMMODITIES[good].opening
     return {
       id,
       name: provinceName(id),

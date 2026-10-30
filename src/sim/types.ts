@@ -1,3 +1,4 @@
+import { COMMODITIES, EXTENDED_GOODS } from './commodity-catalog'
 import type { OverseasQuote } from './overseas'
 import type { PopulationCensus } from './view-snapshot'
 import type { EconomicSystem } from './economic-types'
@@ -21,8 +22,39 @@ import type {
 } from './population-types'
 
 export { MAX_STATE_IDENTITIES } from './simulation-invariants'
-export const GOODS = ['food', 'timber', 'stone', 'iron', 'coal', 'tools', 'textiles', 'arms'] as const
+export const GOODS = [
+  'food',
+  'timber',
+  'stone',
+  'iron',
+  'coal',
+  'tools',
+  'textiles',
+  'arms',
+  'ironOre',
+  'charcoal',
+  'wool',
+  ...EXTENDED_GOODS,
+] as const
 export type Good = (typeof GOODS)[number]
+/** Human-readable labels keep structural save identifiers out of market panels. */
+export const GOOD_LABELS: Readonly<Record<Good, string>> = {
+  food: 'Food',
+  timber: 'Timber',
+  stone: 'Stone',
+  iron: 'Iron',
+  coal: 'Coal',
+  tools: 'Tools',
+  textiles: 'Textiles',
+  arms: 'Arms',
+  ironOre: 'Iron ore',
+  charcoal: 'Charcoal',
+  wool: 'Wool',
+  ...(Object.fromEntries(EXTENDED_GOODS.map((good) => [good, COMMODITIES[good].label])) as Record<
+    (typeof EXTENDED_GOODS)[number],
+    string
+  >),
+}
 export type Inventory = Record<Good, number>
 export type Terrain = 'water' | 'plains' | 'forest' | 'hills' | 'mountains' | 'desert' | 'tundra'
 export type Research = 'agriculture' | 'industry' | 'medicine' | 'logistics' | 'military' | 'governance'
@@ -96,6 +128,7 @@ export interface Region {
   industry: number
   stocks: Inventory
   production: Inventory
+  productionTechniques?: Partial<Record<'textiles' | 'tools' | 'arms', string>>
   plannedProduction?: Inventory
   consumption: Inventory
   prices: Inventory
@@ -264,6 +297,7 @@ export interface HistoryPoint {
   nations: { id: number; population: number; gdp: number; territory: number; treasury: number }[]
 }
 export interface World {
+  resourceStocks?: import('./resource-extraction').ResourceStocks
   dependencies?: import('./state-dependencies').StateDependency[]
   dynasties?: import('./dynasties').DynasticState
   archive?: import('./world-archive').WorldArchive

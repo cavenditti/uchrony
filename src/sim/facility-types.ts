@@ -1,3 +1,10 @@
+import {
+  COMMODITIES,
+  EXTENDED_GOODS,
+  EXTENDED_FACILITIES,
+  type ExtendedFacility,
+  type ExtendedGood,
+} from './commodity-catalog'
 /** Facility identities are structural save/command contracts. Construction
  * recipes and economic coefficients live in the world configuration. */
 import type { Good, Research } from './types'
@@ -7,18 +14,38 @@ export const FACILITY_KINDS = [
   'timber-yard',
   'quarry',
   'iron-mine',
+  'smelter',
+  'charcoal-kiln',
+  'sheep-farm',
   'coal-mine',
   'tool-industry',
   'textile-industry',
   'arms-industry',
   'market',
+  ...EXTENDED_FACILITIES,
 ] as const
 export type FacilityKind = (typeof FACILITY_KINDS)[number]
 export const FACILITY_DEFINITIONS = {
+  ...(Object.fromEntries(
+    EXTENDED_GOODS.map((good) => [
+      COMMODITIES[good].facility,
+      {
+        name: COMMODITIES[good].label + (COMMODITIES[good].sector === 'crop' ? ' farm' : ' works'),
+        sector: good,
+        research: COMMODITIES[good].sector === 'crop' ? 'agriculture' : 'industry',
+      },
+    ]),
+  ) as Record<
+    ExtendedFacility,
+    { name: string; sector: ExtendedGood; research: 'agriculture' | 'industry' }
+  >),
   'farm-estate': { name: 'Agricultural estate', sector: 'food', research: 'agriculture' },
   'timber-yard': { name: 'Timber yard', sector: 'timber', research: 'industry' },
   quarry: { name: 'Stone quarry', sector: 'stone', research: 'industry' },
-  'iron-mine': { name: 'Iron mine', sector: 'iron', research: 'industry' },
+  'iron-mine': { name: 'Iron mine', sector: 'ironOre', research: 'industry' },
+  smelter: { name: 'Iron smelter', sector: 'iron', research: 'industry' },
+  'charcoal-kiln': { name: 'Charcoal kiln', sector: 'charcoal', research: 'industry' },
+  'sheep-farm': { name: 'Sheep farm', sector: 'wool', research: 'agriculture' },
   'coal-mine': { name: 'Coal mine', sector: 'coal', research: 'industry' },
   'tool-industry': { name: 'Tool works', sector: 'tools', research: 'industry' },
   'textile-industry': { name: 'Textile mill', sector: 'textiles', research: 'industry' },

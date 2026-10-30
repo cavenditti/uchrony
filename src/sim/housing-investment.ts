@@ -1,4 +1,5 @@
 import { simulationMonths } from './simulation-period'
+import { constructionMaterials } from './construction-materials'
 import { habitableLand } from './terrain-access'
 import type { World } from './types'
 import type { PhysicalSite, PointMeters } from './adaptive-types'
@@ -41,7 +42,7 @@ export function planHousingInvestment(
     site: PhysicalSite
     plot?: Plot
     spaces: number
-    inputs: ReturnType<typeof housingInputs>
+    inputs: ReturnType<typeof housingInputs> & { bricks: number }
     cost: number
   }[] = []
   const choose = () =>
@@ -68,15 +69,25 @@ export function planHousingInvestment(
         : polygonArea(cellPolygon(w, site.cell))
     if (!habitableLand(w.cells[plot?.cell ?? site.cell])) return
     const opening = plot ? 0 : site.capacity
-    const inputsFor = (q: number) =>
-      w.adaptive!.residentialVersion === 1
-        ? housingInputs(q, opening, area, accessMeters)
-        : { timber: q * 0.08, stone: q * 0.05, labor: q * 0.1 }
+    const inputsFor = (q: number) => {
+      const base =
+        w.adaptive!.residentialVersion === 1
+          ? housingInputs(q, opening, area, accessMeters)
+          : { timber: q * 0.08, stone: q * 0.05, labor: q * 0.1 }
+      const materials = constructionMaterials(unit, { timber: base.timber, stone: base.stone })
+      return {
+        timber: base.timber,
+        stone: materials.stone ?? 0,
+        bricks: materials.bricks ?? 0,
+        labor: base.labor,
+      }
+    }
     const affordable = (q: number) => {
       const inputs = inputsFor(q)
       return (
         inputs.timber <= unit.stocks.timber &&
         inputs.stone <= unit.stocks.stone &&
+        inputs.bricks <= unit.stocks.bricks &&
         inputs.labor <= availableLabor &&
         inputs.labor * (sponsor.wage / simulationMonths()) <= sponsor.cash
       )
@@ -100,6 +111,7 @@ export function planHousingInvestment(
       cost =
         inputs.timber * unit.prices.timber +
         inputs.stone * unit.prices.stone +
+        inputs.bricks * unit.prices.bricks +
         inputs.labor * (sponsor.wage / simulationMonths())
     choices.push({ site, plot, spaces: lo, inputs, cost: cost / lo })
   }
@@ -119,9 +131,11 @@ export function planHousingInvestment(
     // Even a free, adjacent plot pays setup costs. Skip its survey when the
     // cheapest infill is already below this strict new-plot cost lower bound.
     const minimum = housingInputs(need, 0, Infinity, 0)
+    const minimumMaterials = constructionMaterials(unit, minimum)
     const lowerBound =
       (minimum.timber * unit.prices.timber +
-        minimum.stone * unit.prices.stone +
+        (minimumMaterials.stone ?? 0) * unit.prices.stone +
+        (minimumMaterials.bricks ?? 0) * unit.prices.bricks +
         minimum.labor * (sponsor.wage / simulationMonths())) /
       need
     if (choices.some((c) => c.cost <= lowerBound)) return choose()

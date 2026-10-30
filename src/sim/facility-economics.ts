@@ -1,16 +1,14 @@
 /** Synthetic local opportunity estimates; these rank investment alternatives,
  * never create orders, guarantee a transport route or book future revenue. */
-import { parameterGroup } from './configuration-context'
-import { householdNeed } from './economy'
+import { householdNeed, marketNeed } from './economy'
 import { FACILITY_DEFINITIONS, type FacilityKind } from './facility-types'
 import { regionalFirms } from './firms'
+import { plannedInputDemand, productionRecipe } from './production-chains'
 import { economicRegion, provinceId } from './local-units'
 import { FACILITY_POLICY, regionalFacilityLevels } from './productive-facilities'
 import { retailDecay } from './retail-pricing'
 import { simulationMonths } from './simulation-period'
 import { clamp, GOODS, type Good, type Region, type World } from './types'
-
-const INPUTS: Partial<Record<Good, Partial<Record<Good, number>>>> = parameterGroup('recipes')
 
 /** Adjacent domestic demand is an access-weighted prospect, not an order or a
  * guarantee of a transport route. Actual trade still clears through the network. */
@@ -56,14 +54,28 @@ export function facilityEconomicCase(w: World, r: Region, kind: FacilityKind, po
     }
   }
   const localDemand = Math.max(
-    householdNeed(r, good),
+    marketNeed(r, good),
+    plannedInputDemand(r.plannedProduction ?? r.production, good, r),
     merchant.forecast[good],
     firms.reduce((sum, f) => sum + (f.active ? f.forecast[good] : 0), 0),
   )
-  const demand = localDemand + neighbors.reduce((sum, n) => sum + householdNeed(n.r, good) * n.access, 0)
+  // Upstream producers have business customers even when households never buy
+  // their output. The same bill of materials drives procurement and investment.
+  const demand =
+    localDemand +
+    neighbors.reduce(
+      (sum, n) =>
+        sum +
+        Math.max(
+          householdNeed(n.r, good),
+          plannedInputDemand(n.r.plannedProduction ?? n.r.production, good, n.r),
+        ) *
+          n.access,
+      0,
+    )
   const stock = r.stocks[good] + firms.reduce((sum, f) => sum + f.stocks[good], 0)
   const pressure = clamp(demand / Math.max(1, stock + r.production[good] * 3), 0, 2)
-  const inputs = Object.entries(INPUTS[good] ?? {}) as [Good, number][]
+  const inputs = Object.entries(productionRecipe(r, good)) as [Good, number][]
   const margin = Math.max(0, r.prices[good] - inputs.reduce((sum, [g, rate]) => sum + rate * r.prices[g], 0))
   let supply = 1
   for (const [g, rate] of inputs)
@@ -82,7 +94,7 @@ export function facilityEconomicCase(w: World, r: Region, kind: FacilityKind, po
       ? supply > 0.5
         ? 'Local or adjacent inputs, customer demand and existing skills support this industry.'
         : 'Industrial inputs are scarce here; the facility may remain idle until supplies arrive.'
-      : good === 'food'
+      : good === 'food' || good === 'wool'
         ? 'Cultivable land and local or neighboring food demand favor agriculture.'
         : `Remaining ${good} deposits and local or neighboring demand favor extraction.`,
   }

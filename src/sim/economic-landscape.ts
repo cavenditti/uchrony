@@ -1,5 +1,7 @@
+import { COMMODITIES, EXTENDED_GOODS, type ExtendedGood } from './commodity-catalog'
 import { habitableLand } from './terrain-access'
-import { GOODS, clamp, population, type World } from './types'
+import { GOODS, clamp, population, type Good, type World } from './types'
+import { EXTRACTIVE_OUTPUTS } from './production-chains'
 import { landscapeAt } from './landscape'
 import { localFirmRegion } from './local-units'
 import { transportNetwork } from './transport'
@@ -18,6 +20,30 @@ export const TILE_ACTIVITIES = [
   'town',
 ] as const
 export type TileActivity = (typeof TILE_ACTIVITIES)[number]
+/** Explicit sectors survive catalogue additions; array positions are not domain identities. */
+const GOOD_ACTIVITY = {
+  ...(Object.fromEntries(
+    EXTENDED_GOODS.map((good) => [
+      good,
+      COMMODITIES[good].sector === 'crop'
+        ? 'fields'
+        : COMMODITIES[good].sector === 'mineral'
+          ? 'quarry'
+          : 'workshops',
+    ]),
+  ) as Record<ExtendedGood, TileActivity>),
+  food: 'fields',
+  timber: 'timber',
+  stone: 'quarry',
+  ironOre: 'iron',
+  coal: 'coal',
+  iron: 'workshops',
+  tools: 'workshops',
+  textiles: 'workshops',
+  arms: 'workshops',
+  charcoal: 'workshops',
+  wool: 'pasture',
+} satisfies Record<Good, TileActivity>
 export interface EconomicLandscape {
   month: number
   activity: Uint8Array
@@ -50,21 +76,23 @@ export function economicLandscape(w: World): EconomicLandscape {
     if (!r) continue
     const cell = f.cell ?? r.center
     for (let g = 0; g < GOODS.length; g++) {
+      const good = GOODS[g],
+        resource = EXTRACTIVE_OUTPUTS[good]
       const share =
-        f.laborMix?.[GOODS[g]] ?? (f.specialization === 'agricultural' ? Number(g === 0) : Number(g === 5))
+        f.laborMix?.[good] ??
+        (f.specialization === 'agricultural' ? Number(good === 'food') : Number(good === 'tools'))
       const jobs = f.employment * share
       if (!jobs) continue
-      if (g <= 4) {
+      if (good === 'food' || good === 'wool' || resource) {
         const key = `${r.id}:${g}`
         let spread = distribution.get(key)
         if (!spread) {
           const weights = r.cells.map((id) =>
             !habitableLand(w.cells[id])
               ? 0
-              : g === 0
+              : !resource
                 ? landscapeAt(w.cells[id]).habitat
-                : (w.localEconomy?.reserves[id]?.[GOODS[g] as 'timber'] ??
-                  landscapeAt(w.cells[id]).resources[GOODS[g] as 'timber']),
+                : (w.localEconomy?.reserves[id]?.[resource] ?? landscapeAt(w.cells[id]).resources[resource]),
           )
           spread = { weights, total: weights.reduce((a, b) => a + b, 0) }
           distribution.set(key, spread)
@@ -97,14 +125,12 @@ export function economicLandscape(w: World): EconomicLandscape {
     if (residents[id] > (c.terrain === 'forest' ? 1500 : 80) && soil.habitat > 0.15) use = foodUse
     if (maximum > 0) {
       const g = jobs.indexOf(maximum)
-      use = ([foodUse, 'timber', 'quarry', 'iron', 'coal', 'workshops', 'workshops', 'workshops'] as const)[g]
+      const good = GOODS[g],
+        resource = EXTRACTIVE_OUTPUTS[good]
+      use = good === 'food' ? foodUse : GOOD_ACTIVITY[good]
       // Extraction must have an actual local endowment, even if a mixed firm's
       // employment book contains a tiny share of every sector.
-      if (
-        g >= 1 &&
-        g <= 4 &&
-        (w.localEconomy?.reserves[id]?.[GOODS[g] as 'timber'] ?? soil.resources[GOODS[g] as 'timber']) <= 0
-      )
+      if (resource && (w.localEconomy?.reserves[id]?.[resource] ?? soil.resources[resource]) <= 0)
         use = residents[id] > 80 ? foodUse : 'wild'
     }
     if (built >= 0.18 && residents[id] >= 500 && !['quarry', 'iron', 'coal', 'workshops'].includes(use))

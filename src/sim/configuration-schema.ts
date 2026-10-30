@@ -1,3 +1,4 @@
+import { COMMODITIES, EXTENDED_GOODS } from './commodity-catalog'
 import { IDENTITY_POLICY_KEYS, IDENTITY_POLICY_FIELDS, type IdentityPolicyKey } from './identity-policy'
 import { BIOMES, CROPS, MOISTURE_BANDS, TEMPERATURE_BANDS } from './climate-types'
 import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './configuration-defaults'
@@ -400,8 +401,16 @@ export const CONFIGURATION_SCHEMA: SchemaNode<ConfigurationValues> = {
   householdNeeds: recordOf(GOODS, unitInterval()),
   wageSkills: recordOf(STRATA, num(0.01, 10)),
   recipes: {
+    ...Object.fromEntries(
+      EXTENDED_GOODS.filter((good) => Object.keys(COMMODITIES[good].inputs).length).map((good) => [
+        good,
+        Object.fromEntries(Object.keys(COMMODITIES[good].inputs).map((input) => [input, num(1e-6, 100)])),
+      ]),
+    ),
+    iron: { ironOre: num(1e-6, 10), charcoal: num(1e-6, 10) },
+    charcoal: { timber: num(1e-6, 10) },
     tools: { iron: num(1e-6, 10), coal: num(1e-6, 10), timber: num(1e-6, 10) },
-    textiles: { timber: num(1e-6, 10), food: num(1e-6, 10) },
+    textiles: { wool: num(1e-6, 10) },
     arms: { iron: num(1e-6, 10), coal: num(1e-6, 10), tools: num(1e-6, 10) },
   },
   conditions: {

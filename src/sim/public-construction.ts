@@ -1,6 +1,7 @@
 /** Shared settlement for land works: materials leave real stores, unemployed
  * people receive wages, and only completed purchases enter capital formation. */
 import { STRATA } from './economic-types'
+import { constructionMaterials } from './construction-materials'
 import { WAGE_SKILL } from './firms'
 import { governmentAccount, householdAccount, producerAccount, transfer } from './ledger'
 import { provinceId } from './local-units'
@@ -17,6 +18,7 @@ export function publicConstructionQuote(
   recipe: Partial<Record<Good, number>>,
   laborMonths: number,
 ) {
+  recipe = constructionMaterials(r, recipe)
   const labor = laborMonths / simulationMonths(),
     wage = w.economy!.producers[r.id].wage,
     households = w.economy!.households[r.id]

@@ -430,7 +430,8 @@ test('independence withdraws fleets along a sea route without moving ships to an
     (h) => w.regions[h.region].nation === -1 && waterPath(w, coast.water, h.water).length > 1,
   )!
   transferSovereignty(w, home.region, 0)
-  for (const good of ['timber', 'iron', 'arms', 'tools', 'food'] as const) last.stocks[good] = 100000
+  for (const good of ['timber', 'iron', 'arms', 'tools', 'food', 'rope', 'textiles'] as const)
+    last.stocks[good] = 100000
   rebaseEndowments(w)
   beginEconomyMonth(w)
   // This fleet predates the occupation; shipbuilding under enemy control is illegal.

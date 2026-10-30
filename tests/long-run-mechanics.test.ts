@@ -167,7 +167,8 @@ test('one month applies forest recovery exactly once and never replenishes miner
   const before = goods.map((g) => Object.values(local.reserves).reduce((sum, stock) => sum + stock[g], 0))
   tick(w)
   goods.forEach((g, i) => {
-    const remaining = before[i] - economicRegions(w).reduce((sum, r) => sum + r.production[g], 0)
+    const remaining =
+      before[i] - economicRegions(w).reduce((sum, r) => sum + r.production[g === 'iron' ? 'ironOre' : g], 0)
     const expected = remaining + (g === 'timber' ? (capacity - remaining) * 0.002 : 0)
     const actual = Object.values(local.reserves).reduce((sum, stock) => sum + stock[g], 0)
     assert(Math.abs(actual - expected) < Math.max(1, expected) * 1e-12, `${g}: ${actual} vs ${expected}`)
@@ -233,6 +234,7 @@ test('input shortages release workshop labor without erasing the orders needed t
     r = w.regions[0]
   r.prices = { ...BASE_PRICE }
   r.stocks.iron = r.stocks.coal = r.stocks.timber = 0
+  r.stocks.wool = r.stocks.flax = r.stocks.cotton = r.stocks.charcoal = r.stocks.ironOre = 0
   beginEconomyMonth(w)
   produceFirms(w, r)
   const firms = regionalFirms(w, r.id).filter((f) => f.active)

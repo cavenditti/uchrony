@@ -1,3 +1,5 @@
+import { validateProductionTechniques } from './production-chains'
+import { validateResourceStocks } from './resource-extraction'
 import { validateFacilities } from './facility-persistence'
 import { validateProductiveLand } from './productive-land-persistence'
 import { validateOverseas } from './overseas-persistence'
@@ -593,6 +595,9 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
   )
     fail('invalid totals')
   validateDistrictEconomy(w)
+  for (const r of w.regions) validateProductionTechniques(r)
+  for (const r of Object.values(w.localEconomy?.units ?? {})) validateProductionTechniques(r)
+  validateResourceStocks(w)
   validateEconomy(w)
   validateSpatial(w)
   validateAdaptiveWorld(w)

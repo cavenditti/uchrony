@@ -1,3 +1,4 @@
+import { COMMODITIES, type ExtendedGood } from './commodity-catalog'
 /** Merchant offers recover the cost of the stock actually available for sale.
  * Procurement and retail share this rule so a marginal cheap lot, imported
  * freight, or a competing factory sale cannot reset an entire warehouse's price. */
@@ -13,7 +14,12 @@ import type { Good, Region, World } from './types'
 /** Expected physical loss over the current accounting period. */
 export const retailDecay = (good: Good, w?: World, r?: Region) =>
   periodRate(
-    (good === 'food' ? 0.035 : good === 'timber' || good === 'textiles' ? 0.006 : 0.001) /
+    (COMMODITIES[good as ExtendedGood]?.decay ??
+      (good === 'food'
+        ? 0.035
+        : good === 'timber' || good === 'textiles' || good === 'wool'
+          ? 0.006
+          : 0.001)) /
       (1 + FACILITY_POLICY.marketPreservation * (w && r ? regionalFacilityLevels(w, r).market : 0)),
   )
 

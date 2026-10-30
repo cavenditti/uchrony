@@ -6,7 +6,7 @@ import { produce, consume, householdNeed } from '../src/sim/economy'
 import { tick } from '../src/sim/engine'
 import { validateWorld } from '../src/sim/persistence'
 import { DEFAULT_SETTINGS } from '../src/sim/settings'
-import { population } from '../src/sim/types'
+import { inventory, population } from '../src/sim/types'
 
 test('geology creates spatially uneven resources, including provinces without workable iron or coal', () => {
   const w = generateWorld('geological-scarcity')
@@ -33,15 +33,20 @@ test('abundance scales actual raw output; constrained populations can exhaust re
     for (const f of w.economy!.firms!) f.employment = 1000
   }
   // Hold employment and the product mix fixed to isolate the physical abundance coefficient.
-  for (const good of ['food', 'timber', 'iron', 'coal'] as const) {
+  for (const good of ['food', 'timber', 'ironOre', 'coal'] as const) {
     const potential = (w: typeof scarce) =>
       w
         .economy!.firms!.filter((f) => f.active)
         .reduce((sum, f) => sum + firmCapacity(w, w.regions[f.region], f, 3).q[good], 0)
     assert(Math.abs(potential(rich) / potential(scarce) - 1.6 / 0.35) < 1e-9, good)
   }
-  for (const w of [scarce, rich]) produce(w)
-  for (const good of ['food', 'timber', 'iron', 'coal'] as const) {
+  for (const w of [scarce, rich]) {
+    // Ore has industrial customers, not household demand. Give both worlds the
+    // same visible smelting order before comparing actual extractive output.
+    for (const r of w.regions) r.plannedProduction = { ...inventory(), iron: 1000 }
+    produce(w)
+  }
+  for (const good of ['food', 'timber', 'ironOre', 'coal'] as const) {
     const total = (w: typeof scarce) => w.regions.reduce((s, r) => s + r.production[good], 0)
     assert(total(rich) > total(scarce), good)
   }

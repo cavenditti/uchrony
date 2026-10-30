@@ -1,3 +1,4 @@
+import { renewFishStocks } from './resource-extraction'
 /** Provincial production and trade clear physical goods against conserved money.
  * District routing has finer geography but shares the same political tariff rules. */
 import { knownCommuteCandidates, matchCommuters } from './commuting'
@@ -5,6 +6,7 @@ import { parameterGroup } from './configuration-context'
 import { tradeDistricts } from './district-transport'
 import { ensureFirms, hireFirms, produceFirms } from './firms'
 import { governance } from './governance'
+import { plannedInputDemand } from './production-chains'
 import { MinHeap } from './heap'
 import { balance, ensureEconomy, producerAccount, publicGoods } from './ledger'
 import { economicRegions } from './local-units'
@@ -72,24 +74,26 @@ export function householdNeed(r: Region, good: Good) {
     periodFlow(allocation)
   )
 }
+/** Prospective retail orders are not compulsory household rations. They let a
+ * new edible substitute or luxury reach a market before its first actual sale. */
+export function marketNeed(r: Region, good: Good) {
+  const staple = householdNeed(r, 'food')
+  if (good === 'bread') return staple * 0.18
+  if (good === 'fish') return staple * 0.18
+  if (good === 'preservedFood') return staple * 0.06
+  if (good === 'jewelry')
+    return population(r) * 0.000002 * Math.max(0, (r.materialCoverage ?? 1) - 0.5) * periodFlow(1)
+  if (good === 'bricks') return householdNeed(r, 'stone') * 0.5
+  if (good === 'rope') return householdNeed(r, 'tools') * 0.2
+  return householdNeed(r, good)
+}
 export function reserveTarget(r: Region, good: Good) {
-  const p = r.plannedProduction ?? r.production,
-    inputs =
-      good === 'iron'
-        ? p.tools * 0.65 + p.arms * 0.9
-        : good === 'coal'
-          ? p.tools * 0.3 + p.arms * 0.5
-          : good === 'timber'
-            ? p.tools * 0.25 + p.textiles * 0.3
-            : good === 'tools'
-              ? p.arms * 0.3
-              : good === 'food'
-                ? p.textiles * 0.12
-                : 0
-  return householdNeed(r, good) * (good === 'food' ? 2.4 : 3) + inputs * 2
+  const inputs = plannedInputDemand(r.plannedProduction ?? r.production, good, r)
+  return marketNeed(r, good) * (good === 'food' ? 2.4 : 3) + inputs * 2
 }
 
 export function produce(world: World, coarse = false) {
+  renewFishStocks(world)
   ensureFirms(world)
   if (world.adaptive) {
     const known = coarse ? knownCommuteCandidates(world) : undefined

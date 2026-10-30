@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { GOODS, population, type World } from '../sim/types'
+import { GOODS, GOOD_LABELS, population, type World } from '../sim/types'
 import { STRATA } from '../sim/economic-types'
 import { localFirmRegion } from '../sim/local-units'
 
@@ -125,7 +125,7 @@ export function DistrictEconomies({ world, province }: { world: World; province:
         <tbody>
           {GOODS.map((g) => (
             <tr key={g}>
-              <th scope="row">{g[0].toUpperCase() + g.slice(1)}</th>
+              <th scope="row">{GOOD_LABELS[g]}</th>
               <td>{compact(unit.stocks[g] + firms.reduce((sum, f) => sum + f.stocks[g], 0))}</td>
               <td>{unit.prices[g].toFixed(1)}</td>
             </tr>
@@ -137,7 +137,7 @@ export function DistrictEconomies({ world, province }: { world: World; province:
         <dl className="stratum-accounts">
           {(['timber', 'stone', 'iron', 'coal'] as const).map((g) => (
             <div key={g}>
-              <dt>{g[0].toUpperCase() + g.slice(1)}</dt>
+              <dt>{g === 'iron' ? GOOD_LABELS.ironOre : GOOD_LABELS[g]}</dt>
               <dd>{compact(unit.cells.reduce((sum, c) => sum + (local.reserves[c]?.[g] ?? 0), 0))} t</dd>
             </div>
           ))}

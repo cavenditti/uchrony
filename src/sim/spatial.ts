@@ -3,6 +3,7 @@ import { isVisibleSettlement, settlementKind } from './settlement-model'
 import { settlementStructure, urbanResidentsByCell, type SettlementStructure } from './settlement-topology'
 import { METERS_PER_MAP_UNIT } from './physical-space'
 import { localFirmRegion } from './local-units'
+import { industrialLaborShare } from './production-chains'
 import { apportion } from './allocation'
 import { landscapeAt, settlementWeight } from './landscape'
 import { spreadSettlement } from './opening-settlements'
@@ -87,15 +88,7 @@ export function refreshSpatial(w: World, settlements?: SettlementStructure) {
     for (const f of w.economy?.firms ?? []) {
       const id = localFirmRegion(f)
       capital.set(id, (capital.get(id) ?? 0) + f.capital)
-      if (f.active)
-        jobs.set(
-          id,
-          (jobs.get(id) ?? 0) +
-            f.employment *
-              (f.laborMix
-                ? f.laborMix.tools + f.laborMix.textiles + f.laborMix.arms + f.laborMix.iron + f.laborMix.coal
-                : 0),
-        )
+      if (f.active) jobs.set(id, (jobs.get(id) ?? 0) + f.employment * industrialLaborShare(f.laborMix))
     }
     const splits = new Set<string>()
     proposal.districts = w.localEconomy.active.map((id) => {
@@ -150,9 +143,7 @@ export function buildSpatial(w: World, urbanByCell?: ReadonlyMap<number, number>
   const industrialJobs = new Float64Array(w.regions.length)
   for (const f of w.economy?.firms ?? [])
     if (f.active) {
-      const mix = f.laborMix
-      industrialJobs[f.region] +=
-        f.employment * (mix ? mix.tools + mix.textiles + mix.arms + mix.iron + mix.coal : 0)
+      industrialJobs[f.region] += f.employment * industrialLaborShare(f.laborMix)
     }
   if (w.localEconomy) {
     const local = w.localEconomy
@@ -173,12 +164,7 @@ export function buildSpatial(w: World, urbanByCell?: ReadonlyMap<number, number>
       const r = local.units[localFirmRegion(f)],
         cell = f.cell ?? r.center
       capital[cell] += f.capital
-      if (f.active)
-        jobs[cell] +=
-          f.employment *
-          (f.laborMix
-            ? f.laborMix.tools + f.laborMix.textiles + f.laborMix.arms + f.laborMix.iron + f.laborMix.coal
-            : 0)
+      if (f.active) jobs[cell] += f.employment * industrialLaborShare(f.laborMix)
     }
     for (const city of local.cities)
       if (city.absorbedBy === undefined && city.cells.length && isVisibleSettlement(city.population)) {

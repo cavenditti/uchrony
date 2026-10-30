@@ -22,7 +22,14 @@ function fixture() {
     n.treasury = 100000
   }
   for (const r of w.regions)
-    r.stocks.food = r.stocks.timber = r.stocks.iron = r.stocks.tools = r.stocks.arms = 100000
+    r.stocks.food =
+      r.stocks.timber =
+      r.stocks.iron =
+      r.stocks.tools =
+      r.stocks.arms =
+      r.stocks.rope =
+      r.stocks.textiles =
+        100000
   for (const r of w.relations) r.treaty = 'alliance'
   const land = landComponents(w),
     ports = transportNetwork(w).harbors
@@ -117,7 +124,12 @@ test('shipbuilding quotes match execution and reject an occupied shipyard', () =
     n = w.nations[army.nation]
   const q = commissionQuote(w, n.id, departure, 1, 2),
     before = n.treasury
+  const stores = { ...w.regions[departure].stocks }
   commissionFleet(w, n.id, departure, q.warships, q.transports)
+  assert.equal(w.regions[departure].stocks.rope, stores.rope - q.rope)
+  assert.equal(w.regions[departure].stocks.textiles, stores.textiles - q.textiles)
+  w.regions[departure].stocks.rope = 0
+  assert.throws(() => commissionQuote(w, n.id, departure, 0, 1), /rope/)
   assert(Math.abs(n.treasury - (before - q.cost)) < 1e-8)
   assert.equal(w.warfare!.fleets.at(-1)!.soldiers, q.crew)
   w.regions[departure].control = { nation: (n.id + 1) % w.nations.length, since: w.month } as never

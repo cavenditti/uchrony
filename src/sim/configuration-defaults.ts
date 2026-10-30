@@ -1,3 +1,12 @@
+import {
+  COMMODITIES,
+  EXTENDED_GOODS,
+  EXTENDED_PRICES,
+  EXTENDED_RECIPES,
+  ZERO_EXTENDED,
+  commodityValues,
+  type ExtendedFacility,
+} from './commodity-catalog'
 import { resolveIdentityPolicy } from './identity-policy'
 import type { DecisionPolicy } from './decision-policy'
 import type { ExpansionParameters } from './expansion-parameters'
@@ -265,6 +274,10 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     armyScale: 1,
     fleets: true,
     capitalStocks: {
+      ...commodityValues((good) => COMMODITIES[good].opening * 600),
+      ironOre: 96,
+      charcoal: 42,
+      wool: 92,
       food: 780,
       timber: 300,
       stone: 200,
@@ -306,6 +319,11 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     enclaveAreaKm2: 16,
   },
   consumptionBudget: {
+    ...ZERO_EXTENDED,
+    jewelry: 0.02,
+    ironOre: 0,
+    charcoal: 0,
+    wool: 0,
     food: 0.5,
     timber: 0.08,
     stone: 0.02,
@@ -316,6 +334,10 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     arms: 0.01,
   },
   materialCoverage: {
+    ...ZERO_EXTENDED,
+    ironOre: 0,
+    charcoal: 0,
+    wool: 0,
     food: 0,
     timber: 0.15,
     stone: 0.1,
@@ -325,8 +347,25 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     textiles: 0.25,
     arms: 0,
   },
-  basePrices: { food: 14, timber: 24, stone: 18, iron: 65, coal: 32, tools: 155, textiles: 100, arms: 290 },
+  basePrices: {
+    ...EXTENDED_PRICES,
+    food: 14,
+    timber: 24,
+    stone: 18,
+    iron: 125,
+    coal: 32,
+    tools: 155,
+    textiles: 100,
+    arms: 290,
+    ironOre: 28,
+    charcoal: 110,
+    wool: 48,
+  },
   householdNeeds: {
+    ...ZERO_EXTENDED,
+    ironOre: 0,
+    charcoal: 0,
+    wool: 0,
     food: 0.025,
     timber: 0.0025,
     stone: 0.0012,
@@ -338,10 +377,13 @@ export const DEFAULT_CONFIGURATION_VALUES = {
   },
   wageSkills: { smallholder: 0.9, laborer: 1, artisan: 1.25, professional: 1.7, owner: 0.8 },
   recipes: {
+    ...EXTENDED_RECIPES,
+    iron: { ironOre: 1.6, charcoal: 0.7 },
+    charcoal: { timber: 4 },
     tools: { iron: 0.65, coal: 0.3, timber: 0.25 },
-    textiles: { timber: 0.3, food: 0.12 },
+    textiles: { wool: 1.15 },
     arms: { iron: 0.9, coal: 0.5, tools: 0.3 },
-  } satisfies Record<'tools' | 'textiles' | 'arms', Partial<Inventory>>,
+  } satisfies Record<'iron' | 'charcoal' | 'tools' | 'textiles' | 'arms', Partial<Inventory>>,
   conditions: { instability: 1, abundance: 0.85, extremity: 1.2 },
   climate: DEFAULT_CLIMATE,
   model: {
@@ -438,6 +480,25 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     neighborDemand: 0.25,
   },
   facilityRecipes: {
+    ...(Object.fromEntries(
+      EXTENDED_GOODS.map((good) => [
+        COMMODITIES[good].facility,
+        {
+          timber: 28,
+          stone: 40,
+          iron: 6,
+          tools: 6,
+          laborMonths: 240,
+          technology: COMMODITIES[good].technology,
+        },
+      ]),
+    ) as Record<
+      ExtendedFacility,
+      { timber: number; stone: number; iron: number; tools: number; laborMonths: number; technology: number }
+    >),
+    smelter: { timber: 32, stone: 64, iron: 8, tools: 10, laborMonths: 360, technology: 0 },
+    'charcoal-kiln': { timber: 20, stone: 24, iron: 0, tools: 4, laborMonths: 180, technology: 0 },
+    'sheep-farm': { timber: 24, stone: 16, iron: 0, tools: 4, laborMonths: 200, technology: 0 },
     'farm-estate': { timber: 28, stone: 20, iron: 0, tools: 5, laborMonths: 240, technology: 0 },
     'timber-yard': { timber: 40, stone: 16, iron: 0, tools: 6, laborMonths: 200, technology: 0 },
     quarry: { timber: 20, stone: 32, iron: 4, tools: 8, laborMonths: 280, technology: 0 },

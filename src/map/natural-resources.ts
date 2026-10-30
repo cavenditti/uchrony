@@ -6,7 +6,7 @@ import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
 import { clamp, type World } from '../sim/types'
 
 export const RESOURCE_KEYS = {
-  iron: { name: 'Iron', color: '#9e4e38', rgb: [158, 78, 56] },
+  iron: { name: 'Iron ore', color: '#9e4e38', rgb: [158, 78, 56] },
   coal: { name: 'Coal', color: '#394d6b', rgb: [57, 77, 107] },
   stone: { name: 'Stone', color: '#897350', rgb: [137, 115, 80] },
   timber: { name: 'Timber', color: '#2c7759', rgb: [44, 119, 89] },

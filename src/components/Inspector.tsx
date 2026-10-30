@@ -1,3 +1,4 @@
+import { EXTENDED_GOODS, type ExtendedGood } from '../sim/commodity-catalog'
 import { IdentityPolicyControls } from './IdentityPolicyControls'
 import { supplierDebt } from '../sim/supplier-credit'
 import { DistrictEconomies } from './DistrictEconomies'
@@ -55,6 +56,7 @@ import {
   type Good,
   FIELDS,
   GOODS,
+  GOOD_LABELS,
   population,
   relation,
   dateLabel,
@@ -83,6 +85,10 @@ export const TAB_INFO: { id: Tab; name: string; icon: LucideIcon }[] = [
   { id: 'chronicle', name: 'Chronicle', icon: ScrollText },
 ]
 const goodIcons: Record<Good, LucideIcon> = {
+  ...(Object.fromEntries(EXTENDED_GOODS.map((good) => [good, Gem])) as Record<ExtendedGood, LucideIcon>),
+  ironOre: Pickaxe,
+  charcoal: Flame,
+  wool: Shirt,
   food: Wheat,
   timber: TreePine,
   stone: Gem,
@@ -581,7 +587,7 @@ export function Inspector({
                     <tr key={g}>
                       <th>
                         <Icon size={12} />
-                        {title(g)}
+                        {GOOD_LABELS[g]}
                       </th>
                       <td>{compact(regions.reduce((s, r) => s + r.production[g], 0))}</td>
                       <td>{compact(regions.reduce((s, r) => s + r.consumption[g], 0))}</td>
@@ -639,7 +645,7 @@ export function Inspector({
                       · {route.international ? 'International' : 'Domestic'}
                     </small>
                     <small className="route-cargo">
-                      {cargo.map((g) => `${g} ${compact(route.goods[g])} t`).join(' · ')}
+                      {cargo.map((g) => `${GOOD_LABELS[g]} ${compact(route.goods[g])} t`).join(' · ')}
                     </small>
                     {!!harbors?.length && <small>Harbors: {[...new Set(harbors)].join(' → ')}</small>}
                     <b>{compact(route.volume)} t</b>

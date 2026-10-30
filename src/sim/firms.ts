@@ -1,3 +1,10 @@
+import { COMMODITIES, EXTENDED_GOODS, type ExtendedGood } from './commodity-catalog'
+import {
+  regionalMineralPotential,
+  fishingPotential,
+  extractExtendedResource,
+  type ExtendedMineral,
+} from './resource-extraction'
 /** Competitive firms hire from local labor pools and produce against real inputs.
  * Payroll, inventories, capital projects and sales remain reconciled with the ledger. */
 import {
@@ -8,6 +15,12 @@ import {
 } from './productive-facilities'
 import { GOOD_FACILITY } from './facility-types'
 import { regionalLandProductivity } from './productive-land'
+import {
+  EXTRACTIVE_OUTPUTS,
+  WORKSHOP_GOODS,
+  productionRecipe,
+  selectProductionTechniques,
+} from './production-chains'
 import { participatingLabor } from './age-cohorts'
 import { loansForBorrower, payBank, writeDownLoan } from './banking'
 import { localClimate } from './climate'
@@ -17,7 +30,7 @@ import { decisionPolicy } from './decision-policy'
 import { activeDevelopment } from './development'
 import { extractDistrictResource } from './districts'
 import { STRATA, type CompetitiveFirm, type EconomicStratum } from './economic-types'
-import { BASE_PRICE, householdNeed, reserveTarget } from './economy'
+import { BASE_PRICE, householdNeed, marketNeed, reserveTarget } from './economy'
 import { effectMultiplier } from './effects'
 import { expansionParameters } from './expansion-parameters'
 import { governance } from './governance'
@@ -67,7 +80,6 @@ import { recordGift } from './national-accounts'
 import { FIRM_SLOTS_PER_REGION as SLOTS } from './simulation-invariants'
 export { retailDecay, retailMarkup } from './retail-pricing'
 export const WAGE_SKILL: Record<EconomicStratum, number> = parameterGroup('wageSkills')
-const recipes: Partial<Record<Good, Partial<Inventory>>> = parameterGroup('recipes')
 function workingCapitalLimit(w: World, f: CompetitiveFirm) {
   const sales = GOODS.reduce((sum, g) => sum + (f.forecast[g] * f.prices[g]) / 1000, 0)
   const rate = (w.economy!.banking?.centralBank.rate ?? P.policyRateMonthly) + P.bankLoanSpread
@@ -138,7 +150,7 @@ function newFirm(w: World, r: Region, id: number): CompetitiveFirm {
                   : 'mixed',
         }),
   }
-  for (const g of GOODS) f.forecast[g] = householdNeed(r, g) / 3
+  for (const g of GOODS) f.forecast[g] = marketNeed(r, g) / 3
   return f
 }
 export function ensureFirms(w: World) {
@@ -192,6 +204,7 @@ export function beginFirmMonth(w: World) {
 }
 /** Wage offers compete for a shared local labor pool; firms pay every job they obtain. */
 export function hireFirms(w: World, r: Region) {
+  selectProductionTechniques(r, governance(w, r.nation).technologies.industry)
   const e = ensureEconomy(w),
     firms = regionalFirms(w, r.id).filter((f) => f.active),
     hh = e.households[r.id]
@@ -262,17 +275,17 @@ export function hireFirms(w: World, r: Region) {
       // Keep the unconstrained order for procurement, but share available inputs
       // across firms before assigning scarce workers to workshops.
       let executable = plan
-      for (const [input, rate] of Object.entries(recipes[g] ?? {}))
+      for (const [input, rate] of Object.entries(productionRecipe(r, g)))
         executable = Math.min(executable, r.stocks[input as Good] / rate / Math.max(1, firms.length))
       required[g] = q[g] > 1e-9 ? baseline[g] * clamp(executable / q[g], 0, 4) : 0
     }
     // Premises constrain workshop jobs. Farming and extraction use the real
     // land/resource capacities below, so a depreciating workshop cannot evict
     // farmers or prevent a new rural enterprise from employing anyone.
-    const indoor = required.tools + required.textiles + required.arms
+    const indoor = WORKSHOP_GOODS.reduce((sum, good) => sum + required[good], 0)
     const premises = (w.adaptive?.sites[`firm:${f.id}`]?.capacity ?? Infinity) + sharedPremises
     const indoorScale = Math.min(1, premises / Math.max(1e-9, benchmarkJobs * indoor))
-    for (const good of ['tools', 'textiles', 'arms'] as const) required[good] *= indoorScale
+    for (const good of WORKSHOP_GOODS) required[good] *= indoorScale
     const needed = GOODS.reduce((sum, g) => sum + required[g], 0)
     const utilization = clamp(needed, 0.05, 0.98)
     f.laborMix = inventory()
@@ -285,7 +298,7 @@ export function hireFirms(w: World, r: Region) {
     const plannedCapacity = firmCapacity(w, r, f, firms.length).q
     f.employment = oldEmployment
     const valueAdded = GOODS.reduce((sum, g) => {
-      const inputs = Object.entries(recipes[g] ?? {}).reduce(
+      const inputs = Object.entries(productionRecipe(r, g)).reduce(
         (cost, [input, rate]) => cost + r.prices[input as Good] * rate,
         0,
       )
@@ -391,30 +404,48 @@ function baseLaborMix(w: World, r: Region, f?: CompetitiveFirm): Inventory {
   )
   // Nonfarm reference shares sum to 0.52; rescale them to the remaining
   // labor after the endogenous farming share, preserving their relative mix.
-  const mix = {
-    food: farm,
-    timber: ((1 - farm) * 0.11) / 0.52,
-    stone: ((1 - farm) * 0.08) / 0.52,
-    iron: ((1 - farm) * 0.075) / 0.52,
-    coal: ((1 - farm) * 0.065) / 0.52,
-    tools: (1 - farm) * (0.19 / 0.52) * 0.35,
-    textiles: (1 - farm) * (0.19 / 0.52) * 0.5,
-    arms: (1 - farm) * (0.19 / 0.52) * 0.15,
+  const mix: Inventory = {
+    ...inventory(),
+    food: farm * 0.92,
+    wool: farm * 0.08,
+    timber: ((1 - farm) * 0.1) / 0.52,
+    stone: ((1 - farm) * 0.065) / 0.52,
+    ironOre: ((1 - farm) * 0.06) / 0.52,
+    iron: ((1 - farm) * 0.025) / 0.52,
+    coal: ((1 - farm) * 0.05) / 0.52,
+    charcoal: ((1 - farm) * 0.05) / 0.52,
+    tools: ((1 - farm) * 0.06) / 0.52,
+    textiles: ((1 - farm) * 0.085) / 0.52,
+    arms: ((1 - farm) * 0.025) / 0.52,
+  }
+  // Extra sectors compete for the same finite labor pool, rather than adding
+  // another full workforce for every catalogue entry.
+  let extra = 0
+  for (const good of EXTENDED_GOODS) {
+    mix[good] = COMMODITIES[good].laborShare
+    extra += mix[good]
+  }
+  for (const good of GOODS) mix[good] /= 1 + extra
+  for (const good of EXTENDED_GOODS) {
+    const sector = COMMODITIES[good].sector
+    if (sector === 'mineral') mix[good] *= regionalMineralPotential(w, r, good as ExtendedMineral)
+    if (sector === 'fishery') mix[good] *= fishingPotential(w, r)
   }
   if (r.province !== undefined) {
     mix.food *= Math.max(0.03, r.fertility) * (f?.specialization === 'agricultural' ? 3 : 1)
-    for (const g of ['timber', 'stone', 'iron', 'coal'] as const)
-      mix[g] *= r.deposits[g] * (f?.specialization === 'mining' ? 3 : 1)
-    for (const g of ['tools', 'textiles', 'arms'] as const)
+    mix.wool *= Math.max(0.03, r.fertility) * (f?.specialization === 'agricultural' ? 3 : 1)
+    for (const g of ['timber', 'stone', 'ironOre', 'coal'] as const)
+      mix[g] *= r.deposits[EXTRACTIVE_OUTPUTS[g]!] * (f?.specialization === 'mining' ? 3 : 1)
+    for (const g of WORKSHOP_GOODS)
       mix[g] *= (0.15 + r.urban * 2) * (f?.specialization === 'industrial' ? 3 : 1)
-    const sum = GOODS.reduce((n, g) => n + mix[g], 0)
-    for (const g of GOODS) mix[g] /= Math.max(1e-12, sum)
   }
   if (f?.activity) {
     mix[f.activity] *= 4
-    const total = GOODS.reduce((sum, g) => sum + mix[g], 0)
-    for (const g of GOODS) mix[g] /= total
   }
+  // Geography removes unavailable occupations; redistribute their labor once,
+  // including regional firms without a district specialization.
+  const total = GOODS.reduce((sum, g) => sum + mix[g], 0)
+  for (const g of GOODS) mix[g] /= Math.max(1e-12, total)
   return weightFacilityLabor(w, r, mix)
 }
 export function firmCapacity(
@@ -437,7 +468,8 @@ export function firmCapacity(
   // Each base cell supports 1,800 reference labor units, fertility-adjusted and
   // divided among active firms so entry cannot multiply the same land endowment.
   const land = Math.max(1, r.cells.length * 1800 * (0.35 + r.fertility * 0.65)) / Math.max(1, active)
-  const season = localClimate(w, w.cells[f.cell ?? r.center]).season
+  const climate = localClimate(w, w.cells[f.cell ?? r.center]),
+    season = climate.season
   // Capital was seeded against a reference population; normalize that baseline
   // when districts split so refinement cannot grant an equipment productivity bonus.
   const capital =
@@ -446,10 +478,13 @@ export function firmCapacity(
   // Productive equipment also serves farms. Diminishing returns preserve the
   // need for land and labor; an empty balance sheet receives no equipment bonus.
   const equipment = decisionPolicy().agriculture ? 1 + 0.5 * Math.log1p(capital) : 1
+  const agricultural = mix.food + mix.wool + mix.grain + mix.flax + mix.cotton + mix.hemp
+  const farmLabor =
+    (land * (1 - Math.exp((-f.employment * agricultural) / land))) / Math.max(1e-12, agricultural)
   const q = inventory()
   q.food =
-    land *
-    (1 - Math.exp((-f.employment * mix.food) / land)) *
+    farmLabor *
+    mix.food *
     (0.105 + r.fertility * 0.125) *
     abundance *
     equipment *
@@ -462,23 +497,45 @@ export function firmCapacity(
   for (const [g, rate] of [
     ['timber', 0.13],
     ['stone', 0.12],
-    ['iron', 0.07],
+    ['ironOre', 0.12],
     ['coal', 0.1],
   ] as const)
     q[g] =
       f.employment *
       mix[g] *
       rate *
-      r.deposits[g] *
+      r.deposits[EXTRACTIVE_OUTPUTS[g]!] *
       eff *
       abundance *
       effectMultiplier(w, 'extraction', n.id, r.id) *
       (1 + FACILITY_POLICY.productivity * Math.log1p(facilities[GOOD_FACILITY[g]]))
+  // Grazing and crop production share the paid agricultural labor pool. Wool
+  // remains land-limited and seasonal; extra firms cannot multiply the pasture.
+  q.wool =
+    farmLabor *
+    mix.wool *
+    0.045 *
+    abundance *
+    equipment *
+    (1 + t.agriculture * 0.19) *
+    season *
+    w.climate *
+    eff *
+    (1 + FACILITY_POLICY.productivity * Math.log1p(facilities['sheep-farm']))
   const agglomeration =
     r.province === undefined
       ? 1
       : Math.min(1.4, 1 + 0.04 * Math.log1p(population(r) / Math.max(1, r.cells.length) / 1000))
   const manufacturing = effectMultiplier(w, 'manufacturing', n.id, r.id)
+  // Low-tech kilns and bloomery furnaces can bootstrap from labor and inputs;
+  // equipment improves throughput but cannot replace ore or wood in the recipe.
+  const furnace = f.employment * eff * agglomeration * manufacturing * (1 + 0.2 * Math.log1p(capital))
+  q.iron = furnace * mix.iron * 0.1 * (1 + FACILITY_POLICY.productivity * Math.log1p(facilities.smelter))
+  q.charcoal =
+    furnace *
+    mix.charcoal *
+    0.06 *
+    (1 + FACILITY_POLICY.productivity * Math.log1p(facilities['charcoal-kiln']))
   const factory = f.employment * capital * eff * agglomeration * manufacturing
   // Public workshops contain paid productive equipment, so a district with no
   // inherited private equipment can develop industry. Employment and input
@@ -492,6 +549,44 @@ export function firmCapacity(
     mix.arms *
     (0.0025 / 0.19 / 0.15) *
     (n.policies.priority === 'military' ? 2 : 1)
+  const technology = n.technologies.industry
+  for (const good of EXTENDED_GOODS) {
+    const spec = COMMODITIES[good]
+    if ((spec.sector === 'crop' ? t.agriculture : technology) < spec.technology) continue
+    const facility = facilities[GOOD_FACILITY[good]]
+    const improvement = 1 + FACILITY_POLICY.productivity * Math.log1p(facility)
+    if (spec.sector === 'crop') {
+      const suitability =
+        good === 'cotton'
+          ? clamp((climate.temperature - 8) / 16)
+          : good === 'flax'
+            ? clamp(1 - Math.abs(climate.temperature - 15) / 25)
+            : 1
+      q[good] =
+        farmLabor *
+        mix[good] *
+        spec.rate *
+        suitability *
+        abundance *
+        equipment *
+        (1 + t.agriculture * 0.19) *
+        season *
+        w.climate *
+        eff *
+        improvement
+    } else if (spec.sector === 'mineral') {
+      q[good] =
+        f.employment *
+        mix[good] *
+        spec.rate *
+        regionalMineralPotential(w, r, good as ExtendedMineral) *
+        abundance *
+        eff *
+        improvement
+    } else if (spec.sector === 'fishery') {
+      q[good] = f.employment * mix[good] * spec.rate * fishingPotential(w, r) * eff * equipment * improvement
+    } else q[good] = furnace * mix[good] * spec.rate * improvement
+  }
   if (simulationMonths() !== 1) for (const g of GOODS) q[g] *= simulationMonths()
   return { q }
 }
@@ -500,9 +595,11 @@ export function produceFirms(w: World, r: Region, hired = false) {
   const e = ensureEconomy(w),
     firms = regionalFirms(w, r.id).filter((f) => f.active),
     merchant = e.producers[r.id]
+  // Hiring reads the last visible industrial orders. Clearing them first would
+  // erase the only demand signal for ore and wool, which households never buy.
+  if (!hired) hireFirms(w, r)
   r.production = inventory()
   r.plannedProduction = inventory()
-  if (!hired) hireFirms(w, r)
   for (const f of firms) {
     const { q } = firmCapacity(w, r, f, firms.length)
     const laborShares = f.laborMix ?? baseLaborMix(w, r, f)
@@ -510,7 +607,7 @@ export function produceFirms(w: World, r: Region, hired = false) {
       f.planned[g] = Math.max(f.planned[g], q[g])
       r.plannedProduction[g] += f.planned[g]
       if (q[g] <= 1e-9) continue
-      const recipe = recipes[g] ?? {}
+      const recipe = productionRecipe(r, g)
       const unitInput = Object.entries(recipe).reduce(
         (s, [input, rate]) => s + r.prices[input as Good] * rate,
         0,
@@ -534,8 +631,11 @@ export function produceFirms(w: World, r: Region, hired = false) {
         made = Math.min(made, f.cash / perUnit)
       }
       made = Math.max(0, made)
-      if (g === 'timber' || g === 'stone' || g === 'iron' || g === 'coal')
-        made = extractDistrictResource(w, r, g, made)
+      const resource = EXTRACTIVE_OUTPUTS[g]
+      if (resource) made = extractDistrictResource(w, r, resource, made)
+      const extended = COMMODITIES[g as ExtendedGood]
+      if (extended?.sector === 'mineral' || extended?.sector === 'fishery')
+        made = extractExtendedResource(w, r, g as ExtendedMineral | 'fish', made)
       for (const [input, rate] of Object.entries(recipe)) {
         const good = input as Good,
           quantity = made * rate
@@ -566,10 +666,7 @@ export function produceFirms(w: World, r: Region, hired = false) {
   }
   merchant.planned = { ...r.plannedProduction }
   for (const g of GOODS)
-    merchant.inputTargets[g] = Math.max(
-      0,
-      reserveTarget(r, g) - householdNeed(r, g) * (g === 'food' ? 2.4 : 3),
-    )
+    merchant.inputTargets[g] = Math.max(0, reserveTarget(r, g) - marketNeed(r, g) * (g === 'food' ? 2.4 : 3))
   restockMarket(w, r)
 }
 export function restockMarket(w: World, r: Region) {
@@ -878,7 +975,7 @@ export function finishFirms(w: World) {
         slot.productivity = 0.95 + (hashSeed(`${w.seed}:${slot.id}:${slot.generation}`) % 200) / 1000
         for (const g of GOODS) {
           slot.prices[g] = Math.max(0.01, r.prices[g] / (1 + retailMarkup(w, r, g)))
-          slot.forecast[g] = householdNeed(r, g) / 3
+          slot.forecast[g] = marketNeed(r, g) / 3
         }
         transfer(w, owner, firmAccount(slot.id), seed, 'entrepreneur equity subscription')
         e.firmEntries = (e.firmEntries ?? 0) + 1

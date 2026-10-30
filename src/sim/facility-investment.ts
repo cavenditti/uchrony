@@ -1,3 +1,4 @@
+import { geographicNeighbors } from './grid'
 /** Resource-aware district investment. Opportunity scores compare the marginal
  * capacity or distribution saving per construction crown, never promised profits. */
 import { facilityEconomicCase } from './facility-economics'
@@ -10,6 +11,9 @@ import {
   type FacilityKind,
 } from './facility-types'
 import { cellResourcePotential, landscapeAt } from './landscape'
+import { EXTRACTIVE_OUTPUTS } from './production-chains'
+import { COMMODITIES, type ExtendedGood } from './commodity-catalog'
+import { regionalMineralPotential, fishCapacity, type ExtendedMineral } from './resource-extraction'
 import { economicRegion, economicRegions, provinceId } from './local-units'
 import {
   FACILITY_POLICY,
@@ -22,8 +26,6 @@ import { fundPublicConstruction, publicConstructionQuote } from './public-constr
 import { quoteMaterialFinancing } from './supplier-credit'
 import { habitableLand } from './terrain-access'
 import { population, type Good, type Nation, type Region, type World } from './types'
-
-const RAW_GOODS = new Set<Good>(['timber', 'stone', 'iron', 'coal'])
 
 export interface FacilityQuote {
   kind: FacilityKind
@@ -47,10 +49,18 @@ export function facilitySitePotential(w: World, cell: number, kind: FacilityKind
   const c = w.cells[cell]
   if (!c || !habitableLand(c)) return 0
   const good = FACILITY_DEFINITIONS[kind].sector
-  if (good === 'food')
+  const extended = good === 'market' ? undefined : COMMODITIES[good as ExtendedGood]
+  if (extended?.sector === 'mineral')
+    return regionalMineralPotential(w, { cells: [cell] }, good as ExtendedMineral)
+  if (extended?.sector === 'fishery')
+    return geographicNeighbors(w.cells, cell, w.width, w.height).some((id) => fishCapacity(w, id) > 0) ? 1 : 0
+  if (extended?.sector === 'crop')
     return landscapeAt(c).habitat >= FACILITY_POLICY.minimumHabitat ? landscapeAt(c).habitat : 0
-  if (good !== 'market' && RAW_GOODS.has(good)) {
-    const value = cellResourcePotential(w, cell, good as keyof Region['deposits'])
+  if (good === 'food' || good === 'wool')
+    return landscapeAt(c).habitat >= FACILITY_POLICY.minimumHabitat ? landscapeAt(c).habitat : 0
+  const resource = good === 'market' ? undefined : EXTRACTIVE_OUTPUTS[good]
+  if (resource) {
+    const value = cellResourcePotential(w, cell, resource)
     return value >= FACILITY_POLICY.minimumDeposit ? value : 0
   }
   return 1
@@ -121,9 +131,9 @@ function quoteFacility(
   const { cell: best, potential } = selectSite(w, r, kind, limit, cell)
   if (best < 0)
     return block(
-      definition.sector === 'food'
+      definition.sector === 'food' || definition.sector === 'wool'
         ? 'No cultivable site with free capacity is available at current technology.'
-        : definition.sector !== 'market' && RAW_GOODS.has(definition.sector)
+        : definition.sector !== 'market' && EXTRACTIVE_OUTPUTS[definition.sector]
           ? `No remaining ${definition.sector} deposit with free capacity is available at current technology.`
           : 'Available sites are occupied by construction or at their land or technology limit.',
     )

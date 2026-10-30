@@ -4,10 +4,12 @@ import { parameterGroup } from './configuration-context'
 import {
   FACILITY_DEFINITIONS,
   FACILITY_KINDS,
+  GOOD_FACILITY,
   MAX_FACILITY_LEVELS,
   type FacilityKind,
 } from './facility-types'
 import type { DistrictActivity } from './district-types'
+import { WORKSHOP_GOODS } from './production-chains'
 import { GOODS, type Inventory, type Nation, type Region, type World } from './types'
 
 export const FACILITY_POLICY = parameterGroup('facilities')
@@ -15,6 +17,13 @@ export const FACILITY_RECIPES = parameterGroup('facilityRecipes')
 const EMPTY_LEVELS: Readonly<Record<FacilityKind, number>> = Object.freeze(
   Object.fromEntries(FACILITY_KINDS.map((kind) => [kind, 0])) as Record<FacilityKind, number>,
 )
+const WORKSHOP_KINDS = WORKSHOP_GOODS.map((good) => GOOD_FACILITY[good])
+/** Shared premises and descriptive specialization count the same installed workshops. */
+function workshopTiers(levels: Readonly<Record<FacilityKind, number>>) {
+  let total = 0
+  for (const kind of WORKSHOP_KINDS) total += levels[kind]
+  return total
+}
 const regional = new WeakMap<
   World,
   { state: World['facilities']; values: WeakMap<number[], Readonly<Record<FacilityKind, number>>> }
@@ -93,12 +102,7 @@ export function weightFacilityLabor(w: World, r: Region, mix: Inventory) {
  * every entrant. Private establishment capacity remains a separate asset. */
 export function publicWorkshopJobs(w: World, r: Region, active: number) {
   const levels = regionalFacilityLevels(w, r)
-  return (
-    ((levels['tool-industry'] + levels['textile-industry'] + levels['arms-industry']) *
-      r.cells.length *
-      FACILITY_POLICY.jobsPerTier) /
-    Math.max(1, active)
-  )
+  return (workshopTiers(levels) * r.cells.length * FACILITY_POLICY.jobsPerTier) / Math.max(1, active)
 }
 
 /** Installed specialization is descriptive; it does not book jobs or output. */
@@ -107,13 +111,11 @@ export function facilityDistrictActivity(w: World, r: Region): DistrictActivity 
   const levels = regionalFacilityLevels(w, r),
     // Commissioned tiers are integers. Recover their counts from cached means
     // before a majority test, so summation order cannot break an exact tie.
-    farming = Math.round(levels['farm-estate'] * r.cells.length),
+    farming = Math.round((levels['farm-estate'] + levels['sheep-farm']) * r.cells.length),
     mining = Math.round(
       (levels['timber-yard'] + levels.quarry + levels['iron-mine'] + levels['coal-mine']) * r.cells.length,
     ),
-    industry = Math.round(
-      (levels['tool-industry'] + levels['textile-industry'] + levels['arms-industry']) * r.cells.length,
-    ),
+    industry = Math.round(workshopTiers(levels) * r.cells.length),
     market = Math.round(levels.market * r.cells.length),
     total = farming + mining + industry + market,
     largest = Math.max(farming, mining, industry, market)

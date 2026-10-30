@@ -18,7 +18,7 @@ import {
   recordTransport,
   recordUse,
 } from '../src/sim/national-accounts'
-import { inventory, type World } from '../src/sim/types'
+import { GOODS, inventory, type World } from '../src/sim/types'
 import { parseSave, validateWorld } from '../src/sim/persistence'
 import { packWorldSave } from '../src/sim/save-codec'
 import { buildSpatial } from '../src/sim/spatial'
@@ -240,7 +240,13 @@ test('district merges and splits preserve different original inventory costs wit
   for (const partition of [coarse, fine, coarse]) {
     remeshDistricts(w, partition)
     near(total(), opening)
-    near(w.economy!.accounts!.world.holdingGains, 0)
+    // Subtracting large unchanged books loses a few ulps as extra commodity
+    // lots are apportioned. Bound that roundoff by the opening monetary scale;
+    // no material revaluation is allowed and the full accounts still reconcile.
+    assert(
+      Math.abs(w.economy!.accounts!.world.holdingGains) <=
+        Number.EPSILON * Math.max(1, opening) * GOODS.length * 4,
+    )
     near(w.economy!.accounts!.world.productionGDP, 0)
     auditNationalAccounts(w)
   }

@@ -1,3 +1,4 @@
+import { EDIBLE_GOODS, foodUnits, foodEquivalentInventory } from './food-basket'
 /** Monthly household and government clearing transfers existing deposits against
  * real goods and services before final GDP and bank reconciliation. */
 import { settleBanks, updateMonetaryPolicy, withBorrowerLoanIndex } from './banking'
@@ -8,7 +9,7 @@ import { activeDevelopment } from './development'
 import { developmentBudget, developmentCreditLimit, governmentDebtPayments } from './government-budget'
 import { archiveRetiredDistricts } from './districts'
 import { STRATA, type EconomicStratum } from './economic-types'
-import { BASE_PRICE, foodEquivalentPeople, householdNeed } from './economy'
+import { BASE_PRICE, foodEquivalentPeople, householdNeed, marketNeed } from './economy'
 import { effectMultiplier } from './effects'
 import { expansionParameters } from './expansion-parameters'
 import { beginFirmMonth, ensureFirms, finishFirms, hireFirms, regionalFirms, retailDecay } from './firms'
@@ -104,7 +105,7 @@ export function beginEconomyMonth(w: World) {
         f.forecast[g] > 0
           ? (1 - periodRate(P.forecastAdjustment)) * f.forecast[g] +
             periodRate(P.forecastAdjustment) * f.sold[g]
-          : householdNeed(r, g)
+          : marketNeed(r, g)
     f.openingStocks = { ...r.stocks }
     f.sold = inventory()
     f.intermediate = inventory()
@@ -220,6 +221,14 @@ export function consumeHouseholds(w: World) {
         })),
     ]
     const offers = new Map(GOODS.map((g) => [g, [...sellers].sort((a, b) => a.prices[g] - b.prices[g])]))
+    // Food offers compete in ration-equivalent units. Physical transactions
+    // still name bread/fish/etc., so payment, storage and GDP are not relabeled.
+    const foodOffers = EDIBLE_GOODS.flatMap((good) =>
+      offers
+        .get(good)!
+        .filter((offer) => offer.stocks[good] > 1e-9)
+        .map((offer) => ({ good, offer })),
+    ).sort((a, b) => a.offer.prices[a.good] / foodUnits(a.good) - b.offer.prices[b.good] / foodUnits(b.good))
     const foodWeights = Object.fromEntries(STRATA.map((s) => [s, 0])) as Record<EconomicStratum, number>
     const peopleCounts = Object.fromEntries(STRATA.map((s) => [s, 0])) as Record<EconomicStratum, number>
     for (const group of r.communities ?? []) {
@@ -259,6 +268,8 @@ export function consumeHouseholds(w: World) {
       const prices = Object.fromEntries(
         GOODS.map((g) => [g, offers.get(g)!.find((o) => o.stocks[g] > 1e-9)?.prices[g] ?? r.prices[g]]),
       ) as Inventory
+      if (foodOffers.length)
+        prices.food = foodOffers[0].offer.prices[foodOffers[0].good] / foodUnits(foodOffers[0].good)
       const minimum = GOODS.reduce((sum, g) => sum + (needs[g] * prices[g]) / 1000, 0)
       const disposable = Math.max(0, h.income - h.taxes + h.transfers)
       const spending = Math.min(
@@ -277,58 +288,68 @@ export function consumeHouseholds(w: World) {
         remainingBudget: spending,
       })
     }
-    // All strata bid at the same quoted offer. A scarce lot is rationed in
-    // proportion to affordable orders, never by the stratum's array position.
-    for (const g of GOODS)
-      for (const offer of offers.get(g)!) {
-        const price = offer.prices[g] / 1000
-        const quantities = orders.map((o) =>
-          Math.max(
-            0,
-            Math.min(
-              o.requested[g] - e.households[r.id][o.s].consumption[g],
-              Math.min(e.households[r.id][o.s].cash, o.remainingBudget) / Math.max(1e-12, price),
-            ),
-          ),
+    // Each physical lot is apportioned simultaneously across affordable orders.
+    // Complete the substitutable food basket first; luxuries cannot outrank an
+    // unmet ration even if a poor household retains cash after a local stockout.
+    const clearOffer = (g: Good, offer: (typeof sellers)[number], nutrition = 0) => {
+      const price = offer.prices[g] / 1000
+      const quantities = orders.map((o) => {
+        const household = e.households[r.id][o.s]
+        if (g === 'jewelry' && foodEquivalentInventory(household.consumption) + 1e-9 < o.needs.food) return 0
+        const remaining =
+          nutrition > 0
+            ? (o.requested.food - foodEquivalentInventory(household.consumption)) / nutrition
+            : o.requested[g] - household.consumption[g]
+        return Math.max(
+          0,
+          Math.min(remaining, Math.min(household.cash, o.remainingBudget) / Math.max(1e-12, price)),
         )
-        const demand = quantities.reduce((sum, q) => sum + q, 0)
-        // The wholesaler retains a bounded working inventory for next period's
-        // workshop orders. Otherwise retail can empty every input each period,
-        // permanently shutting tools -> arms and replacement-capital chains.
-        // Food is never withheld from residents for this purpose.
-        const reserved =
-          decisionPolicy().renewal && offer.seller === f && g !== 'food'
-            ? Math.min(offer.stocks[g] * 0.5, f.inputTargets[g])
-            : 0
-        const fill = demand > 0 ? Math.min(1, Math.max(0, offer.stocks[g] - reserved) / demand) : 0
-        orders.forEach((o, i) => {
-          const amount = Math.min(offer.stocks[g], quantities[i] * fill)
-          if (amount <= 1e-9) return
-          const h = e.households[r.id][o.s]
-          const paid = payments.transfer(o.account, offer.account, amount * price, 'household consumption')
-          const quantity = price > 0 ? Math.min(amount, paid / price) : 0
-          recordGoodsSale(w, offer.store, g, quantity, paid, {
-            kind: 'household',
-            nation: economicNation(w, r.id),
-          })
-          offer.stocks[g] = Math.max(0, offer.stocks[g] - quantity)
-          offer.seller.sales += paid
-          offer.seller.sold[g] += quantity
-          h.expenditure += paid
-          o.remainingBudget = Math.max(0, o.remainingBudget - paid)
-          r.consumption[g] += quantity
-          h.consumption[g] += quantity
+      })
+      const demand = quantities.reduce((sum, q) => sum + q, 0)
+      const reserved =
+        decisionPolicy().renewal && offer.seller === f && !foodUnits(g)
+          ? Math.min(offer.stocks[g] * 0.5, f.inputTargets[g])
+          : 0
+      const fill = demand > 0 ? Math.min(1, Math.max(0, offer.stocks[g] - reserved) / demand) : 0
+      orders.forEach((o, i) => {
+        const amount = Math.min(offer.stocks[g], quantities[i] * fill)
+        if (amount <= 1e-9) return
+        const h = e.households[r.id][o.s]
+        const paid = payments.transfer(o.account, offer.account, amount * price, 'household consumption')
+        const quantity = price > 0 ? Math.min(amount, paid / price) : 0
+        recordGoodsSale(w, offer.store, g, quantity, paid, {
+          kind: 'household',
+          nation: economicNation(w, r.id),
         })
-      }
+        offer.stocks[g] = Math.max(0, offer.stocks[g] - quantity)
+        offer.seller.sales += paid
+        offer.seller.sold[g] += quantity
+        h.expenditure += paid
+        o.remainingBudget = Math.max(0, o.remainingBudget - paid)
+        r.consumption[g] += quantity
+        h.consumption[g] += quantity
+      })
+    }
+    for (const { good, offer } of foodOffers) clearOffer(good, offer, foodUnits(good))
+    for (const good of GOODS)
+      if (!foodUnits(good)) for (const offer of offers.get(good)!) clearOffer(good, offer)
     let food = 0,
       material = 0
     for (const o of orders) {
       const h = e.households[r.id][o.s]
-      h.foodCoverage = o.needs.food > 0 ? Math.min(1, h.consumption.food / o.needs.food) : 1
+      h.foodCoverage =
+        o.needs.food > 0 ? Math.min(1, foodEquivalentInventory(h.consumption) / o.needs.food) : 1
       h.materialCoverage = clamp(
         GOODS.reduce(
           (sum, g) =>
-            sum + (o.needs[g] > 0 ? Math.min(1, h.consumption[g] / o.needs[g]) : 1) * materialWeights[g],
+            sum +
+            (o.needs[g] > 0
+              ? Math.min(
+                  1,
+                  (g === 'food' ? foodEquivalentInventory(h.consumption) : h.consumption[g]) / o.needs[g],
+                )
+              : 1) *
+              materialWeights[g],
           0,
         ) / totalMaterialWeight,
       )

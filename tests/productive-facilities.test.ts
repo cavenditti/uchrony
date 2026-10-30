@@ -178,14 +178,14 @@ test('matching facilities bias sector labor and capacity without granting output
   const bare = firmCapacity(w, district, f, active).q
   w.facilities = { sites: { [cell]: { 'iron-mine': 1, 'tool-industry': 1 } }, projects: [] }
   const developed = firmCapacity(w, district, f, active).q
-  assert(developed.iron > bare.iron)
+  assert(developed.ironOre > bare.ironOre)
   assert(
     developed.tools > 0 && bare.tools === 0,
     'paid workshops can establish industry without legacy equipment',
   )
   assert.equal(developed.coal, bare.coal)
   const mix = weightFacilityLabor(w, district, inventory(1))
-  assert(mix.iron > mix.coal && mix.tools > mix.textiles)
+  assert(mix.ironOre > mix.coal && mix.tools > mix.textiles)
   assert.equal(
     facilityDistrictActivity(w, district),
     'mixed',
@@ -196,7 +196,7 @@ test('matching facilities bias sector labor and capacity without granting output
   assert.deepEqual(firmCapacity(w, district, f, active).q, inventory())
   f.employment = 100
   district.deposits = { ...r.deposits, iron: 0 }
-  assert.equal(firmCapacity(w, district, f, active).q.iron, 0)
+  assert.equal(firmCapacity(w, district, f, active).q.ironOre, 0)
 })
 
 test('an equipped industrial district still needs its actual manufacturing inputs', () => {
@@ -284,7 +284,10 @@ test('commissioned markets reduce actual merchant spoilage in the household-clea
 
 test('economic conditions change investment rankings: resources, inputs and customers all matter', () => {
   const { w, r, cell } = facilityFixture()
+  // Ore mines serve smelters, rather than fictitious household ore consumption.
+  r.plannedProduction = { ...inventory(), iron: 100 }
   const rich = facilityQuote(w, r, 'iron-mine', cell).score
+  assert(rich > 0)
   w.cells[cell].landscape!.resources.iron = 0.1
   assert(facilityQuote(w, r, 'iron-mine', cell).score < rich)
   const industrial = facilityQuote(w, r, 'tool-industry', cell).score
@@ -342,6 +345,7 @@ test('native portfolios choose an ore mine in a deposit-rich valley and tool wor
         w.cells[cell].landscape!.resources = { ...r.deposits }
       }
     r.stocks = {
+      ...inventory(),
       food: householdNeed(r, 'food') * 2,
       timber: 120,
       stone: 120,
@@ -351,6 +355,7 @@ test('native portfolios choose an ore mine in a deposit-rich valley and tool wor
       textiles: 400,
       arms: 100,
     }
+    r.plannedProduction = { ...inventory(), iron: desired === 'iron-mine' ? 100 : 0 }
     rebaseEndowments(w)
     beginEconomyMonth(w)
     hireFirms(w, r)
