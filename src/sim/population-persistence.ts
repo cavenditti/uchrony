@@ -1,3 +1,5 @@
+import { COMMUNITY_POLITICAL_FIELDS } from './identity-politics'
+import { IDENTITY_POLICY_KEYS } from './identity-policy'
 import { ageTotals } from './age-cohorts'
 import { STRATA } from './economic-types'
 import { allForces } from './forces'
@@ -98,6 +100,8 @@ export function validatePopulation(world: World, allowDuplicateCommunities = fal
         ].some((field) => !number(group[field as keyof PopulationCommunity], 0, 1))
       )
         fail('invalid community profile')
+      if (COMMUNITY_POLITICAL_FIELDS.some((key) => group[key] !== undefined && !number(group[key], 0, 1)))
+        fail('invalid political orientation')
       if (group.stratum !== undefined && !STRATA.includes(group.stratum)) fail('unknown economic stratum')
       if (group.ageCohorts !== undefined) {
         if (
@@ -134,6 +138,19 @@ export function validatePopulation(world: World, allowDuplicateCommunities = fal
       for (const age of AGES) totals[age] += group.population[age]
     }
     return totals
+  }
+  // District implementation belongs to the physical holder; provincial census
+  // validation alone would miss malformed implementation records in local saves.
+  for (const holder of [...world.regions, ...Object.values(world.localEconomy?.units ?? {})]) {
+    const metrics = holder.populationDynamics
+    if (
+      metrics?.appliedIdentityPolicy !== undefined &&
+      (!object(metrics.appliedIdentityPolicy) ||
+        IDENTITY_POLICY_KEYS.some((key) => !number(metrics.appliedIdentityPolicy![key], 0, 1)))
+    )
+      fail('invalid applied identity policy')
+    if (metrics?.identityPolicyMonth !== undefined && !integer(metrics.identityPolicyMonth, 0, world.month))
+      fail('invalid identity policy date')
   }
   for (const region of world.regions) {
     const totals = validateGroups(region.communities)

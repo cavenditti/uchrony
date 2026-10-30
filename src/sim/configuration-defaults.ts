@@ -1,3 +1,4 @@
+import { resolveIdentityPolicy } from './identity-policy'
 import type { DecisionPolicy } from './decision-policy'
 import type { ExpansionParameters } from './expansion-parameters'
 import type { Policies, Research, Inventory } from './types'
@@ -232,6 +233,7 @@ export const DEFAULT_CONFIGURATION_VALUES = {
     researchFromLeaders: true,
     researchFocus: 'logistics' as Research,
     policies: {
+      ...resolveIdentityPolicy({}),
       tax: 22,
       welfare: 20,
       education: 15,

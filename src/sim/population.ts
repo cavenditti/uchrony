@@ -1,3 +1,11 @@
+import { advanceIdentityImplementation } from './identity-implementation'
+import { resolveIdentityPolicy } from './identity-policy'
+import {
+  COMMUNITY_POLITICAL_FIELDS,
+  initializeCommunityPolitics,
+  evaluateIdentityPolicy,
+  evolveCommunityPolitics,
+} from './identity-politics'
 /** Joint identity communities own dated cohorts; province/district views share those holders.
  * Seeding and demography live here; mobility and personnel transfers have separate boundaries. */
 import { cohortBirths, cohortDeaths, ensureAges, extractAges, mergeAges } from './age-cohorts'
@@ -169,6 +177,21 @@ export function communityIndex(groups: PopulationCommunity[]) {
   for (const group of groups) if (!index.has(communityKey(group))) index.set(communityKey(group), group)
   return index
 }
+/** Political fields do not fragment census keys; equal communities merge their
+ * population-weighted attitudes. Legacy absence remains valid until initialized. */
+function mergePoliticalConditions(
+  existing: PopulationCommunity,
+  incoming: PopulationCommunity,
+  size: number,
+  count: number,
+) {
+  for (const key of COMMUNITY_POLITICAL_FIELDS) {
+    if (existing[key] === undefined && incoming[key] === undefined) continue
+    const fallback = key === 'languageTransmission' ? 1 : 0.5
+    existing[key] =
+      ((existing[key] ?? fallback) * size + (incoming[key] ?? fallback) * count) / (size + count)
+  }
+}
 export function addCommunity(
   groups: PopulationCommunity[],
   incoming: PopulationCommunity,
@@ -185,6 +208,7 @@ export function addCommunity(
     return
   }
   const size = communitySize(existing)
+  mergePoliticalConditions(existing, incoming, size, count)
   for (const field of SOCIAL)
     existing[field] = (existing[field] * size + incoming[field] * count) / (size + count)
   if (existing.ageCohorts || incoming.ageCohorts) mergeAges(existing, incoming)
@@ -204,6 +228,7 @@ export function coalesceCommunities(groups: PopulationCommunity[]) {
       continue
     }
     const size = communitySize(existing)
+    mergePoliticalConditions(existing, group, size, count)
     for (const field of SOCIAL)
       existing[field] = (existing[field] * size + group[field] * count) / (size + count)
     if (existing.ageCohorts || group.ageCohorts) mergeAges(existing, group)
@@ -334,6 +359,7 @@ export function ensurePopulation(world: World) {
     nation.policies.citizenship ??= 'civic'
     nation.policies.languagePolicy ??= 'multilingual'
     nation.policies.beliefPolicy ??= 'protected'
+    Object.assign(nation.policies, resolveIdentityPolicy(nation.policies))
     if (!nation.identity) {
       const groups = world.regions
           .filter((region) => region.nation === nation.id)
@@ -377,6 +403,7 @@ export function ensurePopulation(world: World) {
   const initialize = (groups: PopulationCommunity[], urban: number) => {
     const result: PopulationCommunity[] = []
     for (const group of groups) {
+      initializeCommunityPolitics(group, world.demography!.identities[group.movement].orientation)
       ensureAges(group, world.month)
       if (group.stratum) {
         result.push(group)
@@ -406,30 +433,14 @@ export function discrimination(
   protection = (world.historical?.societies.find((society) => society.nation === region.nation)?.pluralism ??
     50) / 100,
 ) {
-  const nation = governance(world, region.nation),
-    identity = nation.identity!,
-    policies = nation.policies
-  return (
-    clamp(
-      (policies.citizenship === 'heritage' && group.culture !== identity.culture ? 0.35 : 0) +
-        (policies.beliefPolicy === 'restricted' && group.belief !== identity.belief
-          ? 0.4
-          : policies.beliefPolicy === 'favored' && group.belief !== identity.belief
-            ? 0.12
-            : 0) +
-        (policies.languagePolicy === 'common' &&
-        (group.language === identity.language
-          ? 1
-          : group.knownLanguage === identity.language
-            ? group.fluency
-            : 0) < 0.5
-          ? 0.12
-          : 0),
-      0,
-      1,
-    ) *
-    (1 - protection * 0.45)
-  )
+  const home = group.locality === undefined ? undefined : world.localEconomy?.units[group.locality]
+  const holder = region.province === undefined && home?.province === region.id ? home : region
+  return evaluateIdentityPolicy(
+    group,
+    governance(world, region.nation),
+    holder.populationDynamics?.appliedIdentityPolicy,
+    protection,
+  ).exclusion
 }
 export function populationTension(world: World, region: Region) {
   if (!region.communities) return 0
@@ -450,6 +461,10 @@ export function updateCommunityDemography(world: World, region: Region, urbanOpp
     fertility = effectMultiplier(world, 'birthRate', nation.id, region.id),
     shortage = 1 - region.foodCoverage,
     education = effectMultiplier(world, 'education', nation.id, region.id)
+  advanceIdentityImplementation(world, region)
+  const metrics = region.populationDynamics!
+  const protection =
+    (world.historical?.societies.find((s) => s.nation === region.nation)?.pluralism ?? 50) / 100
   region.births = 0
   region.deaths = 0
   const basket = GOODS.reduce((sum, g) => sum + householdNeed(region, g) * region.prices[g], 0)
@@ -466,7 +481,8 @@ export function updateCommunityDemography(world: World, region: Region, urbanOpp
     }
     // Secondary language learning belongs to identity evolution. Do not erase
     // a trading language at every demographic update.
-    const exclusion = discrimination(world, region, group),
+    const evaluation = evaluateIdentityPolicy(group, nation, metrics.appliedIdentityPolicy, protection),
+      exclusion = evaluation.exclusion,
       access = 1 - exclusion * 0.45
     group.health = clamp(
       group.health + (region.health * access + group.wealth * 0.03 - group.health) * periodRate(0.05),
@@ -494,18 +510,17 @@ export function updateCommunityDemography(world: World, region: Region, urbanOpp
     group.urban = world.adaptive
       ? region.urban
       : clamp(group.urban + (clamp(region.industry * 0.5, 0.03, 0.92) - group.urban) * 0.001, 0.01, 0.98)
-    const movement = world.demography!.identities[group.movement],
-      dissatisfaction =
-        movement.orientation === 'reform' && nation.policies.citizenship === 'heritage'
-          ? 0.06
-          : movement.orientation === 'local' && nation.policies.languagePolicy === 'common'
-            ? 0.05
-            : 0
+    const movement = world.demography!.identities[group.movement]
+    evolveCommunityPolitics(group, movement.orientation, exclusion, periodRate(0.001))
+    group.governmentSupport = clamp(
+      group.governmentSupport! +
+        (clamp(region.happiness + evaluation.consent) - group.governmentSupport!) * periodRate(0.04),
+    )
     group.contentment = clamp(
       group.contentment +
         (region.happiness -
-          exclusion * 0.22 -
-          dissatisfaction +
+          exclusion * 0.22 +
+          evaluation.consent * 0.15 +
           (group.wealth - 0.5) * 0.08 -
           group.contentment) *
           periodRate(0.06),
@@ -518,7 +533,9 @@ export function updateCommunityDemography(world: World, region: Region, urbanOpp
     group.loyalty = clamp(
       group.loyalty +
         (0.35 +
-          group.contentment * 0.4 +
+          group.contentment * 0.3 +
+          group.governmentSupport! * 0.1 +
+          evaluation.consent * 0.2 +
           nation.legitimacy / 400 -
           exclusion * 0.45 -
           group.grievance * 0.25 -

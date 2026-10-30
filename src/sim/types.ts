@@ -118,6 +118,14 @@ export interface Policies {
   conscription: number
   migration: 'open' | 'controlled' | 'closed'
   priority: 'balanced' | 'agriculture' | 'industry' | 'military'
+  languageEducation?: number
+  localLanguageSupport?: number
+  languageAssimilation?: number
+  languageExclusion?: number
+  culturalAssimilation?: number
+  culturalExclusion?: number
+  stateFaithSupport?: number
+  faithRestrictions?: number
   citizenship?: 'civic' | 'pluralist' | 'heritage'
   languagePolicy?: 'local' | 'common' | 'multilingual'
   beliefPolicy?: 'protected' | 'favored' | 'restricted'

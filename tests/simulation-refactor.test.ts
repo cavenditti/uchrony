@@ -68,12 +68,12 @@ test('shared policy metadata retains command limits and wider configured/save do
     if (rule.kind === 'number') {
       assert.equal(policyCommandValue(key, -100), rule.commandMin)
       assert.equal(policyCommandValue(key, 200), rule.commandMax)
-      assert(validSavedPolicy(key, 0))
-      assert(validSavedPolicy(key, 100))
+      assert(validSavedPolicy(key, rule.min))
+      assert(validSavedPolicy(key, rule.max))
       for (const value of [NaN, Infinity, -Infinity, '40'])
         assert.throws(() => policyCommandValue(key, value))
-      assert(!validSavedPolicy(key, -1))
-      assert(!validSavedPolicy(key, 101))
+      assert(!validSavedPolicy(key, rule.min - 1))
+      assert(!validSavedPolicy(key, rule.max + 1))
       applyCommand(w, { type: 'policy', nation: 0, key, value: 200 })
       assert.equal(w.nations[0].policies[key], rule.commandMax)
     } else {

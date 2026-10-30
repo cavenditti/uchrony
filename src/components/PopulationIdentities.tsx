@@ -1,3 +1,4 @@
+import { evaluateIdentityPolicy } from '../sim/identity-politics'
 import { censusOf, mergeCensuses, censusDistribution } from '../sim/view-snapshot'
 import { EconomicAccounts } from './EconomicAccounts'
 import { useState } from 'react'
@@ -144,6 +145,29 @@ export function PopulationIdentities({
         <b>{count(flows.refugees)}</b>
       </div>
       <details className="community-records">
+        <summary>Political attitudes and government support</summary>
+        <p className="panel-note">
+          Population-weighted attitudes can differ within the same culture or faith. Government approval
+          changes faster than loyalty to the state.
+        </p>
+        {(
+          [
+            ['governmentSupport', 'Government support'],
+            ['pluralism', 'Pluralism'],
+            ['groupIdentification', 'Group identification'],
+            ['authority', 'Acceptance of authority'],
+            ['localAutonomy', 'Local autonomy'],
+            ['publicReligion', 'Public role of religion'],
+            ['languageTransmission', 'Household language transmission'],
+          ] as const
+        ).map(([key, label]) => (
+          <div className="data-row" key={key}>
+            <span>{label}</span>
+            <b>{percent((census.weighted[key] ?? 0) / Math.max(1, total))}</b>
+          </div>
+        ))}
+      </details>
+      <details className="community-records">
         <summary>Inspect community records</summary>
         <h4>Identity transitions this month</h4>
         {(
@@ -177,6 +201,21 @@ export function PopulationIdentities({
                 <br />
                 {name(g.movement)}
               </p>
+              <details>
+                <summary>Response to declared identity policy</summary>
+                <p className="panel-note">
+                  Policy-only contributions; actual enforcement and living conditions also affect support.
+                </p>
+                {Object.entries(evaluateIdentityPolicy(g, world.nations[nation])).map(([key, value]) => (
+                  <div className="data-row" key={key}>
+                    <span>{key}</span>
+                    <b>
+                      {value > 0 ? '+' : ''}
+                      {Math.round(value * 100)}
+                    </b>
+                  </div>
+                ))}
+              </details>
               <dl>
                 <div>
                   <dt>Children / adults / elders</dt>

@@ -1,3 +1,5 @@
+import { resolveIdentityPolicy } from './identity-policy'
+import { identityStateAppeal } from './identity-politics'
 /** Migration plans are simultaneous: destinations are observed before any arrival.
  * Cohorts and their financial claims move together; occupational changes preserve totals. */
 import { expectedInteger, extractAges } from './age-cohorts'
@@ -47,6 +49,7 @@ export function migrateCommunities(world: World, months = 1, coarse = false) {
       return [
         region.id,
         {
+          identityPolicy: resolveIdentityPolicy(governance(world, region.nation).policies),
           strata: Object.fromEntries(STRATA.map((s) => [s, stratumPeople(world, region.id, s)])) as Record<
             EconomicStratum,
             number
@@ -158,7 +161,14 @@ export function migrateCommunities(world: World, months = 1, coarse = false) {
               destination.people
           return (
             destination.appeal[group.stratum ?? 'laborer'] +
-            compatible * 0.12 -
+            compatible * 0.12 +
+            identityStateAppeal(
+              group,
+              governance(world, to.nation),
+              destination.identityPolicy,
+              destination.protection,
+            ) *
+              0.15 -
             (travelCosts.get(to.id) ?? 0) +
             destination.attraction +
             destination.prestige -

@@ -1,3 +1,4 @@
+import { applyIdentityPreset, IDENTITY_PRESETS, IDENTITY_POLICY_FIELDS } from './identity-policy'
 import { fleetReserved } from './maritime-routing'
 import { startOverseasExpedition, cancelOverseasExpedition } from './overseas'
 import { cancelArmyJourney, orderArmyJourney } from './army-journeys'
@@ -24,7 +25,7 @@ import { annexProvince } from './military-control'
 import { inventoryFlow, marketStore, reconcileGDP } from './national-accounts'
 import { commissionFleet, embarkArmy, ensureWarfare, orderFleet } from './navy'
 import { acceptablePeace, proposePeace } from './peace'
-import { policyCommandValue } from './policy-rules'
+import { POLICY_RULES, policyCommandValue } from './policy-rules'
 import { ensurePopulation } from './population'
 import { buildProductiveActivity } from './productive-investment'
 import { buildPublicWork } from './public-works'
@@ -464,10 +465,15 @@ const COMMAND_HANDLERS = {
     const n = activeNation(w, command.nation)
 
     const key = command.key
-    if (!(key in n.policies)) throw new Error('Unknown policy.')
+    if (!(key in n.policies) && !Object.hasOwn(POLICY_RULES, key)) throw new Error('Unknown policy.')
     Object.assign(n.policies, { [key]: policyCommandValue(key, command.value) })
+    if (Object.hasOwn(IDENTITY_PRESETS, key))
+      applyIdentityPreset(n.policies, key as keyof typeof IDENTITY_PRESETS)
     n.ai = false
-    return `${n.shortName}: ${key} policy updated. Manual government enabled.`
+    const label = Object.hasOwn(IDENTITY_POLICY_FIELDS, key)
+      ? IDENTITY_POLICY_FIELDS[key as keyof typeof IDENTITY_POLICY_FIELDS][0]
+      : key
+    return `${n.shortName}: ${label} policy updated. Manual government enabled.`
   },
   research: (w, command) => {
     const n = activeNation(w, command.nation)

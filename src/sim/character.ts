@@ -1,3 +1,4 @@
+import { applyIdentityPreset } from './identity-policy'
 import { ensureAmbition } from './ambitions'
 import { simulationSettings } from './settings'
 import {
@@ -221,14 +222,27 @@ function popularAttitudes(world: World, nation: Nation) {
       .filter((a) => a.nation === nation.id)
       .flatMap((a) => a.communities ?? []),
   ]
-  const moods = { literacy: 0, wealth: 0, urban: 0, grievance: 0, loyalty: 0, rootedness: 0, displacement: 0 }
+  const moods = {
+    literacy: 0,
+    wealth: 0,
+    urban: 0,
+    grievance: 0,
+    loyalty: 0,
+    rootedness: 0,
+    displacement: 0,
+    pluralism: 0,
+    authority: 0,
+    localAutonomy: 0,
+    groupIdentification: 0,
+    publicReligion: 0,
+  }
   const movements = { reform: 0, local: 0, institutional: 0, commerce: 0, communal: 0, neutral: 0 }
   let total = 0
   for (const group of groups) {
     // Adults and elders contribute to political opinion; identity names confer no innate attitudes.
     const weight = group.population.adults + group.population.elders * 0.8
     total += weight
-    for (const key of Object.keys(moods) as (keyof typeof moods)[]) moods[key] += weight * group[key]
+    for (const key of Object.keys(moods) as (keyof typeof moods)[]) moods[key] += weight * (group[key] ?? 0.5)
     const orientation = world.demography?.identities[group.movement]?.orientation ?? 'neutral'
     movements[orientation] += weight
   }
@@ -256,12 +270,26 @@ function popularAttitudes(world: World, nation: Nation) {
         movements.reform * 0.4 +
         moods.literacy * 0.28 +
         movements.commerce * 0.1 -
-        movements.institutional * 0.12,
+        movements.institutional * 0.12 +
+        (moods.pluralism - 0.5) * 0.2 -
+        (moods.publicReligion - 0.5) * 0.05,
     ),
     clamp(0.24 + movements.communal * 0.48 + (1 - moods.wealth) * 0.25 + moods.displacement * 0.12),
-    clamp(0.38 + movements.institutional * 0.36 - movements.local * 0.38 + moods.loyalty * 0.12),
+    clamp(
+      0.38 +
+        movements.institutional * 0.36 -
+        movements.local * 0.38 +
+        moods.loyalty * 0.12 +
+        (moods.authority - moods.localAutonomy) * 0.18,
+    ),
     clamp(0.22 + movements.commerce * 0.48 + moods.urban * 0.25 + trade * 0.12),
-    clamp(0.43 + moods.rootedness * 0.3 - moods.grievance * 0.2 - exhaustion * 0.1),
+    clamp(
+      0.43 +
+        moods.rootedness * 0.3 -
+        moods.grievance * 0.2 -
+        exhaustion * 0.1 +
+        (moods.groupIdentification - 0.5) * 0.1,
+    ),
   ])
 }
 
@@ -483,7 +511,7 @@ export function replaceStateLeader(world: World, nationId: number, name: string)
 export function characterPolicyTargets(nation: Nation): Policies {
   const a = nation.character!.effective,
     drives = nation.character!.leader.politics?.drives
-  return {
+  const targets: Policies = {
     ...nation.policies,
     tax: Math.round(16 + a.solidarity * 12 + a.centralization * 5),
     welfare: Math.round(8 + a.solidarity * 35),
@@ -502,6 +530,9 @@ export function characterPolicyTargets(nation: Nation): Policies {
     languagePolicy: a.centralization > 0.64 ? 'common' : a.centralization < 0.34 ? 'local' : 'multilingual',
     beliefPolicy: a.openness < 0.38 && a.centralization > 0.58 ? 'favored' : 'protected',
   }
+  for (const axis of ['citizenship', 'languagePolicy', 'beliefPolicy'] as const)
+    applyIdentityPreset(targets, axis)
+  return targets
 }
 
 export function characterResearch(nation: Nation): Research {

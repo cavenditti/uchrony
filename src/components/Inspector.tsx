@@ -1,3 +1,4 @@
+import { IdentityPolicyControls } from './IdentityPolicyControls'
 import { supplierDebt } from '../sim/supplier-credit'
 import { DistrictEconomies } from './DistrictEconomies'
 import { spatialState } from '../sim/spatial'
@@ -707,39 +708,7 @@ export function Inspector({
               </select>
             </label>
             <SectionTitle>Citizenship, language &amp; belief</SectionTitle>
-            <label className="select-label">
-              Citizenship
-              <select
-                value={n.policies.citizenship ?? 'civic'}
-                onChange={(e) => policy('citizenship', e.target.value as Policies['citizenship'])}
-              >
-                <option value="civic">Shared civic citizenship</option>
-                <option value="pluralist">Protected cultural pluralism</option>
-                <option value="heritage">Heritage privileges</option>
-              </select>
-            </label>
-            <label className="select-label">
-              Language in public education
-              <select
-                value={n.policies.languagePolicy ?? 'multilingual'}
-                onChange={(e) => policy('languagePolicy', e.target.value as Policies['languagePolicy'])}
-              >
-                <option value="multilingual">Multilingual education</option>
-                <option value="local">Local language continuity</option>
-                <option value="common">Common state language</option>
-              </select>
-            </label>
-            <label className="select-label">
-              Freedom of belief
-              <select
-                value={n.policies.beliefPolicy ?? 'protected'}
-                onChange={(e) => policy('beliefPolicy', e.target.value as Policies['beliefPolicy'])}
-              >
-                <option value="protected">Protect all traditions</option>
-                <option value="favored">Favor the state tradition</option>
-                <option value="restricted">Restrict other traditions</option>
-              </select>
-            </label>
+            <IdentityPolicyControls policies={n.policies} onChange={policy} />
             {(['culture', 'language', 'belief'] as const).map((key) => (
               <label className="select-label" key={key}>
                 {key === 'culture'

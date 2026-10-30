@@ -1,3 +1,4 @@
+import { COMMUNITY_POLITICAL_FIELDS } from './identity-politics'
 import { overseasOptions } from './overseas'
 import { placeLabels } from './almanac'
 import { withWorldConfiguration } from './configuration'
@@ -19,7 +20,8 @@ export interface PopulationCensus {
   total: number
   identities: Record<IdentityAxis, Record<number, number>>
   strata: Partial<Record<EconomicStratum, number>>
-  weighted: Record<'loyalty' | 'displacement' | 'grievance', number>
+  weighted: Record<'loyalty' | 'displacement' | 'grievance', number> &
+    Partial<Record<(typeof COMMUNITY_POLITICAL_FIELDS)[number], number>>
   fluent: Record<number, number>
   ageSex: { age: string; female: number; male: number }[]
   hasAges: boolean
@@ -52,6 +54,9 @@ export function censusOf(holder: PopulationHolder, month: number): PopulationCen
     const stratum = g.stratum ?? 'laborer'
     census.strata[stratum] = (census.strata[stratum] ?? 0) + size
     for (const key of ['loyalty', 'displacement', 'grievance'] as const) census.weighted[key] += size * g[key]
+    for (const key of COMMUNITY_POLITICAL_FIELDS)
+      census.weighted[key] =
+        (census.weighted[key] ?? 0) + size * (g[key] ?? (key === 'languageTransmission' ? 1 : 0.5))
     census.fluent[g.language] = (census.fluent[g.language] ?? 0) + size
     if (g.knownLanguage !== g.language)
       census.fluent[g.knownLanguage] = (census.fluent[g.knownLanguage] ?? 0) + size * g.fluency

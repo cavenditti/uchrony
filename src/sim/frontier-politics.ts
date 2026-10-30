@@ -1,3 +1,5 @@
+import { regionIdentityAppeal } from './identity-politics'
+import { resolveIdentityPolicy } from './identity-policy'
 import { domesticMonthlyWage } from './decision-policy'
 import { publicExpense } from './ledger'
 import { maritimeContacts } from './maritime-presence'
@@ -228,10 +230,11 @@ export function advanceFrontierPolitics(w: World) {
       const commerce = clamp((trade.get(`${r.id}:${n.id}`) ?? 0) / Math.max(1, people * 0.026))
       const security = (n.stability + n.legitimacy) / 200
       const access = clamp((r.infrastructure + neighbor.infrastructure) / 2)
-      const exclusion = n.policies.citizenship === 'heritage' ? (1 - affinity) * 0.25 : 0
+      const exclusion = resolveIdentityPolicy(n.policies).culturalExclusion * (1 - affinity) * 0.25
       const appeal = clamp(
         0.4 +
           affinity * 0.3 +
+          regionIdentityAppeal(n, r) * 0.2 +
           security * 0.24 +
           relativeOutput * 0.12 +
           commerce * 0.14 +
@@ -259,12 +262,13 @@ export function advanceFrontierPolitics(w: World) {
       const appeal = clamp(
         0.4 +
           affinity * 0.3 +
+          regionIdentityAppeal(n, r) * 0.2 +
           ((n.stability + n.legitimacy) / 200) * 0.24 +
           commerce * 0.14 +
           contact.protection * 0.1 -
           (n.policies.tax / 100) * 0.12 -
           opposition * 0.45 -
-          (n.policies.citizenship === 'heritage' ? (1 - affinity) * 0.25 : 0),
+          resolveIdentityPolicy(n.policies).culturalExclusion * (1 - affinity) * 0.25,
       )
       candidates.set(nation, Math.max(candidates.get(nation) ?? 0, appeal))
     }

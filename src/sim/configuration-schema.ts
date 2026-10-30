@@ -1,3 +1,4 @@
+import { IDENTITY_POLICY_KEYS, IDENTITY_POLICY_FIELDS, type IdentityPolicyKey } from './identity-policy'
 import { BIOMES, CROPS, MOISTURE_BANDS, TEMPERATURE_BANDS } from './climate-types'
 import { DEFAULT_CONFIGURATION_VALUES, type ConfigurationValues } from './configuration-defaults'
 import { configurationHelp } from './configuration-help'
@@ -309,6 +310,9 @@ export const CONFIGURATION_SCHEMA: SchemaNode<ConfigurationValues> = {
     researchFromLeaders: bool(),
     researchFocus: select(FIELDS),
     policies: {
+      ...(Object.fromEntries(
+        IDENTITY_POLICY_KEYS.map((key) => [key, num(0, 1, { label: IDENTITY_POLICY_FIELDS[key][0] })]),
+      ) as Record<IdentityPolicyKey, ReturnType<typeof num>>),
       tax: num(POLICY_RULES.tax.min, POLICY_RULES.tax.max),
       welfare: num(POLICY_RULES.welfare.min, POLICY_RULES.welfare.max),
       education: num(POLICY_RULES.education.min, POLICY_RULES.education.max),

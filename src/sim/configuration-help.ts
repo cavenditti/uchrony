@@ -1,3 +1,4 @@
+import { IDENTITY_POLICY_FIELDS, type IdentityPolicyKey } from './identity-policy'
 import type { ConfigurationValues } from './configuration-defaults'
 
 /** User-facing meanings live beside the configuration schema. A missing entry
@@ -420,6 +421,11 @@ const GROUP_HELP_TEMPLATES: Partial<
   recipes: ([output, input]) =>
     `Tonnes of ${input} required to produce one tonne of ${output}. More input per unit makes production more resource-intensive.`,
   starting: ([section, item]) => {
+    if (section === 'policies' && Object.hasOwn(IDENTITY_POLICY_FIELDS, item))
+      return (
+        IDENTITY_POLICY_FIELDS[item as IdentityPolicyKey][1] +
+        ' Opening intensity from 0 to 1, used when policy is not derived from leaders.'
+      )
     if (section === 'capitalStocks')
       return `Tonnes of ${item} placed in each frontier capital at creation, before the stockpile multiplier. Established states use generated stockpiles.`
     if (section === 'technology')

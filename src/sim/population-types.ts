@@ -1,3 +1,4 @@
+import type { IdentityPolicy } from './identity-policy'
 import type { EconomicStratum } from './economic-types'
 /** [absolute birth month, female people, male people]. Sparse, exact birthdays. */
 export type BirthCohort = [number, number, number]
@@ -22,6 +23,14 @@ export interface PopulationCommunity {
   stratum?: EconomicStratum
   ageCohorts?: BirthCohort[]
   ageMonth?: number
+  /** Political attitudes are learned conditions, never ethnic traits. Optional for old saves. */
+  pluralism?: number
+  groupIdentification?: number
+  authority?: number
+  localAutonomy?: number
+  publicReligion?: number
+  governmentSupport?: number
+  languageTransmission?: number
   culture: number
   language: number
   belief: number
@@ -42,6 +51,9 @@ export interface PopulationCommunity {
   fluency: number
 }
 export interface PopulationDynamics {
+  /** Gradual, locally funded implementation, independent of declared targets. */
+  appliedIdentityPolicy?: IdentityPolicy
+  identityPolicyMonth?: number
   immigrants: number
   emigrants: number
   refugees: number

@@ -1,3 +1,4 @@
+import { IDENTITY_POLICY_KEYS, IDENTITY_POLICY_AXIS, resolveIdentityPolicy } from './identity-policy'
 import { characterPolicyTargets } from './character'
 import { cabinetOrderReserved } from './cabinet-state'
 import { cabinetPolicyTargets } from './cabinet-policy'
@@ -33,6 +34,14 @@ export function advanceDomesticPolicy(w: World) {
           key === 'conscription' ? -0.2 : -2,
           key === 'conscription' ? 0.2 : 2,
         )
+    const identityTargets = resolveIdentityPolicy(targets)
+    const current = resolveIdentityPolicy(n.policies)
+    for (const key of IDENTITY_POLICY_KEYS)
+      if (
+        !cabinetOrderReserved(w, n, `policy:${key}`) &&
+        !cabinetOrderReserved(w, n, `policy:${IDENTITY_POLICY_AXIS[key]}`)
+      )
+        n.policies[key] = current[key] + clamp(identityTargets[key] - current[key], -0.04, 0.04)
     const hungry = n.foodCoverage < 0.97
     if (!cabinetOrderReserved(w, n, 'policy:priority'))
       n.policies.priority = hungry

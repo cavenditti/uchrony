@@ -342,7 +342,7 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
     }
   } else if (order.kind === 'policy') {
     const key = order.key as keyof Policies
-    if (!Object.hasOwn(n.policies, key)) throw new Error('Unknown domestic policy.')
+    if (!Object.hasOwn(POLICY_RULES, key)) throw new Error('Unknown domestic policy.')
     const value = policyCommandValue(key, POLICY_RULES[key].kind === 'select' ? order.text : order.value)
     command = { type: 'policy', nation, key, value }
   } else if (order.kind === 'research') {

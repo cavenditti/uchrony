@@ -1,3 +1,7 @@
+import { provincialIdentityImplementation } from './identity-implementation'
+import { resolveIdentityPolicy, ZERO_IDENTITY_POLICY } from './identity-policy'
+import { identityStateAppeal } from './identity-politics'
+import { economicRegion } from './local-units'
 import { advanceTradeInfluence, localImpression } from './influence'
 import { simulationMonths, periodRate } from './simulation-period'
 import { recordWorldEvent } from './event-memory'
@@ -119,6 +123,8 @@ export function evolveIdentities(world: World) {
   const state = world.demography!
   if (state.lastEvolution === world.month) return
   state.lastEvolution = world.month
+  const implementedPolicies = provincialIdentityImplementation(world)
+  const nationPolicies = world.nations.map((n) => resolveIdentityPolicy(n.policies))
   const totals = world.regions.map(population),
     distributions = world.regions.map(
       (region) =>
@@ -161,6 +167,7 @@ export function evolveIdentities(world: World) {
               language: distributions[region.id].language[0].id,
               belief: distributions[region.id].belief[0].id,
             },
+      policy = implementedPolicies[region.id],
       metrics = region.populationDynamics!,
       exposure = Object.fromEntries(AXES.map((axis) => [axis, new Map<number, number>()])) as Record<
         IdentityAxis,
@@ -181,11 +188,11 @@ export function evolveIdentities(world: World) {
           Math.pow(value, 0.8) + (definition.origin === region.id ? 0.13 : 0.04) * definition.momentum,
         )
       }
-    if (nation.policies.beliefPolicy !== 'protected')
+    if (policy.stateFaithSupport > 0)
       exposure.belief.set(
         official.belief,
         (exposure.belief.get(official.belief) ?? 0) +
-          (nation.policies.beliefPolicy === 'restricted' ? 0.45 : 0.15),
+          (policy.stateFaithSupport * 0.3 + policy.faithRestrictions * 0.15),
       )
     const contact = [...contacts[region.id]].reduce(
         (sum, [id, weight]) => sum + (id === region.id ? 0 : weight),
@@ -242,7 +249,8 @@ export function evolveIdentities(world: World) {
     if (
       world.month - metrics.lastLanguage >= 600 &&
       metrics.isolation > 0.7 &&
-      nation.policies.languagePolicy === 'local' &&
+      policy.localLanguageSupport > 0.5 &&
+      policy.languageAssimilation < 0.2 &&
       region.literacy < 0.65
     ) {
       const parent = distributions[region.id].language[0].id,
@@ -273,11 +281,14 @@ export function evolveIdentities(world: World) {
       )
     }
     for (const group of [...region.communities!]) {
+      const applied =
+        economicRegion(world, group.locality ?? region.id)?.populationDynamics?.appliedIdentityPolicy ??
+        ZERO_IDENTITY_POLICY
       const commercial = [...commercialLanguages[region.id]]
         .filter(([language]) => language !== group.language)
         .sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]
       const learningLanguage =
-        commercial && commercial[1] > 0.12 && nation.policies.languagePolicy !== 'common'
+        commercial && commercial[1] > 0.12 && applied.languageAssimilation < 0.5
           ? commercial[0]
           : official.language
       if (group.knownLanguage !== learningLanguage) {
@@ -292,16 +303,30 @@ export function evolveIdentities(world: World) {
           state.identities[learningLanguage].parents.includes(group.language),
         commerce = commercialLanguages[region.id].get(learningLanguage) ?? 0,
         learning =
-          ((0.001 + region.literacy * 0.003 + region.urban * 0.002) * school + commerce * 0.025) *
+          ((0.001 + region.literacy * 0.001 + region.urban * 0.002 + applied.languageEducation * 0.004) *
+            school +
+            commerce * 0.025) *
           (related ? 1 : 0.55) *
           (1 - exclusion * 0.3)
       group.fluency =
         group.language === learningLanguage
           ? 1
           : clamp(group.fluency + (1 - group.fluency) * periodRate(learning))
-      const culture = choose(state, exposure.culture),
+      // Household continuity and funded local schooling preserve a stable bilingual
+      // population; learning a public language alone does not force native replacement.
+      const transmissionTarget = clamp(
+        0.65 +
+          applied.localLanguageSupport * 0.35 -
+          applied.languageAssimilation * (group.language === official.language ? 0 : 0.65),
+      )
+      group.languageTransmission = clamp(
+        (group.languageTransmission ?? 1) +
+          (transmissionTarget - (group.languageTransmission ?? 1)) * periodRate(0.003),
+      )
+      const culture =
+          random(state) < applied.culturalAssimilation ? official.culture : choose(state, exposure.culture),
         language =
-          nation.policies.languagePolicy === 'common' ? official.language : choose(state, exposure.language),
+          random(state) < applied.languageAssimilation ? official.language : choose(state, exposure.language),
         belief = choose(state, exposure.belief),
         movement = choose(state, exposure.movement)
       if (culture !== group.culture) {
@@ -314,7 +339,7 @@ export function evolveIdentities(world: World) {
               0.0015) *
           (0.3 + group.urban) *
           (1 - group.rootedness * 0.75) *
-          (nation.policies.citizenship === 'pluralist' ? 0.35 : 1)
+          (0.25 + applied.culturalAssimilation * 1.25)
         metrics.culturalChanges += splitCommunity(
           region,
           group,
@@ -335,7 +360,9 @@ export function evolveIdentities(world: World) {
         const rate =
           0.0006 *
           (language === group.knownLanguage ? group.fluency : 0.7) *
-          (nation.policies.languagePolicy === 'common' ? 1.8 : 0.35)
+          (0.2 + applied.languageAssimilation * 2) *
+          (1 - applied.localLanguageSupport * 0.65) *
+          (1 - (group.languageTransmission ?? 1) * 0.25)
         metrics.languageChanges += splitCommunity(
           region,
           group,
@@ -347,7 +374,7 @@ export function evolveIdentities(world: World) {
         )
       }
       if (belief !== group.belief) {
-        const pressure = belief === official.belief && nation.policies.beliefPolicy === 'restricted' ? 1.8 : 1
+        const pressure = belief === official.belief ? 1 + applied.faithRestrictions * 0.8 : 1
         metrics.beliefChanges += splitCommunity(
           region,
           group,
@@ -378,7 +405,32 @@ export function evolveIdentities(world: World) {
           index,
         )
       }
-      if (group.allegiance !== region.nation && group.loyalty > 0.65)
+      // Only contacted neighboring states are alternatives. Attraction reallocates
+      // allegiance slowly; sovereignty still requires organization and material gates.
+      let alternative = region.nation
+      let advantage = 0.15
+      const homeAppeal = identityStateAppeal(group, nation, applied)
+      for (const [other] of contacts[region.id]) {
+        const candidate = world.nations[world.regions[other].nation]
+        if (!candidate || candidate.id === region.nation || candidate.extinct !== undefined) continue
+        const difference = identityStateAppeal(group, candidate, nationPolicies[candidate.id]) - homeAppeal
+        if (difference > advantage) {
+          alternative = candidate.id
+          advantage = difference
+        }
+      }
+      if (alternative !== region.nation && group.loyalty < 0.5) {
+        if (group.allegiance !== alternative)
+          metrics.politicalChanges += splitCommunity(
+            region,
+            group,
+            { allegiance: alternative },
+            periodRate(0.001 * advantage * (1 - group.loyalty)),
+            [1, 1, 0.4],
+            index,
+            state,
+          )
+      } else if (group.allegiance !== region.nation && group.loyalty > 0.65)
         metrics.politicalChanges += splitCommunity(
           region,
           group,
