@@ -138,13 +138,22 @@ function transformCensus(value: unknown, pack: boolean): unknown {
   }
   const regions = holders(w.regions),
     armies = holders(w.armies),
-    fleets = holders(w.warfare?.fleets)
-  if (regions === w.regions && armies === w.armies && fleets === w.warfare?.fleets && !encoding) return value
+    fleets = holders(w.warfare?.fleets),
+    expeditions = holders(w.overseas?.expeditions)
+  if (
+    regions === w.regions &&
+    armies === w.armies &&
+    fleets === w.warfare?.fleets &&
+    expeditions === w.overseas?.expeditions &&
+    !encoding
+  )
+    return value
   const { censusEncoding: _encoding, ...base } = source
   return {
     ...base,
     regions,
     armies,
+    ...(w.overseas ? { overseas: { ...w.overseas, expeditions } } : {}),
     ...(w.warfare ? { warfare: { ...w.warfare, fleets } } : {}),
     ...(pack ? { censusEncoding: { version: 1, schemas } } : {}),
   }

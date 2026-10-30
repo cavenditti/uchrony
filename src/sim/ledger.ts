@@ -1,3 +1,4 @@
+import { expeditionAccount } from './overseas-types'
 /** Conserved transfers connect household, firm and government books. Address caches
  * survive account replacement; transaction batching retains a bounded public tail. */
 import {
@@ -57,6 +58,7 @@ function accountHolder(w: World, address: AccountAddress): { cash?: number; trea
   if (kind === 'producer') return w.economy?.producers[id]
   if (kind === 'firm') return w.economy?.firms?.[id]
   if (kind === 'household') return w.economy?.households[id]?.[group]
+  if (kind === 'expedition') return w.overseas?.expeditions.find((e) => e.id === id)?.accounts[group]
   if (kind === 'credit') return w.economy?.credit
   throw new Error(`Unknown settlement account: ${kind}:${id}`)
 }
@@ -243,6 +245,9 @@ export function balances(w: World): Record<string, number> {
     for (const s of STRATA) accounts[householdAccount(+id, s)] = hs[s].cash
   for (const o of w.institutions?.organizations ?? []) accounts[`institution:${o.id}`] = o.treasury
   for (const f of w.economy?.firms ?? []) accounts[firmAccount(f.id)] = f.cash
+  for (const e of w.overseas?.expeditions ?? [])
+    for (const s of [...STRATA, 'construction'] as const)
+      accounts[expeditionAccount(e.id, s)] = e.accounts[s].cash
   return accounts
 }
 /** Explicit deposit issue/extinguishment; only the banking subsystem calls this primitive. */

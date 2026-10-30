@@ -1,3 +1,4 @@
+import { orderArmyJourney } from './army-journeys'
 /** Army logistics and movement share physical capacity, with separate directional access views. */
 import { cabinetOrderReserved } from './cabinet-state'
 import { diplomaticAccessView } from './agreements'
@@ -23,18 +24,7 @@ import { militaryVisit } from './military-access'
 import type { MilitaryPermission } from './border-policy'
 import { armyStore, fleetStore, marketStore, recordGift, recordUse } from './national-accounts'
 import { seaPassageView, portBlockadeView } from './naval-control'
-import {
-  canEmbarkArmy,
-  cargoCapacity,
-  disembark,
-  embarkArmy,
-  ensureWarfare,
-  militaryDeaths,
-  orderFleet,
-  portAt,
-  warEvent,
-  waterPath,
-} from './navy'
+import { cargoCapacity, disembark, ensureWarfare, militaryDeaths, portAt, warEvent } from './navy'
 import { apportion, releaseSoldiers, removeCivilianAdults, returnArmyPeople } from './population'
 import { random } from './random'
 import { musterArmy } from './recruitment'
@@ -529,7 +519,7 @@ export function advanceArmies(w: World) {
     if (a.target === null && !wars.has(a.nation)) continue
     const graph = graphFor(a.nation, true),
       paths = pathsFrom(graph, a.region)
-    if (n.ai && a.target === null && !cabinetOrderReserved(w, n, `army:${a.id}`)) {
+    if (n.ai && a.target === null && !ops.journey && !cabinetOrderReserved(w, n, `army:${a.id}`)) {
       const chart = knownMap(w, n.id)
       const targets = chart
         .filter(
@@ -541,25 +531,12 @@ export function advanceArmies(w: World) {
         .sort((a, b) => paths.distance[a.id] - paths.distance[b.id])
       a.target = targets[0]?.id ?? null
       if (a.target === null) {
-        const fleet = state.fleets.find(
-          (f) =>
-            f.nation === a.nation &&
-            f.cell === portAt(w, a.region)?.water &&
-            !f.embarked.length &&
-            f.transports >= 4 &&
-            canEmbarkArmy(w, a, f),
-        )
-        const enemy = fleet
-          ? chart.find(
-              (r) =>
-                relation(w, a.nation, r.nation)?.treaty === 'war' &&
-                portAt(w, r.id) &&
-                waterPath(w, fleet.cell, portAt(w, r.id)!.water).length,
-            )
-          : undefined
-        if (fleet && enemy) {
-          embarkArmy(w, a.id, fleet.id)
-          orderFleet(w, fleet.id, enemy.id, 'transport')
+        // A destination order assembles the expedition; armies need not already
+        // happen to stand beside a transport when the campaign begins.
+        for (const enemy of chart) {
+          if (relation(w, a.nation, enemy.nation)?.treaty !== 'war' || !portAt(w, enemy.id)) continue
+          orderArmyJourney(w, a, enemy.id)
+          if (ops.journey) break
         }
       }
     }

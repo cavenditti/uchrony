@@ -870,3 +870,58 @@ Battle victory establishes temporary military control while legal ownership rema
 An occupying army may pillage. The levy transfers existing local merchant cash and a proportional portion of the defender's treasury to the occupying government, once per province per accounting period. Supply and occupation strength limit it. Devastation, grievances, fear and opposition rise, reducing the territory's future value. Splitting an army cannot collect the same levy repeatedly.
 
 Peace proposals can combine a five-year truce, one-time compensation and territorial concessions. Each government signs for itself; human governments are never automatically signed. Native cabinets compare their own exhaustion, occupied land and financial burden. Preparation time still applies. Cash and ownership are rechecked at settlement, failed settlements roll back atomically, and armies withdraw from territory not ceded. Military control alone never becomes a peace border.
+
+### Sea journeys and overseas footholds
+
+An army's normal destination order now plans an accessible march, embarkation
+port, sea passage and landing, followed by an onward march when necessary. It
+retains the final destination while troops and an available fleet rendezvous.
+Reservations prevent independent journeys and civilian expeditions from booking
+the same ship. Orders wait with a concrete reason when capacity, provisions or
+access is unavailable. They never create free ships. Holding or entrenching
+cancels the journey; troops already at sea must still land physically.
+
+Shipbuilding quotes use the same checks as execution: an unoccupied owned port,
+real adult crews, timber, iron, arms, tools and treasury funds. Transport prices
+remain 350k crowns per ship and nominal capacity remains 800 passengers, reduced
+by hull condition. Fleets load provisions for their course plus a landing margin.
+Resupply selects usable food and legal supply access, including when neighboring
+harbors share a water cell. Blockades, naval combat, repairs and hostile landings
+remain part of movement. Campaign preparation can stage a seaborne invasion at
+home ports, counting only supplied formations with distinct available carriers.
+
+Civilian expeditions use `found-overseas` (model order `colony` with a terrain cell
+as target). Quotes reserve a real carrier and public funding for construction
+wages, food and building materials, including a 25% cargo-price reserve. Fleet
+operating provisions and upkeep remain separate naval expenses. Families leave
+only when the carrier reaches the departure port and the plan is still feasible.
+Their dated census, deposits, debts and ownership claims travel in expedition
+accounts; cargo remains in physical goods and national accounts. A recall before
+boarding refunds funding. After departure, recall orders a physical return.
+Ship loss, reduced berths and hunger can kill passengers; cargo losses and
+inheritance are recorded once. Unused construction funding returns to the state.
+
+A successful landing creates homes and a sponsored foothold. **It does not
+transfer provincial ownership.** An independent or home coast is eligible;
+foreign land requires secure military control or a ratified, province-scoped
+`settlement` grant from the host and a migration policy permitting settlement.
+The grant permits the reserved civilian carrier to land, without granting troop
+transit or naval basing. Trade and ordinary military access alone grant no right
+to establish a settlement. Rights and available land are checked again on arrival.
+
+Independent coastal communities can develop accession support through actual
+maritime trade or supplied protective presence. A merely proposed route, passing
+empty fleet or insignificant shipment confers no political claim. Footholds need
+ongoing trade or protection; they do not generate permanent automatic influence.
+The existing local mandate, time, cultural affinity, opposition and competing
+patron rules still apply. Distant accession additionally pays administration at
+the existing annexation staffing scale. Foreign sovereign territory is excluded
+from this accession process and still requires diplomatic cession or annexation.
+
+Native expansion considers overseas settlement when no affordable land founding
+is available. A solvent, stable and provisioned state can commission one modest
+civilian carrier when it knows an eligible reachable coast. Model-controlled
+states receive shipyard and expedition quotes, active expedition status and the
+revised movement instructions. The naval dossier shows commitments, costs,
+obstacles and recall controls. Saves retain expedition people and property;
+coarse advancement uses monthly phases while passenger journeys are active.

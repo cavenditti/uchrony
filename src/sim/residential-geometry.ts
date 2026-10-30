@@ -1,9 +1,27 @@
 import { habitableLand } from './terrain-access'
 import type { World } from './types'
-import type { PhysicalSite, PointMeters } from './adaptive-types'
+import type { PhysicalSite, PointMeters, SpatialBounds } from './adaptive-types'
 import { cellPolygon, clipPolygon, pointInPolygon } from './physical-space'
+import { urbanLand } from './urban-land'
 import { movementNeighbors } from './grid'
 import { queryAdaptiveLeaves } from './adaptive-grid'
+
+/** Use the same land boundary convention for surveys, construction and saves.
+ * Urban land assigns a grid edge to its east/south cell, unlike the inclusive
+ * legacy polygon test. A coarse survey must not offer a shoreline plot that
+ * construction would reject. Same-country urban plots may span accounting cells.
+ */
+export function residentialParcelOnLand(w: World, cell: number, nation: number, p: SpatialBounds) {
+  const polygon = w.adaptive?.urban?.enabled ? undefined : cellPolygon(w, cell)
+  const contains = (point: PointMeters) =>
+    polygon ? pointInPolygon(point, polygon) : urbanLand(w, point, nation) >= 0
+  return (
+    contains(p) &&
+    contains({ x: p.x + p.size, y: p.y }) &&
+    contains({ x: p.x, y: p.y + p.size }) &&
+    contains({ x: p.x + p.size, y: p.y + p.size })
+  )
+}
 
 export function residentialFootprint(w: World, site: PhysicalSite) {
   if (site.building) return site.building

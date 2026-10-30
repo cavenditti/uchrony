@@ -1,3 +1,4 @@
+import { expeditionPeople } from '../src/sim/overseas-types'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
@@ -58,7 +59,9 @@ const frontierInitial = generateWorld('Frontier probe', 3, 8, undefined, 'region
 prepareSpatialWorld(frontierInitial)
 const fixture = (frontier = false) => structuredClone(frontier ? frontierInitial : initial)
 const people = (w: World) =>
-  w.regions.reduce((sum, r) => sum + population(r), 0) + allForces(w).reduce((sum, a) => sum + a.soldiers, 0)
+  w.regions.reduce((sum, r) => sum + population(r), 0) +
+  allForces(w).reduce((sum, a) => sum + a.soldiers, 0) +
+  expeditionPeople(w)
 const money = (w: World) => Object.values(balances(w)).reduce((sum, value) => sum + value, 0)
 const plan = (orders: DomesticOrder[] = []): StateAgentPlan => ({
   assessment: 'Material choices.',

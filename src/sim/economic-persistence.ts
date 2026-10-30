@@ -1,3 +1,4 @@
+import { expeditionOwner } from './overseas-types'
 import { auditBanks } from './banking'
 import { configurationFor } from './configuration'
 import { STRATA } from './economic-types'
@@ -155,6 +156,7 @@ export function validateEconomy(w: World) {
             ([a, v]) =>
               !num(v) ||
               !(
+                expeditionOwner(w, a) ||
                 (/^government:\d+$/.test(a) && w.nations[+a.split(':')[1]]) ||
                 (/^household:\d+:(smallholder|laborer|artisan|professional|owner)$/.test(a) &&
                   e.households[+a.split(':')[1]])

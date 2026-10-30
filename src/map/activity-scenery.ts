@@ -170,7 +170,11 @@ export class ActivityScenery {
     for (const shape of Object.keys(this.geometries) as ActorShape[]) {
       const list = pieces.filter((p) => p.shape === shape)
       if (!list.length) continue
-      const mesh = new THREE.InstancedMesh(this.geometries[shape].clone(), this.materialFor(shape), list.length)
+      const mesh = new THREE.InstancedMesh(
+        this.geometries[shape].clone(),
+        this.materialFor(shape),
+        list.length,
+      )
       mesh.geometry.setAttribute(
         'detailThreshold',
         new THREE.InstancedBufferAttribute(new Float32Array(list.map((p) => p.detailThreshold ?? -1)), 1),
@@ -193,7 +197,11 @@ export class ActivityScenery {
     for (const shape of Object.keys(this.geometries) as ActorShape[]) {
       const actors = this.actors.filter((a) => a.shape === shape)
       if (!actors.length) continue
-      const mesh = new THREE.InstancedMesh(this.geometries[shape].clone(), this.materialFor(shape), actors.length)
+      const mesh = new THREE.InstancedMesh(
+        this.geometries[shape].clone(),
+        this.materialFor(shape),
+        actors.length,
+      )
       mesh.geometry.setAttribute(
         'detailThreshold',
         new THREE.InstancedBufferAttribute(new Float32Array(actors.map((a) => a.threshold)), 1),

@@ -4,6 +4,7 @@ import { GOODS, inventory, type World, type Inventory } from './types'
 /** Includes mobile stores: loading a convoy is a transfer, not final consumption. */
 export function physicalStocks(w: World): Inventory {
   const totals = inventory()
+  for (const e of w.overseas?.expeditions ?? []) for (const g of GOODS) totals[g] += e.goods[g]
   for (const shipment of w.adaptive?.transit ?? []) for (const g of GOODS) totals[g] += shipment.goods[g]
   for (const r of economicRegions(w)) for (const g of GOODS) totals[g] += r.stocks[g]
   for (const f of w.economy?.firms ?? []) for (const g of GOODS) totals[g] += f.stocks[g]
@@ -37,7 +38,10 @@ export function auditGoods(w: World) {
   const closing = physicalStocks(w)
   for (const g of GOODS) {
     const made = economicRegions(w).reduce((sum, r) => sum + r.production[g], 0)
-    const used = economicRegions(w).reduce((sum, r) => sum + r.consumption[g] + e.producers[r.id].losses[g], 0)
+    const used = economicRegions(w).reduce(
+      (sum, r) => sum + r.consumption[g] + e.producers[r.id].losses[g],
+      0,
+    )
     ledger.residual[g] =
       closing[g] - ledger.opening[g] - made - ledger.injections[g] + used + ledger.destruction[g]
     if (Math.abs(ledger.residual[g]) > 1e-7 * Math.max(1, ledger.opening[g] + made))

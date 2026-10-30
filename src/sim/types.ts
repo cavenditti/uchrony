@@ -1,3 +1,4 @@
+import type { OverseasQuote } from './overseas'
 import type { PopulationCensus } from './view-snapshot'
 import type { EconomicSystem } from './economic-types'
 import type { WorldScale } from './scale'
@@ -269,6 +270,8 @@ export interface World {
   viewOnly?: true
   /** UI subscription only. Undefined publishes all details; null publishes summaries. */
   viewNation?: number | null
+  /** Worker-computed quotes need the complete household and housing records. */
+  viewOverseas?: { nation: number; options: OverseasQuote[] }
   viewBankLoans?: Record<number, number>
   /** Read-only economic tile projection shared by every observer. */
   viewLandscape?: import('./economic-landscape').EconomicLandscape
@@ -328,6 +331,7 @@ export interface World {
   statecraft?: Statecraft
   demography?: PopulationSystem
   warfare?: Warfare
+  overseas?: import('./overseas-types').OverseasState
   events: SimEvent[]
   history: HistoryPoint[]
   nextEvent: number
@@ -357,6 +361,8 @@ export type Command =
   | { type: 'peace-proposal'; nation: number; target: number; payer: number; payment: number; cede: number[] }
   | { type: 'peace-answer'; nation: number; offer: number; accept: boolean }
   | { type: 'found-settlement'; nation: number; cell: number; pioneer?: boolean }
+  | { type: 'found-overseas'; nation: number; cell: number }
+  | { type: 'cancel-expedition'; nation: number; expedition: number }
   | {
       type: 'intelligence'
       nation: number

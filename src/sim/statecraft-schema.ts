@@ -54,6 +54,7 @@ const clauseProperties = {
     'access',
     'transit',
     'basing',
+    'settlement',
     'guarantee',
     'cede',
     'merge',

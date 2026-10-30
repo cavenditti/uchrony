@@ -1,3 +1,6 @@
+import { prepareOverseasExpeditions, advanceOverseasExpeditions } from './overseas'
+import { activeExpedition, expeditionPeople } from './overseas-types'
+import { advanceArmyJourneys } from './army-journeys'
 import { advanceDynasties } from './dynasties'
 import { advanceDependencies } from './state-dependencies'
 import { recordWorldArchive } from './world-archive'
@@ -97,7 +100,8 @@ function fiscalPolicy(w: World) {
   fundGovernment(w)
   for (const n of w.nations) {
     const regions = territory.regions(n.id)
-    n.population = regions.reduce((s, r) => s + population(r), 0) + militaryPeople(w, n.id)
+    n.population =
+      regions.reduce((s, r) => s + population(r), 0) + militaryPeople(w, n.id) + expeditionPeople(w, n.id)
     n.gdp = regions.reduce((s, r) => s + r.gdp, 0) / simulationMonths()
     if (!regions.length) {
       n.income = 0
@@ -345,6 +349,16 @@ export function advanceCoarsePeriod(w: World, months = 6): World {
 }
 
 function advanceCoarsePeriodConfigured(w: World, months = 6): World {
+  if (w.armies.some((a) => a.operations?.journey) || w.overseas?.expeditions.some(activeExpedition)) {
+    // Passenger journeys need every monthly rendezvous, meal and landing phase.
+    // Preserve the requested elapsed time while avoiding a six-month teleport.
+    return withSimulationPeriod(months, () =>
+      withSimulationPeriod(1, () => {
+        for (let i = 0; i < months; i++) tickConfigured(w, 'coarse')
+        return w
+      }),
+    )
+  }
   // Opening assets, inventories and cohorts are always initialized in monthly units.
   prepareSpatialWorld(w)
   ensureFirms(w)
@@ -398,7 +412,10 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   if (coarse) withLoanOriginationBatch(w, () => produce(w, true))
   else produce(w, false)
   aggregateDistricts(w)
+  prepareOverseasExpeditions(w)
+  advanceArmyJourneys(w)
   advanceNavy(w)
+  advanceOverseasExpeditions(w)
   if (coarse) withLoanOriginationBatch(w, () => trade(w))
   else trade(w)
   advanceHarbors(w)

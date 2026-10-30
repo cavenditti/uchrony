@@ -52,6 +52,7 @@ const ordinaryRights = new Set([
   'access',
   'transit',
   'basing',
+  'settlement',
   'nonaggression',
   'guarantee',
 ])

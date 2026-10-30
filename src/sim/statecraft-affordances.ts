@@ -1,3 +1,5 @@
+import { overseasOptions } from './overseas'
+import { commissionOptions } from './navy'
 import { borderPolicy } from './border-policy'
 /** Action menus are individually executable quotes, never promises that an
  * entire list can be purchased together. Execution revalidates changed worlds. */
@@ -86,6 +88,10 @@ export function statecraftAffordances(w: World, nation: number) {
         .sort((a, b) => b.score - a.score || a.id - b.id)
         .slice(0, 12),
       canFoundTargets: foundingOptions(w, nation),
+      canCommissionIn: commissionOptions(w, nation),
+      canSettleOverseas: overseasOptions(w, nation),
+      maritimeNotice:
+        'Move orders automatically arrange a land-and-sea passage using available transports. No new ships are free: commission capacity separately. Colonies carry real families and supplies; settlement creates a foothold, not provincial ownership.',
       peaceCandidates: w.relations
         .filter((r) => r.treaty === 'war' && (r.a === nation || r.b === nation))
         .map((r) => ({

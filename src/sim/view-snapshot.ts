@@ -1,3 +1,4 @@
+import { overseasOptions } from './overseas'
 import { placeLabels } from './almanac'
 import { withWorldConfiguration } from './configuration'
 import { economicLandscape } from './economic-landscape'
@@ -157,6 +158,10 @@ function configuredSnapshot(world: World, detailNation?: number | null): Omit<Wo
   return {
     ...rest,
     viewOnly: true,
+    viewOverseas:
+      detailNation !== null && detailNation !== undefined
+        ? { nation: detailNation, options: overseasOptions(world, detailNation) }
+        : undefined,
     archive: undefined,
     institutions: world.institutions
       ? {
@@ -208,6 +213,9 @@ function configuredSnapshot(world: World, detailNation?: number | null): Omit<Wo
       : {}),
     regions: world.regions.map((r) => project(regionRates(r))),
     armies: world.armies.map(project),
+    ...(world.overseas
+      ? { overseas: { ...world.overseas, expeditions: world.overseas.expeditions.map(project) } }
+      : {}),
     ...(world.warfare ? { warfare: { ...world.warfare, fleets: world.warfare.fleets.map(project) } } : {}),
   }
 }

@@ -199,7 +199,10 @@ export class ReliefMap {
     // Blender trees share the canopy's bounds: round trees become broadleaves
     // and slender ones conifers. The sphere remains if the kit cannot load.
     const kinds = [
-      { geometry: sceneryModel('broadleaf', canopyGeometry), trees: trees.filter((t) => t.variation <= 0.64) },
+      {
+        geometry: sceneryModel('broadleaf', canopyGeometry),
+        trees: trees.filter((t) => t.variation <= 0.64),
+      },
       { geometry: sceneryModel('conifer', canopyGeometry), trees: trees.filter((t) => t.variation > 0.64) },
     ]
     const material = windMaterial(this.motion.time, false, this.treeScale)

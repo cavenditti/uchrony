@@ -1,3 +1,4 @@
+import { expeditionPeople } from '../src/sim/overseas-types'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
@@ -12,7 +13,9 @@ import { population, type World } from '../src/sim/types'
 import { allForces } from '../src/sim/forces'
 import type { DiplomaticClause } from '../src/sim/statecraft-types'
 const people = (w: World) =>
-  w.regions.reduce((sum, r) => sum + population(r), 0) + allForces(w).reduce((sum, a) => sum + a.soldiers, 0)
+  w.regions.reduce((sum, r) => sum + population(r), 0) +
+  allForces(w).reduce((sum, a) => sum + a.soldiers, 0) +
+  expeditionPeople(w)
 const clause = (kind: DiplomaticClause['kind'], extra: Partial<DiplomaticClause> = {}): DiplomaticClause => ({
   kind,
   from: 0,

@@ -161,6 +161,11 @@ export function validatePopulation(world: World, allowDuplicateCommunities = fal
     if (totals.children + totals.adults + totals.elders !== army.soldiers)
       fail('military communities disagree with troop numbers')
   }
+  for (const expedition of world.overseas?.expeditions ?? []) {
+    const totals = validateGroups(expedition.communities)
+    if (totals.children + totals.adults + totals.elders !== expedition.people)
+      fail('expedition census disagrees with passengers')
+  }
   // The former fixed ceiling rejected a valid 1,400-province world after six
   // simulated years. Keep a bounded import budget, scaled to map size; the
   // per-holder limits and every individual census invariant still apply.

@@ -1,3 +1,4 @@
+import { validateOverseas } from './overseas-persistence'
 import { validateDynasticState } from './dynastic-persistence'
 import { validateWorldArchive } from './world-archive'
 import { MAX_SAVE_BYTES } from '../storage/save-types'
@@ -555,6 +556,7 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
   validatePressures(w)
   if (w.almanac !== undefined) validateAlmanac(w, w.almanac)
   if (w.historical !== undefined) validateHistoryState(w, w.historical)
+  validateOverseas(w)
   validateWarfare(w, validateLegs)
   validateStatecraft(w)
   validatePopulation(w, allowDuplicateCommunities)

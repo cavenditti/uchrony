@@ -293,7 +293,6 @@ export function applyRefereeEffects(
   const id = world.nextEvent++
   if (!secret) {
     recordWorldEvent(world, { id, month: world.month, type: 'diplomacy', title, detail, nation })
-
   }
   installEffects(
     world,

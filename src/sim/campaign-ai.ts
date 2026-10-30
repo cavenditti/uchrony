@@ -1,3 +1,5 @@
+import { availableTransport } from './maritime-routing'
+import { portAt, waterPath } from './navy'
 /** Campaign planning consumes reported opposition and actual home readiness.
  * Persistent objectives concentrate forces without granting movement or supplies. */
 import {
@@ -71,15 +73,41 @@ export function hasCampaignCause(w: World, n: Nation, rival: number) {
 /** A campaign is ready only after its men reach a supplied frontier. Time expiry
  * aborts an unready campaign; it never authorizes an otherwise impossible war. */
 export function campaignReadiness(w: World, n: Nation, rival: number) {
-  const border = w.regions.filter(
+  let border = w.regions.filter(
     (r) => r.nation === n.id && !r.control && r.neighbors.some((id) => w.regions[id].nation === rival),
   )
+  const maritime = !border.length
+  if (maritime) {
+    const coasts = knownMap(w, n.id).filter((r) => r.nation === rival && portAt(w, r.id))
+    border = w.regions.filter(
+      (r) =>
+        r.nation === n.id &&
+        !r.control &&
+        portAt(w, r.id) &&
+        coasts.some((c) => waterPath(w, portAt(w, r.id)!.water, portAt(w, c.id)!.water).length),
+    )
+  }
   const ids = new Set(border.map((r) => r.id))
   const armies = w.armies.filter((a) => a.nation === n.id && a.operations?.embarkedOn == null)
   const total = armies.reduce((s, a) => s + strength(a), 0)
-  const deployed = armies
-    .filter((a) => ids.has(a.region) && a.supply >= 0.65 && a.morale >= 0.5)
-    .reduce((s, a) => s + strength(a), 0)
+  // Count each ship once and only troops that fit whole aboard a ready carrier.
+  const booked = new Set<number>()
+  let deployed = 0
+  for (const army of armies) {
+    if (!ids.has(army.region) || army.supply < 0.65 || army.morale < 0.5) continue
+    if (maritime) {
+      const fleet = availableTransport(w, n.id, army.region, army.soldiers, undefined, booked)
+      if (
+        !fleet ||
+        booked.has(fleet.id) ||
+        fleet.cell !== portAt(w, army.region)?.water ||
+        fleet.food < fleet.soldiers * 0.034 * 2
+      )
+        continue
+      booked.add(fleet.id)
+    }
+    deployed += strength(army)
+  }
   const opposition = Math.max(
     decisionPolicy().realCosts ? 30 : 500,
     perceivedPower(w, n.id, rival) +
@@ -132,6 +160,7 @@ export function advanceCampaignPreparation(w: World, n: Nation) {
       army.nation !== n.id ||
       !army.operations ||
       army.operations.embarkedOn !== null ||
+      !!army.operations.journey ||
       cabinetOrderReserved(w, n, `army:${army.id}`)
     )
       continue
@@ -222,7 +251,7 @@ export function directTheaters(w: World, n: Nation, enemies: Set<number>) {
       if (held >= occupationStrengthRequired(w, r.id)) break
       held += strength(a)
       reserved.add(a.id)
-      if (a.operations && !cabinetOrderReserved(w, n, `army:${a.id}`)) {
+      if (a.operations && !a.operations.journey && !cabinetOrderReserved(w, n, `army:${a.id}`)) {
         a.target = null
         a.operations.stance = 'hold'
       }
@@ -252,6 +281,7 @@ export function directTheaters(w: World, n: Nation, enemies: Set<number>) {
   for (const a of own) {
     if (
       !a.operations ||
+      !!a.operations.journey ||
       reserved.has(a.id) ||
       cabinetOrderReserved(w, n, `army:${a.id}`) ||
       a.operations.disorder

@@ -1,3 +1,4 @@
+import { expeditionPeople } from './overseas-types'
 import { population, type World } from './types'
 import { economicRegions } from './local-units'
 import { allForces, militaryPeople } from './forces'
@@ -13,7 +14,11 @@ export function retireEmptyStates(w: World) {
     people.set(unit.nation, (people.get(unit.nation) ?? 0) + population(unit))
   const ended = new Set(
     w.nations
-      .filter((n) => n.extinct === undefined && (people.get(n.id) ?? 0) + militaryPeople(w, n.id) === 0)
+      .filter(
+        (n) =>
+          n.extinct === undefined &&
+          (people.get(n.id) ?? 0) + militaryPeople(w, n.id) + expeditionPeople(w, n.id) === 0,
+      )
       .map((n) => n.id),
   )
   if (!ended.size) return false

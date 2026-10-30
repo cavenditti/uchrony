@@ -126,6 +126,11 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
       world.warfare?.fleets
         .filter((f) => f.nation === nation)
         .map(({ communities: _crew, ...fleet }) => fleet) ?? [],
+    expeditions: (world.overseas?.expeditions ?? [])
+      .filter((e) => e.nation === nation)
+      .slice(-8)
+      .map(({ communities: _census, accounts: _accounts, ...e }) => e),
+    overseasFootholds: (world.overseas?.footholds ?? []).filter((f) => f.nation === nation),
     foreignStates: foreignIntelligence(world, nation),
     map: strategic ? knownMap(world, nation) : [],
     inbox,

@@ -1,3 +1,4 @@
+import { expeditionPeople, expeditionMigration } from '../src/sim/overseas-types'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
@@ -11,7 +12,9 @@ import { settleCredit } from '../src/sim/macroeconomy'
 import { ensureFirms, firmCapacity, regionalFirms } from '../src/sim/firms'
 
 const totalPeople = (w: World) =>
-  w.regions.reduce((sum, r) => sum + population(r), 0) + allForces(w).reduce((sum, a) => sum + a.soldiers, 0)
+  w.regions.reduce((sum, r) => sum + population(r), 0) +
+  allForces(w).reduce((sum, a) => sum + a.soldiers, 0) +
+  expeditionPeople(w)
 const sumGoods = (w: World, good: (typeof GOODS)[number]) =>
   w.regions.reduce((sum, r) => sum + r.stocks[good], 0)
 
@@ -45,10 +48,7 @@ test('monthly births, deaths, recruitment, and migration conserve people', () =>
     const before = totalPeople(w)
     tick(w)
     assert.equal(totalPeople(w), before + w.totals.births - w.totals.deaths, `month ${w.month}`)
-    assert.equal(
-      w.regions.reduce((s, r) => s + r.migration, 0),
-      0,
-    )
+    assert.equal(w.regions.reduce((s, r) => s + r.migration, 0) + expeditionMigration(w), 0)
   }
 })
 

@@ -1,3 +1,7 @@
+import { commissionFleet, commissionOptions, portAt, waterPath } from './navy'
+import { settlementPermission } from './overseas-access'
+import { departSettlers, receiveSettlers } from './settler-transfers'
+import { overseasOptions, startOverseasExpedition } from './overseas'
 import { knownMap } from './intelligence'
 import { withWorldConfiguration } from './configuration'
 import { parameterGroup } from './configuration-context'
@@ -12,11 +16,8 @@ import { subdivideHousing } from './building-lots'
 import { neighbors } from './grid'
 import { cellPosition } from './physical-space'
 import { population, type World } from './types'
-import { apportion } from './allocation'
-import { extractAges } from './age-cohorts'
-import { addCommunity, communitySize, rollupPopulation } from './population'
+import { communitySize } from './population'
 import { aggregateDistricts } from './districts'
-import { relocateHouseholdClaims } from './district-finance'
 import { governmentAccount, householdAccount, producerAccount, transfer } from './ledger'
 import { marketStore, recordGift, recordOwnCapital, recordUse, recordWages } from './national-accounts'
 import { STRATA } from './economic-types'
@@ -179,48 +180,8 @@ function settleFounding(
   source.stocks.food -= expedition.food
   target.stocks.food += expedition.food
 
-  const counts = apportion(expedition.people, source.communities!.map(communitySize))
-  const moved = STRATA.map(() => 0)
-  source.communities!.forEach((group, i) => {
-    const ages = apportion(counts[i], [
-      group.population.children,
-      group.population.adults,
-      group.population.elders,
-    ])
-    const incoming = extractAges(group, { children: ages[0], adults: ages[1], elders: ages[2] })
-    incoming.locality = target.id
-    incoming.host = nation
-    incoming.rootedness *= 0.65
-    moved[STRATA.indexOf(incoming.stratum ?? 'laborer')] += counts[i]
-    addCommunity(target.communities!, incoming)
-  })
-  const moves = STRATA.map((s, i) => ({
-    from: householdAccount(source.id, s),
-    to: householdAccount(target.id, s),
-    fraction: moved[i] / Math.max(1, workers[i]),
-  }))
-  relocateHouseholdClaims(w, moves)
-  moves.forEach((m, i) =>
-    transfer(
-      w,
-      m.from,
-      m.to,
-      w.economy!.households[source.id][STRATA[i]].cash * m.fraction,
-      'settler household assets',
-    ),
-  )
-  rollupPopulation(source)
-  rollupPopulation(target)
-  // Remove exactly the departing residents from their old physical homes.
-  const homes = residentialSites(w).filter((s) => s.pool === source.id)
-  const departures = apportion(
-    expedition.people,
-    homes.map((s) => s.residents ?? 0),
-    homes.map((s) => s.residents ?? 0),
-  )
-  homes.forEach((s, i) => {
-    s.residents! -= departures[i]
-  })
+  const incoming = departSettlers(w, source, expedition.people, (s) => householdAccount(target.id, s))
+  receiveSettlers(w, target, incoming)
   site.capacity = Math.ceil((expedition.people * 7) / 6)
   site.investedValue = materials + wages
   site.residents = expedition.people
@@ -232,11 +193,6 @@ function settleFounding(
       w.adaptive!.jurisdictions[`${level}:${region.id}`].seat = cell
   }
   if (w.adaptive!.buildingVersion === 1) subdivideHousing(w, site)
-  source.migration -= expedition.people
-  target.migration += expedition.people
-  source.populationDynamics!.emigrants += expedition.people
-  target.populationDynamics!.immigrants += expedition.people
-  w.totals.migration += expedition.people
   aggregateDistricts(w)
   syncResidentialPopulation(w)
   if (!deferMesh) rebuildAdaptiveMesh(w)
@@ -285,7 +241,30 @@ export function advanceFounding(w: World) {
       continue
     for (let review = 0; review < reviews; review++) {
       const option = foundingOptions(w, n.id, 1)[0]
-      if (!option) break
+      if (!option) {
+        const overseas = overseasOptions(w, n.id, 1)[0]
+        if (overseas) startOverseasExpedition(w, n.id, overseas.cell)
+        else if (!w.warfare?.fleets.some((f) => f.nation === n.id && f.transports)) {
+          // Acquire one modest civilian carrier only with a charted destination,
+          // healthy home conditions and ample funds left for the settlement itself.
+          const yard = commissionOptions(w, n.id, 2).find(
+            (q) =>
+              n.treasury >= q.cost * 2 + expedition.cash &&
+              knownMap(w, n.id).some(
+                (r) =>
+                  r.nation !== n.id &&
+                  settlementPermission(w, n.id, r.id) &&
+                  !!portAt(w, r.id) &&
+                  waterPath(w, portAt(w, q.region)!.water, portAt(w, r.id)!.water).length,
+              ),
+          )
+          if (yard) {
+            commissionFleet(w, n.id, yard.region, 0, yard.transports)
+            syncResidentialPopulation(w)
+          }
+        }
+        break
+      }
       settleFounding(w, n.id, option.cell, true, expedition)
       founded++
     }

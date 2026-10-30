@@ -22,7 +22,10 @@ test('world scale adds physical distance, connected provinces, independent state
   assert.equal(new Set(w.nations.map((n) => n.name)).size, 32)
   assert.equal(new Set(w.nations.map((n) => n.shortName)).size, 32)
   assert.equal(new Set(w.regions.map((r) => r.name)).size, w.regions.length)
-  assert(w.cells.at(-1)!.x === (w.width - 0.5) * CELL_SIZE, 'physical sample size stays fixed as the world grows')
+  assert(
+    w.cells.at(-1)!.x === (w.width - 0.5) * CELL_SIZE,
+    'physical sample size stays fixed as the world grows',
+  )
   for (const r of w.regions) {
     const seen = new Set([r.center]),
       queue = [r.center]

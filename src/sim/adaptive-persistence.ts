@@ -6,6 +6,7 @@ import { habitableLand } from './terrain-access'
 import { GOODS, population, type World } from './types'
 import { validateUrbanFabric } from './urban-fabric'
 import { urbanLand } from './urban-land'
+import { residentialParcelOnLand } from './residential-geometry'
 
 export function validateAdaptiveWorld(w: World) {
   const a = w.adaptive
@@ -139,19 +140,7 @@ export function validateAdaptiveWorld(w: World) {
         !w.localEconomy!.units[site.pool].cells.includes(site.cell)
       )
         fail('invalid residential occupancy, geometry or owner')
-      if (
-        sequence &&
-        ![
-          p,
-          { x: p.x + p.size, y: p.y },
-          { x: p.x, y: p.y + p.size },
-          { x: p.x + p.size, y: p.y + p.size },
-        ].every((point) =>
-          a.urban?.enabled
-            ? urbanLand(w, point, w.localEconomy!.units[site.pool].nation) >= 0
-            : pointInPolygon(point, cellPolygon(w, site.cell)),
-        )
-      )
+      if (sequence && !residentialParcelOnLand(w, site.cell, w.localEconomy!.units[site.pool].nation, p))
         fail('residential parcel crosses its source land')
       if (
         site.building !== undefined &&

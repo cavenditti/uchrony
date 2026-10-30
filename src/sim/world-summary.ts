@@ -1,3 +1,4 @@
+import { expeditionPeople } from './overseas-types'
 /** National summaries read one territorial snapshot after local books and population settle. */
 import { withWorldConfiguration } from './configuration'
 import { militaryPeople } from './forces'
@@ -13,7 +14,8 @@ function summarizeConfigured(w: World, record = true) {
   const territory = territorialIndex(w)
   for (const n of w.nations) {
     const regions = territory.regions(n.id)
-    n.population = regions.reduce((s, r) => s + population(r), 0) + militaryPeople(w, n.id)
+    n.population =
+      regions.reduce((s, r) => s + population(r), 0) + militaryPeople(w, n.id) + expeditionPeople(w, n.id)
     n.gdp = w.economy?.accounts?.complete
       ? (w.economy.accounts.nations[n.id]?.productionGDP ?? 0)
       : regions.reduce((s, r) => s + r.gdp, 0)

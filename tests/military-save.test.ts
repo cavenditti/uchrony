@@ -1,3 +1,4 @@
+import { expeditionPeople } from '../src/sim/overseas-types'
 import { endowTreasury } from './fixtures/endowment'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -193,7 +194,9 @@ function fillCadres(w: World, count: number) {
   }
 }
 const people = (w: World) =>
-  w.regions.reduce((sum, r) => sum + population(r), 0) + allForces(w).reduce((sum, a) => sum + a.soldiers, 0)
+  w.regions.reduce((sum, r) => sum + population(r), 0) +
+  allForces(w).reduce((sum, a) => sum + a.soldiers, 0) +
+  expeditionPeople(w)
 
 test('recruiting the 501st formation remains saveable and preserves people and military identities', async () => {
   const w = generateWorld('army-capacity-regression'),

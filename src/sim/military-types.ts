@@ -1,6 +1,18 @@
 import type { Army, RouteLeg } from './types'
 
+/** One retained destination coordinates land marches and a reserved sea passage. */
+export interface ArmyJourney {
+  destination: number
+  departure: number
+  arrival: number
+  fleet: number | null
+  started: number
+  stage: 'assembling' | 'boarding' | 'sailing' | 'landing' | 'inland' | 'waiting'
+  obstacle: string
+}
+
 export interface ArmyOperations {
+  journey?: ArmyJourney
   food: number
   arms: number
   fatigue: number

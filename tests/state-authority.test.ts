@@ -1,3 +1,4 @@
+import { expeditionPeople } from '../src/sim/overseas-types'
 import { endowTreasury } from './fixtures/endowment'
 import { extractAges } from '../src/sim/age-cohorts'
 import { balances } from '../src/sim/ledger'
@@ -21,7 +22,9 @@ import { validateWorld } from '../src/sim/persistence'
 import { allForces } from '../src/sim/forces'
 import { population, type World } from '../src/sim/types'
 const people = (w: World) =>
-  w.regions.reduce((s, r) => s + population(r), 0) + allForces(w).reduce((s, a) => s + a.soldiers, 0)
+  w.regions.reduce((s, r) => s + population(r), 0) +
+  allForces(w).reduce((s, a) => s + a.soldiers, 0) +
+  expeditionPeople(w)
 const funds = (w: World) => Object.values(balances(w)).reduce((s, value) => s + value, 0)
 function funded() {
   const w = generateWorld('standing-replacements')

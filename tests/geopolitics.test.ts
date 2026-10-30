@@ -1,3 +1,4 @@
+import { expeditionPeople } from '../src/sim/overseas-types'
 import { endowTreasury } from './fixtures/endowment'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -17,7 +18,9 @@ import { validateWorld } from '../src/sim/persistence'
 import { withSimulationPeriod } from '../src/sim/simulation-period'
 
 const people = (w: World) =>
-  w.regions.reduce((s, r) => s + population(r), 0) + allForces(w).reduce((s, a) => s + a.soldiers, 0)
+  w.regions.reduce((s, r) => s + population(r), 0) +
+  allForces(w).reduce((s, a) => s + a.soldiers, 0) +
+  expeditionPeople(w)
 function ready(seed: string, nations = 8) {
   const w = generateWorld(seed, 3, nations)
   ensureStatecraft(w)

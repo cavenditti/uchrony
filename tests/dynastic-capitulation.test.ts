@@ -1,3 +1,4 @@
+import { expeditionPeople } from '../src/sim/overseas-types'
 import { sovereignFixture as fixture } from './fixtures/sovereign-world'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -45,7 +46,9 @@ import { rebaseEndowments } from './fixtures/endowment'
 import { beginEconomyMonth } from '../src/sim/macroeconomy'
 
 const totalPeople = (w: World) =>
-  w.regions.reduce((s, r) => s + population(r), 0) + allForces(w).reduce((s, a) => s + a.soldiers, 0)
+  w.regions.reduce((s, r) => s + population(r), 0) +
+  allForces(w).reduce((s, a) => s + a.soldiers, 0) +
+  expeditionPeople(w)
 const totalCash = (w: World) => Object.values(balances(w)).reduce((s, value) => s + value, 0)
 function audit(w: World) {
   reconcileGDP(w)
@@ -430,7 +433,11 @@ test('independence withdraws fleets along a sea route without moving ships to an
   for (const good of ['timber', 'iron', 'arms', 'tools', 'food'] as const) last.stocks[good] = 100000
   rebaseEndowments(w)
   beginEconomyMonth(w)
+  // This fleet predates the occupation; shipbuilding under enemy control is illegal.
+  const occupation = last.control
+  delete last.control
   commissionFleet(w, 1, last.id, 1, 1)
+  last.control = occupation
   const fleet = w.warfare!.fleets.at(-1)!
   fleet.nation = 0
   fleet.mission = 'blockade'

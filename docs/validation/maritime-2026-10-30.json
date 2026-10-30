@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-30",
+  "status": "implemented locally; full-suite validation is not green",
+  "features": [
+    "Automatic army destination journeys with port rendezvous, reserved transports, embarkation, sailing, landing and onward marching",
+    "Paid civilian overseas expeditions carrying real dated families, property and cargo; physical recalls and alternate home ports",
+    "Footholds do not annex provinces; sustained sea trade or supplied protective presence can support slow independent accession",
+    "Scoped settlement consent distinct from military access",
+    "Native/model action menus, revised instructions, UI status/quotes/recall, save and accounting integration",
+    "Food-aware harbor selection and voyage-length naval provisioning"
+  ],
+  "checks": {
+    "build": "npm run build passed (existing large-chunk advisory remains)",
+    "format": "npm run format completed; subsequent touched files formatted with the same formatter",
+    "diff": "git diff --check passed",
+    "focused": {
+      "files": [
+        "military-routing",
+        "military-save",
+        "maritime-journeys",
+        "maritime-presence",
+        "maritime-ui",
+        "overseas-expeditions"
+      ],
+      "tests": 37,
+      "passed": 37,
+      "final_interval_boundary_regression": "Passed separately after strengthening invalid/nested coarse-period handling"
+    },
+    "related_fixture": "Independence withdrawal regression passed after commissioning its setup fleet before occupation",
+    "browser": {
+      "viewports": [
+        1440,
+        390
+      ],
+      "funding": true,
+      "reserved_fleet_orders_disabled": true,
+      "cancel_refund": true,
+      "naval_orders_reenabled": true,
+      "horizontal_overflow": false,
+      "finish_review": "ship, limited to the maritime dossier extension",
+      "design_documentation": "Existing system preserved; no new global tokens"
+    }
+  },
+  "full_suite": {
+    "npm_test": "Attempted; broad parallel run non-green",
+    "bounded_rerun": {
+      "passed": 803,
+      "failed": 14,
+      "cancelled": 1,
+      "elapsed_seconds": 1916.359,
+      "note": "Long simulation file interrupted after other failures. This is the observed earlier run, not a claim about the final patched suite."
+    },
+    "reproduced_in_pre_change_snapshot": [
+      "housing requires paid labor and real materials",
+      "competitive frontier costs",
+      "coarse frontier costs",
+      "industrial investment queue",
+      "bounded map lookups",
+      "world-scale shipping network contract",
+      "published guide equations",
+      "funded within-cell housing expansion",
+      "multiple-centre housing funding",
+      "cabinet trajectory fingerprints",
+      "lean residential display records"
+    ],
+    "fixed_after_run": [
+      "occupied-shipyard setup in independence-withdrawal test"
+    ],
+    "other_limits": [
+      "Local HTTP save endpoint test was environment limited",
+      "Long-run frontier-growth balance failure was not reproduced against baseline in this task",
+      "Long simulation file did not complete"
+    ]
+  },
+  "performance": {
+    "regions": 181,
+    "cells": 8064,
+    "timings": [
+      {
+        "name": "maritime contacts",
+        "medianMs": 0.01,
+        "maxMs": 0.02
+      },
+      {
+        "name": "state action menu including maritime quotes",
+        "medianMs": 1.01,
+        "maxMs": 1.51
+      },
+      {
+        "name": "selected-state display snapshot including maritime quotes",
+        "medianMs": 18.37,
+        "maxMs": 30.65
+      }
+    ]
+  },
+  "refinement_passes": {
+    "architecture": "Separated routing, journeys, civilian access, mobile accounts/census, persistence and shared settler transfers. Worker supplies authoritative UI quotes.",
+    "functions": "Reused quote/execution checks and settler-transfer helpers; revalidated rights, funds, capacity and landing materials; bounded recovery and recall.",
+    "performance": "One shipment/force pass for political contacts, preindexed coastal eligibility, bounded quote menus, cached physical paths and lower-bound route pruning. Regional timings recorded; no continental throughput claim.",
+    "documentation": "Domain and conservation rationale documented; model and agent instructions updated; existing UI language retained."
+  },
+  "limits": [
+    "No long-run crossing-rate or economic-balance claim",
+    "Ships still cost money and require crews, materials, provisions and access",
+    "No commit, push or deployment performed by this task"
+  ],
+  "evidence_directory": ".uchrony/validation/maritime-implementation"
+}

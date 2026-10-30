@@ -1,3 +1,6 @@
+import { domesticMonthlyWage } from './decision-policy'
+import { publicExpense } from './ledger'
+import { maritimeContacts } from './maritime-presence'
 import { parameterGroup } from './configuration-context'
 const frontierParameters = parameterGroup('frontierPolitics')
 import { expansionParameters } from './expansion-parameters'
@@ -184,6 +187,7 @@ export function advanceFrontierPolitics(w: World) {
     const key = `${contact.from}:${nation}`
     trade.set(key, (trade.get(key) ?? 0) + contact.strength * population(w.regions[contact.from]) * 0.026)
   }
+  const maritime = maritimeContacts(w)
   const components = landComponents(w)
   const pending: { region: Region; nation: number; city?: City; capital?: number }[] = []
   state.frontiers = []
@@ -237,6 +241,32 @@ export function advanceFrontierPolitics(w: World) {
           (localImpression(w, r.id, n.id)?.opposition ?? 0) * 0.45,
       )
       candidates.set(n.id, Math.max(candidates.get(n.id) ?? 0, appeal))
+    }
+    for (const [nation, contact] of maritime.get(r.id) ?? []) {
+      const n = w.nations[nation],
+        source = w.regions[contact.source]
+      if (
+        !source ||
+        !solventGovernment(w, n) ||
+        (contact.trade < Math.max(1, people * 0.026 * 0.1) && contact.protection < 0.15)
+      )
+        continue
+      const affinity = culturalAffinity(n, r)
+      const commerce = clamp(contact.trade / Math.max(1, people * 0.026))
+      const opposition = localImpression(w, r.id, nation)?.opposition ?? 0
+      // Contact permits the same slow accession process as a land frontier.
+      // Competing patrons, exclusion and local opposition can still defeat it.
+      const appeal = clamp(
+        0.4 +
+          affinity * 0.3 +
+          ((n.stability + n.legitimacy) / 200) * 0.24 +
+          commerce * 0.14 +
+          contact.protection * 0.1 -
+          (n.policies.tax / 100) * 0.12 -
+          opposition * 0.45 -
+          (n.policies.citizenship === 'heritage' ? (1 - affinity) * 0.25 : 0),
+      )
+      candidates.set(nation, Math.max(candidates.get(nation) ?? 0, appeal))
     }
     const ranked = [...candidates].sort((a, b) => b[1] - a[1] || a[0] - b[0])
     const best = ranked[0]
@@ -298,6 +328,13 @@ export function advanceFrontierPolitics(w: World) {
     const { region, nation, city, capital } = transition
     if (city) establishCityState(w, region, city, units[region.id], capital!)
     else {
+      // A distant administration must be funded before consent changes the map.
+      // Use the same staffing scale as annexation; consent avoids occupation costs.
+      if (maritime.get(region.id)?.has(nation)) {
+        const cost = domesticMonthlyWage(w, nation) * Math.max(20, population(region) * 0.02)
+        if (w.nations[nation].treasury < cost) continue
+        publicExpense(w, nation, cost, 'maritime accession administration', region.id)
+      }
       claimIndependentProvince(w, region, nation, true)
       recordWorldEvent(w, {
         id: w.nextEvent++,
@@ -307,7 +344,7 @@ export function advanceFrontierPolitics(w: World) {
         region: region.id,
         title: `${region.name} joins ${w.nations[nation].shortName}`,
         detail:
-          'Sustained ties to a neighboring state and years of local support lead independent communities to accept its government. Residents retain their cultures, languages, homes and property.',
+          'Sustained land or maritime ties to a state and years of local support lead independent communities to accept its government. Residents retain their cultures, languages, homes and property.',
       })
     }
   }

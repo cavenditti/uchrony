@@ -20,6 +20,7 @@ export interface DiplomaticClause {
     | 'access'
     | 'transit'
     | 'basing'
+    | 'settlement'
     | 'guarantee'
     | 'cede'
     | 'merge'
@@ -89,6 +90,8 @@ export const DOMESTIC_ORDER_KINDS = [
   'annex',
   'capitulate',
   'found',
+  'colony',
+  'recall-colony',
   'strategy',
 ] as const
 export interface DomesticOrder {

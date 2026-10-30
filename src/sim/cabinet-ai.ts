@@ -51,6 +51,7 @@ export function respondToSovereignty(w: World, n: Nation, reports = w.sovereignt
         a.nation === n.id &&
         !assigned.has(a.id) &&
         a.operations?.embarkedOn == null &&
+        !a.operations?.journey &&
         !a.operations?.disorder &&
         a.supply >= 0.5 &&
         a.soldiers >= 50 &&

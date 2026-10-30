@@ -618,6 +618,14 @@ export function remeshDistricts(w: World, partition: SpatialDistrict[]) {
       source.retired = w.month
       system.units[source.id] = source
     }
+  // Expedition accounts are independent of the mesh, but their home market
+  // follows the same remesh so returnees never settle into a retired census pool.
+  for (const expedition of w.overseas?.expeditions ?? []) {
+    if (!targets.some((r) => r.id === expedition.source)) {
+      const next = targets.find((r) => r.province === expedition.departure)
+      if (next) expedition.source = next.id
+    }
+  }
   system.active = targets.map((r) => r.id).sort((a, b) => a - b)
   for (const f of e.firms ?? []) {
     f.cell ??= w.regions[f.region].center

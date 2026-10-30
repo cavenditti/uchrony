@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Uchrony maritime validation</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      for (const event of ['error', 'unhandledrejection'])
+        addEventListener(event, (e) => {
+          const report = document.createElement('pre')
+          report.textContent = e.error?.stack || e.message || e.reason?.stack || String(e.reason)
+          document.body.append(report)
+        })
+    </script>
+    <script type="module" src="./maritime.tsx"></script>
+  </body>
+</html>

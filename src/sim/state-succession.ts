@@ -26,6 +26,15 @@ export function demobilizeState(w: World, nation: number) {
 export function settleStateEstate(w: World, from: number, to: number, forces: 'inherit' | 'demobilize') {
   if (from === to || !w.nations[to] || w.regions.some((r) => r.nation === from))
     throw new Error('A successor can settle only a state that has lost all territory.')
+  // Civilian voyages and their reserved carriers pass to the successor intact.
+  // Demobilization must never turn a change of government into passenger deaths.
+  for (const expedition of w.overseas?.expeditions ?? []) {
+    if (expedition.nation !== from) continue
+    expedition.nation = to
+    const carrier = w.warfare?.fleets.find((f) => f.id === expedition.fleet)
+    if (carrier) carrier.nation = to
+  }
+  for (const foothold of w.overseas?.footholds ?? []) if (foothold.nation === from) foothold.nation = to
   if (forces === 'inherit') {
     for (const force of allForces(w)) if (force.nation === from) force.nation = to
   } else demobilizeState(w, from)

@@ -1,3 +1,5 @@
+import { OverseasSettlements } from './OverseasSettlements'
+import { fleetReserved } from '../sim/maritime-routing'
 import { useState } from 'react'
 import { Anchor } from 'lucide-react'
 import type { Army, Command, World } from '../sim/types'
@@ -28,6 +30,7 @@ export function ArmyLogistics({
     world.warfare?.fleets.filter(
       (f) =>
         f.nation === a.nation &&
+        !fleetReserved(world, f.id) &&
         f.cell === portAt(world, a.region)?.water &&
         transportSeats(f) >=
           a.soldiers +
@@ -35,10 +38,15 @@ export function ArmyLogistics({
     ) ?? []
   return (
     <div className="army-logistics">
-      {fleet && (
-        <p className="panel-note">
-          Embarked aboard {fleet.name}. Its position and destination are controlled through the fleet.
+      {o.journey && (
+        <p className="panel-note" role="status">
+          Journey to <strong>{world.regions[o.journey.destination].name}</strong> · {o.journey.stage}. Via{' '}
+          {world.regions[o.journey.departure].name} and {world.regions[o.journey.arrival].name}.{' '}
+          {o.journey.obstacle || 'Troops and their transport follow this destination automatically.'}
         </p>
+      )}
+      {fleet && (
+        <p className="panel-note">Embarked aboard {fleet.name}. Sea movement follows the fleet’s course.</p>
       )}
       <div className="data-row">
         <span>Standing establishment</span>
@@ -246,6 +254,12 @@ export function NavalForces({
               : `Off ${w.regions[f.region].name}`}{' '}
             · {f.mission}
           </p>
+          {fleetReserved(w, f.id) && (
+            <p className="panel-note">
+              Reserved for a troop journey or settlement expedition. Cancel or recall that commitment to issue
+              separate naval orders.
+            </p>
+          )}
           <label className="select-label">
             Destination coast
             <select
@@ -295,6 +309,7 @@ export function NavalForces({
           <RaidReport world={w} force={f.id} />
           <button
             className="button full"
+            disabled={fleetReserved(w, f.id)}
             onClick={() =>
               command({
                 type: 'fleet-order',
@@ -308,6 +323,7 @@ export function NavalForces({
           </button>
         </div>
       ))}
+      <OverseasSettlements world={w} nation={nation} command={command} />
       {yard ? (
         <>
           <h4>Commission ships</h4>

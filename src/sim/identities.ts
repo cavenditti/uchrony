@@ -416,6 +416,9 @@ export function populationIdentitySummary(world: World, nation: number, regionId
     groups = [
       ...regions.flatMap((region) => region.communities ?? []),
       ...(regionId === undefined
+        ? (world.overseas?.expeditions ?? []).filter((e) => e.nation === nation).flatMap((e) => e.communities)
+        : []),
+      ...(regionId === undefined
         ? allForces(world)
             .filter((army) => army.nation === nation)
             .flatMap((army) => army.communities ?? [])

@@ -1,3 +1,4 @@
+import { civilianLanding } from './overseas-access'
 import { diplomaticAccess } from './agreements'
 import { portBlockadeView } from './naval-control'
 import { militaryVisit } from './military-access'
@@ -120,18 +121,19 @@ export function waterPath(w: World, from: number, to: number) {
   saved.set(key, route)
   return [...route]
 }
-export function commissionFleet(
+/** Validate an individually affordable ship order without spending or recruiting. */
+export function commissionQuote(
   w: World,
   nation: number,
   region: number,
   warships: number,
   transports: number,
 ) {
-  const state = ensureWarfare(w),
+  const state = w.warfare,
     n = w.nations[nation],
     r = w.regions[region],
     harbor = portAt(w, region)
-  if (!n || !r || r.nation !== nation || !harbor)
+  if (!n || !r || r.nation !== nation || r.control || !harbor)
     throw new Error('Commission ships at an owned coastal port.')
   if (
     ![warships, transports].every((v) => Number.isInteger(v) && v >= 0 && v <= 12) ||
@@ -139,7 +141,7 @@ export function commissionFleet(
     warships + transports > 16
   )
     throw new Error('A commission needs 1–16 ships, with at most 12 of either type.')
-  if (state.fleets.filter((f) => f.nation === nation).length >= 8)
+  if ((state?.fleets.filter((f) => f.nation === nation).length ?? 0) >= 8)
     throw new Error('This state already operates eight fleets.')
   const crew = warships * 90 + transports * 30,
     cost = warships * 650 + transports * 350
@@ -158,6 +160,34 @@ export function commissionFleet(
     throw new Error(
       'Shipbuilding needs treasury funds, timber, iron, arms, tools, and adult crews in this port.',
     )
+  return { region, warships, transports, crew, cost, timber, iron, arms, tools }
+}
+
+/** Bounded menus share the exact shipyard validation used when executing. */
+export function commissionOptions(w: World, nation: number, transports = 2) {
+  return transportNetwork(w)
+    .harbors.flatMap((h) => {
+      try {
+        return [commissionQuote(w, nation, h.region, 0, transports)]
+      } catch {
+        return []
+      }
+    })
+    .slice(0, 4)
+}
+
+export function commissionFleet(
+  w: World,
+  nation: number,
+  region: number,
+  warships: number,
+  transports: number,
+) {
+  const { crew, cost, timber, iron, arms, tools } = commissionQuote(w, nation, region, warships, transports)
+  const state = ensureWarfare(w),
+    n = w.nations[nation],
+    r = w.regions[region],
+    harbor = portAt(w, region)!
   ensurePopulation(w)
   const communities = takeCivilianAdults(w, r, crew)
   publicExpense(w, n.id, cost, 'ship construction', r.id)
@@ -225,6 +255,7 @@ export function orderFleet(w: World, id: number, target: number, mission: Fleet[
   if (
     mission === 'transport' &&
     !friendlyPort(w, f.nation, target) &&
+    !civilianLanding(w, f, target) &&
     relation(w, f.nation, w.regions[target].nation)?.treaty !== 'war'
   )
     throw new Error('A landing needs military access or a declared war.')
@@ -276,8 +307,17 @@ export function disembark(w: World, army: Army, fleet: Fleet, region: number) {
   army.region = region
   army.operations!.embarkedOn = null
   army.operations!.fatigue = clamp(army.operations!.fatigue + 0.18)
-  army.target = null
+  const journey = army.operations!.journey
+  if (journey) {
+    journey.fleet = null
+    journey.stage = region === journey.arrival ? 'inland' : 'waiting'
+    journey.obstacle = region === journey.arrival ? '' : 'Voyage interrupted; waiting to regroup.'
+  }
+  army.target =
+    journey && region === journey.arrival && region !== journey.destination ? journey.destination : null
   fleet.embarked = fleet.embarked.filter((id) => id !== army.id)
+  if (!fleet.embarked.length && !fleet.course.length && fleet.mission === 'transport')
+    fleet.mission = 'escort'
 }
 export function militaryDeaths(w: World, force: Army, amount: number) {
   const losses = Math.min(force.soldiers, Math.max(0, Math.floor(amount)))
@@ -308,25 +348,45 @@ export function advanceNavy(w: World) {
       returnArmyPeople(w, f, home)
       continue
     }
-    const coast = transportNetwork(w).harbors.find((h) => h.water === f.cell)
+    // Neighboring ports may share a water cell. Choose a real supplied berth,
+    // preferring the fleet's recorded port on ties, instead of the first empty coast.
+    const coasts = transportNetwork(w).harbors.filter((h) => h.water === f.cell)
+    const dockCandidate = coasts
+      .filter((h) => friendlyPort(w, f.nation, h.region))
+      .sort((a, b) => {
+        const food = (id: number) =>
+          diplomaticAccess(w, f.nation, w.regions[id].nation, 'supply', id)
+            ? Math.max(0, w.regions[id].stocks.food - population(w.regions[id]) * 0.025)
+            : 0
+        return (
+          food(b.region) - food(a.region) || Number(b.region === f.region) - Number(a.region === f.region)
+        )
+      })[0]
+    const coast = dockCandidate ?? coasts.find((h) => h.region === f.region) ?? coasts[0]
     const visit = coast
       ? militaryVisit(w, f.nation, coast.region, f.foreignStay)
       : { stay: undefined, withdraw: false }
     if (visit.stay) f.foreignStay = visit.stay
     else delete f.foreignStay
-    const dock =
-      !visit.withdraw &&
-      transportNetwork(w).harbors.find((h) => h.water === f.cell && friendlyPort(w, f.nation, h.region))
+    const dock = !visit.withdraw ? dockCandidate : undefined
     const n = w.nations[f.nation],
       aboard = w.armies.filter((a) => f.embarked.includes(a.id))
     f.hull = Math.max(0.05, f.hull - (dock ? 0.001 : 0.003))
+    // Reserve provisions for the actual course plus a two-month landing margin.
+    // A fixed four-month ration caused long voyages to turn back repeatedly.
+    const provisionMonths = Math.max(
+      4,
+      Math.ceil(
+        sailingDistance(w, [f.cell, ...f.course]) / Math.max(1, (12 + n.technologies.logistics * 3) * 0.7),
+      ) + 2,
+    )
     if (dock && diplomaticAccess(w, f.nation, w.regions[dock.region].nation, 'supply', dock.region)) {
       const r = w.regions[dock.region]
       const foodPrice = r.prices.food / 1000,
         armsPrice = r.prices.arms / 1000
       const load = Math.min(
         Math.max(0, r.stocks.food - population(r) * 0.025),
-        Math.max(0, f.soldiers * 0.034 * 4 - f.food),
+        Math.max(0, f.soldiers * 0.034 * provisionMonths - f.food),
         Math.max(0, n.treasury) / Math.max(0.001, foodPrice),
       )
       publicGoods(w, n.id, r.id, 'food', load, fleetStore(f.id), foodPrice)
@@ -368,7 +428,7 @@ export function advanceNavy(w: World) {
       for (const a of aboard) {
         const loaded = Math.min(
           Math.max(0, r.stocks.food - population(r) * 0.025),
-          Math.max(0, a.soldiers * 0.034 * 3 - a.operations!.food),
+          Math.max(0, a.soldiers * 0.034 * provisionMonths - a.operations!.food),
           Math.max(0, n.treasury) / Math.max(0.001, foodPrice),
         )
         publicGoods(w, n.id, r.id, 'food', loaded, armyStore(a.id), foodPrice)
@@ -429,6 +489,7 @@ export function advanceNavy(w: World) {
         relation(w, f.nation, w.regions[f.target].nation)?.treaty !== 'war') ||
         (f.mission === 'transport' &&
           !friendlyPort(w, f.nation, f.target) &&
+          !civilianLanding(w, f, f.target) &&
           relation(w, f.nation, w.regions[f.target].nation)?.treaty !== 'war'))
     if (
       (f.supply < 0.35 || f.hull < 0.3 || invalidMission || visit.withdraw) &&
@@ -438,6 +499,9 @@ export function advanceNavy(w: World) {
         .harbors.filter(
           (h) =>
             friendlyPort(w, f.nation, h.region) &&
+            diplomaticAccess(w, f.nation, w.regions[h.region].nation, 'supply', h.region) &&
+            // A harbor that cannot feed the crew is not a resupply destination.
+            w.regions[h.region].stocks.food > population(w.regions[h.region]) * 0.025 + f.soldiers * 0.034 &&
             (!visit.withdraw ||
               diplomaticAccess(w, f.nation, w.regions[h.region].nation, 'basing', h.region)),
         )
@@ -534,6 +598,15 @@ export function advanceNavy(w: World) {
     }
   }
   state.fleets = state.fleets.filter((f) => f.soldiers > 0 && f.warships + f.transports > 0)
+  const surviving = new Set(state.fleets.map((f) => f.id))
+  for (const army of w.armies) {
+    const journey = army.operations?.journey
+    if (journey?.fleet !== null && journey?.fleet !== undefined && !surviving.has(journey.fleet)) {
+      journey.fleet = null
+      journey.stage = 'waiting'
+      journey.obstacle = 'The assigned fleet was lost; waiting for another transport.'
+    }
+  }
   for (const fleet of state.fleets)
     fleet.embarked = fleet.embarked.filter((id) =>
       w.armies.some(

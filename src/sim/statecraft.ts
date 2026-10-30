@@ -181,7 +181,7 @@ function validateTerms(world: World, terms: DiplomaticClause[], parties: number[
         throw new Error('State creation needs a name and territory.')
       creation = true
     }
-    if (['transit', 'access', 'basing', 'preferential-trade', 'trade'].includes(term.kind)) {
+    if (['transit', 'access', 'basing', 'settlement', 'preferential-trade', 'trade'].includes(term.kind)) {
       if (term.from === term.to) throw new Error('Access and trade agreements require distinct states.')
       if (
         relation(world, term.from, term.to)?.treaty === 'war' &&
@@ -191,7 +191,7 @@ function validateTerms(world: World, terms: DiplomaticClause[], parties: number[
       )
         throw new Error('Warring states must agree peace before access or trade can resume.')
       if (
-        ['transit', 'access', 'basing'].includes(term.kind) &&
+        ['transit', 'access', 'basing', 'settlement'].includes(term.kind) &&
         (new Set(term.regions).size !== term.regions.length ||
           term.regions.some((id) => world.regions[id]?.nation !== term.from))
       )
@@ -254,6 +254,10 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
     if (order.kind === 'trade-policy') policy.trade = order.key as BorderPolicy['trade']
     else policy.military = order.key as BorderPolicy['military']
     command = { type: 'border-policy', nation, target: order.target, policy }
+  } else if (order.kind === 'colony') {
+    command = { type: 'found-overseas', nation, cell: order.target }
+  } else if (order.kind === 'recall-colony') {
+    command = { type: 'cancel-expedition', nation, expedition: order.target }
   } else if (order.kind === 'found') {
     const province = world.cells[order.target]?.region
     if (
@@ -695,6 +699,7 @@ export function settleConventionalOffers(world: World) {
     'preferential-trade',
     'transit',
     'basing',
+    'settlement',
     'alliance',
     'peace',
     'access',
@@ -1017,6 +1022,7 @@ export function acceptRefereeDecision(
             'peace',
             'nonaggression',
             'access',
+            'settlement',
             'guarantee',
             'research',
           ].includes(term.kind),

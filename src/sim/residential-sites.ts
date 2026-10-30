@@ -1,4 +1,4 @@
-import { urbanLand } from './urban-land'
+import { residentialParcelOnLand } from './residential-geometry'
 import { habitableLand } from './terrain-access'
 import { buildingFootprint, LOT_SPAN } from './building-lots'
 import { apportion } from './allocation'
@@ -200,16 +200,7 @@ export function createResidentialParcel(
     point.x > parcel.x + parcel.size ||
     point.y < parcel.y ||
     point.y > parcel.y + parcel.size ||
-    ![
-      parcel,
-      { x: parcel.x + parcel.size, y: parcel.y },
-      { x: parcel.x, y: parcel.y + parcel.size },
-      { x: parcel.x + parcel.size, y: parcel.y + parcel.size },
-    ].every((p) =>
-      w.adaptive?.urban?.enabled
-        ? urbanLand(w, p, unit.nation) >= 0
-        : pointInPolygon(p, cellPolygon(w, cell)),
-    )
+    !residentialParcelOnLand(w, cell, unit.nation, parcel)
   )
     throw new Error('Residential plot crosses its source land')
   const id = `residence:${a.nextResidence!++}`
@@ -247,7 +238,8 @@ export function findResidentialParcel(
     radius = w.adaptive?.buildingVersion === 1 ? 160 : 1000,
     origin = 0
   const bounds = { x: near.x - radius, y: near.y - radius, size: radius * 2 }
-  const owned = new Set(w.localEconomy!.units[near.pool].cells)
+  const unit = w.localEconomy!.units[near.pool],
+    owned = new Set(unit.cells)
   const cells = [...new Set(queryAdaptiveLeaves(w, bounds).flatMap((n) => n.fragments.map((f) => f.cell)))]
     .filter((c) => owned.has(c) && habitableLand(w.cells[c]))
     .sort((a, b) => a - b)
@@ -296,6 +288,7 @@ export function findResidentialParcel(
       ]
       const land = polygons.find(({ polygon }) => corners.every((p) => pointInPolygon(p, polygon)))
       if (!land) continue
+      if (!residentialParcelOnLand(w, land.cell, unit.nation, parcel)) continue
       candidates.push({ cell: land.cell, point, parcel, distance })
     }
   return candidates.sort(

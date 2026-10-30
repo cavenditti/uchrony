@@ -1,3 +1,4 @@
+import { expeditionOwner } from './overseas-types'
 import { geographicNeighbors as movementNeighbors, neighbors } from './grid'
 import { integerValidator, numberValidator, recordValue, validationFailure } from './persistence-primitives'
 import { communitySize } from './population'
@@ -304,6 +305,7 @@ export function validateDistrictEconomy(w: World) {
         ([a, v]) =>
           !num(v) ||
           !(
+            expeditionOwner(w, a) ||
             (/^government:\d+$/.test(a) && w.nations[Number(a.split(':')[1])]) ||
             (/^household:\d+:(smallholder|laborer|artisan|professional|owner)$/.test(a) &&
               w.economy!.households[Number(a.split(':')[1])])

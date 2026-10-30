@@ -208,7 +208,8 @@ window.__uchronySoak = {
 // observations but deliberately disallow inspection of application globals.
 if (new URLSearchParams(location.search).has('metrics')) {
   const panel = document.createElement('div')
-  panel.style = 'position:fixed;left:270px;top:58px;z-index:10000;max-width:680px;background:#19252b;color:#e6e7dd;padding:4px;font:10px system-ui'
+  panel.style =
+    'position:fixed;left:270px;top:58px;z-index:10000;max-width:680px;background:#19252b;color:#e6e7dd;padding:4px;font:10px system-ui'
   const reset = document.createElement('button')
   reset.textContent = 'Reset endurance counters'
   reset.onclick = () => window.__uchronySoak.begin()
@@ -220,13 +221,24 @@ if (new URLSearchParams(location.search).has('metrics')) {
   setInterval(() => {
     const s = window.__uchronySoak.snapshot()
     status.textContent = JSON.stringify({
-      runId: s.runId, seconds: Math.round(s.elapsedMs / 1000), month: s.world.month,
-      cells: s.world.cells, running: s.running, mode: s.mode, savedMonth: s.savedMonth,
-      saveMiB: Math.round((s.world.saveBytes ?? 0) / 1048576), replicas: s.world.replicas,
-      drags: Math.min(s.counters.pointerDown, s.counters.pointerUp), wheels: s.counters.wheels,
-      saves: s.counters.saves, lastWorldAgo: Math.round(s.lastWorldAgoMs / 1000),
-      lastSaveAgo: Math.round(s.lastSaveAgoMs / 1000), errors: s.errors,
-      contextLost: s.counters.contextLost, frameMs: s.frameMs, heapMiB: Math.round(s.heapMiB ?? 0),
+      runId: s.runId,
+      seconds: Math.round(s.elapsedMs / 1000),
+      month: s.world.month,
+      cells: s.world.cells,
+      running: s.running,
+      mode: s.mode,
+      savedMonth: s.savedMonth,
+      saveMiB: Math.round((s.world.saveBytes ?? 0) / 1048576),
+      replicas: s.world.replicas,
+      drags: Math.min(s.counters.pointerDown, s.counters.pointerUp),
+      wheels: s.counters.wheels,
+      saves: s.counters.saves,
+      lastWorldAgo: Math.round(s.lastWorldAgoMs / 1000),
+      lastSaveAgo: Math.round(s.lastSaveAgoMs / 1000),
+      errors: s.errors,
+      contextLost: s.counters.contextLost,
+      frameMs: s.frameMs,
+      heapMiB: Math.round(s.heapMiB ?? 0),
     })
   }, 2000)
 }

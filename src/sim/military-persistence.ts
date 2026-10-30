@@ -86,6 +86,7 @@ export function validateWarfare(
       if (!w.armies.some((a) => a.id === id && a.nation === f.nation && a.operations?.embarkedOn === f.id))
         fail(`fleet ${f.id} passenger ${id} disagrees with its embarkation record`)
   }
+  const reservations = new Set<number>()
   for (const a of w.armies) {
     if (
       (a.establishment !== undefined && (!integer(a.establishment, 1e7) || a.establishment < 1)) ||
@@ -93,6 +94,27 @@ export function validateWarfare(
     )
       fail(`army ${a.id} establishment or replacement count`)
     const o = a.operations
+    const j = o?.journey
+    if (j !== undefined) {
+      if (
+        !object(j) ||
+        !region(j.destination) ||
+        !region(j.departure) ||
+        !region(j.arrival) ||
+        !integer(j.started, w.month) ||
+        !['assembling', 'boarding', 'sailing', 'landing', 'inland', 'waiting'].includes(j.stage) ||
+        typeof j.obstacle !== 'string' ||
+        j.obstacle.length > 1000 ||
+        !(
+          j.fleet === null ||
+          (integer(j.fleet, w.nextArmy - 1) &&
+            !reservations.has(j.fleet) &&
+            s.fleets.some((f) => f.id === j.fleet && f.nation === a.nation))
+        )
+      )
+        fail(`army ${a.id} sea journey`)
+      if (j.fleet !== null) reservations.add(j.fleet)
+    }
     if (!object(o)) fail(`army ${a.id} is missing its operations record`)
     if (
       o?.march !== undefined &&

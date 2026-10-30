@@ -1,3 +1,4 @@
+import { expeditionStore } from './overseas-types'
 /** Goods accounts separate cash, inventory cost and explicit revaluation. Merchant
  * receipts blend acquisition values; a marginal purchase never reprices old stock. */
 import { economicRegions, economicRegion, localFirmRegion } from './local-units'
@@ -55,6 +56,18 @@ function businessRegion(w: World, account: string) {
 function currentStore(w: World, key: string) {
   const [kind, text] = key.split(':'),
     id = Number(text)
+  if (kind === 'expedition') {
+    const e = w.overseas?.expeditions.find((e) => e.id === id)
+    if (!e) return undefined
+    return {
+      region: e.source,
+      nation: e.nation,
+      owner: `government:${e.nation}`,
+      government: true,
+      quantity: e.goods,
+      prices: economicRegion(w, e.source).prices,
+    }
+  }
   if (kind === 'transit') {
     const shipment = w.adaptive?.transit?.find((s) => s.id === id)
     if (!shipment) return undefined
@@ -142,6 +155,7 @@ export function beginNationalAccounts(w: World) {
     businesses: {},
     stores: {},
   }
+  for (const e of w.overseas?.expeditions ?? []) addStore(w, expeditionStore(e.id))
   for (const shipment of w.adaptive?.transit ?? []) addStore(w, `transit:${shipment.id}`)
   for (const r of economicRegions(w)) addStore(w, marketStore(r.id))
   for (const f of w.economy!.firms ?? []) addStore(w, firmStore(f.id))

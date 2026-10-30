@@ -1,3 +1,6 @@
+import { fleetReserved } from './maritime-routing'
+import { startOverseasExpedition, cancelOverseasExpedition } from './overseas'
+import { cancelArmyJourney, orderArmyJourney } from './army-journeys'
 import { imposeCapitulation } from './capitulation'
 import { proposeRoyalAgreement } from './royal-diplomacy'
 import { recordWorldArchive } from './world-archive'
@@ -5,7 +8,6 @@ import { reconcileInstitutions } from './institution-lifecycle'
 import { respondToInstitutionDefense } from './institution-defense'
 /** Commands apply one typed handler under world configuration, then reconcile derived views. */
 import { refreshAdaptiveTotals } from './adaptive-world'
-import { diplomaticAccess } from './agreements'
 import { borderPolicy, setBorderPolicy } from './border-policy'
 import { buildFarm } from './agriculture'
 import { refreshPlaces } from './places'
@@ -13,13 +15,11 @@ import { applyConfiguration, withWorldConfiguration } from './configuration'
 import { foreignOfficeContext } from './diplomatic-friction'
 import { aggregateDistricts, linkDistrictPeople } from './districts'
 import { nativeDomesticControl } from './domestic-policy'
-import { shortestPaths } from './economy'
 import { foundSettlement } from './founding'
 import { collectiveDefense, collectiveDefenseBeneficiary, foreignPolicyMandate } from './institutions'
 import { configureIntelligence } from './intelligence'
 import { reconcileJurisdictionSovereignty } from './jurisdictions'
 import { publicExpense } from './ledger'
-import { landGraph } from './military'
 import { annexProvince } from './military-control'
 import { inventoryFlow, marketStore, reconcileGDP } from './national-accounts'
 import { commissionFleet, embarkArmy, ensureWarfare, orderFleet } from './navy'
@@ -112,6 +112,8 @@ function applyCommandConfigured(w: World, command: Command): string {
 
 /** Exhaustive dispatch keeps each command's narrowed payload with its handler. */
 const COMMAND_HANDLERS = {
+  'found-overseas': (w, command) => startOverseasExpedition(w, command.nation, command.cell),
+  'cancel-expedition': (w, command) => cancelOverseasExpedition(w, command.nation, command.expedition),
   'border-policy': (w, command) => {
     activeNation(w, command.target)
     setBorderPolicy(w, command.nation, command.target, command.policy)
@@ -367,9 +369,14 @@ const COMMAND_HANDLERS = {
     return commissionFleet(w, command.nation, command.region, command.warships, command.transports)
   },
   'fleet-order': (w, command) => {
+    if (fleetReserved(w, command.fleet))
+      throw new Error(
+        'This fleet is reserved for a journey or expedition. Cancel or recall that commitment first.',
+      )
     return orderFleet(w, command.fleet, command.target, command.mission)
   },
   embark: (w, command) => {
+    if (fleetReserved(w, command.fleet)) throw new Error('This fleet is already reserved for passengers.')
     return embarkArmy(w, command.army, command.fleet)
   },
   'army-orders': (w, command) => {
@@ -381,6 +388,7 @@ const COMMAND_HANDLERS = {
       !['restrained', 'requisition', 'pillage', 'raid', 'raze'].includes(command.conduct)
     )
       throw new Error('Choose a valid army stance and civilian conduct.')
+    if (command.stance !== 'march') cancelArmyJourney(army)
     army.operations!.stance = command.stance
     army.operations!.conduct = command.conduct
     return 'Standing army orders updated.'
@@ -450,21 +458,7 @@ const COMMAND_HANDLERS = {
     const army = w.armies.find((a) => a.id === command.army),
       target = w.regions[command.target]
     if (!army || !target) throw new Error('Select a valid army and destination.')
-    const rel = relation(w, army.nation, target.nation)
-    if (
-      target.nation !== army.nation &&
-      rel?.treaty !== 'war' &&
-      !diplomaticAccess(w, army.nation, target.nation, 'transit', target.id)
-    )
-      return 'The host has not granted military transit to this province. Negotiate access or choose another destination.'
-    const paths = shortestPaths(landGraph(w, army.nation), army.region)
-    if (!Number.isFinite(paths.distance[target.id]))
-      return 'No accessible land route reaches this province. Overseas movement requires a transport fleet.'
-    ensureWarfare(w)
-    army.operations!.stance = 'march'
-    army.operations!.progress = 0
-    army.target = target.id
-    return `${army.name} ordered to ${target.name}. Movement begins next month.`
+    return orderArmyJourney(w, army, target.id)
   },
   policy: (w, command) => {
     const n = activeNation(w, command.nation)
