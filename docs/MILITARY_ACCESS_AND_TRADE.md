@@ -15,6 +15,8 @@ Signed `transit`, `access` and `basing` clauses are granted by `from` (host) to 
 
 Formal trade between belligerents stops completely; smuggling is not modeled. Both market resolutions check the buyer, seller and every land/harbor host, including long surveyed routes and neutral intermediate markets. Goods promises cannot bypass closures. Paid cargo in transit stays in its conserved inventory until its route reopens. This is a route-level model, without a separate origin-tracing customs system for goods resold in a later month.
 
+The animated map rechecks current war, embargo, restricted-arms and naval-closure rules before displaying recorded shipments. Completed trade remains in accounting history, but no longer animates across a newly closed route. Remembered roads remain visible without spawning carts unless current cargo uses them.
+
 ## Blockades and sacking
 
 A blockade requires warships and war with the target port owner. Its strength depends on crews, hulls, morale, provisions, ammunition and technology. Only vessels within four traversable water-cell spans contribute; pressure cannot cross land. A sufficient cordon closes the port to trade and troop access, including neutral traffic. Defending and escorting fleets can contest it. Distant, starved or disarmed fleets cannot maintain a closure, and peace cancels it immediately.
@@ -22,6 +24,14 @@ A blockade requires warships and war with the target port owner. Its strength de
 The army conduct **Sack hostile trade routes nearby** intercepts cargo crossing the army's province without requiring secure occupation. The naval **Sack hostile sea trade routes** mission intercepts nearby waterborne consignments. At least one cargo endpoint must belong to an enemy. Neutral-only trade is spared. Local guards and escorts reduce interception.
 
 Raids use a shared aggregate interception rate and a finite monthly tonnage budget per formation. Captured food and ammunition enter carried stores up to three months of food or four months of army ammunition; other intercepted cargo is destroyed. The physical-goods ledger records the loss, national accounts record asset transfers/destruction, and no new money is created. Purchases still settle: merchants bear the cargo loss. Raid reports show actual captured and destroyed quantities. Raiders leave a risky sea lane open rather than closing all traffic before there is anything to intercept.
+
+## Destructive army raids
+
+The army conduct **Raid cities, roads and production facilities** (`raze`) requires **Hold and recover** or **Prepare defensive positions** in securely occupied enemy territory. Supplied, orderly troops spend carried ammunition. Their pooled effective strength determines damage, capped at 25% of remaining assets per month; small remnants eventually collapse completely. Splitting formations cannot multiply damage, and the province's saved report prevents repeating a raid in the same month.
+
+Raids reduce actual housing capacity, building floor area, merchant and enterprise capital, unfinished capital projects, road infrastructure and surveyed lanes. Destroyed buildings lose their footprints; destroyed road upgrades lose their transport bonuses. Pending housing and urban redevelopment projects are cancelled so an old blueprint cannot restore demolished assets for free. Neutral territory, sea routes and natural resource deposits are unaffected. Existing deposits, loans and population remain: destroyed housing leaves people without enough accommodation, while devastation and grievance increase. Paid reconstruction can restore assets later.
+
+The army panel and world events report housing and capital losses plus demolished buildings and road segments. Existing cargo sacking and deposit pillage remain separate orders.
 
 ## Isolated territory
 

@@ -11,6 +11,7 @@ import { harborVisibility } from '../sim/harbors'
 import { StringTable } from './string-table'
 import type { Route, World } from '../sim/types'
 import { METERS_PER_MAP_UNIT } from '../sim/physical-space'
+import { currentFreightVolumeView } from '../sim/freight-access'
 
 export interface FreightSegment {
   a: number
@@ -43,7 +44,8 @@ export function freightOverlay(world: World, nation: number, region: number | nu
         { cell: p.cell, volume: 0, selected: 0, opacity: harborVisibility(world, p) },
       ]),
     ),
-    terminals = new Set(world.regions.map((r) => r.center))
+    terminals = new Set(world.regions.map((r) => r.center)),
+    visibleVolume = currentFreightVolumeView(world)
   let legacy = false
   for (const route of world.routes) {
     if (!route.legs) {
@@ -51,6 +53,8 @@ export function freightOverlay(world: World, nation: number, region: number | nu
       continue
     }
     if (!traversableLegs(world, route.legs)) continue
+    const volume = visibleVolume(route)
+    if (volume <= 0) continue
     const selected =
       region !== null
         ? route.from === region || route.to === region
@@ -60,8 +64,8 @@ export function freightOverlay(world: World, nation: number, region: number | nu
         for (const cell of [leg.cells[0], leg.cells[leg.cells.length - 1]]) {
           terminals.add(cell)
           const port = ports.get(cell) ?? { cell, volume: 0, selected: 0, opacity: 1 }
-          port.volume += route.volume
-          if (selected) port.selected += route.volume
+          port.volume += volume
+          if (selected) port.selected += volume
           ports.set(cell, port)
         }
       for (let i = 1; i < leg.cells.length; i++) {
@@ -80,11 +84,11 @@ export function freightOverlay(world: World, nation: number, region: number | nu
             selectedBackward: 0,
           }
         if (from === a) {
-          segment.forward += route.volume
-          if (selected) segment.selectedForward += route.volume
+          segment.forward += volume
+          if (selected) segment.selectedForward += volume
         } else {
-          segment.backward += route.volume
-          if (selected) segment.selectedBackward += route.volume
+          segment.backward += volume
+          if (selected) segment.selectedBackward += volume
         }
         segments.set(key, segment)
       }

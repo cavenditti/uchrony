@@ -1,0 +1,203 @@
+{
+  "date": "2026-10-30",
+  "fiscalSnapshot": {
+    "month": 247,
+    "units": "thousands of crowns",
+    "scope": "Replanned budgets on a copied save, not a forward economic forecast",
+    "nations": [
+      {
+        "nation": "Aurelia",
+        "treasury": 0.34748607317570607,
+        "debt": 5.826722380025422,
+        "receipts": 0.6856483585386823,
+        "spending": 1.4538522888680205,
+        "previousAppropriation": 1.1156900035050594,
+        "replannedAppropriation": 0.4903680993301789,
+        "scheduledDebtCash": 0.1188721115162361,
+        "creditLimit": 6.812606643977628
+      },
+      {
+        "nation": "Veyr",
+        "treasury": 0.05689167539868816,
+        "debt": 1.1417810724463515,
+        "receipts": 0.09313568769101681,
+        "spending": 0.08854957429354154,
+        "previousAppropriation": 0.05188802630540166,
+        "replannedAppropriation": 0.07648252493854146,
+        "scheduledDebtCash": 0.006470092743862659,
+        "creditLimit": 0.9275874183901264
+      },
+      {
+        "nation": "Serrane",
+        "treasury": 0.31087956150960777,
+        "debt": 8.021045418676003,
+        "receipts": 0.4858841184184812,
+        "spending": 0.5615058633697929,
+        "previousAppropriation": 0.3865013064609183,
+        "replannedAppropriation": 0.44110994409876836,
+        "scheduledDebtCash": 0.04545259070583069,
+        "creditLimit": 5.440808236730182
+      },
+      {
+        "nation": "Verdant",
+        "treasury": 0.08448922701054978,
+        "debt": 4.421210790231733,
+        "receipts": 0.1436611139406967,
+        "spending": 0.15132237232408377,
+        "previousAppropriation": 0.09215048539393683,
+        "replannedAppropriation": 0.17995173044400686,
+        "scheduledDebtCash": 0.025053527811313155,
+        "creditLimit": 2.2923965942763753
+      },
+      {
+        "nation": "Thalassa",
+        "treasury": 0.17660625243079045,
+        "debt": 3.576856364683363,
+        "receipts": 0.27577489383321907,
+        "spending": 0.3268365599624991,
+        "previousAppropriation": 0.2248200327083407,
+        "replannedAppropriation": 0.2564961183113424,
+        "scheduledDebtCash": 0.020268852733205722,
+        "creditLimit": 3.094823432515821
+      },
+      {
+        "nation": "Ordan",
+        "treasury": 3714.9857774101756,
+        "debt": 0,
+        "receipts": 2.149372009218517,
+        "spending": 15.358218156031043,
+        "previousAppropriation": 39.67040781288998,
+        "replannedAppropriation": 39.315877766243986,
+        "scheduledDebtCash": 0,
+        "creditLimit": 22.018844764270526
+      },
+      {
+        "nation": "Illyra",
+        "treasury": 0.20458130280353484,
+        "debt": 6.072485870695025,
+        "receipts": 0.37703116362479405,
+        "spending": 0.38891126106878354,
+        "previousAppropriation": 0.21646140024752522,
+        "replannedAppropriation": 0.34807520521326907,
+        "scheduledDebtCash": 0.034410753267271804,
+        "creditLimit": 4.277009848631887
+      },
+      {
+        "nation": "Nordmark",
+        "treasury": 0.04691395123876247,
+        "debt": 0.9871712497731242,
+        "receipts": 0.057041430700215855,
+        "spending": 0.04992123870213976,
+        "previousAppropriation": 0.0397359299997314,
+        "replannedAppropriation": 0.05139074725537545,
+        "scheduledDebtCash": 0.005593970415381037,
+        "creditLimit": 0.6372108394973474
+      }
+    ]
+  },
+  "fiscalChanges": [
+    "Fund after current receipts rather than borrowing before taxes arrive",
+    "Taper stimulus by actual credit headroom",
+    "Reserve scheduled debt payments before public hiring",
+    "Cap the final funding base by collected receipts and deduct earlier public expenses"
+  ],
+  "destructiveRaids": {
+    "conduct": "raze",
+    "requires": [
+      "war",
+      "secure occupation",
+      "hold or entrench",
+      "supplied orderly unembarked troops",
+      "carried ammunition"
+    ],
+    "maximumMonthlyStockDamage": 0.25,
+    "conserved": ["people", "cash deposits", "financial claims"],
+    "lost": [
+      "housing capacity and fabric",
+      "merchant and firm fixed capital",
+      "unfinished capital",
+      "surveyed lanes and road upgrades",
+      "cancelled housing and urban construction"
+    ]
+  },
+  "targetedTests": {
+    "passed": 46,
+    "suites": [
+      "government-budget",
+      "destructive-raids",
+      "trade-interdiction",
+      "development-war",
+      "freight-visibility",
+      "renderer-placement"
+    ]
+  },
+  "build": "passed",
+  "format": "npm run format completed; all changed feature files pass Prettier check. Concurrent files changed during global checks.",
+  "browser": {
+    "fixture": "tests/browser/border-access.html",
+    "selectedOrder": "raze",
+    "selectedStance": "hold",
+    "desktop": "checked",
+    "mobileWidth": 390,
+    "mobileOverflow": false,
+    "consoleErrors": 0
+  },
+  "fullSuite": {
+    "status": "failed; remaining simulation.test.ts worker stopped after 21 minutes",
+    "baselineCommit": "53c2411",
+    "reproducedBaselineFailures": [
+      "paid housing construction",
+      "assertive frontier accounting",
+      "coarse frontier accounting",
+      "queued industrial investment",
+      "ordinary 480-month frontier growth",
+      "map geometry fingerprint",
+      "mathematics guide completeness",
+      "cabinet trajectory fingerprints"
+    ],
+    "permissionFailure": "autosave disk endpoint could not bind a local server",
+    "passed": 791,
+    "failed": 17,
+    "interruptedWorkers": 1,
+    "durationSeconds": 1636.186,
+    "permissionRetest": "autosave endpoint passed with local-port permission",
+    "failures": [
+      "✖ housing requires paid labor and real materials, and capacity appears only on completion (5381.700125ms)",
+      "✖ the disk endpoint requires same-origin writes and isolates browser save slots (53.605667ms)",
+      "✖ a more assertive frontier still pays for materials, relocates people and respects player control (5092.813417ms)",
+      "✖ coarse frontier reviews account for multiple scheduled decisions without adding resources (4618.723708ms)",
+      "✖ industrial investment is queued and unfunded capacity does not grow automatically (1143.391709ms)",
+      "✖ an ordinary frontier expands and produces a funded new state without injected resources (486266.820458ms)",
+      "✖ bounded map lookups retain exact coastline geometry and freight traversal order (1286.381708ms)",
+      "✖ world scale adds physical distance, connected provinces, independent states and a sparse navigable shipping network (15052.023083ms)",
+      "✖ one destination order embarks, sails and lands without manual fleet orders (1627.164084ms)",
+      "✖ every published guide equation renders with accessible MathML (87.687875ms)",
+      "✖ funded expedition preserves people, cash and cargo in transit and creates only a foothold (3343.477583ms)",
+      "✖ cancellation before embarkation restores all funding without moving families (3894.191125ms)",
+      "✖ funded expansion creates a within-cell parcel only after payment; capacity waits for construction (2778.647834ms)",
+      "✖ several centres in one pool can fund housing without duplicating projects or creating money (2474.22375ms)",
+      "✖ cabinet planning preserves deterministic settled/frontier monthly and coarse checkpoints (35378.692166ms)",
+      "✖ tests/simulation.test.ts (1292420.447459ms)",
+      "✖ lean residential display records preserve every recorded capacity and town description (47707.663542ms)"
+    ]
+  },
+  "refinement": [
+    "Separated budget calculation and shared loan schedule from funding; kept fixed-asset destruction separate from money/cargo transfers",
+    "Reviewed each changed function; extracted force pooling, production, buildings and roads",
+    "One loan-book pass per budget phase, at most one refresh after lending; one asset scan per active raid phase; idle raid path never scans sites or ledgers",
+    "Documented economic rationale, damage/splitting invariants and debt cash versus expense; applied repository formatting"
+  ],
+  "limits": [
+    "No live autosave was modified",
+    "Budget comparison is a copied-save planning check, not a long-run solvency forecast",
+    "Existing debt is retained; military commitments and later expenses can still consume cash",
+    "The 100-year simulation test is not qualified; its worker was stopped after over 20 minutes. The full shared checkout is not green."
+  ],
+  "commitVerification": {
+    "baseCommit": "dba41ead007c6c3cb146e516a9e1f12866854afc",
+    "scope": "Isolated HEAD snapshot with only the 25 scoped files/hunks, excluding concurrent maritime and settlement changes",
+    "build": "passed",
+    "focusedTests": 46,
+    "focusedFailures": 0
+  }
+}

@@ -5,6 +5,7 @@ import { competitivePressure } from './competitive-pressure'
 import { parameterGroup } from './configuration-context'
 import { decisionPolicy } from './decision-policy'
 import { activeDevelopment } from './development'
+import { developmentBudget, developmentCreditLimit, governmentDebtPayments } from './government-budget'
 import { archiveRetiredDistricts } from './districts'
 import { STRATA, type EconomicStratum } from './economic-types'
 import { BASE_PRICE, foodEquivalentPeople, householdNeed } from './economy'
@@ -349,6 +350,7 @@ export function consumeHouseholds(w: World) {
 export function fundGovernment(w: World) {
   const e = ensureEconomy(w),
     territory = territorialIndex(w)
+  let debtPayments = governmentDebtPayments(w)
   const unitsByNation = new Map<number, Region[]>()
   for (const unit of economicRegions(w)) {
     if (w.regions[provinceId(unit)].control) continue
@@ -356,6 +358,37 @@ export function fundGovernment(w: World) {
     if (!units) unitsByNation.set(unit.nation, (units = []))
     units.push(unit)
   }
+  let borrowed = false
+  for (const n of w.nations) {
+    const plan = activeDevelopment(w, n)
+    if (!plan || !unitsByNation.has(n.id)) continue
+    // Falling receipts must constrain spending now, not after the revenue average
+    // catches up. Earlier naval/farm spending has already used part of this budget.
+    const revenue = Math.min(plan.revenue, Math.max(0, n.income) / simulationMonths())
+    const limit = developmentCreditLimit(w, revenue)
+    plan.appropriation = Math.max(
+      0,
+      Math.min(
+        plan.appropriation,
+        developmentBudget(
+          revenue,
+          n.treasury,
+          n.debt,
+          limit,
+          debtPayments.get(n.id) ?? 0,
+          e.national[n.id]?.unemployment ?? 0,
+        ),
+      ) - n.spending,
+    )
+    const shortfall = plan.appropriation + (debtPayments.get(n.id) ?? 0) - n.treasury
+    if (shortfall <= 0) continue
+    const funded = borrow(w, governmentAccount(n.id), shortfall, limit)
+    plan.borrowed += funded
+    borrowed ||= funded > 0
+  }
+  // New principal also owes service this period. Reprice once after all funding,
+  // including weighted fixed-rate top-ups, rather than estimating a second rule.
+  if (borrowed) debtPayments = governmentDebtPayments(w)
   for (const n of w.nations) {
     const own = unitsByNation.get(n.id) ?? [],
       people = own.reduce((sum, r) => sum + population(r), 0)
@@ -370,6 +403,7 @@ export function fundGovernment(w: World) {
         Math.max(0, n.treasury - (n.income * 12) / simulationMonths()) * periodRate(0.02)
     if (!plan && n.treasury < intended)
       borrow(w, governmentAccount(n.id), intended - n.treasury, Math.max(1000, n.gdp * 24))
+    const protectedCash = plan ? (debtPayments.get(n.id) ?? 0) : 0
     const expansion = expansionParameters()
     const compete =
       n.ai &&
@@ -381,7 +415,7 @@ export function fundGovernment(w: World) {
     const frontier = territory.bordering(-1, n.id)
     const savings = frontier && compete ? expansion.savingShare * compete.urgency : 0
     const development = compete ? expansion.developmentShare * (compete.urgency + compete.peer) : 0
-    const available = Math.min(n.treasury, intended) * (1 - savings),
+    const available = Math.min(Math.max(0, n.treasury - protectedCash), intended) * (1 - savings),
       weights = {
         welfare: n.policies.welfare,
         education: n.policies.education + development * 12,

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWorld } from '../src/sim/generate'
 import { applyCommand, summarize } from '../src/sim/engine'
-import { beginEconomyMonth } from '../src/sim/macroeconomy'
+import { beginEconomyMonth, fundGovernment } from '../src/sim/macroeconomy'
 import { cabinetResearchFocus } from '../src/sim/cabinet-policy'
 import { advanceDevelopment, recordDevelopment } from '../src/sim/development'
 import {
@@ -254,6 +254,8 @@ test('development programs persist for five years and borrow only within current
       w.regions.filter((r) => r.nation === n.id),
     ),
   )
+  assert.equal(n.debt, 0, 'planning must wait for tax receipts before taking a loan')
+  fundGovernment(w)
   assert(n.debt > 0 && n.debt <= 72)
   const plan = n.development,
     borrowed = plan.borrowed

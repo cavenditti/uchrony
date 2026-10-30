@@ -26,6 +26,19 @@ export function validateGeopolitics(w: World) {
         c.spoils < 0)
     )
       fail()
+    const raid = c?.destruction
+    if (
+      raid !== undefined &&
+      (!raid ||
+        !integer(raid.month, 0, w.month) ||
+        ['housing', 'capital', 'buildings', 'roads'].some((key) => {
+          const value = raid[key as 'housing']
+          return typeof value !== 'number' || !Number.isFinite(value) || value < 0
+        }) ||
+        !integer(raid.buildings) ||
+        !integer(raid.roads))
+    )
+      fail()
     const o = r.occupation
     if (
       o !== undefined &&

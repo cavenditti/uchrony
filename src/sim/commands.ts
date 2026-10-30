@@ -378,7 +378,7 @@ const COMMAND_HANDLERS = {
     if (
       !army ||
       !['march', 'hold', 'entrench'].includes(command.stance) ||
-      !['restrained', 'requisition', 'pillage', 'raid'].includes(command.conduct)
+      !['restrained', 'requisition', 'pillage', 'raid', 'raze'].includes(command.conduct)
     )
       throw new Error('Choose a valid army stance and civilian conduct.')
     army.operations!.stance = command.stance

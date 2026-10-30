@@ -9,7 +9,7 @@ export interface ArmyOperations {
   entrenchment: number
   progress: number
   stance: 'march' | 'hold' | 'entrench'
-  conduct: 'restrained' | 'requisition' | 'pillage' | 'raid'
+  conduct: 'restrained' | 'requisition' | 'pillage' | 'raid' | 'raze'
   /** Temporary access permits a three-month visit, not an indefinite garrison. */
   foreignStay?: { host: number; months: number }
   isolated: number

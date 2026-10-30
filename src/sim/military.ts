@@ -3,6 +3,7 @@ import { cabinetOrderReserved } from './cabinet-state'
 import { diplomaticAccessView } from './agreements'
 import { corridorProfile, corridorUsage } from './corridors'
 import { decisionPolicy, domesticMonthlyWage } from './decision-policy'
+import { advanceDestructiveRaids } from './destructive-raids'
 import { BASE_PRICE, pathTo, shortestPaths, transportGraph } from './economy'
 import { effectMultiplier } from './effects'
 import { allForces, unitLoyalty } from './forces'
@@ -594,4 +595,5 @@ export function advanceArmies(w: World) {
   }
   w.armies = w.armies.filter((a) => a.soldiers > 0)
   maintainControl(w)
+  advanceDestructiveRaids(w)
 }

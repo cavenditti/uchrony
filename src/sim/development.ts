@@ -3,7 +3,7 @@ import { cabinetOrderReserved } from './cabinet-state'
 import { nativeDomesticControl } from './domestic-policy'
 import { decisionPolicy } from './decision-policy'
 import { economicRegions, provinceId } from './local-units'
-import { governmentAccount, borrow } from './ledger'
+import { developmentBudget, developmentCreditLimit, governmentDebtPayments } from './government-budget'
 import { recordWorldEvent } from './event-memory'
 import { simulationMonths, periodRate, crossedPeriodMonth } from './simulation-period'
 import { clamp, population, type Nation, type Research, type World } from './types'
@@ -25,6 +25,7 @@ export interface DevelopmentPlan {
 export function advanceDevelopment(w: World) {
   if (!decisionPolicy().development) return
   const units = economicRegions(w)
+  const payments = governmentDebtPayments(w)
   for (const n of w.nations) {
     if (!nativeDomesticControl(w, n)) continue
     const own = units.filter((r) => r.nation === n.id && !w.regions[provinceId(r)].control)
@@ -85,20 +86,21 @@ export function advanceDevelopment(w: World) {
             Object.values(w.economy!.households[r.id]).reduce((s, h) => s + h.laborForce, 0),
         0,
       ) / months
-    const revenue = Math.max(p.revenue, ((payroll * n.policies.tax) / 100) * 0.35)
-    const rate = (w.economy?.banking?.centralBank.rate ?? 0.002) + 0.002 + 1 / 240
-    const limit = Math.min(revenue * 36, (revenue * 0.2) / Math.max(0.001, rate))
-    const debtPressure = n.debt / Math.max(1e-9, revenue * 24)
-    const reserve = revenue * 6
+    // Payroll is only a bootstrap estimate. Once receipts have been observed,
+    // hypothetical full employment must not overrule the actual tax base.
+    const revenue = p.revenue > 0 || w.month > 1 ? p.revenue : ((payroll * n.policies.tax) / 100) * 0.35
+    const limit = developmentCreditLimit(w, revenue)
     const unemployment = w.economy?.national[n.id]?.unemployment ?? 0
-    const recovery = clamp((unemployment - 0.06) / 0.2) * 0.5
-    const budget =
-      (revenue * (debtPressure < 1 ? 1.15 + recovery : 0.8) + Math.max(0, n.treasury - reserve) * 0.01) *
-      months
-    // Borrow only against a current tax base, with bank capital and servicing limits.
-    if (n.treasury < budget && n.debt < limit)
-      p.borrowed += borrow(w, governmentAccount(n.id), budget - n.treasury, limit)
-    p.appropriation = Math.min(n.treasury, budget)
+    p.appropriation = developmentBudget(
+      revenue,
+      n.treasury,
+      n.debt,
+      limit,
+      payments.get(n.id) ?? 0,
+      unemployment,
+    )
+    // Funding waits until taxes have cleared. Borrowing here, before this month's
+    // receipts, would turn an ordinary cash-timing gap into unnecessary new debt.
   }
 }
 

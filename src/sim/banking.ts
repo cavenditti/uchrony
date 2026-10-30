@@ -299,6 +299,26 @@ export function resolveBank(w: World, bank: Bank) {
   }
   bank.resolutions++
 }
+/** Quote the same period obligations used by settlement, including a reset due now.
+ * Budget planners must reserve principal as cash even though it is not an expense. */
+export function scheduledLoanPayments(w: World, loan: Loan) {
+  const policyRate = w.economy?.banking?.centralBank.rate ?? P.policyRateMonthly
+  const rate =
+    loan.rateType === 'floating' && w.month >= loan.nextReset!
+      ? policyRate + loan.spread!
+      : (loan.rate ?? policyRate + P.bankLoanSpread)
+  return {
+    interest: loan.principal * periodInterest(rate),
+    principal:
+      loan.principal *
+      periodRate(
+        loan.borrower.startsWith('government:') && decisionPolicy().development
+          ? 1 / 240
+          : P.creditRepaymentMonthly,
+      ),
+  }
+}
+
 export function settleBanks(w: World) {
   const e = ensureEconomy(w),
     b = ensureBanking(w)
@@ -308,18 +328,10 @@ export function settleBanks(w: World) {
       loan.rate = b.centralBank.rate + loan.spread!
       loan.nextReset = w.month + loan.resetMonths!
     }
-    const due = loan.principal * periodInterest(loan.rate ?? b.centralBank.rate + P.bankLoanSpread)
+    const scheduled = scheduledLoanPayments(w, loan)
+    const due = scheduled.interest
     const interest = payBank(w, loan.borrower, loan.bank!, due, 'bank loan interest', true)
-    const principal = payBank(
-      w,
-      loan.borrower,
-      loan.bank!,
-      loan.principal *
-        periodRate(
-          address.kind === 'government' && decisionPolicy().development ? 1 / 240 : P.creditRepaymentMonthly,
-        ),
-      'bank loan principal',
-    )
+    const principal = payBank(w, loan.borrower, loan.bank!, scheduled.principal, 'bank loan principal')
     loan.principal -= principal
     loan.arrears = interest + 1e-8 < due ? loan.arrears + simulationMonths() : 0
     if (address.kind === 'firm') e.firms![address.id].interest += interest

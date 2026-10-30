@@ -13,6 +13,8 @@ export interface MilitaryControl {
   since: number
   lastPillage: number
   spoils: number
+  /** Latest physical raid doubles as the once-per-province monthly guard. */
+  destruction?: { month: number; housing: number; capital: number; buildings: number; roads: number }
 }
 export const controller = (w: World, region: number) =>
   w.regions[region].control?.nation ?? w.regions[region].nation

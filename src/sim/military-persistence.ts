@@ -111,7 +111,7 @@ export function validateWarfare(
       !integer(o.isolated) ||
       !integer(o.disorder) ||
       !['march', 'hold', 'entrench'].includes(o.stance) ||
-      !['restrained', 'requisition', 'pillage', 'raid'].includes(o.conduct) ||
+      !['restrained', 'requisition', 'pillage', 'raid', 'raze'].includes(o.conduct) ||
       !visit(o.foreignStay) ||
       !(o.source === null || region(o.source)) ||
       !Array.isArray(o.line) ||

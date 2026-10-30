@@ -7,7 +7,8 @@ import type { World } from '../sim/types'
 import { roadSurface, type RoadSurface } from '../sim/transport-development'
 import { reliefRandom } from './relief-field'
 import { illuminated } from './illuminated-palette'
-import { tradeRoadEdges, type RoadPoint } from './road-curves'
+import { tradeRoadEdges, roadKey, type RoadPoint } from './road-curves'
+import { currentFreightVolumeView } from '../sim/freight-access'
 import { footprint, landSurface, renderedLand } from './land-surface'
 
 export type DetailShape = 'box' | 'roof' | 'cone' | 'cylinder' | 'crown' | 'conifer' | 'sheep'
@@ -47,6 +48,7 @@ export interface DetailRoad {
   b: number
   surface: RoadSurface
   points: RoadPoint[]
+  traffic: boolean
 }
 
 /** Detailed props are stateless conditional samples. Their identity depends on
@@ -426,7 +428,7 @@ export function activityLayout(
         phase: random(i + 901) * 6,
       })
   for (const road of roads)
-    if (road.a === id && w.cells[road.b]) {
+    if (road.traffic && road.a === id && w.cells[road.b]) {
       const a = w.cells[road.a],
         b = w.cells[road.b],
         turn = Math.atan2(b.x - a.x, b.y - a.y)
@@ -449,10 +451,20 @@ export function distanceTo(x: number, z: number, ax: number, az: number, bx: num
 }
 
 export function detailRoads(w: World): DetailRoad[] {
+  // Remembered roads remain physical infrastructure. Only current open cargo
+  // justifies moving carts; stale familiarity or last month's traffic does not.
+  const active = new Set<string>(),
+    volume = currentFreightVolumeView(w)
+  for (const route of w.routes)
+    if (volume(route) > 0)
+      for (const leg of route.legs ?? [])
+        if (leg.mode === 'land')
+          for (let i = 1; i < leg.cells.length; i++) active.add(roadKey(leg.cells[i - 1], leg.cells[i]))
   return [...tradeRoadEdges(w).values()].map(({ a, b, points }) => ({
     a,
     b,
     points,
     surface: roadSurface(w, a, b),
+    traffic: active.has(roadKey(a, b)),
   }))
 }

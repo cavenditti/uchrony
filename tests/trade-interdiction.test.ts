@@ -16,6 +16,8 @@ import { arriveFreight } from '../src/sim/freight-transit'
 import { setBorderPolicy } from '../src/sim/border-policy'
 import { inventory, relation, type RouteLeg } from '../src/sim/types'
 import { rebaseEndowments } from './fixtures/endowment'
+import { completedFreight } from './fixtures/corridors'
+import { currentFreightVolumeView } from '../src/sim/freight-access'
 
 function navalWorld() {
   const w = generateWorld('naval interdiction', 3, 4),
@@ -54,9 +56,15 @@ test('a supplied port blockade closes neutral trade and military entry, while re
   assert.equal(portBlockadeView(w)(neutral, target.region), 0)
   assert.equal(seaPassageView(w)(neutral, legs), 0)
   assert(!friendlyPort(w, neutral, target.region))
+  const shipment = completedFreight(
+    { from: w.regions.find((r) => r.nation === neutral)!.id, to: target.region, legs },
+    100,
+  )
+  assert.equal(currentFreightVolumeView(w)(shipment), 0, 'a new blockade hides previously recorded cargo')
   fleet.supply = 0
   w.warfare!.revision++
   assert.equal(seaPassageView(w)(neutral, legs), 1)
+  assert.equal(currentFreightVolumeView(w)(shipment), 100, 'a lifted blockade restores the live display')
   fleet.supply = 1
   const reachable = fleetReach(w, fleet)
   fleet.cell = w.cells.find((c) => c.terrain === 'water' && !reachable.has(c.id))!.id

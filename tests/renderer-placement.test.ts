@@ -12,6 +12,7 @@ import { groundRoads } from '../src/map/ground-roads'
 import { TerrainPicker } from '../src/map/relief-picking'
 import { ActivityScenery } from '../src/map/activity-scenery'
 import { CityScenery } from '../src/map/city-scenery'
+import { completedFreight } from './fixtures/corridors'
 
 function fixture(water: (q: number, r: number) => boolean = (q) => q >= 10) {
   const width = 16,
@@ -128,6 +129,7 @@ test('carts follow the painted bend and face travel, without creating traffic on
   const { world, land } = fixture()
   const path = [66, 67, 68, 84, 100, 101]
   world.corridors = path.slice(1).map((b, i) => ({ a: path[i], b, familiarity: 1, traffic: 10 }))
+  world.routes = [completedFreight({ from: 0, to: 0, legs: [{ mode: 'land', cells: path }] }, 10)]
   const roads = detailRoads(world),
     painted = groundRoads(world)
   assert.equal(roads.length, painted.length)
@@ -159,6 +161,9 @@ test('carts follow the painted bend and face travel, without creating traffic on
     }
   }
   assert(bends > 0, 'the regression actually exercises curved segments')
+  world.routes = []
+  for (const road of detailRoads(world))
+    assert(!activityLayout(world, land, road.a, [road]).motions.some((m) => m.kind === 'cart'))
   world.corridors = []
   world.corridorPlan = { links: [{ legs: [{ mode: 'land', cells: path }] }] } as World['corridorPlan']
   assert.equal(detailRoads(world).length, 0)

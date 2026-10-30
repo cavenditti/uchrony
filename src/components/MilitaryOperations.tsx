@@ -22,6 +22,7 @@ export function ArmyLogistics({
   if (!o) return null
   const fleet = world.warfare?.fleets.find((f) => f.id === o.embarkedOn)
   const held = world.regions[a.region].control?.nation === a.nation
+  const destruction = held ? world.regions[a.region].control?.destruction : undefined
   const annexation = held ? annexationObstacle(world, a.nation, a.region) : ''
   const available =
     world.warfare?.fleets.filter(
@@ -110,6 +111,7 @@ export function ArmyLogistics({
           <option value="requisition">Requisition when provision fails</option>
           <option value="pillage">Pillage occupied enemy territory</option>
           <option value="raid">Sack hostile trade routes nearby</option>
+          <option value="raze">Raid cities, roads and production facilities</option>
         </select>
       </label>
       {o.conduct === 'requisition' && (
@@ -119,6 +121,20 @@ export function ArmyLogistics({
         <p className="panel-note">
           Intercept hostile cargo crossing this province. Capture provisions and ammunition within carrying
           limits; destroy other intercepted goods. Enemy guards reduce the raid.
+        </p>
+      )}
+      {o.conduct === 'raze' && (
+        <p className="panel-note">
+          Hold or entrench in a securely occupied enemy province to destroy housing, productive capital and
+          roads over successive months. Requires supply and ammunition. Construction is lost; residents lose
+          housing and local opposition rises.
+        </p>
+      )}
+      {destruction && (
+        <p className="panel-note">
+          Last destructive raid (month {destruction.month}): {count(destruction.housing)} housing spaces lost,{' '}
+          {destruction.capital.toFixed(3)} productive capital lost; {destruction.buildings} buildings and{' '}
+          {destruction.roads} road segments demolished.
         </p>
       )}
       {o.foreignStay && (
