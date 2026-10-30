@@ -1,5 +1,7 @@
 /** Action menus are individually executable quotes, never promises that an
  * entire list can be purchased together. Execution revalidates changed worlds. */
+import { cabinetCrown, capitulationOptions } from './sovereign-strategy'
+import { diplomaticInfluence, dependencyOf } from './state-dependencies'
 import { withWorldConfiguration } from './configuration'
 import { foundingOptions } from './founding'
 import { PUBLIC_WORKS, publicWorkQuote, publicWorkValue } from './public-works'
@@ -14,6 +16,32 @@ export function statecraftAffordances(w: World, nation: number) {
       own = w.regions.filter((r) => r.nation === nation && !r.control)
     return {
       quotedMonth: w.month,
+      crown: cabinetCrown(w, nation),
+      dependency: dependencyOf(w, nation),
+      capitulations: w.relations
+        .filter((r) => r.treaty === 'war' && [r.a, r.b].includes(nation))
+        .flatMap((r) => {
+          const target = r.a === nation ? r.b : r.a
+          const options = capitulationOptions(w, nation, target)
+          const outcomes = options.filter((option) => option.available).map((option) => option.outcome)
+          return outcomes.length
+            ? [
+                {
+                  nation: target,
+                  outcomes,
+                  options,
+                  notice:
+                    'Complete military defeat permits the victor to impose these terms without the defeated government’s signature.',
+                },
+              ]
+            : []
+        }),
+      royalTies: (w.dynasties?.marriages ?? [])
+        .filter((m) => [m.a, m.b].includes(nation))
+        .map((m) => {
+          const other = m.a === nation ? m.b : m.a
+          return { nation: other, since: m.since, influence: diplomaticInfluence(w, nation, other) }
+        }),
       notice:
         'Each option is affordable separately. Orders execute in sequence and are checked again; founding targets are cell IDs, other targets are province IDs.',
       canRecruitIn: own

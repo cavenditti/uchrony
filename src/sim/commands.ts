@@ -1,3 +1,5 @@
+import { imposeCapitulation } from './capitulation'
+import { proposeRoyalAgreement } from './royal-diplomacy'
 import { recordWorldArchive } from './world-archive'
 import { reconcileInstitutions } from './institution-lifecycle'
 import { respondToInstitutionDefense } from './institution-defense'
@@ -109,6 +111,35 @@ function applyCommandConfigured(w: World, command: Command): string {
 
 /** Exhaustive dispatch keeps each command's narrowed payload with its handler. */
 const COMMAND_HANDLERS = {
+  capitulate: (w, command) =>
+    imposeCapitulation(w, command.nation, command.target, command.outcome, command.indemnity),
+  'royal-proposal': (w, command) => {
+    if (!['royal-marriage', 'personal-union'].includes(command.kind))
+      throw new Error('Choose a supported royal agreement.')
+    const offer = proposeRoyalAgreement(w, command.nation, command.target, command.kind, true)
+    return offer
+      ? 'Royal terms dispatched. Both governments must sign before the agreement takes effect.'
+      : foreignOfficeContext(w, command.nation).notice
+  },
+  'royal-answer': (w, command) => {
+    const offer = w.statecraft?.offers.find(
+      (o) =>
+        o.id === command.offer &&
+        o.status === 'proposed' &&
+        o.parties.includes(command.nation) &&
+        o.terms.some((t) => t.kind === 'royal-marriage' || t.kind === 'personal-union'),
+    )
+    if (!offer) throw new Error('Choose a pending royal agreement addressed to this government.')
+    if (!command.accept) {
+      offer.status = 'rejected'
+      w.statecraft!.revision++
+      return 'Royal agreement declined.'
+    }
+    if (!admitDiplomaticConsent(w, command.nation, offer))
+      return foreignOfficeContext(w, command.nation).notice
+    settleConventionalOffers(w)
+    return 'Royal terms signed. They take effect after diplomatic preparation and the final eligibility check.'
+  },
   annex: (w, command) => {
     return annexProvince(w, command.nation, command.region)
   },

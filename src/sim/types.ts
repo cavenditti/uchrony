@@ -252,6 +252,8 @@ export interface HistoryPoint {
   nations: { id: number; population: number; gdp: number; territory: number; treasury: number }[]
 }
 export interface World {
+  dependencies?: import('./state-dependencies').StateDependency[]
+  dynasties?: import('./dynasties').DynasticState
   archive?: import('./world-archive').WorldArchive
   influence?: import('./influence').InfluenceState
   /** Persistent provenance; coarse history remains approximate after returning to monthly play. */
@@ -340,6 +342,15 @@ export interface World {
   }
 }
 export type Command =
+  | {
+      type: 'capitulate'
+      nation: number
+      target: number
+      outcome: import('./capitulation').CapitulationOutcome
+      indemnity: number
+    }
+  | { type: 'royal-proposal'; nation: number; target: number; kind: import('./dynasties').RoyalAgreement }
+  | { type: 'royal-answer'; nation: number; offer: number; accept: boolean }
   | { type: 'annex'; nation: number; region: number }
   | { type: 'peace-proposal'; nation: number; target: number; payer: number; payment: number; cede: number[] }
   | { type: 'peace-answer'; nation: number; offer: number; accept: boolean }

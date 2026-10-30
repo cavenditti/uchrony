@@ -1,3 +1,4 @@
+import { settleStateEstate } from './state-succession'
 import { domesticMonthlyWage } from './decision-policy'
 import { recordWorldEvent } from './event-memory'
 import { recordMilitaryInfluence } from './influence'
@@ -102,6 +103,7 @@ export function annexProvince(w: World, nation: number, region: number) {
       const next = w.regions.filter((p) => p.nation === n.id).sort((a, b) => population(b) - population(a))[0]
       if (next) n.capital = next.id
     }
+  if (!w.regions.some((p) => p.nation === former)) settleStateEstate(w, former, nation, 'demobilize')
   recordWorldEvent(w, {
     id: w.nextEvent++,
     month: w.month,

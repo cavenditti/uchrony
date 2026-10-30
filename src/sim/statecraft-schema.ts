@@ -54,6 +54,8 @@ const clauseProperties = {
     'guarantee',
     'cede',
     'merge',
+    'royal-marriage',
+    'personal-union',
     'create',
     'research',
     'custom',

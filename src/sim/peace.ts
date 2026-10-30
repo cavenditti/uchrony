@@ -1,3 +1,4 @@
+import { capitulationObstacle } from './capitulation'
 import { relation, population, type World } from './types'
 import type { DiplomaticClause, DiplomaticOffer, StateAgentPlan } from './statecraft-types'
 import { nativeDomesticControl } from './domestic-policy'
@@ -111,6 +112,7 @@ export function proposePeace(
 export function advancePeaceNegotiations(w: World) {
   for (const rel of w.relations) {
     if (rel.treaty !== 'war') continue
+    if (!capitulationObstacle(w, rel.a, rel.b) || !capitulationObstacle(w, rel.b, rel.a)) continue
     const pair = [rel.a, rel.b]
     let offer = w.statecraft?.offers.find(
       (p) =>

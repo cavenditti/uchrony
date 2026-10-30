@@ -1,3 +1,4 @@
+import { validateDynasticState } from './dynastic-persistence'
 import { validateWorldArchive } from './world-archive'
 import { MAX_SAVE_BYTES } from '../storage/save-types'
 import { validateAdaptiveWorld } from './adaptive-persistence'
@@ -540,6 +541,7 @@ function validateConfiguredWorld(value: unknown, allowDuplicateCommunities = fal
       if (e.historical.causeEvent >= e.id) fail('historical cause must precede its consequence')
     }
   }
+  validateDynasticState(w)
   validateInstitutions(w)
   validateWorldArchive(w)
   validateIntelligence(w)

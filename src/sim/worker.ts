@@ -544,6 +544,10 @@ function schedule() {
           offers: context.offers.map((offer) => offer.id),
           leaderGeneration: context.character?.leader.generation,
           advice: context.adviser.pending.map((note) => note.id),
+          capitulations: context.affordances.capitulations.map(({ nation, outcomes }) => ({
+            nation,
+            outcomes,
+          })),
         }),
     )
   }

@@ -1,6 +1,7 @@
 import { population, type World } from './types'
-import type { DiplomaticOffer } from './statecraft-types'
+import type { DiplomaticOffer, DiplomaticClause } from './statecraft-types'
 import { intelligenceService, perceivedPower, knownRelation } from './intelligence'
+import { acceptsRoyalAgreement, type RoyalAgreement } from './dynasties'
 
 export function effectiveForce(world: World, nation: number) {
   return world.armies
@@ -10,10 +11,20 @@ export function effectiveForce(world: World, nation: number) {
       0,
     )
 }
+/** Constitutional concessions matter even without ceding a province. Native
+ * willingness is advice to the cabinet, never a substitute for its signature. */
 export function sovereigntyAssessment(world: World, nation: number, offer: DiplomaticOffer) {
   const n = world.nations[nation],
     own = world.regions.filter((r) => r.nation === nation),
     merges = offer.terms.filter((t) => t.kind === 'merge' && t.from === nation),
+    royalTerms = offer.terms.filter(
+      (t): t is DiplomaticClause & { kind: RoyalAgreement } =>
+        (t.kind === 'personal-union' || t.kind === 'royal-marriage') &&
+        (t.from === nation || t.to === nation),
+    ),
+    personalUnion = royalTerms.some((t) => t.kind === 'personal-union'),
+    juniorUnion = royalTerms.some((t) => t.kind === 'personal-union' && t.to === nation),
+    royalConsent = royalTerms.every((t) => acceptsRoyalAgreement(world, nation, t.kind, t.from, t.to)),
     lost = new Set(
       merges.length
         ? own.map((r) => r.id)
@@ -41,8 +52,11 @@ export function sovereigntyAssessment(world: World, nation: number, offer: Diplo
       .map((r) => (r.a === nation ? r.b : r.a)),
     force = effectiveForce(world, nation),
     strongest = Math.max(0, ...enemies.map((id) => perceivedPower(world, nation, id))),
-    occupied = world.regions.filter((r) => (r.occupation?.former === nation && r.nation !== nation) ||
-      (r.nation === nation && r.control && r.control.nation !== nation)).length,
+    occupied = world.regions.filter(
+      (r) =>
+        (r.occupation?.former === nation && r.nation !== nation) ||
+        (r.nation === nation && r.control && r.control.nation !== nation),
+    ).length,
     defeated =
       enemies.length > 0 &&
       (strongest > Math.max(200, force) * 1.8 ||
@@ -78,24 +92,33 @@ export function sovereigntyAssessment(world: World, nation: number, offer: Diplo
     fairPrice = compensation >= output * 36,
     separatist =
       provinces.length > 0 && provinces.every((r) => r.unrest > 75) && n.stability < 35 && force < 1000,
-    acceptable = !lost.size || defeated || union || (!costly && fairPrice) || (separatist && fairPrice)
+    acceptable =
+      royalConsent && (!lost.size || defeated || union || (!costly && fairPrice) || (separatist && fairPrice))
   return {
     acceptable,
     populationShare: share,
     capitalAtStake: capital,
     endsSovereignty: merges.length > 0,
+    delegatesForeignPolicy: juniorUnion,
+    changesRuler: juniorUnion,
+    retainsSeparateAccounts: personalUnion,
+    royalConsent,
     compensation,
     referenceValue: output * 36,
     militaryDefeat: defeated,
     domesticUnionMandate: union,
-    reasoning: !lost.size
-      ? 'No territorial authority is surrendered.'
-      : defeated
-        ? 'A credible military defeat can justify painful territorial concessions.'
-        : union
-          ? 'A shared constituency and institutional mandate can support political union.'
-          : acceptable
-            ? 'A limited, compensated territorial settlement is within the government’s mandate.'
-            : 'The governing coalition and affected constituencies oppose surrendering core territory or independence without a credible defeat, adequate compensation for a limited sale, or a genuine mandate for political union.',
+    reasoning: juniorUnion
+      ? `Becoming the junior crown replaces this state's ruler and delegates offensive foreign policy while retaining its treasury, debt, laws and forces. ${royalConsent ? 'Current native consent conditions support the bargain; an explicit signature remains necessary.' : 'Current royal eligibility or native consent conditions do not support accession.'}`
+      : royalTerms.length
+        ? `Royal commitments require explicit consent and diplomatic preparation. ${royalConsent ? 'Current native consent conditions support the proposed terms.' : 'Current royal eligibility or native consent conditions do not support these terms.'}`
+        : !lost.size
+          ? 'No territorial authority is surrendered.'
+          : defeated
+            ? 'A credible military defeat can justify painful territorial concessions.'
+            : union
+              ? 'A shared constituency and institutional mandate can support political union.'
+              : acceptable
+                ? 'A limited, compensated territorial settlement is within the government’s mandate.'
+                : 'The governing coalition and affected constituencies oppose surrendering core territory or independence without a credible defeat, adequate compensation for a limited sale, or a genuine mandate for political union.',
   }
 }

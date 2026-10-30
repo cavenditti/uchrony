@@ -1,3 +1,5 @@
+import { advanceDynasties } from './dynasties'
+import { advanceDependencies } from './state-dependencies'
 import { recordWorldArchive } from './world-archive'
 import { reconcileInstitutions } from './institution-lifecycle'
 /** Monthly orchestration: local books and cohorts settle before provincial political
@@ -379,6 +381,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
   worldEvents(w)
   advanceHistory(w)
   advancePressures(w)
+  advanceDynasties(w)
   advanceCharacters(w)
   if (w.statecraft) advanceStatecraft(w)
   advanceCabinet(w)
@@ -419,6 +422,7 @@ function advanceMonth(w: World, detail: TickDetail, prepared = false): World {
     reinforceArmies(w)
   }
   advanceSovereignty(w)
+  advanceDependencies(w)
   // Enclosed land has no accession waiting period or independent charter race.
   absorbUnclaimedEnclaves(w)
   advanceFrontierPolitics(w)

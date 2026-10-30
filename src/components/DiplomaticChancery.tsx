@@ -20,6 +20,10 @@ function describe(world: World, term: DiplomaticClause) {
       return `${from} supplies ${to} ${term.amount.toLocaleString()} t of ${term.good} monthly${duration}, subject to actual carriage.`
     case 'cede':
       return `${from} transfers ${places} to ${to}.`
+    case 'royal-marriage':
+      return `${from} and ${to} join their royal houses by marriage.`
+    case 'personal-union':
+      return `${to} shares ${from}’s ruler while retaining separate territory and accounts.`
     case 'merge':
       return `${from} merges into ${to}${term.text ? ` as ${term.text}` : ''}.`
     case 'create':
@@ -214,7 +218,9 @@ export function DiplomaticChancery({
               {dateLabel({ month: offer.notBefore, startYear: world.startYear })}, subject to consent.
             </p>
           )}
-          {offer.status === 'proposed' && offer.nativeReview && <p className="panel-note">{offer.nativeReview}</p>}
+          {offer.status === 'proposed' && offer.nativeReview && (
+            <p className="panel-note">{offer.nativeReview}</p>
+          )}
           {!!offer.supersedes && (
             <p className="agreement-relationship">
               Revises <AgreementReference {...referenceProps} id={offer.supersedes} />

@@ -2,6 +2,7 @@ import { supplierDebt } from '../sim/supplier-credit'
 import { DistrictEconomies } from './DistrictEconomies'
 import { spatialState } from '../sim/spatial'
 import { MacroAccounts } from './EconomicAccounts'
+import { SovereignRelations } from './SovereignRelations'
 import { PeaceNegotiation } from './PeaceNegotiation'
 import { StateAdvisor } from './StateAdvisor'
 import { StateSecurity } from './StateSecurity'
@@ -867,6 +868,13 @@ export function Inspector({
                     <b>{Math.round(targetRel.warExhaustion)}</b>
                   </div>
                 )}
+                <SovereignRelations
+                  key={`sovereignty:${n.id}:${target.id}`}
+                  world={w}
+                  nation={n.id}
+                  target={target.id}
+                  command={command}
+                />
                 {targetRel.treaty === 'war' && (
                   <PeaceNegotiation
                     key={`${n.id}:${target.id}`}

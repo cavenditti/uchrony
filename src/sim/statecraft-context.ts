@@ -2,6 +2,7 @@
  * The referee projection separately includes evidence needed to validate settlement. */
 import { advisorContext } from './advisors'
 import { statecraftAffordances } from './statecraft-affordances'
+import { sovereignStrategyContext } from './sovereign-strategy'
 import { agreementReference, agreementReferenceIndex } from './agreement-references'
 import { currentAgreements } from './agreements'
 import { strategicPressures } from './ambitions'
@@ -68,6 +69,7 @@ export function stateAgentContext(world: World, nation: number, strategic: boole
     foreignOffice: foreignOfficeContext(world, nation),
     institutions: visibleInstitutions(world, nation),
     strategicLandscape: strategicPressures(world, n),
+    sovereignStrategy: sovereignStrategyContext(world, nation),
     government,
     affordances: statecraftAffordances(world, nation),
     supplierCompensation: {
@@ -232,6 +234,8 @@ export function refereeContext(world: World, offers: DiplomaticOffer[]) {
       armies: world.armies.map(({ communities: _census, ...army }) => army),
       fleets: world.warfare?.fleets.map(({ communities: _crew, ...fleet }) => fleet) ?? [],
       relations: world.relations,
+      dynasties: world.dynasties,
+      dependencies: world.dependencies,
     },
     agreements: currentAgreements(world).map((offer) => ({
       ...offer,

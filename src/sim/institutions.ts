@@ -1,4 +1,5 @@
 /** Institutional consent, constitutional changes and monthly shared services. */
+import { dependencyMandate } from './state-dependencies'
 import { validateInstitutionHistory, validInstitutionCharter } from './institution-validation'
 import { transfer, governmentAccount } from './ledger'
 import { purchasePublicLabor } from './macroeconomy'
@@ -42,9 +43,12 @@ export function sharedInstitution(
   )
 }
 export function foreignPolicyMandate(w: World, nation: number, parties: number[] = []) {
-  return (w.institutions?.organizations ?? [])
-    .filter((o) => institutionEligible(w, o, nation) && o.charter.powers.includes('foreignPolicy'))
-    .every((o) => institutionQuorum(w, o, parties))
+  return (
+    dependencyMandate(w, nation, parties) &&
+    (w.institutions?.organizations ?? [])
+      .filter((o) => institutionEligible(w, o, nation) && o.charter.powers.includes('foreignPolicy'))
+      .every((o) => institutionQuorum(w, o, parties))
+  )
 }
 /** A standing mutual-defense commitment authorizes defense against the specific aggressor. */
 export function collectiveDefense(w: World, nation: number, attacker: number) {

@@ -8,6 +8,8 @@ import type { World } from './types'
 /** Build a trial without mutating the source, including nonserialized district views. */
 export function createSettlementTrialWorld(world: World, territorial: boolean): World {
   const changes = {
+    dependencies: territorial ? structuredClone(world.dependencies) : world.dependencies,
+    dynasties: territorial ? structuredClone(world.dynasties) : world.dynasties,
     intelligence: territorial ? structuredClone(world.intelligence) : world.intelligence,
     institutions: territorial ? cloneInstitutions(world.institutions) : world.institutions,
     // Ordinary terms only change treasury scalars, relation scalars and army targets.
@@ -23,6 +25,14 @@ export function createSettlementTrialWorld(world: World, territorial: boolean): 
     economy: world.economy
       ? {
           ...world.economy,
+          ...(world.economy.firms && territorial
+            ? {
+                firms: world.economy.firms.map((f) => ({
+                  ...f,
+                  ...(f.owners ? { owners: { ...f.owners } } : {}),
+                })),
+              }
+            : {}),
           credit: structuredClone(world.economy.credit),
           ...(world.economy.supplierCredit
             ? { supplierCredit: structuredClone(world.economy.supplierCredit) }
@@ -81,6 +91,8 @@ export function commitSettlementTrialWorld(world: World, trial: World) {
   }
 }
 const SETTLEMENT_ROOTS = [
+  'dependencies',
+  'dynasties',
   'economy',
   'localEconomy',
   'institutions',

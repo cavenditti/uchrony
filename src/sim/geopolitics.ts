@@ -1,3 +1,4 @@
+import { advanceCapitulations, advanceRoyalDiplomacy } from './royal-diplomacy'
 import {
   ensureCabinet,
   nativeStrategicControl,
@@ -629,6 +630,8 @@ export function advanceGeopolitics(world: World) {
  * and commerce. Each autonomous signatory consents through the ordinary rules. */
 export function advanceNativeAccords(world: World) {
   const statecraft = ensureStatecraft(world)
+  advanceCapitulations(world)
+  advanceRoyalDiplomacy(world)
   advancePeaceNegotiations(world)
   for (const r of world.regions) {
     const id = r.control?.nation

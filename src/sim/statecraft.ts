@@ -1,3 +1,7 @@
+import { applyRoyalAgreement, royalAgreementObstacle } from './dynasties'
+import { CAPITULATION_OUTCOMES, type CapitulationOutcome } from './capitulation'
+import { settleStateEstate } from './state-succession'
+import { reconcileJurisdictionSovereignty } from './jurisdictions'
 import { reconcileInstitutions } from './institution-lifecycle'
 import {
   reserveCabinetOrder,
@@ -32,11 +36,10 @@ import {
   collectiveDefenseBeneficiary,
   foreignPolicyMandate,
   institutionalFunds,
-  transferInstitutionMembership,
   validateInstitutionTerm,
 } from './institutions'
 import { INTELLIGENCE_PRIORITIES, type IntelligencePriority } from './intelligence'
-import { publicTransfer, transferDebt } from './ledger'
+import { publicTransfer } from './ledger'
 import { inWorldText } from './narrative'
 import { POLICY_RULES, policyCommandValue } from './policy-rules'
 import { ensurePopulation, returnArmyPeople } from './population'
@@ -192,6 +195,10 @@ function validateTerms(world: World, terms: DiplomaticClause[], parties: number[
     if (term.kind === 'goods' && !term.good) throw new Error('A supply obligation needs a good.')
     if (term.kind === 'research' && (!term.field || term.amount > 30))
       throw new Error('Research cooperation needs a field and at most 30 knowledge units monthly.')
+    if (term.kind === 'royal-marriage' || term.kind === 'personal-union') {
+      const obstacle = royalAgreementObstacle(world, term.kind, term.from, term.to)
+      if (obstacle) throw new Error(obstacle)
+    }
     if (term.kind === 'merge' && term.from === term.to) throw new Error('A state cannot merge with itself.')
   }
 }
@@ -273,6 +280,16 @@ function executeOrder(world: World, nation: number, order: DomesticOrder) {
     )
       throw new Error('Embarkation requires an army and fleet under your command.')
     command = { type: 'embark', army: order.target, fleet: order.value }
+  } else if (order.kind === 'capitulate') {
+    if (!CAPITULATION_OUTCOMES.includes(order.key as CapitulationOutcome))
+      throw new Error('Choose a supported capitulation outcome.')
+    command = {
+      type: 'capitulate',
+      nation,
+      target: order.target,
+      outcome: order.key as CapitulationOutcome,
+      indemnity: order.value / 100,
+    }
   } else if (order.kind === 'annex') {
     if (world.regions[order.target]?.control?.nation !== nation)
       throw new Error('Annexation requires your own military control.')
@@ -366,6 +383,7 @@ export function acceptStatePlan(
     offers?: number[]
     leaderGeneration?: number
     advice?: number[]
+    capitulations?: { nation: number; outcomes: CapitulationOutcome[] }[]
   },
 ) {
   const plan: StateAgentPlan = parseStatePlan(input, strategic),
@@ -444,7 +462,17 @@ export function acceptStatePlan(
         order.kind === 'found' &&
         error instanceof Error &&
         !/surveyed land|belongs to another state/.test(error.message)
-      if (stale || changedReadiness || lostFleet || foundingReadiness)
+      // Only the exact outcome quoted to this cabinet can become stale; another
+      // outcome against the same enemy never acquired authority in the first place.
+      const changedCapitulation =
+        order.kind === 'capitulate' &&
+        knowledge?.capitulations?.some(
+          (quote) => quote.nation === order.target && quote.outcomes.some((outcome) => outcome === order.key),
+        ) &&
+        Number.isFinite(order.value) &&
+        order.value >= 0 &&
+        order.value <= 100
+      if (stale || changedReadiness || lostFleet || foundingReadiness || changedCapitulation)
         agent.escalation = 'The world changed during deliberation; update the planned domestic action.'
       else sanction(world, nation, error instanceof Error ? error.message : 'Invalid domestic authority.')
     }
@@ -636,6 +664,8 @@ export function tryStandingOffer(...args: Parameters<typeof submitStandingOffer>
 }
 export function settleConventionalOffers(world: World) {
   const routine = new Set([
+    'royal-marriage',
+    'personal-union',
     'war',
     'trade',
     'alliance',
@@ -795,17 +825,16 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
     } else if (term.kind === 'cede') {
       for (const id of term.regions) transferProvince(world, id, from, to)
     } else if (term.kind === 'merge') {
-      transferInstitutionMembership(world, from, to)
       if (!world.nations[to] || from === to) throw new Error('Invalid successor state.')
       for (const region of world.regions.filter((entry) => entry.nation === from))
         transferProvince(world, region.id, from, to)
-      for (const army of allForces(world)) if (army.nation === from) army.nation = to
-      publicTransfer(world, from, to, world.nations[from].treasury, 'state merger')
-      transferDebt(world, from, to)
+      settleStateEstate(world, from, to, 'inherit')
       if (term.text.trim()) {
         world.nations[to].name = term.text
         world.nations[to].shortName = term.text.slice(0, 40)
       }
+    } else if (term.kind === 'royal-marriage' || term.kind === 'personal-union') {
+      applyRoyalAgreement(world, term.kind, from, to)
     } else if (term.kind === 'payment') {
       if (world.nations[from].treasury < term.amount)
         throw new Error('A signatory no longer has the promised funds.')
@@ -834,6 +863,17 @@ function applyTerms(world: World, offer: DiplomaticOffer, terms: DiplomaticClaus
     // Recurring clauses retain concrete successor IDs after creation.
     term.from = from
     term.to = to
+  }
+  // A signed cession of the final province has the same public-estate successor
+  // as outright annexation. Partial cessions leave the old treasury untouched.
+  for (let i = terms.length - 1; i >= 0; i--) {
+    const term = terms[i]
+    if (
+      term.kind === 'cede' &&
+      world.nations[term.from].extinct === undefined &&
+      !world.regions.some((r) => r.nation === term.from)
+    )
+      settleStateEstate(world, term.from, term.to, 'demobilize')
   }
   if (
     terms.some((term) =>
@@ -896,7 +936,16 @@ export function acceptRefereeDecision(
             'The negotiated source terms cannot support this replacement. Seek updated terms from the participating governments.',
           )
         const territorial = resolved.some((term) =>
-          ['peace', 'cede', 'create', 'merge', 'institution', 'devolution'].includes(term.kind),
+          [
+            'peace',
+            'cede',
+            'create',
+            'merge',
+            'institution',
+            'devolution',
+            'royal-marriage',
+            'personal-union',
+          ].includes(term.kind),
         )
         const trial = createSettlementTrialWorld(world, territorial)
         applyTerms(trial, offer, resolved)
@@ -918,6 +967,7 @@ export function acceptRefereeDecision(
         if (Math.abs(fundsAfter - fundsBefore) > 1e-6)
           throw new Error('Settlement would create or destroy treasury funds.')
         commitSettlementTrialWorld(world, trial)
+        if (territorial) reconcileJurisdictionSovereignty(world)
         offer.status = 'ratified'
         offer.activated = world.month
         offer.resolved = resolved

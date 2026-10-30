@@ -20,6 +20,8 @@ export interface DiplomaticClause {
     | 'guarantee'
     | 'cede'
     | 'merge'
+    | 'royal-marriage'
+    | 'personal-union'
     | 'create'
     | 'research'
     | 'custom'
@@ -80,6 +82,7 @@ export const DOMESTIC_ORDER_KINDS = [
   'embark',
   'army',
   'annex',
+  'capitulate',
   'found',
   'strategy',
 ] as const
