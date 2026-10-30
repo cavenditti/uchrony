@@ -3,15 +3,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { ResourceLegend } from '../src/components/ResourceLegend'
+import { ResourceLegend, ResourceTileDetails } from '../src/components/ResourceLegend'
 import { drawAtlas, type AtlasCache } from '../src/map/renderer'
 import {
   RESOURCE_KEYS,
+  MAPPED_RESOURCES,
   resourceAtPoint,
   resourceColor,
   resourceMapData,
   resourceQuantity,
   resourceRaster,
+  resourceOceanRaster,
 } from '../src/map/natural-resources'
 import { ensureAdaptiveWorld } from '../src/sim/adaptive-world'
 import { generateWorld } from '../src/sim/generate'
@@ -23,6 +25,12 @@ import {
   remainingResourceReserve,
 } from '../src/sim/landscape'
 import { METERS_PER_MAP_UNIT } from '../src/sim/physical-space'
+import {
+  EXTENDED_MINERALS,
+  ensureResourceStocks,
+  fishCapacity,
+  openingMineralStock,
+} from '../src/sim/resource-extraction'
 import { viewSnapshot } from '../src/sim/view-snapshot'
 import type { Cell, World } from '../src/sim/types'
 import { canonicalHash } from './fixtures/world-hash'
@@ -41,7 +49,15 @@ function fixture() {
     river: false,
     landscape: { habitat: 0.8, attraction: 0.5, resources: { iron: id / 2, coal: 0, stone: 1, timber: 0.8 } },
   }))
-  return { cells, width: 3, height: 2, month: 0, regions: [], nations: [] } as unknown as World
+  return {
+    seed: 'resource-map-fixture',
+    cells,
+    width: 3,
+    height: 2,
+    month: 0,
+    regions: [],
+    nations: [],
+  } as unknown as World
 }
 
 test('all four resources share the reserve initializer and a read-only legacy fallback', () => {
@@ -90,11 +106,18 @@ test('resource observation survives every dossier filter without changing econom
   ensureAdaptiveWorld(w)
   const cell = w.cells.find((c) => c.terrain !== 'water')!
   w.localEconomy!.reserves[cell.id].iron = 123.456
+  const stocks = ensureResourceStocks(w)
+  for (const good of EXTENDED_MINERALS) {
+    const cell = w.cells.find((c) => openingMineralStock(w, c.id, good) > 0)!
+    stocks.minerals[cell.id][good] = 0.123
+  }
+  const water = w.cells.find((c) => fishCapacity(w, c.id) > 0)!
+  stocks.fish[water.id] = 12.345
   const before = canonicalHash(w)
   for (const selection of [undefined, null, 0]) {
     const observed = { ...viewSnapshot(w, selection), cells: w.cells }
     assert.equal(resourceMapData(observed, 'iron').quantities[cell.id], 123.456)
-    for (const good of NATURAL_RESOURCES)
+    for (const good of MAPPED_RESOURCES)
       assert.deepEqual(resourceMapData(observed, good), resourceMapData(w, good))
   }
   assert.equal(canonicalHash(w), before)
@@ -115,17 +138,30 @@ test('physical pointer picking agrees at tile edges in both map presentations', 
     assert.equal(resourceAtPoint(w, data, point), undefined)
 })
 
-test('the persistent resource legend has four choices, honest units and a zero-deposit state', () => {
+test('the persistent resource legend offers every natural stock with honest units and renewal guidance', () => {
   const w = fixture()
-  for (const good of NATURAL_RESOURCES) {
+  assert.deepEqual(
+    [...MAPPED_RESOURCES],
+    ['iron', 'coal', 'stone', 'timber', 'clay', 'salt', 'preciousOre', 'fish'],
+  )
+  for (const good of MAPPED_RESOURCES) {
     const data = resourceMapData(w, good),
       html = renderToStaticMarkup(createElement(ResourceLegend, { data, onResource: () => {} }))
-    for (const kind of NATURAL_RESOURCES) assert(html.includes(`value="${kind}"`))
-    assert(html.includes('Remaining tonnes / terrain tile'))
+    for (const kind of MAPPED_RESOURCES) assert(html.includes(`value="${kind}"`))
+    assert.equal((html.match(/<option /g) ?? []).length, MAPPED_RESOURCES.length)
+    assert(
+      html.includes(good === 'fish' ? 'Fish biomass (t) / water tile' : 'Remaining tonnes / terrain tile'),
+    )
     assert(html.includes(`value="${good}" selected=""`))
     assert(!html.includes('NaN'))
-    if (!data.maximum) assert(html.includes('No deposits in this world'))
-    else assert(html.includes(good === 'timber' ? 'can regrow' : 'Finite reserves'))
+    if (!data.maximum)
+      assert(html.includes(good === 'fish' ? 'No coastal fish stocks' : 'No deposits in this world'))
+    else
+      assert(
+        html.includes(
+          good === 'timber' ? 'can regrow' : good === 'fish' ? 'stocks can recover' : 'Finite reserves',
+        ),
+      )
   }
   assert.equal(resourceQuantity(0), '0 t')
   assert.equal(resourceQuantity(0.2), '<1 t')
@@ -139,6 +175,75 @@ test('the persistent resource legend has four choices, honest units and a zero-d
     renderToStaticMarkup(createElement(ResourceLegend, { data: exhausted, onResource: () => {} })).includes(
       'No remaining reserves.',
     ),
+  )
+})
+
+test('extended mineral maps read finite reservoirs, preserve opening scales and never reseed missing entries', () => {
+  const w = generateWorld('extended resource map reserves', 3, 4),
+    before = canonicalHash(w)
+  for (const good of EXTENDED_MINERALS) {
+    const data = resourceMapData(w, good)
+    assert(data.maximum > 0)
+    for (const c of w.cells) assert.equal(data.quantities[c.id], openingMineralStock(w, c.id, good))
+  }
+  assert.equal(w.resourceStocks, undefined)
+  assert.equal(canonicalHash(w), before, 'opening views must not initialize economic stocks')
+  const stocks = ensureResourceStocks(w)
+  for (const good of EXTENDED_MINERALS) {
+    const opening = resourceMapData(w, good),
+      cell = w.cells.find((c) => opening.quantities[c.id] > 0)!
+    stocks.minerals[cell.id][good] = 1.234
+    assert.equal(resourceMapData(w, good).quantities[cell.id], 1.234)
+    for (const stock of Object.values(stocks.minerals)) stock[good] = 0
+    const depleted = resourceMapData(w, good)
+    assert.equal(depleted.maximum, opening.maximum)
+    assert.equal(depleted.available, false)
+    assert.deepEqual(resourceColor(depleted, 0), [216, 213, 189])
+    delete stocks.minerals[cell.id]
+    assert.equal(resourceMapData(w, good).quantities[cell.id], 0)
+  }
+})
+
+test('coastal fish display shared water biomass without renewing it or assigning it to land', () => {
+  const w = fixture(),
+    opening = resourceMapData(w, 'fish'),
+    meters = METERS_PER_MAP_UNIT,
+    point = { x: 2.5 * CELL_SIZE * meters, y: 1.5 * CELL_SIZE * meters }
+  assert.equal(opening.quantities[5], fishCapacity(w, 5))
+  assert(opening.quantities[5] > 0)
+  assert(opening.quantities.slice(0, 5).every((quantity) => quantity === 0))
+  assert.equal(w.resourceStocks, undefined)
+  const stocks = ensureResourceStocks(w)
+  stocks.fish[5] = 12.345
+  w.month++
+  const before = JSON.stringify(w),
+    data = resourceMapData(w, 'fish')
+  assert.equal(data.maximum, opening.maximum)
+  assert.deepEqual(resourceAtPoint(w, data, point), { cell: 5, quantity: 12.345 })
+  assert.equal(resourceAtPoint(w, data, { x: 0, y: 0 }), undefined)
+  assert.equal(resourceAtPoint(w, resourceMapData(w, 'clay'), point), undefined)
+  const readout = renderToStaticMarkup(
+    createElement(ResourceTileDetails, { data, tile: resourceAtPoint(w, data, point)! }),
+  )
+  assert(readout.includes('Water tile 5'))
+  assert(readout.includes('Shared coastal biomass'))
+  assert(!readout.includes('Unextracted reserve'))
+  assert.equal(JSON.stringify(w), before)
+  stocks.fish[5] = 0
+  const depleted = resourceMapData(w, 'fish')
+  assert.equal(depleted.available, false)
+  assert.equal(depleted.maximum, opening.maximum)
+  assert(
+    renderToStaticMarkup(createElement(ResourceLegend, { data: depleted, onResource: () => {} })).includes(
+      'No remaining fish stocks.',
+    ),
+  )
+  w.cells[5].terrain = 'plains'
+  const landOnly = { ...w, cells: [...w.cells] }
+  assert(
+    renderToStaticMarkup(
+      createElement(ResourceLegend, { data: resourceMapData(landOnly, 'fish'), onResource: () => {} }),
+    ).includes('No coastal fish stocks in this world.'),
   )
 })
 
@@ -202,4 +307,103 @@ test('flat and relief draw the same compact raster, preserve zero deposits and r
   assert.equal(ctx.imageSmoothingEnabled, true)
   assert.equal(allocations, 1, 'camera draws share the one-pixel-per-tile raster')
   assert.equal(pixels!.byteLength, w.cells.length * 4)
+})
+
+test('every resource raster respects its physical surface and fish is visible before land clipping', (t) => {
+  const prior = Object.getOwnPropertyDescriptor(globalThis, 'document'),
+    w = fixture(),
+    canvases: {
+      width: number
+      height: number
+      pixels?: Uint8ClampedArray
+      draws: unknown[]
+      getContext: () => unknown
+    }[] = []
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => {
+        const canvas = {
+          width: 0,
+          height: 0,
+          pixels: undefined as Uint8ClampedArray | undefined,
+          draws: [] as unknown[],
+          getContext: () => ({
+            imageSmoothingEnabled: true,
+            createImageData: (width: number, height: number) => ({
+              data: new Uint8ClampedArray(width * height * 4),
+            }),
+            putImageData: (image: { data: Uint8ClampedArray }) => {
+              canvas.pixels = image.data
+            },
+            drawImage: (image: unknown) => {
+              canvas.draws.push(image)
+            },
+          }),
+        }
+        canvases.push(canvas)
+        return canvas
+      },
+    },
+  })
+  t.after(() => {
+    if (prior) Object.defineProperty(globalThis, 'document', prior)
+    else Reflect.deleteProperty(globalThis, 'document')
+  })
+  for (const good of MAPPED_RESOURCES) {
+    const data = resourceMapData(w, good),
+      raster = resourceRaster(w, data),
+      pixels = canvases.at(-1)!.pixels!
+    for (const cell of w.cells) {
+      const present = (cell.terrain === 'water') === (good === 'fish')
+      assert.equal(pixels[cell.id * 4 + 3], present ? 255 : 0, `${good} tile ${cell.id}`)
+      if (present) {
+        const color = resourceColor(data, data.quantities[cell.id])
+        for (let channel = 0; channel < 3; channel++)
+          assert(Math.abs(pixels[cell.id * 4 + channel] - color[channel]) <= 1)
+      }
+    }
+    assert.equal(resourceRaster(w, data), raster)
+  }
+  const data = resourceMapData(w, 'fish'),
+    ocean = { width: 48, height: 32 } as HTMLCanvasElement,
+    painted = resourceOceanRaster(w, data, ocean),
+    composite = canvases.at(-2)!,
+    raster = canvases.at(-1)!,
+    allocations = canvases.length
+  assert.equal(painted, composite)
+  assert.deepEqual(composite.draws, [ocean, raster])
+  assert.equal(resourceOceanRaster(w, data, ocean), painted)
+  assert.equal(resourceOceanRaster(w, resourceMapData(w, 'clay'), ocean), ocean)
+  const calls: { image: unknown; clipped: boolean }[] = []
+  let clipped = false
+  const ctx = {
+    save() {},
+    restore() {
+      clipped = false
+    },
+    clip() {
+      clipped = true
+    },
+    drawImage(image: unknown) {
+      calls.push({ image, clipped })
+    },
+  } as unknown as CanvasRenderingContext2D
+  const cache = {
+    ocean,
+    terrain: {},
+    relief: {},
+    land: {},
+    rivers: [],
+    worldWidth: 48,
+    worldHeight: 32,
+  } as unknown as AtlasCache
+  for (const relief of [false, true]) drawAtlas(ctx, cache, w, 'resources', 1, relief, false, false, data)
+  assert.equal(calls.filter((call) => call.image === painted && !call.clipped).length, 2)
+  assert.equal(
+    calls.filter((call) => call.image === raster).length,
+    0,
+    'fish cannot be hidden behind the land clip',
+  )
+  assert.equal(canvases.length, allocations, 'flat and relief reuse the same ocean composition')
 })

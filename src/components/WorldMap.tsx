@@ -34,9 +34,14 @@ import { dominantIdentity, identityAxis, identityColor } from '../map/identity'
 import { censusOf, mergeCensuses, censusDistribution } from '../sim/view-snapshot'
 import { drawWarfare, fleetMapPosition } from '../map/warfare'
 import { compact, type Tab } from './Inspector'
-import { ResourceLegend } from './ResourceLegend'
-import type { NaturalResource } from '../sim/landscape'
-import { RESOURCE_KEYS, resourceAtPoint, resourceMapData, resourceQuantity } from '../map/natural-resources'
+import { ResourceLegend, ResourceTileDetails } from './ResourceLegend'
+import {
+  RESOURCE_KEYS,
+  resourceAtPoint,
+  resourceMapData,
+  resourceQuantity,
+  type MappedResource,
+} from '../map/natural-resources'
 
 interface Props {
   world: World
@@ -103,7 +108,7 @@ export function WorldMap({
   const reliefCanvasRef = useRef<HTMLCanvasElement>(null)
   const reliefRef = useRef<ReliefMap | null>(null)
   const [presentation, setPresentation] = useState<'relief' | 'atlas'>('atlas')
-  const [resource, setResource] = useState<NaturalResource>('iron')
+  const [resource, setResource] = useState<MappedResource>('iron')
   const resources = useMemo(
     () => (layer === 'resources' ? resourceMapData(world, resource) : undefined),
     [world, layer, resource],
@@ -129,7 +134,9 @@ export function WorldMap({
     frame = useRef(0)
   const [size, setSize] = useState({ w: 900, h: 680 }),
     [view, setView] = useState({ zoom: 1, x: 0, y: 0 })
-  type MapPick = { id: number; x: number; y: number; point: { x: number; y: number } }
+  // A shared water stock has no province owner. Keep that distinction through
+  // hover and touch selection rather than assigning it to a neighboring state.
+  type MapPick = { x: number; y: number; point: { x: number; y: number } } & ({ id: number } | { id: null })
   const [hover, setHover] = useState<MapPick | null>(null)
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null)
   const [layerMenu, setLayerMenu] = useState(false),
@@ -140,6 +147,10 @@ export function WorldMap({
     setPicked(null)
     setHover(null)
   }, [mapKey])
+  useEffect(() => {
+    setPicked(null)
+    setHover(null)
+  }, [resource, layer])
   useEffect(() => {
     if (!showContext || orderMode || region === null) setPicked(null)
   }, [showContext, orderMode, region])
@@ -187,9 +198,23 @@ export function WorldMap({
     offsetY = (size.h - mapH * scale) / 2 + view.y
   // Content revisions exclude camera-only changes. ReliefMap separately refreshes
   // its visible-area texture when a pan, tilt or zoom needs new coverage.
+  const hoveredResource = resources && hover ? resourceAtPoint(world, resources, hover.point) : undefined
   const overlayRevision = useMemo(
     () => ({}),
-    [world, layer, resources, nation, region, showRoutes, showArmies, running, scale, hover?.id, atlas],
+    [
+      world,
+      layer,
+      resources,
+      nation,
+      region,
+      showRoutes,
+      showArmies,
+      running,
+      scale,
+      hover?.id,
+      hoveredResource?.cell,
+      atlas,
+    ],
   )
   const transforms = useRef({ scale, offsetX, offsetY })
   transforms.current = { scale, offsetX, offsetY }
@@ -483,7 +508,7 @@ export function WorldMap({
             ctx.lineWidth = 1.2 / scale
             ctx.strokeStyle = '#f1ca79'
             ctx.strokeRect(b.x / meters, b.y / meters, b.size / meters, b.size / meters)
-          } else if (hover.id !== region) ctx.fill(atlas.provinces[hover.id], 'evenodd')
+          } else if (hover.id !== null && hover.id !== region) ctx.fill(atlas.provinces[hover.id], 'evenodd')
         }
         ctx.restore()
         if (showArmies || layer === 'military') drawWarfare(ctx, world, nation, !(isRelief && scale >= 3))
@@ -603,6 +628,9 @@ export function WorldMap({
         }
     if (!surface) return null
     const { x, y } = surface
+    const point = { x: x * METERS_PER_MAP_UNIT, y: y * METERS_PER_MAP_UNIT }
+    if (resources?.good === 'fish' && resourceAtPoint(world, resources, point))
+      return { id: null, x: clientX - rect.left, y: clientY - rect.top, point }
     // Hit-test the rendered province polygons, including islands and holes.
     for (let id = 0; id < atlas.geometry.provinces.length; id++) {
       const b = atlas.geometry.bounds[id]
@@ -617,13 +645,12 @@ export function WorldMap({
           id,
           x: clientX - rect.left,
           y: clientY - rect.top,
-          point: { x: x * METERS_PER_MAP_UNIT, y: y * METERS_PER_MAP_UNIT },
+          point,
         }
     }
     return null
   }
   const maxZoom = Math.max(32, 160 / fit)
-  const hoveredResource = resources && hover ? resourceAtPoint(world, resources, hover.point) : undefined
   const pickedResource = resources && picked ? resourceAtPoint(world, resources, picked.point) : undefined
   const hoveredCell =
     !isRelief && hover
@@ -787,7 +814,7 @@ export function WorldMap({
           e.preventDefault()
           const found = locate(e.clientX, e.clientY)
           if (found && !orderMode) {
-            onSelect(found.id)
+            if (found.id !== null) onSelect(found.id)
             setPicked(found)
             setHover(null)
           }
@@ -857,7 +884,7 @@ export function WorldMap({
           if (drag.current && !drag.current.moved) {
             const found = locate(e.clientX, e.clientY)
             if (found) {
-              onSelect(found.id)
+              if (found.id !== null) onSelect(found.id)
               if (!orderMode && showContext) setPicked(found)
             } else {
               setPicked(null)
@@ -1115,7 +1142,28 @@ export function WorldMap({
           <Maximize2 size={15} />
         </button>
       </div>
-      {picked && showContext && !orderMode && world.regions[picked.id] && (
+      {picked && picked.id === null && pickedResource && resources && showContext && !orderMode && (
+        <div
+          className="place-context"
+          role="region"
+          aria-label="Selected water resource"
+          style={{ left: Math.max(12, Math.min(picked.x + 14, size.w - 290)), top: placeContextTop }}
+        >
+          <div className="place-context-heading">
+            <MapPin size={16} />
+            <h2>Water tile {pickedResource.cell}</h2>
+            <button
+              className="icon-button"
+              aria-label="Dismiss water resource"
+              onClick={() => setPicked(null)}
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <ResourceTileDetails data={resources} tile={pickedResource} />
+        </div>
+      )}
+      {picked && picked.id !== null && showContext && !orderMode && world.regions[picked.id] && (
         <div
           className="place-context"
           role="region"
@@ -1150,17 +1198,7 @@ export function WorldMap({
             {compact(population(world.regions[picked.id]))} people <span>·</span>{' '}
             {world.regions[picked.id].terrain}
           </p>
-          {resources && pickedResource && (
-            <div className="picked-cell">
-              <strong>
-                {RESOURCE_KEYS[resources.good].name} · {resourceQuantity(pickedResource.quantity)} remaining
-              </strong>
-              <span>
-                Terrain tile {pickedResource.cell} ·{' '}
-                {resources.good === 'timber' ? 'Standing timber' : 'Unextracted reserve'}
-              </span>
-            </div>
-          )}
+          {resources && pickedResource && <ResourceTileDetails data={resources} tile={pickedResource} />}
           {pickedCell && (
             <div className="picked-cell">
               <span>
@@ -1286,7 +1324,22 @@ export function WorldMap({
           </div>
         </div>
       )}
-      {hover && !picked && !drag.current && (
+      {hover && hover.id === null && hoveredResource && resources && !picked && !drag.current && (
+        <div
+          className="map-tooltip"
+          style={{ left: Math.min(hover.x + 15, size.w - 205), top: Math.min(hover.y + 15, size.h - 88) }}
+        >
+          <strong>
+            <MapPin size={12} />
+            Water tile {hoveredResource.cell}
+          </strong>
+          <small>
+            {RESOURCE_KEYS[resources.good].name} · {resourceQuantity(hoveredResource.quantity)} remaining in
+            this tile
+          </small>
+        </div>
+      )}
+      {hover && hover.id !== null && !picked && !drag.current && (
         <div
           className="map-tooltip"
           style={{ left: Math.min(hover.x + 15, size.w - 205), top: Math.min(hover.y + 15, size.h - 88) }}

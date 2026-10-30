@@ -1,0 +1,78 @@
+{
+  "date": "2026-10-30",
+  "baseCommit": "ac88582",
+  "scope": "Expose every modeled natural stock in the Natural resources map selector, with geographic quantities and water-stock inspection in the flat atlas and 3D relief.",
+  "resources": [
+    "Iron ore",
+    "Coal",
+    "Stone",
+    "Timber",
+    "Clay",
+    "Salt",
+    "Precious-metal ore",
+    "Coastal fish"
+  ],
+  "implementation": [
+    "Map choices derive from the original natural-resource keys, extended mineral keys and shared coastal fish stock. Manufactured goods and farm output are not presented as unextracted deposits.",
+    "Clay, salt and precious ore read their actual finite cell reservoirs. An absent reservoir uses opening geography; a missing entry in an initialized reservoir stays depleted.",
+    "Fish biomass stays on water cells, with a shared cached ocean raster for both map presentations and exact hover/click inspection without assigning a province owner.",
+    "All choices retain their opening-world logarithmic scale and resource-specific absence, depletion and renewal text. Viewing never initializes or renews physical stocks.",
+    "The full-width native selector keeps all resource names legible on small screens."
+  ],
+  "checks": [
+    {
+      "command": "npm run build",
+      "result": "pass",
+      "environment": "Shared workspace and an isolated archive containing only this resource-map patch."
+    },
+    {
+      "command": "node --import tsx --test --test-concurrency=2 tests/natural-resources.test.ts tests/map-legend.test.ts tests/renderer-placement.test.ts tests/relief.test.ts tests/production-chains.test.ts",
+      "result": "pass",
+      "tests": 42,
+      "environment": "Isolated resource-map patch."
+    },
+    {
+      "command": "npm run format",
+      "result": "pass"
+    },
+    {
+      "command": "npm test",
+      "result": "incomplete",
+      "qualification": "The entire repository suite is run with a temporary Node launcher limiting test concurrency to two, a 60-second runner timeout and a three-minute process-group bound. No full-suite pass is claimed."
+    }
+  ],
+  "browser": {
+    "fixture": "/tests/browser/natural-resources.html; paused synthetic world without saves or provider calls",
+    "desktopViewport": [
+      1440,
+      1000
+    ],
+    "mobileViewport": [
+      390,
+      844
+    ],
+    "allEightSelectors": "Each option was selected through the real native control; the selected value and matching legend were read back.",
+    "flatFish": "Visible coastal biomass and a clicked water-resource readout were verified.",
+    "reliefFish": "Visible coastal biomass and a clicked readout of 523 t at water tile 417 were verified; no province action panel was selected.",
+    "mobile": "The longest resource label is visible, all eight options remain available, and there is no horizontal page overflow.",
+    "pageErrors": 0,
+    "accessibility": {
+      "desktopViolations": 0,
+      "mobileViolations": 0,
+      "incompleteRulesPerViewport": 1,
+      "qualification": "axe could not fully determine color contrast over canvas-backed surfaces. The selector foreground/background contrast was independently measured at 11.65:1; this is not a whole-page WCAG certification."
+    },
+    "mechanicalDesignReview": {
+      "advisoryFindings": 416,
+      "nonAdvisoryFindings": 0,
+      "qualification": "Whole-file results include existing map and stylesheet tokens; no global restyling was performed."
+    }
+  },
+  "refinement": {
+    "design": "Keep map-only resource choices separate from the original four-key simulation deposit contract, sharing the same source reservoirs. Land and water readouts share a component.",
+    "functions": "Reviewed source selection, physical-surface matching, scale/color construction, pointer picking, raster/ocean composition, legend status, typed ownerless picks and selection reset.",
+    "performance": "One O(terrain cells) quantity pass per active resource snapshot. Camera redraws reuse weakly cached pixel rasters and the composed fish ocean image; zero per-tile RGB allocations. No simulation throughput benchmark is claimed.",
+    "documentation": "Comments explain read-only reserve access, missing-entry depletion, biological stocks, ownerless water selection and cached rendering. The model description lists all eight choices and their units."
+  },
+  "commitScope": "Resource-map changes only. Concurrent state-self-image, investment, demographics and other workspace changes remain excluded. No push or deployment."
+}

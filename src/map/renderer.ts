@@ -6,7 +6,12 @@ import { CELL_SIZE, neighbors } from '../sim/grid'
 import { clamp, type World, type Layer } from '../sim/types'
 import { buildGeometry, type MapGeometry, type Ring } from './geometry'
 import { dominantIdentity, identityAxis, identityColor } from './identity'
-import { resourceMapData, resourceRaster, type ResourceMapData } from './natural-resources'
+import {
+  resourceMapData,
+  resourceRaster,
+  resourceOceanRaster,
+  type ResourceMapData,
+} from './natural-resources'
 
 export const terrainColors = {
   plains: '#b9be85',
@@ -178,7 +183,14 @@ export function drawAtlas(
   quadtree = false,
   resources?: ResourceMapData,
 ) {
-  ctx.drawImage(cache.ocean, 0, 0, cache.worldWidth, cache.worldHeight)
+  const resourceData = layer === 'resources' ? (resources ?? resourceMapData(world, 'iron')) : undefined
+  ctx.drawImage(
+    resourceData ? resourceOceanRaster(world, resourceData, cache.ocean) : cache.ocean,
+    0,
+    0,
+    cache.worldWidth,
+    cache.worldHeight,
+  )
   ctx.save()
   ctx.clip(cache.land, 'evenodd')
   ctx.drawImage(cache.terrain, 0, 0, cache.worldWidth, cache.worldHeight)
@@ -191,19 +203,13 @@ export function drawAtlas(
       ctx.fillStyle = n.color
       ctx.fill(shape)
     }
-  } else if (layer === 'resources') {
+  } else if (layer === 'resources' && resourceData?.good !== 'fish') {
     ctx.globalAlpha = 1
     // Nearest-neighbour sampling preserves actual deposit boundaries and empty
     // cells; interpolation must not paint ore into a neighboring barren tile.
     const smoothing = ctx.imageSmoothingEnabled
     ctx.imageSmoothingEnabled = false
-    ctx.drawImage(
-      resourceRaster(world, resources ?? resourceMapData(world, 'iron')),
-      0,
-      0,
-      cache.worldWidth,
-      cache.worldHeight,
-    )
+    ctx.drawImage(resourceRaster(world, resourceData!), 0, 0, cache.worldWidth, cache.worldHeight)
     ctx.imageSmoothingEnabled = smoothing
   } else if (layer === 'population' && !quadtree) {
     const spatial = spatialState(world),
@@ -228,7 +234,7 @@ export function drawAtlas(
           : `rgb(${191 - t * 81},${122 + t * 56},${105 + t * 27})`
       ctx.fill(districts.paths[i], 'evenodd')
     })
-  } else if (layer !== 'terrain' && !(layer === 'population' && quadtree))
+  } else if (layer !== 'terrain' && layer !== 'resources' && !(layer === 'population' && quadtree))
     for (const r of world.regions) {
       if (r.nation < 0 && ['political', 'trade', 'military'].includes(layer)) continue
       let fill = world.nations[r.nation]?.color ?? terrainColors[r.terrain]

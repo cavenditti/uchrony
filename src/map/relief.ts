@@ -3,7 +3,7 @@ import { CityScenery } from './city-scenery'
 import { describeCity } from './city-layout'
 import * as THREE from 'three'
 import { type World, type Layer } from '../sim/types'
-import type { ResourceMapData } from './natural-resources'
+import { resourceOceanRaster, type ResourceMapData } from './natural-resources'
 import { type AtlasCache, drawAtlas, drawAtlasLinework } from './renderer'
 import { OverlayUpdates, resizeCanvas } from './render-budget'
 import { overlayWindow, TerrainCoverage, type OverlayWindow } from './overlay-window'
@@ -299,6 +299,14 @@ export class ReliefMap {
   paint(world: World, layer: Layer, scale: number, resources?: ResourceMapData) {
     this.lineworkWorld = world
     this.lineworkLayer = layer
+    const ocean =
+      layer === 'resources' && resources
+        ? resourceOceanRaster(world, resources, this.atlas.ocean)
+        : this.atlas.ocean
+    if (this.oceanTexture.image !== ocean) {
+      this.oceanTexture.image = ocean
+      this.oceanTexture.needsUpdate = true
+    }
     this.cities.update(world)
     if (this.activityWorld !== world) {
       const landscape = world.viewLandscape ?? economicLandscape(world)
